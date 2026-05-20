@@ -204,6 +204,170 @@ The conversion is good enough when:
 - The generated `hld_index.md` gives a useful overview of the HLD.
 
 
+## Existing huge HLD or raw HLD not in HLDspec format
+
+Use this workflow when the user provides a large existing HLD that is not yet in HLDspec format, or asks to make an HLD workable for spec sync.
+
+The goal is to make the HLD parseable and safe for bounded processing without destroying the original document.
+
+### Case
+
+Use this workflow when:
+
+- the HLD is very large
+- the HLD does not use `## HLD-xxx - Title` headings
+- the HLD does not contain `HLD-*` metadata lines
+- the HLD has implicit cross-section relationships
+- the user asks to convert, prepare, normalize, or make the HLD usable by HLDspec
+- the user wants to update specs from an existing HLD but `--hld-map-only` fails
+
+### Required solution
+
+Do not run full HLD-to-spec sync on an unformatted huge HLD.
+
+Do not blindly rewrite the whole HLD.
+
+Do this instead:
+
+1. Preserve the original HLD.
+
+```bash
+cp <original-hld-file>.md HLD.raw.md
+cp HLD.raw.md HLD.md
+```
+
+2. If `--hld-format-report` exists, run it first.
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-format-report
+```
+
+Review:
+
+```text
+logs/hld_spec_sync/<timestamp>/hld_format_report.md
+logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
+```
+
+This report is read-only. It should not modify `HLD.md`, call an agent, or write specs.
+
+3. If `--hld-format-report` does not exist yet, use the grep fallback.
+
+```bash
+grep -nE '^(#|##|###) ' HLD.raw.md > /tmp/hld_headings.txt
+cat /tmp/hld_headings.txt
+```
+
+4. Identify major sections only.
+
+Do not tag every subsection. Use `HLD-xxx` IDs only for major design areas, such as:
+
+- executive summary
+- governance/source of truth
+- architecture
+- processing flow
+- interfaces/contracts
+- data/state
+- failure modes/recovery
+- testing/verification
+- risks/open questions
+
+5. Convert accepted major sections into HLDspec format.
+
+```md
+## HLD-003 - Section Title
+
+HLD-ID: HLD-003
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+HLD-VERIFY: section can be processed without loading the full HLD; related specs preserve HLD anchors
+```
+
+6. Use `TBD` instead of inventing mappings.
+
+Unknown spec IDs, owners, resources, or source-of-truth decisions must be marked as `TBD`.
+
+Do not guess.
+
+7. Add inline references between sections where relationships are known.
+
+```md
+This section DEPENDS REF HLD-002 because governance defines what may be generated.
+
+This section REF HLD-006 for rollback behavior.
+
+This approach CONFLICTS_WITH REF HLD-011 because both define different ownership rules.
+```
+
+8. Validate the formatted HLD.
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-map-only
+```
+
+Review:
+
+```text
+.specify/sync/hld_index.md
+.specify/sync/hld_ref_map.json
+.specify/sync/hld_sections/
+```
+
+Do not continue if map validation fails.
+
+9. Run one bounded prompt before syncing.
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
+```
+
+Review:
+
+```text
+logs/hld_spec_sync/<timestamp>/context_selection.json
+logs/hld_spec_sync/<timestamp>/prompt.md
+```
+
+10. Sync one target section at a time.
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
+```
+
+11. Continue downstream only after the related spec exists.
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan --prompt-only
+
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan
+```
+
+### Do not
+
+- Do not overwrite or delete `HLD.raw.md`.
+- Do not tag every small subsection.
+- Do not invent spec IDs, owners, resources, or source-of-truth decisions.
+- Do not manually split the HLD into many canonical source files by default.
+- Do not run full-HLD sync when `--use-hld-map --target-hld` is appropriate.
+- Do not continue if `--hld-map-only` reports validation errors.
+- Do not use auto-conversion or auto-chunk execution without first reviewing a report or chunk plan.
+
+### Success criteria
+
+The HLD is ready for HLDspec processing when:
+
+- `HLD.raw.md` preserves the original.
+- `HLD.md` has stable `## HLD-xxx - Title` major sections.
+- each major section has required `HLD-*` metadata.
+- cross-section relationships use `REF HLD-xxx`.
+- `./hld_spec_sync.py --hld HLD.md --hld-map-only` passes.
+- `hld_index.md` gives a useful overview of the design.
+- one `--prompt-only --target-hld` run shows bounded context instead of the full huge HLD.
+
+
 ## Standard workflow
 
 ### 1. Validate HLD structure
