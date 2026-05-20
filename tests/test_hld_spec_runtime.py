@@ -104,6 +104,46 @@ class HldSpecRuntimeTests(unittest.TestCase):
         self.assertIn("--- HLD SECTION HLD-002", context)
         self.assertEqual(["001"], report["target_specs"])
 
+    def test_sync_staged_validation_failure_leaves_real_files_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            sync_dir = workspace / ".specify" / "sync"
+            sync_dir.mkdir(parents=True)
+
+            real_report = sync_dir / "sync_report.md"
+            real_report.write_text("original\n", encoding="utf-8")
+
+            log_path = workspace / "agent.log"
+            log_path.write_text(
+                "WRITE FILE: .specify/sync/sync_report.md\n"
+                "CONTENT:\n"
+                "changed\n",
+                encoding="utf-8",
+            )
+
+            staging = hld_spec_sync.stage_write_blocks(log_path, workspace, run_id="test")
+            tmp_holder = hld_spec_sync.copy_validation_workspace(workspace)
+            try:
+                tmp_workspace = Path(tmp_holder.name) / "workspace"
+                hld_spec_sync.apply_staged_writes_to_workspace(
+                    staging_workspace=workspace,
+                    target_workspace=tmp_workspace,
+                    staging_info=staging,
+                    allow_constitution=False,
+                    allow_specs=False,
+                )
+                staged_errors = hld_spec_sync.validate_outputs(
+                    tmp_workspace,
+                    require_constitution=False,
+                    require_specs=False,
+                )
+                self.assertTrue(staged_errors)
+            finally:
+                tmp_holder.cleanup()
+
+            self.assertEqual("original\n", real_report.read_text(encoding="utf-8"))
+            self.assertTrue((workspace / staging["proposed_writes"]).exists())
+
 
 if __name__ == "__main__":
     unittest.main()
