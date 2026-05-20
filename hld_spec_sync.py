@@ -526,6 +526,245 @@ def select_hld_context(
     return context, report
 
 
+
+def infer_hld_role(title: str) -> str:
+    lower = title.lower()
+    role_keywords = [
+        ("governance", ("governance", "source of truth", "ownership", "decision", "policy", "constitution")),
+        ("architecture", ("architecture", "design", "overview", "component", "system")),
+        ("processing", ("flow", "process", "pipeline", "sync", "workflow", "orchestration")),
+        ("api", ("api", "interface", "contract", "endpoint", "integration")),
+        ("data", ("data", "state", "storage", "database", "persistence", "schema")),
+        ("operations", ("failure", "recovery", "rollback", "observability", "operations", "deploy")),
+        ("testing", ("test", "verification", "validation", "quality", "acceptance")),
+        ("risk", ("risk", "conflict", "open question", "unknown", "blocker")),
+        ("purpose", ("summary", "purpose", "goal", "scope", "introduction")),
+    ]
+    for role, keywords in role_keywords:
+        if any(keyword in lower for keyword in keywords):
+            return role
+    return "architecture"
+
+
+def infer_hld_risk(title: str, role: str) -> str:
+    lower = title.lower()
+    high_keywords = (
+        "security",
+        "permission",
+        "auth",
+        "data",
+        "state",
+        "persistence",
+        "failure",
+        "recovery",
+        "rollback",
+        "migration",
+        "api",
+        "contract",
+        "governance",
+        "source of truth",
+        "conflict",
+    )
+    if role in {"governance", "api", "data", "operations", "risk"}:
+        return "HIGH"
+    if any(keyword in lower for keyword in high_keywords):
+        return "HIGH"
+    if role in {"architecture", "processing", "testing"}:
+        return "MEDIUM"
+    return "LOW"
+
+
+def build_hld_format_report(hld_text: str, *, source_path: str) -> tuple[dict[str, object], str]:
+    lines = hld_text.splitlines()
+    fence_mask = hld_map.iter_code_fence_mask(lines)
+    generic_heading_re = re.compile(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*$")
+
+    headings: list[dict[str, object]] = []
+    existing_hld_ids: set[str] = set()
+
+    for idx, line in enumerate(lines, start=1):
+        if fence_mask[idx - 1]:
+            continue
+        match = generic_heading_re.match(line)
+        if not match:
+            continue
+        title = match.group("title").strip()
+        level = len(match.group("marks"))
+        hld_match = hld_map.SECTION_HEADING_RE.match(line)
+        hld_id = hld_match.group("id") if hld_match else ""
+        if hld_id:
+            existing_hld_ids.add(hld_id)
+        headings.append(
+            {
+                "line": idx,
+                "level": level,
+                "title": title,
+                "is_hldspec_heading": bool(hld_id),
+                "hld_id": hld_id or None,
+            }
+        )
+
+    warnings: list[str] = []
+    if not headings:
+        warnings.append("No markdown headings were detected outside fenced code blocks.")
+    if existing_hld_ids:
+        warnings.append("The HLD already contains HLDspec-style headings; do not renumber existing HLD IDs.")
+
+    if existing_hld_ids:
+        candidate_headings = [heading for heading in headings if heading["is_hldspec_heading"]]
+    else:
+        candidate_headings = [
+            heading
+            for pos, heading in enumerate(headings)
+            if int(heading["level"]) <= 2 and not (pos == 0 and int(heading["level"]) == 1 and len(headings) > 1)
+        ]
+        if not candidate_headings:
+            candidate_headings = [heading for heading in headings if int(heading["level"]) <= 3]
+
+    suggestions: list[dict[str, object]] = []
+    large_section_warnings: list[str] = []
+    for idx, heading in enumerate(candidate_headings, start=1):
+        title = str(heading["title"])
+        role = infer_hld_role(title)
+        risk = infer_hld_risk(title, role)
+        suggested_id = str(heading.get("hld_id") or f"HLD-{idx:03d}")
+        line_start = int(heading["line"])
+        next_line = int(candidate_headings[idx]["line"]) if idx < len(candidate_headings) else len(lines) + 1
+        approx_lines = max(1, next_line - line_start)
+
+        if approx_lines > 500:
+            large_section_warnings.append(
+                f"{suggested_id} candidate '{title}' spans about {approx_lines} lines; consider splitting before sync."
+            )
+
+        suggestions.append(
+            {
+                "suggested_id": suggested_id,
+                "line": line_start,
+                "heading_level": heading["level"],
+                "title": title,
+                "role": role,
+                "risk": risk,
+                "approx_lines_until_next_candidate": approx_lines,
+                "metadata_skeleton": {
+                    "HLD-ID": suggested_id,
+                    "HLD-ROLE": role,
+                    "HLD-STATUS": "active",
+                    "HLD-RISK": risk,
+                    "HLD-SPECS": "TBD",
+                    "HLD-RESOURCES": "TBD",
+                    "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors",
+                },
+            }
+        )
+
+    warnings.extend(large_section_warnings)
+
+    report: dict[str, object] = {
+        "source_path": source_path,
+        "line_count": len(lines),
+        "heading_count": len(headings),
+        "existing_hldspec_section_count": len(existing_hld_ids),
+        "candidate_section_count": len(suggestions),
+        "headings": headings,
+        "suggested_hld_sections": suggestions,
+        "warnings": warnings,
+        "next_steps": [
+            "Preserve the original as HLD.raw.md.",
+            "Edit a working HLD.md copy only.",
+            "Apply HLD-xxx IDs only to major sections.",
+            "Use TBD for unknown specs, resources, and owners.",
+            "Add REF HLD-xxx relationships where known.",
+            "Run ./hld_spec_sync.py --hld HLD.md --hld-map-only before syncing.",
+            "Run --use-hld-map --target-hld <id> --prompt-only before applying agent output.",
+        ],
+    }
+
+    md_lines: list[str] = [
+        "# HLD Format Report",
+        "",
+        f"Source: `{source_path}`",
+        f"Lines: {len(lines)}",
+        f"Markdown headings detected: {len(headings)}",
+        f"Existing HLDspec headings: {len(existing_hld_ids)}",
+        f"Candidate major sections: {len(suggestions)}",
+        "",
+        "## Verdict",
+        "",
+    ]
+    if existing_hld_ids:
+        md_lines.append("This HLD appears partially or fully formatted for HLDspec. Preserve existing HLD IDs.")
+    elif suggestions:
+        md_lines.append("This HLD is not yet HLDspec-formatted. Convert major sections first; do not run full sync yet.")
+    else:
+        md_lines.append("This HLD has no detectable markdown heading structure. Add major headings before HLDspec conversion.")
+
+    if warnings:
+        md_lines.extend(["", "## Warnings", ""])
+        md_lines.extend(f"- {warning}" for warning in warnings)
+
+    md_lines.extend(["", "## Detected headings", ""])
+    for heading in headings[:200]:
+        marker = "HLDspec" if heading["is_hldspec_heading"] else "plain"
+        md_lines.append(
+            f"- line {heading['line']}: level {heading['level']} [{marker}] {heading['title']}"
+        )
+    if len(headings) > 200:
+        md_lines.append(f"- ... {len(headings) - 200} more headings omitted from markdown report; see JSON.")
+
+    md_lines.extend(["", "## Suggested HLD section skeletons", ""])
+    for item in suggestions[:80]:
+        metadata = item["metadata_skeleton"]
+        if not isinstance(metadata, dict):
+            continue
+        md_lines.extend(
+            [
+                f"### {item['suggested_id']} - {item['title']}",
+                "",
+                "```md",
+                f"## {item['suggested_id']} - {item['title']}",
+                "",
+                f"HLD-ID: {metadata['HLD-ID']}",
+                f"HLD-ROLE: {metadata['HLD-ROLE']}",
+                f"HLD-STATUS: {metadata['HLD-STATUS']}",
+                f"HLD-RISK: {metadata['HLD-RISK']}",
+                f"HLD-SPECS: {metadata['HLD-SPECS']}",
+                f"HLD-RESOURCES: {metadata['HLD-RESOURCES']}",
+                f"HLD-VERIFY: {metadata['HLD-VERIFY']}",
+                "```",
+                "",
+            ]
+        )
+    if len(suggestions) > 80:
+        md_lines.append(f"... {len(suggestions) - 80} more suggestions omitted from markdown report; see JSON.")
+
+    md_lines.extend(
+        [
+            "",
+            "## Safe next steps",
+            "",
+            "1. Preserve the original as `HLD.raw.md`.",
+            "2. Edit a working `HLD.md` copy only.",
+            "3. Convert only major sections to `## HLD-xxx - Title`.",
+            "4. Add required `HLD-*` metadata.",
+            "5. Use `TBD` for unknown mappings.",
+            "6. Add `REF HLD-xxx` links only where relationships are known.",
+            "7. Run `./hld_spec_sync.py --hld HLD.md --hld-map-only`.",
+            "8. Fix validation errors before syncing specs.",
+            "",
+            "## Do not",
+            "",
+            "- Do not overwrite the raw HLD.",
+            "- Do not tag every subsection.",
+            "- Do not invent spec IDs, owners, or resources.",
+            "- Do not run full-HLD sync before the map validates.",
+            "- Do not auto-convert or auto-chunk without reviewing a report or plan.",
+            "",
+        ]
+    )
+
+    return report, "\n".join(md_lines)
+
 def load_current_state(workspace: Path, mode: str, max_existing_spec_chars: int, max_existing_specs: int) -> dict[str, str]:
     if mode == "greenfield":
         return {
@@ -1482,6 +1721,7 @@ def main() -> int:
     ap.add_argument("--prompt-only", action="store_true")
     ap.add_argument("--no-apply-write-blocks", action="store_true")
     ap.add_argument("--hld-map-only", action="store_true", help="Parse/validate HLD map artifacts and exit without agent.")
+    ap.add_argument("--hld-format-report", action="store_true", help="Write a read-only report to help convert a raw/huge HLD into HLDspec format and exit without agent.")
     ap.add_argument("--use-hld-map", action="store_true", help="Use HLD section map for bounded context selection.")
     ap.add_argument("--target-hld", default=None, help="Target one HLD section such as HLD-003 for map-aware runs.")
     ap.add_argument("--resume", action="store_true", help="Resume a map-aware target run when section hashes still match.")
@@ -1517,6 +1757,17 @@ def main() -> int:
     allow_sync_mutations = not args.report_only and not args.analyze_only
 
     hld_text = read_text(hld_path)
+    if args.hld_format_report:
+        report_json, report_md = build_hld_format_report(hld_text, source_path=str(hld_path))
+        report_path = logs_dir / "hld_format_report.md"
+        json_path = logs_dir / "suggested_hld_sections.json"
+        write_text(report_path, report_md)
+        write_text(json_path, json.dumps(report_json, indent=2, sort_keys=True))
+        print("HLD format report generated:")
+        print(f"- report: {report_path}")
+        print(f"- suggestions: {json_path}")
+        return 0
+
     parsed_hld_map: hld_map.HldMap | None = None
     context_selection: dict[str, object] | None = None
     if args.hld_map_only or args.use_hld_map:

@@ -177,6 +177,28 @@ class HldSpecRuntimeTests(unittest.TestCase):
             self.assertIn("HLD-002", hld_spec_sync.target_required_section_ids(original, "HLD-001"))
             self.assertIsNone(hld_spec_sync.resume_skip_reason(workspace, changed, "HLD-001"))
 
+    def test_hld_format_report_is_read_only_and_suggests_sections(self) -> None:
+        raw_hld = """# Raw Design
+
+## Architecture
+
+Some architecture text.
+
+## Data Model
+
+Some data text.
+"""
+        report, markdown = hld_spec_sync.build_hld_format_report(raw_hld, source_path="HLD.md")
+
+        self.assertEqual("HLD.md", report["source_path"])
+        self.assertEqual(3, report["heading_count"])
+        self.assertEqual(0, report["existing_hldspec_section_count"])
+        suggestions = report["suggested_hld_sections"]
+        self.assertIsInstance(suggestions, list)
+        self.assertGreaterEqual(len(suggestions), 2)
+        self.assertIn("HLD-001", markdown)
+        self.assertIn("Do not", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()

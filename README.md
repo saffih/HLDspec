@@ -159,6 +159,24 @@ Devin runs through a PTY-backed `pexpect` runner by default because some agent C
 ./hld_spec_sync.py --hld ./hld.md --prompt-only
 ```
 
+## HLD format report
+
+For an existing large or raw HLD that is not yet in HLDspec format, generate a read-only conversion report:
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-format-report
+```
+
+This does not call an agent, modify `HLD.md`, or write specs. It writes:
+
+```text
+logs/hld_spec_sync/<timestamp>/hld_format_report.md
+logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
+```
+
+Use this before `--hld-map-only` when the HLD does not yet contain stable `## HLD-xxx - Title` sections.
+
+
 ## HLD map mode
 
 Generate and validate an HLD section map without calling an agent:
