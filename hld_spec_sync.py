@@ -58,6 +58,8 @@ DEFAULT_AGENT_MODELS = {
 
 FEATURE_SPECS_REL = Path("specs")
 SYNC_REL = Path(".specify") / "sync"
+SYNC_SKEPTIC_REPORT_REL = SYNC_REL / "skeptic_report.md"
+SYNC_SKEPTIC_CONFLICTS_REL = SYNC_REL / "skeptic_conflicts.json"
 SYNC_ALLOWED_SPEC_FILENAMES = {"spec.md"}
 PROTECTED_RELS = {
     ".git",
@@ -65,6 +67,8 @@ PROTECTED_RELS = {
     ".codex",
     "logs",
 }
+CONFLICT_RETURN_CODE = 2
+RESOLVED_CONFLICT_STATUSES = {"handled", "resolved", "closed", "fixed", "accepted"}
 
 
 def eprint(*args: object) -> None:
@@ -192,6 +196,75 @@ def validate_json_file(path: Path, errors: list[str]) -> None:
         json.loads(read_text(path))
     except Exception as exc:
         errors.append(f"invalid JSON: {path}: {exc}")
+
+
+def evaluate_skeptic_outputs(
+    workspace: Path,
+    *,
+    report_rel: Path,
+    conflicts_rel: Path,
+    errors: list[str],
+) -> list[dict[str, object]]:
+    report_path = workspace / report_rel
+    conflicts_path = workspace / conflicts_rel
+
+    if not report_path.exists():
+        errors.append(f"missing required skeptic output: {report_rel}")
+    if not conflicts_path.exists():
+        errors.append(f"missing required skeptic output: {conflicts_rel}")
+        return []
+
+    try:
+        data = json.loads(read_text(conflicts_path))
+    except Exception as exc:
+        errors.append(f"invalid skeptic JSON: {conflicts_rel}: {exc}")
+        return []
+
+    if isinstance(data, dict):
+        raw_conflicts = data.get("conflicts", [])
+        status = str(data.get("status", "")).upper()
+    elif isinstance(data, list):
+        raw_conflicts = data
+        status = "CONFLICT" if raw_conflicts else "HANDLED"
+    else:
+        errors.append(f"invalid skeptic JSON shape: {conflicts_rel}: expected object or array")
+        return []
+
+    if not isinstance(raw_conflicts, list):
+        errors.append(f"invalid skeptic conflicts shape: {conflicts_rel}: conflicts must be an array")
+        return []
+
+    unresolved: list[dict[str, object]] = []
+    for idx, item in enumerate(raw_conflicts, start=1):
+        if isinstance(item, dict):
+            item_status = str(item.get("status") or item.get("resolution") or "unresolved").lower()
+            if item_status not in RESOLVED_CONFLICT_STATUSES:
+                unresolved.append(item)
+        else:
+            unresolved.append({"id": f"SK-{idx:03d}", "issue": str(item), "status": "unresolved"})
+
+    if status == "CONFLICT" and not unresolved:
+        unresolved.append(
+            {
+                "id": "SK-STATUS",
+                "issue": "Skeptic status is CONFLICT but no unresolved conflict item was provided.",
+                "status": "unresolved",
+                "decision_needed": "Provide the missing human decision or mark status HANDLED.",
+            }
+        )
+
+    return unresolved
+
+
+def print_skeptic_conflicts(conflicts: list[dict[str, object]], conflicts_rel: Path) -> None:
+    eprint("Skeptic unresolved conflicts require human decision:")
+    for idx, conflict in enumerate(conflicts, start=1):
+        conflict_id = conflict.get("id") or f"SK-{idx:03d}"
+        issue = conflict.get("issue") or conflict.get("title") or "(no issue provided)"
+        decision = conflict.get("decision_needed") or conflict.get("decision") or "(no decision_needed provided)"
+        eprint(f"- {conflict_id}: {issue}")
+        eprint(f"  decision_needed: {decision}")
+    eprint(f"See: {conflicts_rel}")
 
 
 def validate_outputs(workspace: Path, *, require_constitution: bool, require_specs: bool) -> list[str]:
@@ -426,6 +499,98 @@ def run_agent_pexpect(*, cmd: list[str], workspace: Path, log_path: Path, timeou
         return int(child.exitstatus if child.exitstatus is not None else child.signalstatus or 1)
 
 
+def skeptic_prompt_section(*, enabled: bool) -> str:
+    if not enabled:
+        return "SKEPTIC MODE\nDisabled. Do not write skeptic_report.md or skeptic_conflicts.json.\n"
+
+    return f"""SKEPTIC MODE (--skeptic)
+Apply the Skeptic framework from https://github.com/saffih/skeptic/blob/main/skeptic.md as part of this run.
+
+Required Skeptic flow:
+- GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN.
+- Start detect-only. Do not fix until findings are stabilized and DECIDE says FIX.
+- Use all thinkers/checks: Charlie Munger (CH), Occam's Razor (OM), Richard Feynman (FE), Karl Popper (PO), Immanuel Kant (KT), and Saffi (SH).
+- Track findings, unknowns, assumptions, evidence strength, skipped/uncertain areas, detection confidence, and evidence level.
+- A safe FIX may update only the allowed sync targets for this run.
+- A CONFLICT must not be patched in the conflicted area. It must be handed to the human with a decision_needed field.
+- You may still close independent safe gaps while reporting unresolved conflicts.
+- End as HANDLED or CONFLICT.
+
+Skeptic must defend:
+- HLD anchors and source-of-truth hierarchy
+- spec boundaries and ownership
+- contracts, dependencies, exceptions, acceptance criteria
+- verification path, drift/failure modes, and human approval needs
+
+Always include thinker-to-change trace in the form: "thinker found X, so we changed Y".
+
+Required Skeptic artifacts:
+WRITE FILE: {SYNC_SKEPTIC_REPORT_REL}
+CONTENT:
+# Skeptic Report
+
+## Outcome
+HANDLED or CONFLICT
+
+## Thinker Trace
+| Thinker/check | Found | Changed |
+|---|---|---|
+| Charlie Munger (CH) | ... | ... |
+
+## Findings
+- ...
+
+## Fixes Applied
+- ...
+
+## Unresolved Conflicts
+- ...
+
+## Verification
+- ...
+
+WRITE FILE: {SYNC_SKEPTIC_CONFLICTS_REL}
+CONTENT:
+{{
+  "status": "HANDLED|CONFLICT",
+  "scope": "hld_spec_sync",
+  "thinker_trace": [
+    {{
+      "thinker": "Charlie Munger (CH)",
+      "found": "...",
+      "changed": "..."
+    }}
+  ],
+  "actions": [
+    {{
+      "id": "SK-ACTION-001",
+      "status": "handled",
+      "issue": "...",
+      "root_cause": "...",
+      "action": "...",
+      "verification": "...",
+      "evidence_level": "OBSERVED|REPRODUCED|HISTORICAL|INFERRED RISK"
+    }}
+  ],
+  "conflicts": [
+    {{
+      "id": "SK-CONFLICT-001",
+      "status": "unresolved",
+      "issue": "...",
+      "thesis": "...",
+      "antithesis": "...",
+      "tradeoffs": "...",
+      "blocking_unknowns": ["..."],
+      "missing_evidence": ["..."],
+      "safe_recommendation": "...",
+      "decision_needed": "..."
+    }}
+  ],
+  "human_loop": "required|not_required"
+}}
+"""
+
+
 def build_prompt(
     *,
     mode: str,
@@ -434,6 +599,7 @@ def build_prompt(
     current_state: dict[str, str],
     report_only: bool,
     analyze_only: bool,
+    skeptic: bool,
 ) -> str:
     if analyze_only:
         work_mode = "ANALYZE ONLY: Do not update constitution or specs. Write reports only."
@@ -470,6 +636,8 @@ MODE
 
 WORK MODE
 {work_mode}
+
+{skeptic_prompt_section(enabled=skeptic)}
 
 IMPORTANT MODEL
 Use the same algorithm for greenfield and brownfield:
@@ -780,6 +948,11 @@ def main() -> int:
     ap.add_argument("--mode", choices=["auto", "greenfield", "brownfield"], default="auto")
     ap.add_argument("--report-only", action="store_true")
     ap.add_argument("--analyze-only", action="store_true")
+    ap.add_argument(
+        "--skeptic",
+        action="store_true",
+        help="Apply Skeptic gap/conflict review, write skeptic reports, and exit 2 on unresolved conflicts.",
+    )
     ap.add_argument("--prompt-only", action="store_true")
     ap.add_argument("--no-apply-write-blocks", action="store_true")
 
@@ -829,6 +1002,7 @@ def main() -> int:
         current_state=current_state,
         report_only=args.report_only,
         analyze_only=args.analyze_only,
+        skeptic=args.skeptic,
     )
 
     prompt_path = logs_dir / "prompt.md"
@@ -838,6 +1012,7 @@ def main() -> int:
     print(f"Mode: {mode}")
     print(f"Agent: {args.agent}")
     print(f"Model: {args.model or '(none)'}")
+    print(f"Skeptic: {args.skeptic}")
     print(f"Prompt: {prompt_path}")
     print(f"Log: {log_path}")
 
@@ -874,6 +1049,7 @@ def main() -> int:
             "write_blocks_applied": 0,
             "validation_errors": [],
             "agent_timeout_seconds": args.agent_timeout_seconds,
+            "skeptic": args.skeptic,
         }
         write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
         eprint(f"Agent failed with rc={rc}. WRITE FILE blocks were not applied. See: {log_path}")
@@ -907,6 +1083,7 @@ def main() -> int:
                 "write_blocks_applied": writes,
                 "validation_errors": [f"failed to apply WRITE FILE blocks: {exc}"],
                 "agent_timeout_seconds": args.agent_timeout_seconds,
+                "skeptic": args.skeptic,
             }
             write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
             return 1
@@ -916,6 +1093,14 @@ def main() -> int:
         require_constitution=allow_sync_mutations,
         require_specs=allow_sync_mutations,
     )
+    skeptic_conflicts: list[dict[str, object]] = []
+    if args.skeptic:
+        skeptic_conflicts = evaluate_skeptic_outputs(
+            workspace,
+            report_rel=SYNC_SKEPTIC_REPORT_REL,
+            conflicts_rel=SYNC_SKEPTIC_CONFLICTS_REL,
+            errors=validation_errors,
+        )
 
     run_summary = {
         "mode": mode,
@@ -928,6 +1113,9 @@ def main() -> int:
         "write_blocks_applied": writes,
         "validation_errors": validation_errors,
         "agent_timeout_seconds": args.agent_timeout_seconds,
+        "skeptic": args.skeptic,
+        "skeptic_conflicts_path": str((workspace / SYNC_SKEPTIC_CONFLICTS_REL).relative_to(workspace)) if args.skeptic else None,
+        "skeptic_unresolved_conflicts": len(skeptic_conflicts),
     }
     write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
 
@@ -937,6 +1125,11 @@ def main() -> int:
             eprint(f"- {err}")
         eprint(f"See: {logs_dir / 'run_summary.json'}")
         return 1
+
+    if skeptic_conflicts:
+        print_skeptic_conflicts(skeptic_conflicts, SYNC_SKEPTIC_CONFLICTS_REL)
+        eprint(f"Run summary: {logs_dir / 'run_summary.json'}")
+        return CONFLICT_RETURN_CODE
 
     print("PASS")
     print("Updated files under:")

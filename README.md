@@ -120,6 +120,21 @@ Devin runs through a PTY-backed `pexpect` runner by default because some agent C
 ./hld_spec_sync.py --hld ./hld.md --prompt-only
 ```
 
+## Skeptic mode
+
+Use `--skeptic` to bake the Skeptic framework into the sync run. The agent must apply the flow from [`skeptic.md`](https://github.com/saffih/skeptic/blob/main/skeptic.md), close safe HLD/spec/constitution gaps, and write:
+
+```text
+.specify/sync/skeptic_report.md
+.specify/sync/skeptic_conflicts.json
+```
+
+If unresolved conflicts remain, the script exits with code `2` after applying only allowed safe fixes. The JSON conflict file is the human-in-the-loop handoff.
+
+```bash
+./hld_spec_sync.py --hld ./hld.md --skeptic --agent codex
+```
+
 ## Agent timeout
 
 ```bash
@@ -189,6 +204,33 @@ Set an agent timeout:
 ```bash
 ./hld_spec_downstream.py --hld ./hld.md --agent-timeout-seconds 900 --agent codex
 ```
+
+Run downstream with Skeptic gap closure:
+
+```bash
+./hld_spec_downstream.py --hld ./hld.md --phase all --skeptic --agent codex
+```
+
+With implementation fixes:
+
+```bash
+./hld_spec_downstream.py \
+  --hld ./hld.md \
+  --phase implement \
+  --skeptic \
+  --allow-implementation \
+  --implementation-root src \
+  --agent codex
+```
+
+Downstream Skeptic mode writes:
+
+```text
+.specify/sync/downstream/skeptic_report.md
+.specify/sync/downstream/skeptic_conflicts.json
+```
+
+If unresolved conflicts remain, downstream also exits with code `2` and leaves the conflict JSON as the human decision queue.
 
 Prompt only:
 
