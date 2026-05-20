@@ -63,6 +63,147 @@ CONFLICTS_WITH REF HLD-011
 8. Mark unknown mappings as `TBD`; do not invent them.
 9. Mark unresolved design conflicts as `CONFLICT` or `CONFLICTS_WITH REF HLD-xxx`.
 
+## Converting an existing large HLD into HLDspec format
+
+When asked to make an existing large or unstructured HLD workable for HLDspec, do not rewrite the whole document blindly.
+
+Treat the existing HLD as source material and create a safe formatted working copy.
+
+### Required workflow
+
+1. Preserve the original HLD.
+
+```bash
+cp HLD.md HLD.raw.md
+```
+
+If the original file has another name:
+
+```bash
+cp <original-hld-file>.md HLD.raw.md
+cp HLD.raw.md HLD.md
+```
+
+2. Extract the heading outline.
+
+```bash
+grep -nE '^(#|##|###) ' HLD.raw.md > /tmp/hld_headings.txt
+cat /tmp/hld_headings.txt
+```
+
+3. Identify only major sections.
+
+Do not tag every subsection. Use stable `HLD-xxx` IDs only for major sections that represent real design areas, such as:
+
+- executive summary
+- governance/source of truth
+- architecture
+- processing flow
+- interfaces/contracts
+- data/state
+- failure modes/recovery
+- testing/verification
+- risks/open questions
+
+4. Convert major sections to the required format.
+
+Each major section must use:
+
+```md
+## HLD-003 - Section Title
+
+HLD-ID: HLD-003
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+HLD-VERIFY: section can be processed without loading the full HLD; related specs preserve HLD anchors
+```
+
+5. Use `TBD` instead of inventing mappings.
+
+Unknown spec IDs, owners, resources, or source-of-truth decisions must be marked as:
+
+```text
+TBD
+```
+
+Do not guess.
+
+6. Add inline references between sections.
+
+Use:
+
+```md
+This section DEPENDS REF HLD-002 because governance defines what may be generated.
+
+This section REF HLD-006 for rollback behavior.
+
+This approach CONFLICTS_WITH REF HLD-011 because both define different ownership rules.
+```
+
+7. Validate the formatted HLD.
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-map-only
+```
+
+Review:
+
+```text
+.specify/sync/hld_index.md
+.specify/sync/hld_ref_map.json
+.specify/sync/hld_sections/
+```
+
+8. Fix validation errors before syncing specs.
+
+Do not run HLD-to-spec sync until the HLD map validates.
+
+9. Sync one section at a time.
+
+First review the prompt:
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
+```
+
+Then run sync:
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
+```
+
+10. Continue downstream only after the related spec exists.
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan --prompt-only
+
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan
+```
+
+### Do not
+
+- Do not destroy or overwrite the original HLD.
+- Do not tag every small subsection.
+- Do not invent spec IDs or owners.
+- Do not manually split the HLD into many canonical HLD files by default.
+- Do not run full-HLD sync when `--use-hld-map --target-hld` is appropriate.
+- Do not continue if `--hld-map-only` reports validation errors.
+
+### Success criteria
+
+The conversion is good enough when:
+
+- `HLD.raw.md` preserves the original.
+- `HLD.md` has stable `## HLD-xxx - Title` major sections.
+- Each major section has required `HLD-*` metadata.
+- Cross-section relationships use `REF HLD-xxx`.
+- `./hld_spec_sync.py --hld HLD.md --hld-map-only` passes.
+- The generated `hld_index.md` gives a useful overview of the HLD.
+
+
 ## Standard workflow
 
 ### 1. Validate HLD structure
