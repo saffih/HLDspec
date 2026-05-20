@@ -331,6 +331,14 @@ Map-aware downstream processing can target one HLD section and include only that
 
 `--target-hld` and `--target` may be combined only when `--target` matches the section's `HLD-SPECS` mapping.
 
+### Resume support
+
+`--resume` and `--restart-map-run` currently apply to `hld_spec_sync.py` map-aware target runs only.
+
+Downstream map-aware runs should be rerun explicitly with `--target-hld`, `--target`, and `--phase`.
+
+Future downstream resume must include phase, target HLD section, target specs, implementation roots, and input hashes.
+
 ## Downstream outputs
 
 ```text

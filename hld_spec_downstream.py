@@ -415,22 +415,64 @@ def hld_spec_targets(section: hld_map.HldSection) -> list[str]:
     ]
 
 
+
 def target_hld_context(parsed_map: hld_map.HldMap, target_hld: str) -> tuple[str, dict[str, object]]:
     sections_by_id = parsed_map.section_by_id()
     if target_hld not in sections_by_id:
         raise ValueError(f"Unknown target HLD section: {target_hld}")
-    loaded: dict[str, str] = {target_hld: "target"}
-    target = sections_by_id[target_hld]
-    for ref in target.references:
-        if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"} and ref.target in sections_by_id:
-            loaded[ref.target] = f"{ref.kind} from {target_hld}"
+
+    queue: list[tuple[str, str, int]] = [(target_hld, "target", 0)]
+    loaded: dict[str, str] = {}
+    skipped_refs: list[dict[str, object]] = []
+
+    while queue:
+        section_id, reason, depth = queue.pop(0)
+        if section_id in loaded:
+            continue
+
+        section = sections_by_id.get(section_id)
+        if not section:
+            skipped_refs.append(
+                {
+                    "section": section_id,
+                    "reason": "missing-section",
+                    "requested_by": reason,
+                }
+            )
+            continue
+
+        loaded[section_id] = reason
+
+        max_depth = 2 if section.metadata_value("HLD-RISK").upper() == "HIGH" else 1
+        if depth >= max_depth:
+            for ref in section.references:
+                if ref.target not in loaded:
+                    skipped_refs.append(
+                        {
+                            "section": ref.target,
+                            "reason": f"depth-limit-{max_depth}",
+                            "requested_by": section.id,
+                            "ref_kind": ref.kind,
+                        }
+                    )
+            continue
+
+        for ref in section.references:
+            if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"}:
+                queue.append((ref.target, f"{ref.kind} from {section.id}", depth + 1))
+            elif ref.kind == "REF":
+                queue.append((ref.target, f"REF from {section.id}", depth + 1))
+
     parts = [
         "BOUNDED HLD MAP CONTEXT",
         "The full HLD is intentionally not included in this prompt.",
     ]
+
     for section_id, why in loaded.items():
         section = sections_by_id[section_id]
         parts.append(f"\n--- HLD SECTION {section.id}: {section.title} ({why}) ---\n{section.text}")
+
+    target = sections_by_id[target_hld]
     report = {
         "target_section": target_hld,
         "loaded_sections": [
@@ -443,6 +485,7 @@ def target_hld_context(parsed_map: hld_map.HldMap, target_hld: str) -> tuple[str
             }
             for section_id, why in loaded.items()
         ],
+        "skipped_refs": skipped_refs,
         "target_specs": hld_spec_targets(target),
     }
     return "\n".join(parts), report
