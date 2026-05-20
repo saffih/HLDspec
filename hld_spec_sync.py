@@ -41,6 +41,7 @@ default model is used.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shlex
@@ -48,6 +49,8 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import hld_map
 
 
 DEFAULT_AGENT_MODELS = {
@@ -60,7 +63,9 @@ FEATURE_SPECS_REL = Path("specs")
 SYNC_REL = Path(".specify") / "sync"
 SYNC_SKEPTIC_REPORT_REL = SYNC_REL / "skeptic_report.md"
 SYNC_SKEPTIC_CONFLICTS_REL = SYNC_REL / "skeptic_conflicts.json"
+RUN_STATE_REL = SYNC_REL / "chunks" / "run_state.json"
 SYNC_ALLOWED_SPEC_FILENAMES = {"spec.md"}
+STAGED_REL = SYNC_REL / "staged"
 PROTECTED_RELS = {
     ".git",
     ".agents",
@@ -98,8 +103,165 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def stable_hash(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def section_state(section: hld_map.HldSection) -> dict[str, object]:
+    return {
+        "section_id": section.id,
+        "content_hash": hashlib.sha256(section.text.encode("utf-8")).hexdigest(),
+        "metadata_hash": stable_hash({key: section.metadata_values(key) for key in sorted(section.metadata)}),
+        "refs_hash": stable_hash([ref.to_dict() for ref in section.references]),
+        "related_specs": hld_map.split_metadata_list(section.metadata_value("HLD-SPECS")),
+    }
+
+
+def load_run_state(workspace: Path) -> dict[str, object]:
+    path = workspace / RUN_STATE_REL
+    if not path.exists():
+        return {"sections": {}}
+    try:
+        data = json.loads(read_text(path))
+    except Exception:
+        return {"sections": {}}
+    if not isinstance(data, dict):
+        return {"sections": {}}
+    data.setdefault("sections", {})
+    return data
+
+
+def write_run_state(workspace: Path, state: dict[str, object]) -> None:
+    write_text(workspace / RUN_STATE_REL, json.dumps(state, indent=2, sort_keys=True))
+
+
+def target_required_section_ids(parsed_map: hld_map.HldMap, target_hld: str) -> list[str]:
+    sections_by_id = parsed_map.section_by_id()
+    target = sections_by_id[target_hld]
+    ids = [target_hld]
+    for ref in target.references:
+        if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"} and ref.target in sections_by_id:
+            ids.append(ref.target)
+    return ids
+
+
+def resume_skip_reason(workspace: Path, parsed_map: hld_map.HldMap, target_hld: str) -> str | None:
+    state = load_run_state(workspace)
+    sections_state = state.get("sections", {})
+    if not isinstance(sections_state, dict):
+        return None
+    sections_by_id = parsed_map.section_by_id()
+    for section_id in target_required_section_ids(parsed_map, target_hld):
+        current = section_state(sections_by_id[section_id])
+        saved = sections_state.get(section_id)
+        if not isinstance(saved, dict):
+            return None
+        for key in ("content_hash", "metadata_hash", "refs_hash"):
+            if saved.get(key) != current[key]:
+                return None
+        if section_id == target_hld and saved.get("status") != "done":
+            return None
+    return f"{target_hld} and required refs are unchanged and already done"
+
+
+def update_run_state(
+    workspace: Path,
+    parsed_map: hld_map.HldMap,
+    target_hld: str | None,
+    *,
+    status: str,
+    prompt_path: Path,
+    log_path: Path,
+    staged_output_path: str | None,
+) -> None:
+    if not target_hld:
+        return
+    state = load_run_state(workspace)
+    sections_state = state.setdefault("sections", {})
+    if not isinstance(sections_state, dict):
+        sections_state = {}
+        state["sections"] = sections_state
+    sections_by_id = parsed_map.section_by_id()
+    for section_id in target_required_section_ids(parsed_map, target_hld):
+        current = section_state(sections_by_id[section_id])
+        current.update(
+            {
+                "status": status if section_id == target_hld else "done",
+                "prompt_path": str(prompt_path.relative_to(workspace)),
+                "log_path": str(log_path.relative_to(workspace)),
+                "staged_output_path": staged_output_path,
+            }
+        )
+        sections_state[section_id] = current
+    write_run_state(workspace, state)
+
+
 def number_hld(hld_text: str) -> str:
     return "\n".join(f"{i}: {line}" for i, line in enumerate(hld_text.splitlines(), start=1)) + "\n"
+
+
+def parse_write_blocks_text(text: str, workspace: Path) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=^WRITE FILE:|\Z)",
+        re.DOTALL | re.MULTILINE,
+    )
+    writes: list[dict[str, str]] = []
+    for match in pattern.finditer(text):
+        raw_path = match.group("path").strip()
+        content = match.group("content").rstrip() + "\n"
+        out_path = Path(raw_path)
+        if not out_path.is_absolute():
+            rel_path = out_path
+        else:
+            rel_path = out_path.resolve().relative_to(workspace.resolve())
+        writes.append({"path": str(rel_path), "content": content})
+    return writes
+
+
+def stage_write_blocks(
+    log_path: Path,
+    workspace: Path,
+    *,
+    run_id: str,
+    echoed_prompt: str | None = None,
+) -> dict[str, object]:
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
+    writes = parse_write_blocks_text(text, workspace)
+    staged_dir = workspace / STAGED_REL / run_id
+    staged_dir.mkdir(parents=True, exist_ok=True)
+    proposed_lines: list[str] = ["# Proposed Writes", ""]
+    manifest_writes: list[dict[str, object]] = []
+    for idx, write in enumerate(writes, start=1):
+        rel_path = write["path"]
+        staged_file = staged_dir / f"{idx:03d}" / rel_path
+        write_text(staged_file, write["content"])
+        proposed_lines.extend(
+            [
+                f"## {idx}. `{rel_path}`",
+                "",
+                "```text",
+                write["content"].rstrip(),
+                "```",
+                "",
+            ]
+        )
+        manifest_writes.append(
+            {
+                "path": rel_path,
+                "staged_path": str(staged_file.relative_to(workspace)),
+                "bytes": len(write["content"].encode("utf-8")),
+            }
+        )
+    write_text(staged_dir / "proposed_writes.md", "\n".join(proposed_lines))
+    manifest = {"run_id": run_id, "writes": manifest_writes}
+    write_text(staged_dir / "write_manifest.json", json.dumps(manifest, indent=2))
+    return {
+        "staged_dir": str(staged_dir.relative_to(workspace)),
+        "proposed_writes": str((staged_dir / "proposed_writes.md").relative_to(workspace)),
+        "write_manifest": str((staged_dir / "write_manifest.json").relative_to(workspace)),
+        "write_count": len(writes),
+    }
 
 
 def compact_middle(text: str, max_chars: int) -> str:
@@ -137,6 +299,146 @@ def list_existing_specs(workspace: Path, max_chars_per_spec: int, max_specs: int
         text = compact_middle(read_text(path), max_chars_per_spec)
         parts.append(f"\n--- EXISTING SPEC {idx}: {rel} ---\n{text}\n--- END EXISTING SPEC {idx} ---\n")
     return "\n".join(parts)
+
+
+def spec_paths_for_ids(workspace: Path, spec_ids: list[str], max_chars_per_spec: int) -> tuple[str, list[str]]:
+    parts: list[str] = []
+    included: list[str] = []
+    if not spec_ids:
+        return "No HLD-SPECS metadata selected.\n", included
+    for spec_id in spec_ids:
+        if spec_id.upper() in {"TBD", "CONSTITUTION"}:
+            continue
+        matches = sorted((workspace / FEATURE_SPECS_REL).glob(f"{spec_id}-*/spec.md"))
+        for path in matches:
+            rel = path.relative_to(workspace)
+            included.append(str(rel))
+            parts.append(f"\n--- RELATED SPEC: {rel} ---\n{compact_middle(read_text(path), max_chars_per_spec)}\n")
+    return ("\n".join(parts) if parts else "No related specs found for selected HLD-SPECS.\n"), included
+
+
+def resource_text_for_paths(workspace: Path, resources: list[str], max_chars: int = 12000) -> tuple[str, list[str], list[str]]:
+    parts: list[str] = []
+    included: list[str] = []
+    skipped: list[str] = []
+    for resource in resources:
+        if resource.upper() == "TBD" or "*" in resource:
+            skipped.append(resource)
+            continue
+        path = (workspace / resource).resolve()
+        try:
+            rel = path.relative_to(workspace.resolve())
+        except ValueError:
+            skipped.append(resource)
+            continue
+        if not path.is_file():
+            skipped.append(resource)
+            continue
+        included.append(str(rel))
+        parts.append(f"\n--- RELATED RESOURCE: {rel} ---\n{compact_middle(read_text(path), max_chars)}\n")
+    return ("\n".join(parts) if parts else "No related resource files included.\n"), included, skipped
+
+
+def select_hld_context(
+    *,
+    parsed_map: hld_map.HldMap,
+    workspace: Path,
+    target_hld: str | None,
+    max_chars: int,
+    max_spec_chars: int,
+) -> tuple[str, dict[str, object]]:
+    sections_by_id = parsed_map.section_by_id()
+    if target_hld:
+        if target_hld not in sections_by_id:
+            raise ValueError(f"Unknown target HLD section: {target_hld}")
+        root_ids = [target_hld]
+    else:
+        root_ids = [section.id for section in parsed_map.sections]
+
+    queue: list[tuple[str, str, int]] = []
+    loaded: dict[str, str] = {}
+    skipped_refs: list[dict[str, object]] = []
+    for section_id in root_ids:
+        queue.append((section_id, "target" if target_hld else "all-sections", 0))
+
+    while queue:
+        section_id, reason, depth = queue.pop(0)
+        if section_id in loaded:
+            continue
+        section = sections_by_id.get(section_id)
+        if not section:
+            skipped_refs.append({"section": section_id, "reason": "missing-section", "requested_by": reason})
+            continue
+        loaded[section_id] = reason
+        max_depth = 2 if section.metadata_value("HLD-RISK").upper() == "HIGH" else 1
+        if depth >= max_depth:
+            for ref in section.references:
+                if ref.target not in loaded:
+                    skipped_refs.append(
+                        {
+                            "section": ref.target,
+                            "reason": f"depth-limit-{max_depth}",
+                            "requested_by": section.id,
+                            "ref_kind": ref.kind,
+                        }
+                    )
+            continue
+        for ref in section.references:
+            if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"}:
+                queue.append((ref.target, f"{ref.kind} from {section.id}", depth + 1))
+            elif not target_hld:
+                queue.append((ref.target, f"REF from {section.id}", depth + 1))
+
+    selected_sections = [sections_by_id[section_id] for section_id in loaded if section_id in sections_by_id]
+    selected_specs = sorted({spec for section in selected_sections for spec in hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))})
+    selected_resources = sorted({resource for section in selected_sections for resource in hld_map.split_metadata_list(section.metadata_value("HLD-RESOURCES"))})
+    related_specs_text, related_specs_included = spec_paths_for_ids(workspace, selected_specs, max_spec_chars)
+    resources_text, resources_included, resources_skipped = resource_text_for_paths(workspace, selected_resources)
+
+    section_parts = []
+    budget_used = 0
+    for section in selected_sections:
+        part = f"\n--- HLD SECTION {section.id}: {section.title} (lines {section.line_start}-{section.line_end}) ---\n{section.text}"
+        part_len = len(part)
+        if max_chars > 0 and budget_used + part_len > max_chars:
+            skipped_refs.append({"section": section.id, "reason": "prompt-budget-exceeded", "requested_by": loaded[section.id]})
+            continue
+        budget_used += part_len
+        section_parts.append(part)
+
+    context = "\n".join(
+        [
+            "BOUNDED HLD MAP CONTEXT",
+            "The full HLD is intentionally not included in this prompt.",
+            "\n".join(section_parts),
+            "\nRELATED SPECS",
+            related_specs_text,
+            "\nRELATED RESOURCES",
+            resources_text,
+        ]
+    )
+    report: dict[str, object] = {
+        "target_section": target_hld,
+        "loaded_sections": [
+            {
+                "id": section.id,
+                "title": section.title,
+                "line_start": section.line_start,
+                "line_end": section.line_end,
+                "why_loaded": loaded[section.id],
+            }
+            for section in selected_sections
+            if section.id in loaded
+        ],
+        "skipped_refs": skipped_refs,
+        "prompt_size_estimate": len(context),
+        "budget_used": budget_used,
+        "budget_limit": max_chars,
+        "related_specs_included": related_specs_included,
+        "related_resources_included": resources_included,
+        "related_resources_skipped": resources_skipped,
+    }
+    return context, report
 
 
 def load_current_state(workspace: Path, mode: str, max_existing_spec_chars: int, max_existing_specs: int) -> dict[str, str]:
@@ -397,6 +699,54 @@ def validate_outputs(workspace: Path, *, require_constitution: bool, require_spe
     return errors
 
 
+def validate_map_consolidation(workspace: Path, parsed_map: hld_map.HldMap | None) -> list[str]:
+    if parsed_map is None:
+        return []
+    errors: list[str] = []
+
+    duplicate_path = workspace / SYNC_REL / "duplicate_report.json"
+    if duplicate_path.exists():
+        try:
+            duplicate_report = json.loads(read_text(duplicate_path))
+            if isinstance(duplicate_report, list):
+                for idx, item in enumerate(duplicate_report, start=1):
+                    if isinstance(item, dict) and str(item.get("status", "")).upper() == "DUPLICATE_RISK":
+                        errors.append(f"duplicate spec risk remains in duplicate_report.json item {idx}")
+        except Exception as exc:
+            errors.append(f"invalid duplicate_report.json during consolidation: {exc}")
+
+    missing_path = workspace / SYNC_REL / "missing_report.json"
+    if missing_path.exists():
+        try:
+            missing_report = json.loads(read_text(missing_path))
+            if isinstance(missing_report, list):
+                for idx, item in enumerate(missing_report, start=1):
+                    if isinstance(item, dict) and item.get("recommended_action") not in {"mark_out_of_scope", "needs_review"}:
+                        errors.append(f"unresolved missing HLD coverage remains in missing_report.json item {idx}")
+        except Exception as exc:
+            errors.append(f"invalid missing_report.json during consolidation: {exc}")
+
+    drift_path = workspace / SYNC_REL / "drift_report.json"
+    if drift_path.exists():
+        try:
+            drift_report = json.loads(read_text(drift_path))
+            if isinstance(drift_report, list):
+                for idx, item in enumerate(drift_report, start=1):
+                    if isinstance(item, dict) and item.get("drift_type") in {"anchor_missing", "stale_spec"}:
+                        errors.append(f"stale or missing HLD ref remains in drift_report.json item {idx}")
+        except Exception as exc:
+            errors.append(f"invalid drift_report.json during consolidation: {exc}")
+
+    for section in parsed_map.sections:
+        if section.metadata_value("HLD-STATUS").lower() == "active" and not section.metadata_value("HLD-SPECS"):
+            errors.append(f"{section.id}: active HLD section has no HLD-SPECS coverage marker")
+        for ref in section.references:
+            if ref.kind in {"BLOCKED_BY", "CONFLICTS_WITH"}:
+                errors.append(f"{section.id}: unresolved blocking/conflict ref remains: {ref.kind} REF {ref.target}")
+
+    return errors
+
+
 def is_protected_path(path: Path, workspace: Path) -> bool:
     rel = path.relative_to(workspace)
     return bool(rel.parts) and rel.parts[0] in PROTECTED_RELS
@@ -470,7 +820,7 @@ def build_agent_command(
     stdin_prompt: bool,
 ) -> list[str]:
     if agent == "devin":
-        cmd = ["devin", "-p", prompt]
+        cmd = ["devin", "--prompt-file", str(prompt_file)]
         if model:
             cmd += ["--model", model]
         return cmd + extra_args
@@ -1046,8 +1396,14 @@ def main() -> int:
     )
     ap.add_argument("--prompt-only", action="store_true")
     ap.add_argument("--no-apply-write-blocks", action="store_true")
+    ap.add_argument("--hld-map-only", action="store_true", help="Parse/validate HLD map artifacts and exit without agent.")
+    ap.add_argument("--use-hld-map", action="store_true", help="Use HLD section map for bounded context selection.")
+    ap.add_argument("--target-hld", default=None, help="Target one HLD section such as HLD-003 for map-aware runs.")
+    ap.add_argument("--resume", action="store_true", help="Resume a map-aware target run when section hashes still match.")
+    ap.add_argument("--restart-map-run", action="store_true", help="Clear map-aware run state before running.")
 
     ap.add_argument("--max-hld-chars", type=int, default=0, help="0 means no HLD truncation")
+    ap.add_argument("--max-hld-map-context-chars", type=int, default=60000, help="0 means no map-context budget")
     ap.add_argument("--max-existing-spec-chars", type=int, default=16000)
     ap.add_argument("--max-existing-specs", type=int, default=80)
     ap.add_argument("--agent-timeout-seconds", type=int, default=0, help="0 means no timeout")
@@ -1076,7 +1432,58 @@ def main() -> int:
     allow_sync_mutations = not args.report_only and not args.analyze_only
 
     hld_text = read_text(hld_path)
-    numbered_hld = compact_middle(number_hld(hld_text), args.max_hld_chars)
+    parsed_hld_map: hld_map.HldMap | None = None
+    context_selection: dict[str, object] | None = None
+    if args.hld_map_only or args.use_hld_map:
+        parsed_hld_map = hld_map.parse_hld_text(hld_text, source_path=str(hld_path))
+        map_outputs = hld_map.write_hld_map_outputs(parsed_hld_map, workspace)
+        if parsed_hld_map.validation_errors:
+            eprint("Invalid HLD map:")
+            for error in parsed_hld_map.validation_errors:
+                eprint(f"- {error}")
+            write_text(
+                logs_dir / "run_summary.json",
+                json.dumps(
+                    {
+                        "mode": "hld-map-only" if args.hld_map_only else "map-aware",
+                        "hld": str(hld_path),
+                        "map_outputs": map_outputs,
+                        "validation_errors": parsed_hld_map.validation_errors,
+                    },
+                    indent=2,
+                ),
+            )
+            return 1
+        if args.hld_map_only:
+            print("HLD map generated:")
+            for key, value in map_outputs.items():
+                if key != "sections":
+                    print(f"- {key}: {value}")
+            print(f"- sections: {len(map_outputs['sections'])}")
+            return 0
+        if args.restart_map_run:
+            write_run_state(workspace, {"sections": {}})
+        if args.resume and args.target_hld:
+            reason = resume_skip_reason(workspace, parsed_hld_map, args.target_hld)
+            if reason:
+                print(f"Resume: skipped {args.target_hld}: {reason}")
+                return 0
+
+    if args.use_hld_map:
+        assert parsed_hld_map is not None
+        try:
+            numbered_hld, context_selection = select_hld_context(
+                parsed_map=parsed_hld_map,
+                workspace=workspace,
+                target_hld=args.target_hld,
+                max_chars=args.max_hld_map_context_chars,
+                max_spec_chars=args.max_existing_spec_chars,
+            )
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        write_text(logs_dir / "context_selection.json", json.dumps(context_selection, indent=2))
+    else:
+        numbered_hld = compact_middle(number_hld(hld_text), args.max_hld_chars)
     write_text(logs_dir / "hld_numbered.md", numbered_hld)
 
     current_state = load_current_state(
@@ -1104,6 +1511,9 @@ def main() -> int:
     print(f"Agent: {args.agent}")
     print(f"Model: {args.model or '(none)'}")
     print(f"Skeptic: {args.skeptic}")
+    print(f"HLD map: {args.use_hld_map}")
+    if args.target_hld:
+        print(f"Target HLD: {args.target_hld}")
     print(f"Prompt: {prompt_path}")
     print(f"Log: {log_path}")
 
@@ -1129,6 +1539,16 @@ def main() -> int:
         return 127
 
     if rc != 0:
+        if args.use_hld_map and parsed_hld_map is not None:
+            update_run_state(
+                workspace,
+                parsed_hld_map,
+                args.target_hld,
+                status="failed",
+                prompt_path=prompt_path,
+                log_path=log_path,
+                staged_output_path=None,
+            )
         run_summary = {
             "mode": mode,
             "agent": args.agent,
@@ -1141,12 +1561,16 @@ def main() -> int:
             "validation_errors": [],
             "agent_timeout_seconds": args.agent_timeout_seconds,
             "skeptic": args.skeptic,
+            "use_hld_map": args.use_hld_map,
+            "target_hld": args.target_hld,
+            "context_selection": context_selection,
         }
         write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
         eprint(f"Agent failed with rc={rc}. WRITE FILE blocks were not applied. See: {log_path}")
         return rc
 
     writes = 0
+    staging_info: dict[str, object] | None = None
     if not args.no_apply_write_blocks:
         try:
             validate_write_targets(
@@ -1156,6 +1580,13 @@ def main() -> int:
                 allow_specs=allow_sync_mutations,
                 echoed_prompt=prompt,
             )
+            if args.use_hld_map:
+                staging_info = stage_write_blocks(
+                    log_path,
+                    workspace,
+                    run_id=ts,
+                    echoed_prompt=prompt,
+                )
             writes = apply_write_blocks(
                 log_path,
                 workspace,
@@ -1164,6 +1595,16 @@ def main() -> int:
                 echoed_prompt=prompt,
             )
         except Exception as exc:
+            if args.use_hld_map and parsed_hld_map is not None:
+                update_run_state(
+                    workspace,
+                    parsed_hld_map,
+                    args.target_hld,
+                    status="failed",
+                    prompt_path=prompt_path,
+                    log_path=log_path,
+                    staged_output_path=(str(staging_info["staged_dir"]) if staging_info else None),
+                )
             eprint(f"Failed to apply WRITE FILE blocks: {exc}")
             run_summary = {
                 "mode": mode,
@@ -1177,6 +1618,10 @@ def main() -> int:
                 "validation_errors": [f"failed to apply WRITE FILE blocks: {exc}"],
                 "agent_timeout_seconds": args.agent_timeout_seconds,
                 "skeptic": args.skeptic,
+                "use_hld_map": args.use_hld_map,
+                "target_hld": args.target_hld,
+                "context_selection": context_selection,
+                "staging": staging_info,
             }
             write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
             return 1
@@ -1186,6 +1631,8 @@ def main() -> int:
         require_constitution=allow_sync_mutations,
         require_specs=allow_sync_mutations,
     )
+    if args.use_hld_map:
+        validation_errors.extend(validate_map_consolidation(workspace, parsed_hld_map))
     skeptic_conflicts: list[dict[str, object]] = []
     if args.skeptic:
         skeptic_conflicts = evaluate_skeptic_outputs(
@@ -1207,12 +1654,26 @@ def main() -> int:
         "validation_errors": validation_errors,
         "agent_timeout_seconds": args.agent_timeout_seconds,
         "skeptic": args.skeptic,
+        "use_hld_map": args.use_hld_map,
+        "target_hld": args.target_hld,
+        "context_selection": context_selection,
+        "staging": staging_info,
         "skeptic_conflicts_path": str((workspace / SYNC_SKEPTIC_CONFLICTS_REL).relative_to(workspace)) if args.skeptic else None,
         "skeptic_unresolved_conflicts": len(skeptic_conflicts),
     }
     write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
 
     if validation_errors:
+        if args.use_hld_map and parsed_hld_map is not None:
+            update_run_state(
+                workspace,
+                parsed_hld_map,
+                args.target_hld,
+                status="failed",
+                prompt_path=prompt_path,
+                log_path=log_path,
+                staged_output_path=(str(staging_info["staged_dir"]) if staging_info else None),
+            )
         eprint("Completed with validation errors:")
         for err in validation_errors:
             eprint(f"- {err}")
@@ -1220,11 +1681,31 @@ def main() -> int:
         return 1
 
     if skeptic_conflicts:
+        if args.use_hld_map and parsed_hld_map is not None:
+            update_run_state(
+                workspace,
+                parsed_hld_map,
+                args.target_hld,
+                status="failed",
+                prompt_path=prompt_path,
+                log_path=log_path,
+                staged_output_path=(str(staging_info["staged_dir"]) if staging_info else None),
+            )
         print_skeptic_conflicts(skeptic_conflicts, SYNC_SKEPTIC_CONFLICTS_REL)
         eprint(f"Run summary: {logs_dir / 'run_summary.json'}")
         return CONFLICT_RETURN_CODE
 
     print("PASS")
+    if args.use_hld_map and parsed_hld_map is not None:
+        update_run_state(
+            workspace,
+            parsed_hld_map,
+            args.target_hld,
+            status="done",
+            prompt_path=prompt_path,
+            log_path=log_path,
+            staged_output_path=(str(staging_info["staged_dir"]) if staging_info else None),
+        )
     print("Updated files under:")
     print("- .specify/memory/constitution.md")
     print("- specs/ (native Spec Kit feature specs)")

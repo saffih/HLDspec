@@ -153,6 +153,42 @@ Devin runs through a PTY-backed `pexpect` runner by default because some agent C
 ./hld_spec_sync.py --hld ./hld.md --prompt-only
 ```
 
+## HLD map mode
+
+Generate and validate an HLD section map without calling an agent:
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-map-only
+```
+
+Map-aware sync can target one HLD section and build a bounded prompt from that section plus required references instead of loading the full HLD:
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --resume
+```
+
+Generated map artifacts:
+
+```text
+.specify/sync/hld_ref_map.json
+.specify/sync/hld_index.md
+.specify/sync/hld_sections/<section-id>.md
+```
+
+Map-aware runs also write:
+
+```text
+logs/hld_spec_sync/<timestamp>/context_selection.json
+.specify/sync/staged/<run-id>/proposed_writes.md
+.specify/sync/staged/<run-id>/write_manifest.json
+.specify/sync/chunks/run_state.json
+```
+
+The staged writes are created after WRITE FILE target validation and before final apply.
+Use `--restart-map-run` to clear map-aware run state before rerunning a target.
+
 ## Skeptic mode
 
 Use `--skeptic` to bake the Skeptic framework into the sync run. The agent must apply the flow from [`skeptic.md`](https://github.com/saffih/skeptic/blob/main/skeptic.md), close safe HLD/spec/constitution gaps, and write:
@@ -270,6 +306,16 @@ Prompt only:
 ```bash
 ./hld_spec_downstream.py --hld ./hld.md --prompt-only --agent codex
 ```
+
+Map-aware downstream processing can target one HLD section and include only that section, required refs, mapped specs, and relevant downstream artifacts:
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --hld-map-only
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase plan --prompt-only
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase plan
+```
+
+`--target-hld` and `--target` may be combined only when `--target` matches the section's `HLD-SPECS` mapping.
 
 ## Downstream outputs
 

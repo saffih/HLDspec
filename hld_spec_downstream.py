@@ -31,6 +31,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import hld_map
+
 
 DEFAULT_AGENT_MODELS = {
     "devin": "swe-1.6",
@@ -41,6 +43,7 @@ DEFAULT_AGENT_MODELS = {
 SPEC_DIR_REL = Path("specs")
 SYNC_DIR_REL = Path(".specify") / "sync"
 DOWNSTREAM_DIR_REL = SYNC_DIR_REL / "downstream"
+STAGED_DIR_REL = SYNC_DIR_REL / "staged"
 DOWNSTREAM_SKEPTIC_REPORT_REL = DOWNSTREAM_DIR_REL / "skeptic_report.md"
 DOWNSTREAM_SKEPTIC_CONFLICTS_REL = DOWNSTREAM_DIR_REL / "skeptic_conflicts.json"
 PLAN_ALLOWED_FILENAMES = {
@@ -87,6 +90,69 @@ def read_text(path: Path, default: str = "") -> str:
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
+
+
+def parse_write_blocks_text(text: str, workspace: Path) -> list[dict[str, str]]:
+    pattern = re.compile(
+        r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=^WRITE FILE:|\Z)",
+        re.DOTALL | re.MULTILINE,
+    )
+    writes: list[dict[str, str]] = []
+    for match in pattern.finditer(text):
+        raw_path = match.group("path").strip()
+        content = match.group("content").rstrip() + "\n"
+        out_path = Path(raw_path)
+        if out_path.is_absolute():
+            rel_path = out_path.resolve().relative_to(workspace.resolve())
+        else:
+            rel_path = out_path
+        writes.append({"path": str(rel_path), "content": content})
+    return writes
+
+
+def stage_write_blocks(
+    log_path: Path,
+    workspace: Path,
+    *,
+    run_id: str,
+    echoed_prompt: str | None = None,
+) -> dict[str, object]:
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
+    writes = parse_write_blocks_text(text, workspace)
+    staged_dir = workspace / STAGED_DIR_REL / run_id
+    staged_dir.mkdir(parents=True, exist_ok=True)
+    proposed_lines: list[str] = ["# Proposed Writes", ""]
+    manifest_writes: list[dict[str, object]] = []
+    for idx, write in enumerate(writes, start=1):
+        rel_path = write["path"]
+        staged_file = staged_dir / f"{idx:03d}" / rel_path
+        write_text(staged_file, write["content"])
+        proposed_lines.extend(
+            [
+                f"## {idx}. `{rel_path}`",
+                "",
+                "```text",
+                write["content"].rstrip(),
+                "```",
+                "",
+            ]
+        )
+        manifest_writes.append(
+            {
+                "path": rel_path,
+                "staged_path": str(staged_file.relative_to(workspace)),
+                "bytes": len(write["content"].encode("utf-8")),
+            }
+        )
+    write_text(staged_dir / "proposed_writes.md", "\n".join(proposed_lines))
+    manifest = {"run_id": run_id, "writes": manifest_writes}
+    write_text(staged_dir / "write_manifest.json", json.dumps(manifest, indent=2))
+    return {
+        "staged_dir": str(staged_dir.relative_to(workspace)),
+        "proposed_writes": str((staged_dir / "proposed_writes.md").relative_to(workspace)),
+        "write_manifest": str((staged_dir / "write_manifest.json").relative_to(workspace)),
+        "write_count": len(writes),
+    }
 
 
 def strip_echoed_prompt(text: str, prompt: str | None) -> str:
@@ -341,6 +407,67 @@ def list_specs(workspace: Path, targets: list[str], max_chars_per_spec: int) -> 
     return "\n".join(parts)
 
 
+def hld_spec_targets(section: hld_map.HldSection) -> list[str]:
+    return [
+        spec
+        for spec in hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))
+        if spec.upper() not in {"TBD", "CONSTITUTION"}
+    ]
+
+
+def target_hld_context(parsed_map: hld_map.HldMap, target_hld: str) -> tuple[str, dict[str, object]]:
+    sections_by_id = parsed_map.section_by_id()
+    if target_hld not in sections_by_id:
+        raise ValueError(f"Unknown target HLD section: {target_hld}")
+    loaded: dict[str, str] = {target_hld: "target"}
+    target = sections_by_id[target_hld]
+    for ref in target.references:
+        if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"} and ref.target in sections_by_id:
+            loaded[ref.target] = f"{ref.kind} from {target_hld}"
+    parts = [
+        "BOUNDED HLD MAP CONTEXT",
+        "The full HLD is intentionally not included in this prompt.",
+    ]
+    for section_id, why in loaded.items():
+        section = sections_by_id[section_id]
+        parts.append(f"\n--- HLD SECTION {section.id}: {section.title} ({why}) ---\n{section.text}")
+    report = {
+        "target_section": target_hld,
+        "loaded_sections": [
+            {
+                "id": section_id,
+                "title": sections_by_id[section_id].title,
+                "why_loaded": why,
+                "line_start": sections_by_id[section_id].line_start,
+                "line_end": sections_by_id[section_id].line_end,
+            }
+            for section_id, why in loaded.items()
+        ],
+        "target_specs": hld_spec_targets(target),
+    }
+    return "\n".join(parts), report
+
+
+def resolve_hld_targets(parsed_map: hld_map.HldMap, target_hld: str | None, targets: list[str]) -> list[str]:
+    if not target_hld:
+        return targets
+    section = parsed_map.section_by_id().get(target_hld)
+    if not section:
+        raise ValueError(f"Unknown target HLD section: {target_hld}")
+    spec_targets = hld_spec_targets(section)
+    normalized_targets = normalize_targets(targets)
+    if normalized_targets == ["all"] and spec_targets:
+        return spec_targets
+    if spec_targets and normalized_targets != ["all"]:
+        unknown = [target for target in normalized_targets if target not in spec_targets]
+        if unknown:
+            raise ValueError(
+                f"--target-hld {target_hld} maps to HLD-SPECS {', '.join(spec_targets)}; "
+                f"inconsistent --target value(s): {', '.join(unknown)}"
+            )
+    return targets
+
+
 def load_current_state(
     *,
     workspace: Path,
@@ -590,7 +717,7 @@ def build_agent_command(
     stdin_prompt: bool,
 ) -> list[str]:
     if agent == "devin":
-        cmd = ["devin", "-p", prompt]
+        cmd = ["devin", "--prompt-file", str(prompt_file)]
         if model:
             cmd += ["--model", model]
         return cmd + extra_args
@@ -1035,6 +1162,9 @@ def main() -> int:
     )
     ap.add_argument("--prompt-only", action="store_true")
     ap.add_argument("--no-apply-write-blocks", action="store_true")
+    ap.add_argument("--hld-map-only", action="store_true", help="Parse/validate HLD map artifacts and exit without agent.")
+    ap.add_argument("--use-hld-map", action="store_true", help="Use HLD section map for bounded context selection.")
+    ap.add_argument("--target-hld", default=None, help="Target one HLD section such as HLD-007 for map-aware runs.")
     ap.add_argument("--max-hld-chars", type=int, default=0, help="0 means no HLD truncation")
     ap.add_argument("--max-spec-chars", type=int, default=18000)
     ap.add_argument("--agent-timeout-seconds", type=int, default=0, help="0 means no timeout")
@@ -1050,7 +1180,30 @@ def main() -> int:
     if not hld_path.exists():
         raise SystemExit(f"Missing HLD file: {hld_path}")
 
+    parsed_hld_map: hld_map.HldMap | None = None
+    context_selection: dict[str, object] | None = None
+    if args.hld_map_only or args.use_hld_map:
+        parsed_hld_map = hld_map.parse_hld_file(hld_path)
+        map_outputs = hld_map.write_hld_map_outputs(parsed_hld_map, workspace)
+        if parsed_hld_map.validation_errors:
+            eprint("Invalid HLD map:")
+            for error in parsed_hld_map.validation_errors:
+                eprint(f"- {error}")
+            return 1
+        if args.hld_map_only:
+            print("HLD map generated:")
+            for key, value in map_outputs.items():
+                if key != "sections":
+                    print(f"- {key}: {value}")
+            print(f"- sections: {len(map_outputs['sections'])}")
+            return 0
+
     targets = normalize_targets(args.target)
+    if parsed_hld_map is not None and args.target_hld:
+        try:
+            targets = normalize_targets(resolve_hld_targets(parsed_hld_map, args.target_hld, args.target))
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
     try:
         resolve_spec_dirs(workspace, targets, strict=True)
         implementation_roots = normalize_implementation_roots(workspace, args.implementation_root)
@@ -1070,6 +1223,15 @@ def main() -> int:
         max_hld_chars=args.max_hld_chars,
         max_spec_chars=args.max_spec_chars,
     )
+    if args.use_hld_map:
+        if not args.target_hld:
+            raise SystemExit("--use-hld-map requires --target-hld for downstream bounded context")
+        assert parsed_hld_map is not None
+        try:
+            state["numbered_hld"], context_selection = target_hld_context(parsed_hld_map, args.target_hld)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        write_text(logs_dir / "context_selection.json", json.dumps(context_selection, indent=2))
 
     write_text(logs_dir / "hld_numbered.md", state["numbered_hld"])
     prompt = build_prompt(
@@ -1096,6 +1258,9 @@ def main() -> int:
     print(f"Agent: {args.agent}")
     print(f"Model: {args.model or '(none)'}")
     print(f"Skeptic: {args.skeptic}")
+    print(f"HLD map: {args.use_hld_map}")
+    if args.target_hld:
+        print(f"Target HLD: {args.target_hld}")
     print(f"Prompt: {prompt_path}")
     print(f"Log: {log_path}")
 
@@ -1136,12 +1301,16 @@ def main() -> int:
             "implementation_roots": [str(root.relative_to(workspace)) for root in implementation_roots],
             "agent_timeout_seconds": args.agent_timeout_seconds,
             "skeptic": args.skeptic,
+            "use_hld_map": args.use_hld_map,
+            "target_hld": args.target_hld,
+            "context_selection": context_selection,
         }
         write_text(logs_dir / "run_summary.json", json.dumps(summary, indent=2))
         eprint(f"Agent failed with rc={rc}. WRITE FILE blocks were not applied. See: {log_path}")
         return rc
 
     writes = 0
+    staging_info: dict[str, object] | None = None
     if not args.no_apply_write_blocks:
         try:
             validate_write_targets(
@@ -1152,6 +1321,13 @@ def main() -> int:
                 implementation_roots=implementation_roots,
                 echoed_prompt=prompt,
             )
+            if args.use_hld_map:
+                staging_info = stage_write_blocks(
+                    log_path,
+                    workspace,
+                    run_id=ts,
+                    echoed_prompt=prompt,
+                )
             writes = apply_write_blocks(
                 log_path=log_path,
                 workspace=workspace,
@@ -1177,6 +1353,10 @@ def main() -> int:
                 "validation_errors": [f"failed to apply WRITE FILE blocks: {exc}"],
                 "agent_timeout_seconds": args.agent_timeout_seconds,
                 "skeptic": args.skeptic,
+                "use_hld_map": args.use_hld_map,
+                "target_hld": args.target_hld,
+                "context_selection": context_selection,
+                "staging": staging_info,
             }
             write_text(logs_dir / "run_summary.json", json.dumps(summary, indent=2))
             return 1
@@ -1205,6 +1385,10 @@ def main() -> int:
         "validation_errors": validation_errors,
         "agent_timeout_seconds": args.agent_timeout_seconds,
         "skeptic": args.skeptic,
+        "use_hld_map": args.use_hld_map,
+        "target_hld": args.target_hld,
+        "context_selection": context_selection,
+        "staging": staging_info,
         "skeptic_conflicts_path": (
             str((workspace / DOWNSTREAM_SKEPTIC_CONFLICTS_REL).relative_to(workspace)) if args.skeptic else None
         ),
