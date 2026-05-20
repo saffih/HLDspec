@@ -1,7 +1,9 @@
 #!/usr/bin/env -S uv run --script --no-project
 # /// script
 # requires-python = ">=3.10"
-# dependencies = []
+# dependencies = [
+#   "pexpect>=4.9.0",
+# ]
 # ///
 
 """
@@ -9,42 +11,60 @@ hld_spec_sync.py
 
 Sync one large HLD into:
 - .specify/memory/constitution.md
-- specs/*/spec.md
-- specs/spec_index.json
-- specs/feature_graph.json
-- specs/sync_report.md
-- specs/analyze_report.md
-- specs/missing_report.json
-- specs/duplicate_report.json
-- specs/drift_report.json
-- specs/constitution_change_report.md
+- specs/*/spec.md (native Spec Kit feature specs)
+- .specify/sync/spec_index.json
+- .specify/sync/feature_graph.json
+- .specify/sync/sync_report.md
+- .specify/sync/analyze_report.md
+- .specify/sync/missing_report.json
+- .specify/sync/duplicate_report.json
+- .specify/sync/drift_report.json
+- .specify/sync/constitution_change_report.md
 
 Works for:
 - Greenfield: compare HLD desired state against empty current state.
-- Brownfield: compare HLD desired state against existing constitution/specs/index/graph.
+- Brownfield: compare HLD desired state against existing constitution/native Spec Kit specs/sync index/sync graph.
 
 Backends:
-- --agent devin
-- --agent claude
-- --agent codex
+- --agent devin  -> default model swe-1.6
+- --agent claude -> default model opus-4.6
+- --agent codex  -> default model gpt-5.5
 - --agent custom
 
 Default:
-    ./hld_spec_sync.py --hld ./hld.md --agent devin --model swe-1.6
+    ./hld_spec_sync.py --hld ./hld.md
+
+The default agent is devin. If --model is omitted, the selected agent's
+default model is used.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import shlex
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+
+
+DEFAULT_AGENT_MODELS = {
+    "devin": "swe-1.6",
+    "claude": "opus-4.6",
+    "codex": "gpt-5.5",
+}
+
+FEATURE_SPECS_REL = Path("specs")
+SYNC_REL = Path(".specify") / "sync"
+SYNC_ALLOWED_SPEC_FILENAMES = {"spec.md"}
+PROTECTED_RELS = {
+    ".git",
+    ".agents",
+    ".codex",
+    "logs",
+}
 
 
 def eprint(*args: object) -> None:
@@ -69,12 +89,19 @@ def number_hld(hld_text: str) -> str:
 def compact_middle(text: str, max_chars: int) -> str:
     if max_chars <= 0 or len(text) <= max_chars:
         return text
-    half = max_chars // 2
-    return text[:half] + "\n\n[...TRUNCATED BY hld_spec_sync.py...]\n\n" + text[-half:]
+
+    marker = "\n\n[...TRUNCATED BY hld_spec_sync.py...]\n\n"
+    if max_chars <= len(marker):
+        return marker[:max_chars]
+
+    keep = max_chars - len(marker)
+    head = keep // 2
+    tail = keep - head
+    return text[:head] + marker + text[-tail:]
 
 
 def find_existing_spec_files(workspace: Path) -> list[Path]:
-    specs_dir = workspace / "specs"
+    specs_dir = workspace / FEATURE_SPECS_REL
     if not specs_dir.exists():
         return []
     return sorted(p for p in specs_dir.glob("*/spec.md") if p.is_file())
@@ -83,7 +110,7 @@ def find_existing_spec_files(workspace: Path) -> list[Path]:
 def list_existing_specs(workspace: Path, max_chars_per_spec: int, max_specs: int) -> str:
     files = find_existing_spec_files(workspace)
     if not files:
-        return "No existing specs/*/spec.md files found.\n"
+        return "No existing native Spec Kit specs/*/spec.md files found.\n"
 
     parts: list[str] = []
     for idx, path in enumerate(files, start=1):
@@ -107,13 +134,19 @@ def load_current_state(workspace: Path, mode: str, max_existing_spec_chars: int,
 
     return {
         "constitution": read_text(workspace / ".specify" / "memory" / "constitution.md", "No constitution exists.\n"),
-        "spec_index": read_text(workspace / "specs" / "spec_index.json", "No spec_index.json exists.\n"),
-        "feature_graph": read_text(workspace / "specs" / "feature_graph.json", "No feature_graph.json exists.\n"),
+        "spec_index": read_text(workspace / SYNC_REL / "spec_index.json", "No spec_index.json exists.\n"),
+        "feature_graph": read_text(workspace / SYNC_REL / "feature_graph.json", "No feature_graph.json exists.\n"),
         "existing_specs": list_existing_specs(workspace, max_existing_spec_chars, max_existing_specs),
     }
 
 
-def apply_write_blocks(log_path: Path, workspace: Path) -> int:
+def apply_write_blocks(
+    log_path: Path,
+    workspace: Path,
+    *,
+    allow_constitution: bool,
+    allow_specs: bool,
+) -> int:
     text = read_text(log_path)
     pattern = re.compile(
         r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=\nWRITE FILE:|\Z)",
@@ -132,8 +165,18 @@ def apply_write_blocks(log_path: Path, workspace: Path) -> int:
             out_path = workspace / out_path
         out_path = out_path.resolve()
 
-        if not str(out_path).startswith(str(workspace)):
-            raise RuntimeError(f"Refusing to write outside workspace: {out_path}")
+        try:
+            out_path.relative_to(workspace)
+        except ValueError as exc:
+            raise RuntimeError(f"Refusing to write outside workspace: {out_path}") from exc
+
+        if not is_sync_allowed_path(
+            out_path,
+            workspace,
+            allow_constitution=allow_constitution,
+            allow_specs=allow_specs,
+        ):
+            raise RuntimeError(f"Refusing disallowed sync write target: {out_path.relative_to(workspace)}")
 
         write_text(out_path, content)
         count += 1
@@ -151,22 +194,23 @@ def validate_json_file(path: Path, errors: list[str]) -> None:
         errors.append(f"invalid JSON: {path}: {exc}")
 
 
-def validate_outputs(workspace: Path, require_specs: bool) -> list[str]:
+def validate_outputs(workspace: Path, *, require_constitution: bool, require_specs: bool) -> list[str]:
     errors: list[str] = []
 
     required_text = [
-        ".specify/memory/constitution.md",
-        "specs/sync_report.md",
-        "specs/analyze_report.md",
-        "specs/constitution_change_report.md",
+        ".specify/sync/sync_report.md",
+        ".specify/sync/analyze_report.md",
+        ".specify/sync/constitution_change_report.md",
     ]
+    if require_constitution:
+        required_text.insert(0, ".specify/memory/constitution.md")
 
     required_json = [
-        "specs/spec_index.json",
-        "specs/feature_graph.json",
-        "specs/missing_report.json",
-        "specs/duplicate_report.json",
-        "specs/drift_report.json",
+        ".specify/sync/spec_index.json",
+        ".specify/sync/feature_graph.json",
+        ".specify/sync/missing_report.json",
+        ".specify/sync/duplicate_report.json",
+        ".specify/sync/drift_report.json",
     ]
 
     for rel in required_text:
@@ -178,26 +222,88 @@ def validate_outputs(workspace: Path, require_specs: bool) -> list[str]:
 
     spec_files = find_existing_spec_files(workspace)
     if require_specs and not spec_files:
-        errors.append("no specs/*/spec.md files exist after sync")
+        errors.append("no native Spec Kit specs/*/spec.md files exist after sync")
 
     for path in spec_files:
         text = read_text(path)
         rel = str(path.relative_to(workspace))
-        for section in ["## Source Anchors", "## Requirements", "## Acceptance Criteria", "## Traceability"]:
+        for section in ["## User Scenarios & Testing", "### Functional Requirements", "## Success Criteria"]:
             if section not in text:
                 errors.append(f"{rel}: missing section {section}")
 
     return errors
 
 
+def is_protected_path(path: Path, workspace: Path) -> bool:
+    rel = path.relative_to(workspace)
+    return bool(rel.parts) and rel.parts[0] in PROTECTED_RELS
+
+
+def is_sync_allowed_path(
+    path: Path,
+    workspace: Path,
+    *,
+    allow_constitution: bool,
+    allow_specs: bool,
+) -> bool:
+    rel = path.relative_to(workspace)
+    parts = rel.parts
+    if not parts:
+        return False
+
+    if is_protected_path(path, workspace):
+        return False
+
+    if allow_constitution and rel == Path(".specify") / "memory" / "constitution.md":
+        return True
+
+    if len(parts) >= 2 and parts[0] == ".specify" and parts[1] == "sync":
+        return True
+
+    if allow_specs and len(parts) == 3 and parts[0] == "specs" and parts[-1] in SYNC_ALLOWED_SPEC_FILENAMES:
+        return True
+
+    return False
+
+
+def validate_write_targets(
+    log_path: Path,
+    workspace: Path,
+    *,
+    allow_constitution: bool,
+    allow_specs: bool,
+) -> None:
+    text = read_text(log_path)
+    pattern = re.compile(r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
+    workspace = workspace.resolve()
+    for match in pattern.finditer(text):
+        raw_path = match.group("path").strip()
+        out_path = Path(raw_path)
+        if not out_path.is_absolute():
+            out_path = workspace / out_path
+        out_path = out_path.resolve()
+        try:
+            out_path.relative_to(workspace)
+        except ValueError as exc:
+            raise RuntimeError(f"Refusing to write outside workspace: {out_path}") from exc
+        if not is_sync_allowed_path(
+            out_path,
+            workspace,
+            allow_constitution=allow_constitution,
+            allow_specs=allow_specs,
+        ):
+            raise RuntimeError(f"Refusing disallowed sync write target: {out_path.relative_to(workspace)}")
+
+
 def build_agent_command(
     *,
     agent: str,
-    model: str,
+    model: str | None,
     prompt: str,
     prompt_file: Path,
     custom_command: str | None,
     extra_args: list[str],
+    stdin_prompt: bool,
 ) -> list[str]:
     if agent == "devin":
         cmd = ["devin", "-p", prompt]
@@ -214,10 +320,12 @@ def build_agent_command(
     if agent == "codex":
         # Codex CLI interfaces may vary by version. This default is intended
         # for non-interactive execution. If it fails, use --agent custom.
-        cmd = ["codex", "exec", prompt]
+        cmd = ["codex", "exec"]
         if model:
             cmd += ["--model", model]
-        return cmd + extra_args
+        cmd += extra_args
+        cmd.append("-" if stdin_prompt else prompt)
+        return cmd
 
     if agent == "custom":
         if not custom_command:
@@ -235,14 +343,21 @@ def build_agent_command(
 def run_agent(
     *,
     agent: str,
-    model: str,
+    model: str | None,
     prompt: str,
     prompt_file: Path,
     workspace: Path,
     log_path: Path,
     custom_command: str | None,
     extra_args: list[str],
+    runner: str,
+    timeout_seconds: int,
 ) -> int:
+    if runner == "auto":
+        runner = "pexpect" if agent == "devin" else "subprocess"
+
+    stdin_prompt = agent == "codex" and runner == "subprocess"
+
     cmd = build_agent_command(
         agent=agent,
         model=model,
@@ -250,21 +365,65 @@ def run_agent(
         prompt_file=prompt_file,
         custom_command=custom_command,
         extra_args=extra_args,
+        stdin_prompt=stdin_prompt,
     )
 
     printable = " ".join(shlex.quote(x if len(x) < 180 else x[:180] + "...") for x in cmd)
-    eprint(f"Running: {printable}")
+
+    eprint(f"Running ({runner}): {printable}")
+
+    if runner == "pexpect":
+        return run_agent_pexpect(cmd=cmd, workspace=workspace, log_path=log_path, timeout_seconds=timeout_seconds)
+
+    if runner != "subprocess":
+        raise SystemExit(f"Unknown runner: {runner}")
 
     with log_path.open("w", encoding="utf-8") as log:
-        proc = subprocess.run(
-            cmd,
-            cwd=str(workspace),
-            text=True,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                cwd=str(workspace),
+                input=prompt if stdin_prompt else None,
+                text=True,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                check=False,
+                timeout=timeout_seconds if timeout_seconds > 0 else None,
+            )
+        except subprocess.TimeoutExpired:
+            log.write(f"\nAgent timed out after {timeout_seconds} seconds.\n")
+            return 124
     return int(proc.returncode)
+
+
+def run_agent_pexpect(*, cmd: list[str], workspace: Path, log_path: Path, timeout_seconds: int) -> int:
+    try:
+        import pexpect
+    except ImportError as exc:
+        raise SystemExit("pexpect runner requires the pexpect package") from exc
+
+    if not cmd:
+        raise SystemExit("Agent command is empty")
+
+    with log_path.open("w", encoding="utf-8") as log:
+        child = pexpect.spawn(
+            cmd[0],
+            cmd[1:],
+            cwd=str(workspace),
+            encoding="utf-8",
+            codec_errors="replace",
+            timeout=None,
+        )
+        child.logfile_read = log
+        try:
+            child.expect(pexpect.EOF, timeout=timeout_seconds if timeout_seconds > 0 else None)
+        except pexpect.TIMEOUT:
+            log.write(f"\nAgent timed out after {timeout_seconds} seconds.\n")
+            child.terminate(force=True)
+            child.close()
+            return 124
+        child.close()
+        return int(child.exitstatus if child.exitstatus is not None else child.signalstatus or 1)
 
 
 def build_prompt(
@@ -283,14 +442,25 @@ def build_prompt(
     else:
         work_mode = "SYNC MODE: Update/create/deprecate constitution and specs as needed."
 
+    if analyze_only or report_only:
+        allowed_write_targets = "- .specify/sync/**"
+    else:
+        allowed_write_targets = "\n".join(
+            [
+                "- .specify/memory/constitution.md",
+                "- .specify/sync/**",
+                "- specs/<NNN-feature-slug>/spec.md",
+            ]
+        )
+
     return f"""You are a careful HLD-to-SpecKit synchronization agent.
 
 USER GOAL
 Maintain one large HLD as the parent source of truth while keeping:
 - .specify/memory/constitution.md
-- specs/*/spec.md
-- specs/spec_index.json
-- specs/feature_graph.json
+- specs/*/spec.md (native Spec Kit feature specs)
+- .specify/sync/spec_index.json
+- .specify/sync/feature_graph.json
 - missing/duplicate/drift/analyze reports
 
 synchronized with that HLD.
@@ -304,7 +474,7 @@ WORK MODE
 IMPORTANT MODEL
 Use the same algorithm for greenfield and brownfield:
 - Desired state = what the HLD says should exist now.
-- Current state = existing constitution/specs/index/graph.
+- Current state = existing constitution/native Spec Kit specs/sync index/sync graph.
 - In greenfield, current state is intentionally empty.
 - Diff desired vs current.
 - Create missing, update changed, deprecate removed/stale, report uncertain.
@@ -312,7 +482,7 @@ Use the same algorithm for greenfield and brownfield:
 SOURCE OF TRUTH RULES
 1. Constitution governs all specs and implementation.
 2. HLD is the canonical parent source for system intent, architecture, work units, scope, and ordering.
-3. Feature specs are derived living contracts, one per stable capability.
+3. Feature specs are derived living contracts, one per stable capability, written as native Spec Kit specs under specs/.
 4. Implementation is derived from specs.
 5. If a spec conflicts with the HLD, flag drift and update the spec unless a documented exception says otherwise.
 
@@ -331,29 +501,32 @@ Every run must evaluate whether the constitution needs updates from the HLD, inc
 DO NOT
 - Do not implement code.
 - Do not modify source code outside .specify/ and specs/.
+- Do not write any implementation files. This sync tool will reject WRITE FILE targets outside the allowed sync paths.
 - Do not create tasks.md or plan.md.
 - Do not create a new spec for every HLD change.
 - Do not duplicate specs.
 - Do not turn non-goals into features.
 - Do not turn context-only architecture/rationale into unnecessary specs.
 - Do not silently ignore missing feature coverage.
+- Do not write sync metadata files into specs/. Keep specs/ for native Spec Kit feature directories only.
+- Do not invent a parallel custom spec format.
 
 DO
 - Create/update .specify/memory/constitution.md.
-- Create/update specs/spec_index.json.
-- Create/update specs/feature_graph.json.
-- Create/update specs/sync_report.md.
-- Create/update specs/analyze_report.md.
-- Create/update specs/missing_report.json.
-- Create/update specs/duplicate_report.json.
-- Create/update specs/drift_report.json.
-- Create/update specs/constitution_change_report.md.
+- Create/update .specify/sync/spec_index.json.
+- Create/update .specify/sync/feature_graph.json.
+- Create/update .specify/sync/sync_report.md.
+- Create/update .specify/sync/analyze_report.md.
+- Create/update .specify/sync/missing_report.json.
+- Create/update .specify/sync/duplicate_report.json.
+- Create/update .specify/sync/drift_report.json.
+- Create/update .specify/sync/constitution_change_report.md.
 - Create/update specs/<NNN-feature-slug>/spec.md when not in analyze-only/report-only mode.
 - Update existing related specs when HLD changes existing capabilities.
 - Create a new spec only for a new independent capability.
 - Mark removed/deprecated behavior clearly.
 - Preserve HLD line anchors and quote anchors in every spec.
-- Include constitution checks in every spec.
+- Include HLD traceability in every spec without breaking the native Spec Kit template structure.
 - Build bottom-up feature ordering:
   1. constitution/governance
   2. foundation/data models/interfaces
@@ -374,57 +547,73 @@ Default decisions:
 - Technical debt -> debt/refactor spec only if actionable and HLD says it matters.
 
 REQUIRED SPEC FORMAT
-Every specs/<NNN-feature-slug>/spec.md must include:
+Every specs/<NNN-feature-slug>/spec.md MUST be a native Spec Kit feature spec matching .specify/templates/spec-template.md.
+
+Use this section order and heading style:
 
 # Feature Specification: <title>
 
-## Status
-active|needs-review|deprecated
+**Feature Branch**: `[<NNN-feature-slug>]`
 
-## Source of Truth
-- Parent HLD: {hld_path}
+**Created**: <YYYY-MM-DD>
+
+**Status**: Draft
+
+**Input**: HLD-derived feature from `{hld_path}`; HLD lines <start-end>; anchor quote: "<exact quote>"
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - <brief title> (Priority: P1)
+
+<plain-language independently testable journey>
+
+**Why this priority**: <why this is the first viable slice>
+
+**Independent Test**: <how this story can be tested independently>
+
+**Acceptance Scenarios**:
+
+1. **Given** <state>, **When** <action>, **Then** <result>
+
+### Edge Cases
+
+- <edge case>
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: <technology-agnostic requirement>
+
+### Key Entities *(include if feature involves data)*
+
+- **<Entity>**: <what it represents and relationships>
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: <measurable outcome>
+
+## Assumptions
+
+- <assumption, dependency, or out-of-scope boundary>
+
+## HLD Traceability
+
+- Parent HLD: `{hld_path}`
 - HLD lines: <start-end>
 - Anchor quote: "<exact quote>"
+- Source anchors:
+  - HLD lines <start-end>: "<quote>"
+- Related specs: <spec ids/paths>
+- Sync status: synced|missing|drift|duplicate-risk|needs-review
 
-## Source Anchors
-- ...
-
-## Constitution Checks
-- HLD anchored: PASS|FAIL
-- Single-goal spec: PASS|FAIL
-- No source-code implementation included: PASS|FAIL
-- Non-goals respected: PASS|FAIL
-- Dependencies declared: PASS|FAIL
-
-## User Story
-As a ...
-I want ...
-So that ...
-
-## Requirements
-- FR-001: ...
-
-## Acceptance Criteria
-- Given ...
-  When ...
-  Then ...
-
-## Dependencies
-- Depends on: ...
-- Blocks: ...
-
-## Edge Cases
-- ...
-
-## Out of Scope
-- ...
-
-## Open Questions
-- ...
-
-## Traceability
-- HLD lines ...
-- Related specs ...
+Rules for native Spec Kit compatibility:
+- Preserve the Spec Kit top-level sections and order.
+- Do not use the old custom sections `## Source of Truth`, `## Constitution Checks`, `## Acceptance Criteria`, `## Dependencies`, or `## Traceability`.
+- Put dependencies, blockers, non-goals, and open questions in Assumptions or HLD Traceability unless they need their own Spec Kit story/requirement.
+- Use `[NEEDS CLARIFICATION: ...]` markers for unresolved ambiguity.
 
 REQUIRED spec_index.json SCHEMA
 [
@@ -528,9 +717,11 @@ Must summarize:
 
 OUTPUT FORMAT
 You MUST output all file changes using WRITE FILE blocks only.
+Allowed WRITE FILE targets are only:
+{allowed_write_targets}
 
 Example:
-WRITE FILE: specs/sync_report.md
+WRITE FILE: .specify/sync/sync_report.md
 CONTENT:
 # Sync Report
 ...
@@ -554,14 +745,37 @@ NUMBERED HLD INPUT
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Sync HLD -> constitution + SpecKit specs + missing/duplicate/drift/analyze reports."
+        description="Sync HLD -> constitution + SpecKit specs + missing/duplicate/drift/analyze reports.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Agent model defaults:\n"
+            "  devin  -> swe-1.6\n"
+            "  claude -> opus-4.6\n"
+            "  codex  -> gpt-5.5\n"
+            "  custom -> no default model\n\n"
+            "Use --model to override the selected agent default."
+        ),
     )
     ap.add_argument("--hld", required=True, help="Path to HLD markdown file")
     ap.add_argument("--workspace", default=".", help="Repo/workspace root")
     ap.add_argument("--agent", choices=["devin", "claude", "codex", "custom"], default="devin")
-    ap.add_argument("--model", default="swe-1.6")
+    ap.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "Model to pass to the selected agent. Defaults by agent: "
+            "devin=swe-1.6, claude=opus-4.6, codex=gpt-5.5. "
+            "Custom has no default model."
+        ),
+    )
     ap.add_argument("--agent-command", default=None, help="For --agent custom. Supports {prompt_file} and {model}.")
     ap.add_argument("--agent-extra-arg", action="append", default=[])
+    ap.add_argument(
+        "--runner",
+        choices=["auto", "subprocess", "pexpect"],
+        default="auto",
+        help="How to run the agent. Auto uses pexpect for Devin and subprocess for other agents.",
+    )
 
     ap.add_argument("--mode", choices=["auto", "greenfield", "brownfield"], default="auto")
     ap.add_argument("--report-only", action="store_true")
@@ -572,7 +786,11 @@ def main() -> int:
     ap.add_argument("--max-hld-chars", type=int, default=0, help="0 means no HLD truncation")
     ap.add_argument("--max-existing-spec-chars", type=int, default=16000)
     ap.add_argument("--max-existing-specs", type=int, default=80)
+    ap.add_argument("--agent-timeout-seconds", type=int, default=0, help="0 means no timeout")
     args = ap.parse_args()
+
+    if args.model is None:
+        args.model = DEFAULT_AGENT_MODELS.get(args.agent)
 
     workspace = Path(args.workspace).resolve()
     hld_path = Path(args.hld)
@@ -591,6 +809,7 @@ def main() -> int:
         mode = "brownfield" if existing_specs else "greenfield"
     else:
         mode = args.mode
+    allow_sync_mutations = not args.report_only and not args.analyze_only
 
     hld_text = read_text(hld_path)
     numbered_hld = compact_middle(number_hld(hld_text), args.max_hld_chars)
@@ -618,7 +837,7 @@ def main() -> int:
 
     print(f"Mode: {mode}")
     print(f"Agent: {args.agent}")
-    print(f"Model: {args.model}")
+    print(f"Model: {args.model or '(none)'}")
     print(f"Prompt: {prompt_path}")
     print(f"Log: {log_path}")
 
@@ -636,19 +855,67 @@ def main() -> int:
             log_path=log_path,
             custom_command=args.agent_command,
             extra_args=args.agent_extra_arg,
+            runner=args.runner,
+            timeout_seconds=args.agent_timeout_seconds,
         )
     except FileNotFoundError as exc:
         eprint(f"Agent binary not found: {exc}")
         return 127
 
+    if rc != 0:
+        run_summary = {
+            "mode": mode,
+            "agent": args.agent,
+            "model": args.model,
+            "hld": str(hld_path),
+            "prompt": str(prompt_path),
+            "log": str(log_path),
+            "returncode": rc,
+            "write_blocks_applied": 0,
+            "validation_errors": [],
+            "agent_timeout_seconds": args.agent_timeout_seconds,
+        }
+        write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
+        eprint(f"Agent failed with rc={rc}. WRITE FILE blocks were not applied. See: {log_path}")
+        return rc
+
     writes = 0
     if not args.no_apply_write_blocks:
         try:
-            writes = apply_write_blocks(log_path, workspace)
+            validate_write_targets(
+                log_path,
+                workspace,
+                allow_constitution=allow_sync_mutations,
+                allow_specs=allow_sync_mutations,
+            )
+            writes = apply_write_blocks(
+                log_path,
+                workspace,
+                allow_constitution=allow_sync_mutations,
+                allow_specs=allow_sync_mutations,
+            )
         except Exception as exc:
             eprint(f"Failed to apply WRITE FILE blocks: {exc}")
+            run_summary = {
+                "mode": mode,
+                "agent": args.agent,
+                "model": args.model,
+                "hld": str(hld_path),
+                "prompt": str(prompt_path),
+                "log": str(log_path),
+                "returncode": rc,
+                "write_blocks_applied": writes,
+                "validation_errors": [f"failed to apply WRITE FILE blocks: {exc}"],
+                "agent_timeout_seconds": args.agent_timeout_seconds,
+            }
+            write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
+            return 1
 
-    validation_errors = validate_outputs(workspace, require_specs=not args.report_only and not args.analyze_only)
+    validation_errors = validate_outputs(
+        workspace,
+        require_constitution=allow_sync_mutations,
+        require_specs=allow_sync_mutations,
+    )
 
     run_summary = {
         "mode": mode,
@@ -660,12 +927,9 @@ def main() -> int:
         "returncode": rc,
         "write_blocks_applied": writes,
         "validation_errors": validation_errors,
+        "agent_timeout_seconds": args.agent_timeout_seconds,
     }
     write_text(logs_dir / "run_summary.json", json.dumps(run_summary, indent=2))
-
-    if rc != 0:
-        eprint(f"Agent failed with rc={rc}. See: {log_path}")
-        return rc
 
     if validation_errors:
         eprint("Completed with validation errors:")
@@ -677,7 +941,8 @@ def main() -> int:
     print("PASS")
     print("Updated files under:")
     print("- .specify/memory/constitution.md")
-    print("- specs/")
+    print("- specs/ (native Spec Kit feature specs)")
+    print("- .specify/sync/")
     print(f"Run summary: {logs_dir / 'run_summary.json'}")
     return 0
 
