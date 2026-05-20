@@ -9,6 +9,39 @@ chmod +x hld_spec_sync.py
 chmod +x hld_spec_downstream.py
 ```
 
+## HLD input format
+
+For large HLDs, prefer one canonical `HLD.md` with stable, grepable section metadata instead of many manually maintained HLD source files.
+
+Recommended section format:
+
+```md
+## HLD-003 - Sync Engine
+
+HLD-ID: HLD-003
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: 001,002
+HLD-RESOURCES: hld_spec_sync.py,.specify/memory/constitution.md,specs/*/spec.md
+HLD-VERIFY: related specs preserve HLD anchors; feature graph includes dependencies
+```
+
+Use inline references for section relationships:
+
+```md
+This section DEPENDS REF HLD-002 because source-of-truth rules define what may be generated.
+This section REF HLD-006 for rollback behavior.
+```
+
+This is a short excerpt; a complete HLD defines referenced sections or marks unknown references as `TBD` nearby.
+
+See:
+
+- [HLD_FORMAT.md](HLD_FORMAT.md) for the HLD section format and grep/reference rules.
+- [HLD_GENERATION.md](HLD_GENERATION.md) for a reusable prompt to create HLDs in this format.
+- [HLD_DOCS_JUDGE_WORKFLOW.md](HLD_DOCS_JUDGE_WORKFLOW.md) for an optional Skeptic-derived Judge workflow for documentation-project HLDs.
+
 ## Sync script
 
 `hld_spec_sync.py` syncs one large HLD into a Spec Kit-native constitution, feature specs, sync index, graph, and reports.
