@@ -25,9 +25,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import shlex
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -153,6 +155,52 @@ def stage_write_blocks(
         "write_manifest": str((staged_dir / "write_manifest.json").relative_to(workspace)),
         "write_count": len(writes),
     }
+
+
+def copy_validation_workspace(workspace: Path) -> tempfile.TemporaryDirectory[str]:
+    tmp = tempfile.TemporaryDirectory()
+    tmp_workspace = Path(tmp.name) / "workspace"
+
+    def ignore(_dir_path: str, names: list[str]) -> set[str]:
+        return {name for name in names if name in {".git", "logs", ".agents", ".codex"}}
+
+    shutil.copytree(workspace, tmp_workspace, ignore=ignore)
+    return tmp
+
+
+def apply_staged_writes_to_workspace(
+    *,
+    staging_workspace: Path,
+    target_workspace: Path,
+    staging_info: dict[str, object],
+    phase: str,
+    allow_implementation: bool,
+    implementation_roots: list[Path],
+) -> int:
+    staging_workspace = staging_workspace.resolve()
+    target_workspace = target_workspace.resolve()
+    implementation_roots = [root.resolve() for root in implementation_roots]
+    manifest_path = staging_workspace / str(staging_info["write_manifest"])
+    manifest = json.loads(read_text(manifest_path))
+    count = 0
+
+    for item in manifest.get("writes", []):
+        rel_path = Path(str(item["path"]))
+        staged_path = staging_workspace / str(item["staged_path"])
+        out_path = (target_workspace / rel_path).resolve()
+
+        validate_write_target(
+            out_path,
+            target_workspace,
+            phase=phase,
+            allow_implementation=allow_implementation,
+            implementation_roots=implementation_roots,
+        )
+
+        write_text(out_path, read_text(staged_path))
+        count += 1
+
+    return count
 
 
 def strip_echoed_prompt(text: str, prompt: str | None) -> str:
@@ -1371,14 +1419,53 @@ def main() -> int:
                     run_id=ts,
                     echoed_prompt=prompt,
                 )
-            writes = apply_write_blocks(
-                log_path=log_path,
-                workspace=workspace,
-                phase=args.phase,
-                allow_implementation=args.allow_implementation,
-                implementation_roots=implementation_roots,
-                echoed_prompt=prompt,
-            )
+                tmp_holder = copy_validation_workspace(workspace)
+                try:
+                    tmp_workspace = Path(tmp_holder.name) / "workspace"
+                    tmp_implementation_roots = [
+                        tmp_workspace / root.relative_to(workspace)
+                        for root in implementation_roots
+                    ]
+                    apply_staged_writes_to_workspace(
+                        staging_workspace=workspace,
+                        target_workspace=tmp_workspace,
+                        staging_info=staging_info,
+                        phase=args.phase,
+                        allow_implementation=args.allow_implementation,
+                        implementation_roots=tmp_implementation_roots,
+                    )
+                    staged_validation_errors = validate_workspace(tmp_workspace, args.phase, targets)
+                    if args.skeptic:
+                        evaluate_skeptic_outputs(
+                            tmp_workspace,
+                            report_rel=DOWNSTREAM_SKEPTIC_REPORT_REL,
+                            conflicts_rel=DOWNSTREAM_SKEPTIC_CONFLICTS_REL,
+                            errors=staged_validation_errors,
+                        )
+                    if staged_validation_errors:
+                        raise RuntimeError(
+                            "staged validation failed before apply: "
+                            + "; ".join(staged_validation_errors)
+                        )
+                    writes = apply_staged_writes_to_workspace(
+                        staging_workspace=workspace,
+                        target_workspace=workspace,
+                        staging_info=staging_info,
+                        phase=args.phase,
+                        allow_implementation=args.allow_implementation,
+                        implementation_roots=implementation_roots,
+                    )
+                finally:
+                    tmp_holder.cleanup()
+            else:
+                writes = apply_write_blocks(
+                    log_path=log_path,
+                    workspace=workspace,
+                    phase=args.phase,
+                    allow_implementation=args.allow_implementation,
+                    implementation_roots=implementation_roots,
+                    echoed_prompt=prompt,
+                )
         except Exception as exc:
             eprint(f"Failed to apply WRITE FILE blocks: {exc}")
             summary = {

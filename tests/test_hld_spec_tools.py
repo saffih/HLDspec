@@ -792,6 +792,64 @@ HLD-RESOURCES: TBD
             self.assertEqual(1, len(staged_manifests))
             self.assertTrue((workspace / ".specify" / "sync" / "downstream" / "downstream_analysis.md").exists())
 
+    def test_downstream_map_mode_failed_staged_validation_does_not_modify_final_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            hld_path = workspace / "HLD.md"
+            hld_path.write_text(VALID_HLD, encoding="utf-8")
+            (workspace / ".specify" / "memory").mkdir(parents=True)
+            (workspace / ".specify" / "sync" / "downstream").mkdir(parents=True)
+            (workspace / ".specify" / "memory" / "constitution.md").write_text("# Constitution\n", encoding="utf-8")
+            (workspace / ".specify" / "sync" / "spec_index.json").write_text("[]\n", encoding="utf-8")
+            (workspace / ".specify" / "sync" / "downstream" / "downstream_analysis.md").write_text(
+                "# Original Downstream Analysis\n",
+                encoding="utf-8",
+            )
+            (workspace / "specs" / "001-alpha").mkdir(parents=True)
+            (workspace / "specs" / "001-alpha" / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+            def fake_run_agent(**kwargs):
+                Path(kwargs["log_path"]).write_text(
+                    "WRITE FILE: .specify/sync/downstream/downstream_analysis.md\n"
+                    "CONTENT:\n# Changed Downstream Analysis\n",
+                    encoding="utf-8",
+                )
+                return 0
+
+            old_run_agent = DOWNSTREAM.run_agent
+            old_argv = sys.argv
+            DOWNSTREAM.run_agent = fake_run_agent
+            sys.argv = [
+                "hld_spec_downstream.py",
+                "--workspace",
+                str(workspace),
+                "--hld",
+                str(hld_path),
+                "--use-hld-map",
+                "--target-hld",
+                "HLD-002",
+                "--phase",
+                "analyze",
+                "--agent",
+                "custom",
+                "--agent-command",
+                "fake",
+            ]
+            try:
+                rc = DOWNSTREAM.main()
+            finally:
+                DOWNSTREAM.run_agent = old_run_agent
+                sys.argv = old_argv
+
+            self.assertEqual(1, rc)
+            staged_manifests = list((workspace / ".specify" / "sync" / "staged").glob("*/write_manifest.json"))
+            self.assertEqual(1, len(staged_manifests))
+            self.assertEqual(
+                "# Original Downstream Analysis\n",
+                (workspace / ".specify" / "sync" / "downstream" / "downstream_analysis.md").read_text(encoding="utf-8"),
+            )
+            self.assertFalse((workspace / ".specify" / "sync" / "downstream" / "gap_closure_plan.md").exists())
+
     def test_downstream_ignores_echoed_prompt_write_blocks(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             workspace = Path(td)

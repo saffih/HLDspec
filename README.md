@@ -321,7 +321,7 @@ Prompt only:
 ./hld_spec_downstream.py --hld ./hld.md --prompt-only --agent codex
 ```
 
-Map-aware downstream processing can target one HLD section and include only that section, required refs, mapped specs, and relevant downstream artifacts:
+Map-aware downstream processing can target one HLD section and include only that section, required refs, normal refs within depth, mapped specs, and relevant downstream artifacts:
 
 ```bash
 ./hld_spec_downstream.py --hld HLD.md --hld-map-only
@@ -330,6 +330,8 @@ Map-aware downstream processing can target one HLD section and include only that
 ```
 
 `--target-hld` and `--target` may be combined only when `--target` matches the section's `HLD-SPECS` mapping.
+
+Map-aware downstream writes are staged and validated in a temporary workspace before they are applied to the real workspace.
 
 ### Resume support
 
