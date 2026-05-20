@@ -42,6 +42,12 @@ See:
 - [HLD_GENERATION.md](HLD_GENERATION.md) for a reusable prompt to create HLDs in this format.
 - [HLD_DOCS_JUDGE_WORKFLOW.md](HLD_DOCS_JUDGE_WORKFLOW.md) for an optional Skeptic-derived Judge workflow for documentation-project HLDs.
 
+## Agent usage
+
+For agent-facing repository instructions, see [AGENTS.md](AGENTS.md).
+
+Agents should use the wrapper scripts instead of manually editing generated Spec Kit artifacts.
+
 ## Sync script
 
 `hld_spec_sync.py` syncs one large HLD into a Spec Kit-native constitution, feature specs, sync index, graph, and reports.
@@ -188,6 +194,14 @@ logs/hld_spec_sync/<timestamp>/context_selection.json
 
 The staged writes are created after WRITE FILE target validation and before final apply.
 Use `--restart-map-run` to clear map-aware run state before rerunning a target.
+
+### Resume support
+
+`--resume` and `--restart-map-run` currently apply to `hld_spec_sync.py` map-aware target runs only.
+
+Downstream map-aware runs do not yet support resume. Re-run downstream phases explicitly with `--target-hld` and/or `--target`.
+
+Future downstream resume should include the phase, target HLD section, target specs, implementation roots, and input hashes in the run-state key.
 
 ## Skeptic mode
 

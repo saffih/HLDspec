@@ -93,6 +93,7 @@ class HldMap:
     sections: list[HldSection]
     validation_errors: list[str] = field(default_factory=list)
     cycles: list[list[str]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     def section_by_id(self) -> dict[str, HldSection]:
         return {section.id: section for section in self.sections}
@@ -103,6 +104,7 @@ class HldMap:
             "sections": [section.to_dict() for section in self.sections],
             "validation_errors": self.validation_errors,
             "cycles": self.cycles,
+            "warnings": self.warnings,
         }
 
 
@@ -172,9 +174,13 @@ def parse_hld_text(text: str, *, source_path: str = "HLD.md") -> HldMap:
 
     hld_map = HldMap(source_path=source_path, sections=sections)
     hld_map.validation_errors = validate_hld_map(hld_map, lines=lines, fence_mask=fence_mask)
-    hld_map.cycles = detect_cycles(hld_map)
+    hld_map.cycles = detect_cycles(hld_map, kinds={"DEPENDS", "BLOCKED_BY"})
     for cycle in hld_map.cycles:
-        hld_map.validation_errors.append(f"reference cycle detected: {' -> '.join(cycle)}")
+        hld_map.validation_errors.append(f"required reference cycle detected: {' -> '.join(cycle)}")
+    for cycle in detect_cycles(hld_map, kinds={"CONFLICTS_WITH"}):
+        hld_map.warnings.append(f"conflict reference cycle detected: {' -> '.join(cycle)}")
+    for cycle in detect_cycles(hld_map, kinds={"REF"}):
+        hld_map.warnings.append(f"normal reference cycle detected: {' -> '.join(cycle)}")
     return hld_map
 
 
@@ -233,8 +239,11 @@ def validate_hld_map(hld_map: HldMap, *, lines: list[str], fence_mask: list[bool
     return errors
 
 
-def detect_cycles(hld_map: HldMap) -> list[list[str]]:
-    graph = {section.id: section.required_refs() for section in hld_map.sections}
+def detect_cycles(hld_map: HldMap, *, kinds: set[str]) -> list[list[str]]:
+    graph = {
+        section.id: sorted({ref.target for ref in section.references if ref.kind in kinds})
+        for section in hld_map.sections
+    }
     cycles: list[list[str]] = []
     path: list[str] = []
     visiting: set[str] = set()
@@ -295,6 +304,9 @@ def hld_index_markdown(hld_map: HldMap) -> str:
     if hld_map.validation_errors:
         lines.extend(["", "## Validation Errors", ""])
         lines.extend(f"- {error}" for error in hld_map.validation_errors)
+    if hld_map.warnings:
+        lines.extend(["", "## Warnings", ""])
+        lines.extend(f"- {warning}" for warning in hld_map.warnings)
     return "\n".join(lines) + "\n"
 
 
@@ -350,4 +362,5 @@ def load_hld_map_json(path: Path) -> HldMap:
         sections=sections,
         validation_errors=list(data.get("validation_errors", [])),
         cycles=list(data.get("cycles", [])),
+        warnings=list(data.get("warnings", [])),
     )

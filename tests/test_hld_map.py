@@ -139,7 +139,7 @@ TBD: target section not assigned yet.
 
         self.assertFalse(any("unknown HLD-404" in error for error in parsed.validation_errors))
 
-    def test_cycles_are_detected(self) -> None:
+    def test_depends_cycle_is_validation_error(self) -> None:
         text = """## HLD-001 - One
 
 HLD-ID: HLD-001
@@ -165,7 +165,93 @@ This section DEPENDS REF HLD-001.
         parsed = hld_map.parse_hld_text(text)
 
         self.assertEqual([["HLD-001", "HLD-002", "HLD-001"]], parsed.cycles)
-        self.assertTrue(any("reference cycle detected" in error for error in parsed.validation_errors))
+        self.assertTrue(any("required reference cycle detected" in error for error in parsed.validation_errors))
+
+    def test_blocked_by_cycle_is_validation_error(self) -> None:
+        text = """## HLD-001 - One
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section BLOCKED_BY REF HLD-002.
+
+## HLD-002 - Two
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section BLOCKED_BY REF HLD-001.
+"""
+        parsed = hld_map.parse_hld_text(text)
+
+        self.assertEqual([["HLD-001", "HLD-002", "HLD-001"]], parsed.cycles)
+        self.assertTrue(any("required reference cycle detected" in error for error in parsed.validation_errors))
+
+    def test_normal_ref_cycle_is_warning_not_error(self) -> None:
+        text = """## HLD-001 - One
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section REF HLD-002.
+
+## HLD-002 - Two
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section REF HLD-001.
+"""
+        parsed = hld_map.parse_hld_text(text)
+
+        self.assertEqual([], parsed.cycles)
+        self.assertEqual([], parsed.validation_errors)
+        self.assertTrue(any("normal reference cycle detected" in warning for warning in parsed.warnings))
+
+    def test_conflicts_with_cycle_is_warning_not_parser_error(self) -> None:
+        text = """## HLD-001 - One
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section CONFLICTS_WITH REF HLD-002.
+
+## HLD-002 - Two
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section CONFLICTS_WITH REF HLD-001.
+"""
+        parsed = hld_map.parse_hld_text(text)
+
+        self.assertEqual([], parsed.cycles)
+        self.assertEqual([], parsed.validation_errors)
+        self.assertTrue(any("conflict reference cycle detected" in warning for warning in parsed.warnings))
 
     def test_generated_section_files_match_source_hld_content(self) -> None:
         parsed = hld_map.parse_hld_text(VALID_HLD, source_path="HLD.md")

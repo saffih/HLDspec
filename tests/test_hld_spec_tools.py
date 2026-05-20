@@ -334,6 +334,132 @@ This should not appear.
             report_paths = list((workspace / "logs" / "hld_spec_sync").glob("*/context_selection.json"))
             self.assertEqual(1, len(report_paths))
 
+    def test_sync_target_loads_normal_refs(self) -> None:
+        hld_text = """## HLD-001 - A
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section REF HLD-002.
+
+## HLD-002 - B
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+"""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            parsed = SYNC.hld_map.parse_hld_text(hld_text)
+
+            _context, report = SYNC.select_hld_context(
+                parsed_map=parsed,
+                workspace=workspace,
+                target_hld="HLD-001",
+                max_chars=20000,
+                max_spec_chars=1000,
+            )
+
+            loaded_ids = [section["id"] for section in report["loaded_sections"]]
+            self.assertIn("HLD-002", loaded_ids)
+
+    def test_sync_target_reports_normal_refs_when_budget_exceeded(self) -> None:
+        hld_text = """## HLD-001 - A
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section REF HLD-002.
+
+## HLD-002 - B
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+Budget-heavy optional context.
+"""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            parsed = SYNC.hld_map.parse_hld_text(hld_text)
+
+            _context, report = SYNC.select_hld_context(
+                parsed_map=parsed,
+                workspace=workspace,
+                target_hld="HLD-001",
+                max_chars=1,
+                max_spec_chars=1000,
+            )
+
+            self.assertTrue(
+                any(
+                    item.get("section") == "HLD-002"
+                    and item.get("reason") == "prompt-budget-exceeded"
+                    and item.get("ref_kind") == "REF"
+                    for item in report["skipped_refs"]
+                )
+            )
+
+    def test_sync_required_refs_are_loaded_before_optional_refs(self) -> None:
+        hld_text = """## HLD-001 - A
+
+HLD-ID: HLD-001
+HLD-ROLE: purpose
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+This section REF HLD-002.
+This section DEPENDS REF HLD-003.
+
+## HLD-002 - Optional
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+## HLD-003 - Required
+
+HLD-ID: HLD-003
+HLD-ROLE: governance
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+"""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            parsed = SYNC.hld_map.parse_hld_text(hld_text)
+
+            _context, report = SYNC.select_hld_context(
+                parsed_map=parsed,
+                workspace=workspace,
+                target_hld="HLD-001",
+                max_chars=20000,
+                max_spec_chars=1000,
+            )
+
+            loaded_ids = [section["id"] for section in report["loaded_sections"]]
+            self.assertLess(loaded_ids.index("HLD-003"), loaded_ids.index("HLD-002"))
+
     def test_sync_map_mode_stages_writes_before_apply(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             workspace = Path(td)
@@ -390,6 +516,66 @@ This should not appear.
             staged_manifests = list((workspace / ".specify" / "sync" / "staged").glob("*/write_manifest.json"))
             self.assertEqual(1, len(staged_manifests))
             self.assertTrue((workspace / ".specify" / "sync" / "sync_report.md").exists())
+
+    def test_sync_map_mode_failed_staged_validation_does_not_modify_final_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            hld_path = workspace / "HLD.md"
+            hld_path.write_text(VALID_HLD, encoding="utf-8")
+            (workspace / ".specify" / "sync").mkdir(parents=True)
+            (workspace / ".specify" / "sync" / "spec_index.json").write_text("[]\n", encoding="utf-8")
+
+            def fake_run_agent(**kwargs):
+                Path(kwargs["log_path"]).write_text(
+                    "WRITE FILE: .specify/sync/sync_report.md\n"
+                    "CONTENT:\n# Sync Report\n\n"
+                    "WRITE FILE: .specify/sync/analyze_report.md\n"
+                    "CONTENT:\n# Analyze Report\n\n"
+                    "WRITE FILE: .specify/sync/constitution_change_report.md\n"
+                    "CONTENT:\n# Constitution Change Report\n\n"
+                    "WRITE FILE: .specify/sync/spec_index.json\n"
+                    "CONTENT:\nnot json\n\n"
+                    "WRITE FILE: .specify/sync/feature_graph.json\n"
+                    "CONTENT:\n{\"nodes\": [], \"edges\": [], \"recommended_order\": []}\n\n"
+                    "WRITE FILE: .specify/sync/missing_report.json\n"
+                    "CONTENT:\n[]\n\n"
+                    "WRITE FILE: .specify/sync/duplicate_report.json\n"
+                    "CONTENT:\n[]\n\n"
+                    "WRITE FILE: .specify/sync/drift_report.json\n"
+                    "CONTENT:\n[]\n",
+                    encoding="utf-8",
+                )
+                return 0
+
+            old_run_agent = SYNC.run_agent
+            old_argv = sys.argv
+            SYNC.run_agent = fake_run_agent
+            sys.argv = [
+                "hld_spec_sync.py",
+                "--workspace",
+                str(workspace),
+                "--hld",
+                str(hld_path),
+                "--use-hld-map",
+                "--target-hld",
+                "HLD-002",
+                "--report-only",
+                "--agent",
+                "custom",
+                "--agent-command",
+                "fake",
+            ]
+            try:
+                rc = SYNC.main()
+            finally:
+                SYNC.run_agent = old_run_agent
+                sys.argv = old_argv
+
+            self.assertEqual(1, rc)
+            staged_manifests = list((workspace / ".specify" / "sync" / "staged").glob("*/write_manifest.json"))
+            self.assertEqual(1, len(staged_manifests))
+            self.assertEqual("[]\n", (workspace / ".specify" / "sync" / "spec_index.json").read_text(encoding="utf-8"))
+            self.assertFalse((workspace / ".specify" / "sync" / "sync_report.md").exists())
 
     def test_sync_map_consolidation_catches_duplicate_risk(self) -> None:
         with tempfile.TemporaryDirectory() as td:

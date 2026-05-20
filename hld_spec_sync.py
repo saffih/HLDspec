@@ -44,9 +44,11 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import shlex
 import subprocess
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -264,6 +266,50 @@ def stage_write_blocks(
     }
 
 
+def copy_validation_workspace(workspace: Path) -> tempfile.TemporaryDirectory[str]:
+    tmp = tempfile.TemporaryDirectory()
+    tmp_workspace = Path(tmp.name) / "workspace"
+
+    def ignore(_dir_path: str, names: list[str]) -> set[str]:
+        return {name for name in names if name in {".git", "logs", ".agents", ".codex"}}
+
+    shutil.copytree(workspace, tmp_workspace, ignore=ignore)
+    return tmp
+
+
+def apply_staged_writes_to_workspace(
+    *,
+    staging_workspace: Path,
+    target_workspace: Path,
+    staging_info: dict[str, object],
+    allow_constitution: bool,
+    allow_specs: bool,
+) -> int:
+    staging_workspace = staging_workspace.resolve()
+    target_workspace = target_workspace.resolve()
+    manifest_path = staging_workspace / str(staging_info["write_manifest"])
+    manifest = json.loads(read_text(manifest_path))
+    count = 0
+
+    for item in manifest.get("writes", []):
+        rel_path = Path(str(item["path"]))
+        staged_path = staging_workspace / str(item["staged_path"])
+        out_path = (target_workspace / rel_path).resolve()
+
+        if not is_sync_allowed_path(
+            out_path,
+            target_workspace,
+            allow_constitution=allow_constitution,
+            allow_specs=allow_specs,
+        ):
+            raise RuntimeError(f"Refusing disallowed sync write target: {rel_path}")
+
+        write_text(out_path, read_text(staged_path))
+        count += 1
+
+    return count
+
+
 def compact_middle(text: str, max_chars: int) -> str:
     if max_chars <= 0 or len(text) <= max_chars:
         return text
@@ -358,6 +404,10 @@ def select_hld_context(
     queue: list[tuple[str, str, int]] = []
     loaded: dict[str, str] = {}
     skipped_refs: list[dict[str, object]] = []
+
+    def ref_kind_from_reason(reason: str) -> str:
+        return reason.split(" ", 1)[0] if reason.startswith(("REF ", "DEPENDS ", "BLOCKED_BY ", "CONFLICTS_WITH ")) else ""
+
     for section_id in root_ids:
         queue.append((section_id, "target" if target_hld else "all-sections", 0))
 
@@ -386,25 +436,36 @@ def select_hld_context(
         for ref in section.references:
             if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"}:
                 queue.append((ref.target, f"{ref.kind} from {section.id}", depth + 1))
-            elif not target_hld:
+        for ref in section.references:
+            if ref.kind == "REF":
                 queue.append((ref.target, f"REF from {section.id}", depth + 1))
 
     selected_sections = [sections_by_id[section_id] for section_id in loaded if section_id in sections_by_id]
-    selected_specs = sorted({spec for section in selected_sections for spec in hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))})
-    selected_resources = sorted({resource for section in selected_sections for resource in hld_map.split_metadata_list(section.metadata_value("HLD-RESOURCES"))})
-    related_specs_text, related_specs_included = spec_paths_for_ids(workspace, selected_specs, max_spec_chars)
-    resources_text, resources_included, resources_skipped = resource_text_for_paths(workspace, selected_resources)
-
     section_parts = []
+    included_sections: list[hld_map.HldSection] = []
     budget_used = 0
     for section in selected_sections:
         part = f"\n--- HLD SECTION {section.id}: {section.title} (lines {section.line_start}-{section.line_end}) ---\n{section.text}"
         part_len = len(part)
         if max_chars > 0 and budget_used + part_len > max_chars:
-            skipped_refs.append({"section": section.id, "reason": "prompt-budget-exceeded", "requested_by": loaded[section.id]})
+            skip: dict[str, object] = {
+                "section": section.id,
+                "reason": "prompt-budget-exceeded",
+                "requested_by": loaded[section.id],
+            }
+            ref_kind = ref_kind_from_reason(loaded[section.id])
+            if ref_kind:
+                skip["ref_kind"] = ref_kind
+            skipped_refs.append(skip)
             continue
         budget_used += part_len
+        included_sections.append(section)
         section_parts.append(part)
+
+    selected_specs = sorted({spec for section in included_sections for spec in hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))})
+    selected_resources = sorted({resource for section in included_sections for resource in hld_map.split_metadata_list(section.metadata_value("HLD-RESOURCES"))})
+    related_specs_text, related_specs_included = spec_paths_for_ids(workspace, selected_specs, max_spec_chars)
+    resources_text, resources_included, resources_skipped = resource_text_for_paths(workspace, selected_resources)
 
     context = "\n".join(
         [
@@ -427,7 +488,7 @@ def select_hld_context(
                 "line_end": section.line_end,
                 "why_loaded": loaded[section.id],
             }
-            for section in selected_sections
+            for section in included_sections
             if section.id in loaded
         ],
         "skipped_refs": skipped_refs,
@@ -1587,13 +1648,44 @@ def main() -> int:
                     run_id=ts,
                     echoed_prompt=prompt,
                 )
-            writes = apply_write_blocks(
-                log_path,
-                workspace,
-                allow_constitution=allow_sync_mutations,
-                allow_specs=allow_sync_mutations,
-                echoed_prompt=prompt,
-            )
+                tmp_holder = copy_validation_workspace(workspace)
+                try:
+                    tmp_workspace = Path(tmp_holder.name) / "workspace"
+                    apply_staged_writes_to_workspace(
+                        staging_workspace=workspace,
+                        target_workspace=tmp_workspace,
+                        staging_info=staging_info,
+                        allow_constitution=allow_sync_mutations,
+                        allow_specs=allow_sync_mutations,
+                    )
+                    staged_validation_errors = validate_outputs(
+                        tmp_workspace,
+                        require_constitution=allow_sync_mutations,
+                        require_specs=allow_sync_mutations,
+                    )
+                    staged_validation_errors.extend(validate_map_consolidation(tmp_workspace, parsed_hld_map))
+                    if staged_validation_errors:
+                        raise RuntimeError(
+                            "staged validation failed before apply: "
+                            + "; ".join(staged_validation_errors)
+                        )
+                    writes = apply_staged_writes_to_workspace(
+                        staging_workspace=workspace,
+                        target_workspace=workspace,
+                        staging_info=staging_info,
+                        allow_constitution=allow_sync_mutations,
+                        allow_specs=allow_sync_mutations,
+                    )
+                finally:
+                    tmp_holder.cleanup()
+            else:
+                writes = apply_write_blocks(
+                    log_path,
+                    workspace,
+                    allow_constitution=allow_sync_mutations,
+                    allow_specs=allow_sync_mutations,
+                    echoed_prompt=prompt,
+                )
         except Exception as exc:
             if args.use_hld_map and parsed_hld_map is not None:
                 update_run_state(
