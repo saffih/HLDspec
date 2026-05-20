@@ -144,6 +144,39 @@ class HldSpecRuntimeTests(unittest.TestCase):
             self.assertEqual("original\n", real_report.read_text(encoding="utf-8"))
             self.assertTrue((workspace / staging["proposed_writes"]).exists())
 
+    def test_sync_resume_invalidates_when_normal_ref_changes(self) -> None:
+        original = hld_map.parse_hld_text(RUNTIME_HLD, source_path="HLD.md")
+        self.assertEqual([], original.validation_errors)
+
+        changed_hld = RUNTIME_HLD.replace("Related context.", "Changed related context.")
+        changed = hld_map.parse_hld_text(changed_hld, source_path="HLD.md")
+        self.assertEqual([], changed.validation_errors)
+
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+
+            # Simulate a completed previous target run whose prompt context loaded
+            # both the target section and its normal REF section.
+            state: dict[str, object] = {"sections": {}}
+            sections_state = state["sections"]
+            assert isinstance(sections_state, dict)
+            for section_id in hld_spec_sync.target_required_section_ids(original, "HLD-001"):
+                section = original.section_by_id()[section_id]
+                current = hld_spec_sync.section_state(section)
+                current.update(
+                    {
+                        "status": "done",
+                        "prompt_path": "logs/hld_spec_sync/old/prompt.md",
+                        "log_path": "logs/hld_spec_sync/old/agent.log",
+                        "staged_output_path": None,
+                    }
+                )
+                sections_state[section_id] = current
+            hld_spec_sync.write_run_state(workspace, state)
+
+            self.assertIn("HLD-002", hld_spec_sync.target_required_section_ids(original, "HLD-001"))
+            self.assertIsNone(hld_spec_sync.resume_skip_reason(workspace, changed, "HLD-001"))
+
 
 if __name__ == "__main__":
     unittest.main()

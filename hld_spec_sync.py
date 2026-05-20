@@ -139,12 +139,36 @@ def write_run_state(workspace: Path, state: dict[str, object]) -> None:
 
 
 def target_required_section_ids(parsed_map: hld_map.HldMap, target_hld: str) -> list[str]:
+    # Return target-context section IDs that should invalidate --resume.
+    #
+    # This intentionally includes normal REF links, not only required refs,
+    # because map-aware target prompts load normal REF sections when depth
+    # allows. Resume must not skip a run when any loaded context section changed.
     sections_by_id = parsed_map.section_by_id()
-    target = sections_by_id[target_hld]
-    ids = [target_hld]
-    for ref in target.references:
-        if ref.kind in {"DEPENDS", "BLOCKED_BY", "CONFLICTS_WITH"} and ref.target in sections_by_id:
-            ids.append(ref.target)
+    if target_hld not in sections_by_id:
+        return []
+
+    queue: list[tuple[str, int]] = [(target_hld, 0)]
+    ids: list[str] = []
+    seen: set[str] = set()
+
+    while queue:
+        section_id, depth = queue.pop(0)
+        if section_id in seen or section_id not in sections_by_id:
+            continue
+
+        seen.add(section_id)
+        ids.append(section_id)
+
+        section = sections_by_id[section_id]
+        max_depth = 2 if section.metadata_value("HLD-RISK").upper() == "HIGH" else 1
+        if depth >= max_depth:
+            continue
+
+        for ref in section.references:
+            if ref.target in sections_by_id:
+                queue.append((ref.target, depth + 1))
+
     return ids
 
 
@@ -164,7 +188,7 @@ def resume_skip_reason(workspace: Path, parsed_map: hld_map.HldMap, target_hld: 
                 return None
         if section_id == target_hld and saved.get("status") != "done":
             return None
-    return f"{target_hld} and required refs are unchanged and already done"
+    return f"{target_hld} and loaded HLD context sections are unchanged and already done"
 
 
 def update_run_state(
