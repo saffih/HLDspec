@@ -89,6 +89,15 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def strip_echoed_prompt(text: str, prompt: str | None) -> str:
+    if not prompt:
+        return text
+    prompt_idx = text.find(prompt)
+    if prompt_idx >= 0:
+        return (text[:prompt_idx] + text[prompt_idx + len(prompt):]).lstrip("\r\n")
+    return text
+
+
 def compact_middle(text: str, max_chars: int) -> str:
     if max_chars <= 0 or len(text) <= max_chars:
         return text
@@ -490,7 +499,7 @@ def validate_write_target(
 
 def iter_write_block_paths(log_path: Path, workspace: Path) -> list[Path]:
     text = read_text(log_path)
-    pattern = re.compile(r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
+    pattern = re.compile(r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
     workspace = workspace.resolve()
     paths: list[Path] = []
     for match in pattern.finditer(text):
@@ -509,9 +518,17 @@ def validate_write_targets(
     phase: str,
     allow_implementation: bool,
     implementation_roots: list[Path],
+    echoed_prompt: str | None = None,
 ) -> None:
     workspace = workspace.resolve()
-    for out_path in iter_write_block_paths(log_path, workspace):
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
+    pattern = re.compile(r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
+    for match in pattern.finditer(text):
+        raw_path = match.group("path").strip()
+        out_path = Path(raw_path)
+        if not out_path.is_absolute():
+            out_path = workspace / out_path
+        out_path = out_path.resolve()
         validate_write_target(
             out_path,
             workspace,
@@ -528,11 +545,12 @@ def apply_write_blocks(
     phase: str,
     allow_implementation: bool,
     implementation_roots: list[Path],
+    echoed_prompt: str | None = None,
 ) -> int:
-    text = read_text(log_path)
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
     pattern = re.compile(
-        r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=\nWRITE FILE:|\Z)",
-        re.DOTALL,
+        r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=^WRITE FILE:|\Z)",
+        re.DOTALL | re.MULTILINE,
     )
 
     workspace = workspace.resolve()
@@ -1132,6 +1150,7 @@ def main() -> int:
                 phase=args.phase,
                 allow_implementation=args.allow_implementation,
                 implementation_roots=implementation_roots,
+                echoed_prompt=prompt,
             )
             writes = apply_write_blocks(
                 log_path=log_path,
@@ -1139,6 +1158,7 @@ def main() -> int:
                 phase=args.phase,
                 allow_implementation=args.allow_implementation,
                 implementation_roots=implementation_roots,
+                echoed_prompt=prompt,
             )
         except Exception as exc:
             eprint(f"Failed to apply WRITE FILE blocks: {exc}")

@@ -92,6 +92,38 @@ class HldSpecToolTests(unittest.TestCase):
                     allow_specs=True,
                 )
 
+    def test_sync_ignores_echoed_prompt_write_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            log_path = workspace / "agent.log"
+            prompt = "WRITE FILE: src/unsafe.py\nCONTENT:\nprint('bad')\n"
+            log_path.write_text(
+                "codex header\nuser\n"
+                + prompt
+                + "\nWRITE FILE: .specify/sync/sync_report.md\n"
+                + "CONTENT:\n# Real Sync Report\n",
+                encoding="utf-8",
+            )
+
+            SYNC.validate_write_targets(
+                log_path,
+                workspace,
+                allow_constitution=True,
+                allow_specs=True,
+                echoed_prompt=prompt,
+            )
+            writes = SYNC.apply_write_blocks(
+                log_path,
+                workspace,
+                allow_constitution=True,
+                allow_specs=True,
+                echoed_prompt=prompt,
+            )
+
+            self.assertEqual(1, writes)
+            self.assertFalse((workspace / "src" / "unsafe.py").exists())
+            self.assertEqual("# Real Sync Report\n", (workspace / ".specify" / "sync" / "sync_report.md").read_text())
+
     def test_sync_accepts_complete_skeptic_contract(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             workspace = Path(td)
@@ -164,6 +196,43 @@ class HldSpecToolTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "Unknown target"):
                 DOWNSTREAM.resolve_spec_dirs(workspace, ["999"], strict=True)
+
+    def test_downstream_ignores_echoed_prompt_write_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            log_path = workspace / "agent.log"
+            prompt = "WRITE FILE: src/unsafe.py\nCONTENT:\nprint('bad')\n"
+            log_path.write_text(
+                "codex header\nuser\n"
+                + prompt
+                + "\nWRITE FILE: .specify/sync/downstream/downstream_analysis.md\n"
+                + "CONTENT:\n# Real Downstream Analysis\n",
+                encoding="utf-8",
+            )
+
+            DOWNSTREAM.validate_write_targets(
+                log_path,
+                workspace,
+                phase="analyze",
+                allow_implementation=False,
+                implementation_roots=[],
+                echoed_prompt=prompt,
+            )
+            writes = DOWNSTREAM.apply_write_blocks(
+                log_path,
+                workspace,
+                phase="analyze",
+                allow_implementation=False,
+                implementation_roots=[],
+                echoed_prompt=prompt,
+            )
+
+            self.assertEqual(1, writes)
+            self.assertFalse((workspace / "src" / "unsafe.py").exists())
+            self.assertEqual(
+                "# Real Downstream Analysis\n",
+                (workspace / ".specify" / "sync" / "downstream" / "downstream_analysis.md").read_text(),
+            )
 
     def test_downstream_conflict_contract_returns_unresolved(self) -> None:
         with tempfile.TemporaryDirectory() as td:

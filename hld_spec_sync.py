@@ -156,17 +156,27 @@ def load_current_state(workspace: Path, mode: str, max_existing_spec_chars: int,
     }
 
 
+def strip_echoed_prompt(text: str, prompt: str | None) -> str:
+    if not prompt:
+        return text
+    prompt_idx = text.find(prompt)
+    if prompt_idx >= 0:
+        return (text[:prompt_idx] + text[prompt_idx + len(prompt):]).lstrip("\r\n")
+    return text
+
+
 def apply_write_blocks(
     log_path: Path,
     workspace: Path,
     *,
     allow_constitution: bool,
     allow_specs: bool,
+    echoed_prompt: str | None = None,
 ) -> int:
-    text = read_text(log_path)
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
     pattern = re.compile(
-        r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=\nWRITE FILE:|\Z)",
-        re.DOTALL,
+        r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n(?P<content>.*?)(?=^WRITE FILE:|\Z)",
+        re.DOTALL | re.MULTILINE,
     )
 
     workspace = workspace.resolve()
@@ -425,9 +435,10 @@ def validate_write_targets(
     *,
     allow_constitution: bool,
     allow_specs: bool,
+    echoed_prompt: str | None = None,
 ) -> None:
-    text = read_text(log_path)
-    pattern = re.compile(r"WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
+    text = strip_echoed_prompt(read_text(log_path), echoed_prompt)
+    pattern = re.compile(r"^WRITE FILE:\s*(?P<path>[^\n]+)\nCONTENT:\n", re.MULTILINE)
     workspace = workspace.resolve()
     for match in pattern.finditer(text):
         raw_path = match.group("path").strip()
@@ -1143,12 +1154,14 @@ def main() -> int:
                 workspace,
                 allow_constitution=allow_sync_mutations,
                 allow_specs=allow_sync_mutations,
+                echoed_prompt=prompt,
             )
             writes = apply_write_blocks(
                 log_path,
                 workspace,
                 allow_constitution=allow_sync_mutations,
                 allow_specs=allow_sync_mutations,
+                echoed_prompt=prompt,
             )
         except Exception as exc:
             eprint(f"Failed to apply WRITE FILE blocks: {exc}")
