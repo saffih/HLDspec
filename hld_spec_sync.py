@@ -69,6 +69,18 @@ PROTECTED_RELS = {
 }
 CONFLICT_RETURN_CODE = 2
 RESOLVED_CONFLICT_STATUSES = {"handled", "resolved", "closed", "fixed", "accepted"}
+VALID_SKEPTIC_STATUSES = {"HANDLED", "CONFLICT"}
+VALID_EVIDENCE_LEVELS = {"OBSERVED", "REPRODUCED", "HISTORICAL", "INFERRED RISK"}
+REQUIRED_THINKER_CODES = ("CH", "OM", "FE", "PO", "KT", "SH")
+REQUIRED_CONFLICT_FIELDS = (
+    "issue",
+    "thesis",
+    "antithesis",
+    "tradeoffs",
+    "blocking_unknowns",
+    "missing_evidence",
+    "decision_needed",
+)
 
 
 def eprint(*args: object) -> None:
@@ -198,6 +210,75 @@ def validate_json_file(path: Path, errors: list[str]) -> None:
         errors.append(f"invalid JSON: {path}: {exc}")
 
 
+def has_thinker_code(text: str, code: str) -> bool:
+    normalized = text.upper()
+    return f"({code})" in normalized or normalized == code
+
+
+def validate_skeptic_contract(data: object, conflicts_rel: Path, errors: list[str]) -> None:
+    if not isinstance(data, dict):
+        return
+
+    status = str(data.get("status", "")).upper()
+    if status not in VALID_SKEPTIC_STATUSES:
+        errors.append(f"invalid skeptic status in {conflicts_rel}: expected HANDLED or CONFLICT")
+
+    thinker_trace = data.get("thinker_trace")
+    if not isinstance(thinker_trace, list) or not thinker_trace:
+        errors.append(f"invalid skeptic thinker_trace in {conflicts_rel}: expected non-empty array")
+    else:
+        trace_texts: list[str] = []
+        for idx, item in enumerate(thinker_trace, start=1):
+            if not isinstance(item, dict):
+                errors.append(f"invalid skeptic thinker_trace[{idx}] in {conflicts_rel}: expected object")
+                continue
+            thinker = str(item.get("thinker", "")).strip()
+            found = str(item.get("found", "")).strip()
+            changed = str(item.get("changed", "")).strip()
+            trace_texts.append(thinker)
+            if not thinker or not found or not changed:
+                errors.append(
+                    f"invalid skeptic thinker_trace[{idx}] in {conflicts_rel}: thinker, found, and changed are required"
+                )
+        for code in REQUIRED_THINKER_CODES:
+            if not any(has_thinker_code(text, code) for text in trace_texts):
+                errors.append(f"missing skeptic thinker trace for {code} in {conflicts_rel}")
+
+    actions = data.get("actions", [])
+    if not isinstance(actions, list):
+        errors.append(f"invalid skeptic actions in {conflicts_rel}: expected array")
+    else:
+        for idx, item in enumerate(actions, start=1):
+            if not isinstance(item, dict):
+                errors.append(f"invalid skeptic actions[{idx}] in {conflicts_rel}: expected object")
+                continue
+            for field in ("issue", "action", "verification", "evidence_level"):
+                if not str(item.get(field, "")).strip():
+                    errors.append(f"invalid skeptic actions[{idx}] in {conflicts_rel}: missing {field}")
+            evidence_level = str(item.get("evidence_level", "")).upper()
+            if evidence_level and evidence_level not in VALID_EVIDENCE_LEVELS:
+                errors.append(f"invalid skeptic actions[{idx}] evidence_level in {conflicts_rel}: {evidence_level}")
+
+    conflicts = data.get("conflicts", [])
+    if not isinstance(conflicts, list):
+        errors.append(f"invalid skeptic conflicts in {conflicts_rel}: expected array")
+    else:
+        for idx, item in enumerate(conflicts, start=1):
+            if not isinstance(item, dict):
+                errors.append(f"invalid skeptic conflicts[{idx}] in {conflicts_rel}: expected object")
+                continue
+            item_status = str(item.get("status") or item.get("resolution") or "unresolved").lower()
+            if item_status not in RESOLVED_CONFLICT_STATUSES:
+                for field in REQUIRED_CONFLICT_FIELDS:
+                    value = item.get(field)
+                    if isinstance(value, list):
+                        missing = not value
+                    else:
+                        missing = not str(value or "").strip()
+                    if missing:
+                        errors.append(f"invalid skeptic conflicts[{idx}] in {conflicts_rel}: missing {field}")
+
+
 def evaluate_skeptic_outputs(
     workspace: Path,
     *,
@@ -220,15 +301,14 @@ def evaluate_skeptic_outputs(
         errors.append(f"invalid skeptic JSON: {conflicts_rel}: {exc}")
         return []
 
-    if isinstance(data, dict):
-        raw_conflicts = data.get("conflicts", [])
-        status = str(data.get("status", "")).upper()
-    elif isinstance(data, list):
-        raw_conflicts = data
-        status = "CONFLICT" if raw_conflicts else "HANDLED"
-    else:
-        errors.append(f"invalid skeptic JSON shape: {conflicts_rel}: expected object or array")
+    if not isinstance(data, dict):
+        errors.append(f"invalid skeptic JSON shape: {conflicts_rel}: expected object")
         return []
+
+    validate_skeptic_contract(data, conflicts_rel, errors)
+
+    raw_conflicts = data.get("conflicts", [])
+    status = str(data.get("status", "")).upper()
 
     if not isinstance(raw_conflicts, list):
         errors.append(f"invalid skeptic conflicts shape: {conflicts_rel}: conflicts must be an array")

@@ -252,3 +252,9 @@ specs/<NNN-feature-slug>/contracts/
 specs/<NNN-feature-slug>/tasks.md
 logs/hld_spec_downstream/<timestamp>/
 ```
+
+## Tests
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
+```
