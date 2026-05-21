@@ -92,6 +92,7 @@ PY
 report_spec_gate() {
   local review="$FIRSTRUN/.specify/sync/spec_build_plan_review.md"
   local plan="$FIRSTRUN/.specify/sync/spec_build_plan.json"
+  local prework_review="$FIRSTRUN/.specify/sync/speckit_prework_quality_review.json"
 
   if [ ! -f "$review" ]; then
     return 1
@@ -101,11 +102,15 @@ report_spec_gate() {
   echo "- review: $review"
   echo "- plan: $plan"
   echo "- decision queue: $FIRSTRUN/.specify/sync/spec_build_plan_decision_queue.md"
-  echo "- target work order: $FIRSTRUN/.specify/sync/target_spec_work_order.md"
-  echo "- spec branch queue: $FIRSTRUN/.specify/sync/spec_branch_queue.md"
+  echo "- SpecKit input manifest: $FIRSTRUN/.specify/sync/speckit_input_manifest.md"
+  echo "- SpecKit invocation queue: $FIRSTRUN/.specify/sync/speckit_invocation_queue.md"
+  echo "- constitution update plan: $FIRSTRUN/.specify/sync/constitution_update_plan.md"
+  echo "- feature dependency graph: $FIRSTRUN/.specify/sync/feature_dependency_graph.md"
+  echo "- SpecKit prework quality review: $FIRSTRUN/.specify/sync/speckit_prework_quality_review.md"
+  echo "- SpecKit proxy dossier: $FIRSTRUN/.specify/sync/speckit_proxy_dossier.md"
   echo
 
-  "${PYTHON_RUN[@]}" - "$review" "$plan" <<'PY'
+  "${PYTHON_RUN[@]}" - "$review" "$plan" "$prework_review" <<'PY'
 import json
 import re
 import sys
@@ -113,6 +118,8 @@ from pathlib import Path
 
 review = Path(sys.argv[1])
 plan_path = Path(sys.argv[2])
+prework_path = Path(sys.argv[3])
+
 text = review.read_text(encoding="utf-8", errors="replace")
 plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.exists() else {}
 pq = plan.get("plan_quality", {}) if isinstance(plan, dict) else {}
@@ -128,23 +135,47 @@ for spec in planned:
 
 continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", text, re.I))
 continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", text, re.I))
+plan_green = continue_true and not continue_false and decision == "FIX" and recommendation == "KEEP_PLAN" and not conflicts and not bad
 
 print(f"Plan quality decision: {decision}")
 print(f"Recommendation: {recommendation}")
 print(f"Planned specs: {len(planned)}")
 print(f"Conflicts: {len(conflicts)}")
 print(f"Flagged specs: {len(bad)}")
-print(f"Continue to target-spec generation: {continue_true and not continue_false}")
+print(f"Plan gate green: {plan_green}")
 
-if continue_true and decision == "FIX" and recommendation == "KEEP_PLAN" and not conflicts and not bad:
+if not plan_green:
     print()
-    print("Next safe checkpoint: target-spec generation is allowed.")
-    print("Write target specs only under the first-run workspace, follow target_spec_work_order.md bottom-up, and process spec_branch_queue.md one branch at a time unless separately approved.")
-    sys.exit(0)
+    print("Next safe checkpoint: Spec Build Plan is blocked.")
+    print("Review spec_build_plan_review.md and spec_build_plan_decision_queue.md.")
+    sys.exit(2)
 
+prework = json.loads(prework_path.read_text(encoding="utf-8")) if prework_path.exists() else {}
+prework_status = prework.get("status", "MISSING")
+findings = prework.get("findings", [])
+blockers = [item for item in findings if isinstance(item, dict) and item.get("severity") == "BLOCKER"]
+
+print(f"SpecKit prework quality status: {prework_status}")
+print(f"SpecKit prework findings: {len(findings)}")
+print(f"SpecKit prework blockers: {len(blockers)}")
 print()
-print("Next safe checkpoint: target-spec generation is blocked. Review spec_build_plan_review.md and spec_build_plan_decision_queue.md.")
-sys.exit(2)
+
+if not prework_path.exists():
+    print("Next safe checkpoint: SpecKit prework artifacts are missing.")
+    print("Rerun first_readonly to regenerate SpecKit prework artifacts.")
+    sys.exit(2)
+
+if prework_status == "REWORK_REQUIRED" or blockers:
+    print("Next safe checkpoint: SpecKit prework requires rework.")
+    print("Review speckit_prework_quality_review.md, rebuild affected artifacts, and rerun the quality gate.")
+    sys.exit(2)
+
+print("Next safe checkpoint: SpecKit prework approval gate.")
+print("Present speckit_prework_quality_review.md and speckit_proxy_dossier.md to the human.")
+print("Explain the constitution case, architecture/dependency case, first-feature case, Beskeptic findings, and feedback impact rules.")
+print("Do not write specs manually from HLDspec.")
+print("Do not invoke SpecKit until the human approves this gate.")
+sys.exit(0)
 PY
 }
 

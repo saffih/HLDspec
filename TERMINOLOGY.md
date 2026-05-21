@@ -130,3 +130,11 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **Answer From Reasonable Default** | Question-answering mode used only for safe non-architecture defaults. |
 | **Escalate To Human** | Question-answering mode for architecture, constitution, API, source-of-truth, data ownership, dependency, scope, split/merge, or implementation decisions. |
 
+## Flow status terms
+
+| Term | Meaning |
+|---|---|
+| **Canonical HLDspec Flow** | Current approved flow documented in `docs/CANONICAL_FLOW.md`. |
+| **SpecKit Prework Approval Gate** | Checkpoint after a green Spec Build Plan where the human reviews constitution, dependency graph, invocation queue, quality review, and proxy dossier before SpecKit is invoked. |
+| **Legacy Target Work Order** | Earlier HLDspec artifact for manual target-spec generation. It is not the controlling checkpoint when SpecKit is available. |
+

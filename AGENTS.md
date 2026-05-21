@@ -1876,3 +1876,17 @@ The proxy may answer SpecKit questions from evidence in the HLD/prework dossier.
 
 The judge/orchestrator remains responsible for final decisions, human checkpoints, affected-artifact rebuilds, and continuation.
 
+## Canonical HLDspec flow
+
+The current source of truth for HLDspec flow is:
+
+```text
+docs/CANONICAL_FLOW.md
+```
+
+After the SpecKit ownership correction, a green Spec Build Plan does not mean HLDspec should write target specs.
+
+The next checkpoint is the SpecKit prework approval gate.
+
+HLDspec must present the prework quality review and proxy dossier, then wait for human approval before a SpecKit proxy subagent invokes SpecKit.
+
