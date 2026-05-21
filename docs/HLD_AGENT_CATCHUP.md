@@ -78,3 +78,15 @@ Human checkpoint answers must be recorded in:
 
 Do not apply the appendix to the source HLD unless the human explicitly approves that source-HLD write.
 
+
+## Source-HLD update queue
+
+Some checkpoint answers may affect source HLD content or structure.
+
+Review:
+
+```text
+.specify/sync/hld_source_update_queue.md
+```
+
+If the queue has items, report them as possible source-HLD updates and ask for explicit approval before modifying the source HLD.

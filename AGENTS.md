@@ -75,6 +75,28 @@ Do not claim "real Beskeptic" from naming alone; the framework source, companion
 The framework cache must include both `skeptic.md` and the companion `skeptic-questions.md` domain question bank.
 
 
+
+## Source-HLD-affecting feedback
+
+Some checkpoint answers are not process-only. They may affect HLD boundaries, section structure, architecture intent, or source-of-truth content.
+
+HLDspec must generate:
+
+```text
+.specify/sync/hld_source_update_queue.json
+.specify/sync/hld_source_update_queue.md
+```
+
+The judge/orchestrator must distinguish:
+
+- process-only decisions
+- source-HLD-affecting decisions
+- unclear feedback requiring review
+
+Do not treat an append-only decision log as sufficient when the feedback should change HLD content or structure.
+
+Do not modify the source HLD without explicit human approval.
+
 ## HLD decision source-of-truth log
 
 Human checkpoint answers are architecture/process decisions. They must not live only in transient queue JSON.

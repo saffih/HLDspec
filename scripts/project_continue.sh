@@ -164,6 +164,7 @@ if [ -f "$QUEUE" ]; then
   set -e
   if [ "$qrc" -eq 2 ]; then
     "${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_decision_log.py" "$WORK" --source-hld "$SOURCE_HLD"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_source_update_queue.py" "$WORK" --source-hld "$SOURCE_HLD"
     echo "State: human checkpoint required. Conversion decisions are still TBD."
     echo
     print_decision_queue "$QUEUE"
@@ -186,6 +187,7 @@ if ! is_converted_hld "$WORK/HLD.md"; then
   if [ -f "$QUEUE" ]; then
     echo "State: conversion decisions are answered and working HLD is raw. Recording decisions and applying conversion."
     "${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_decision_log.py" "$WORK" --source-hld "$SOURCE_HLD"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_source_update_queue.py" "$WORK" --source-hld "$SOURCE_HLD"
     "${PYTHON_RUN[@]}" "$ROOT/scripts/apply_hld_conversion_decisions.py" "$WORK/HLD.md" "$QUEUE"
   else
     echo "State: working HLD is raw and no decision queue exists. Running initial first run again."
