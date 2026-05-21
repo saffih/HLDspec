@@ -42,6 +42,15 @@ class HldspecRunTests(unittest.TestCase):
         self.assertIn("Continue to target-spec generation", script)
         self.assertIn("PYTHON_RUN=(uv run python)", script)
 
+    def test_default_invocation_contract_exists(self) -> None:
+        doc = (ROOT / "docs" / "HLD_AGENT_CATCHUP.md").read_text(encoding="utf-8")
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Every project-level HLDspec invocation uses the judge/orchestrator role by default", doc)
+        self.assertIn("HLDspec ./Flow-System-HLD.md", doc)
+        self.assertIn("hldspec_run.sh", doc)
+        self.assertIn("Do not modify the source HLD", doc)
+        self.assertIn("Default HLDspec invocation contract", agents)
+
 
 if __name__ == "__main__":
     unittest.main()

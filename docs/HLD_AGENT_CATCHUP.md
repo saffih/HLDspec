@@ -40,29 +40,3 @@ Use project-local cache:
 ```bash
 UV_CACHE_DIR="$PWD/.hldspec-uv-cache" ~/code/HLDspec/scripts/hldspec_run.sh <path-to-HLD.md>
 ```
-
-## Checkpoint continuation protocol
-
-When HLDspec stops at a human checkpoint, the human only answers the listed questions.
-
-The agent must then:
-
-1. update the generated checkpoint JSON with the human answers
-2. preserve the checkpoint artifact as the source of truth
-3. rerun the exact same HLDspec command
-4. report the next checkpoint
-
-For conversion checkpoints, update:
-
-```text
-.hldspec-first-run/.specify/sync/hld_conversion_decision_queue.json
-```
-
-Then rerun:
-
-```bash
-~/code/HLDspec/scripts/hldspec_run.sh <path-to-HLD.md>
-```
-
-The human should not need to provide this process again.
-
