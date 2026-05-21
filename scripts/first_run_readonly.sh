@@ -154,6 +154,14 @@ into:
 Rules:
 
 - Preserve original design content.
+- Context budget rules:
+  - Do not paste the whole HLD into agent context.
+  - Use local tools such as `grep`, `rg`, `sed -n`, `awk`, and `wc` for bounded inspection.
+  - Convert in bounded batches of 3-5 major sections.
+  - For very large candidate sections, inspect internal headings first and explain whether a split is needed.
+  - Before each batch, state what sections you will edit and why.
+  - After each batch, report changed sections, metadata chosen, refs added, uncertain fields, and a concise diff summary.
+  - Let the human steer or stop before the next batch when interpretation is involved.
 - Create stable major HLD sections: `## HLD-001 - Title`, `## HLD-002 - Title`, etc.
 - Add required metadata under each major section:
   - `HLD-ID`

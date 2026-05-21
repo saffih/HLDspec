@@ -32,6 +32,15 @@ logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
 Convert `HLD.md` using the prompt, then rerun the script on the converted `HLD.md`.
 
 
+## Context budget during conversion
+
+If the input HLD needs conversion, do not rewrite the whole HLD in one hidden pass.
+
+Use `HLD_CONVERSION_PROMPT.md` and convert in bounded batches of 3-5 major sections. Use local tools such as `grep`, `rg`, `sed -n`, `awk`, and `wc` for bounded inspection. Preserve `HLD.raw.md`; edit only the working `HLD.md`.
+
+After each batch, report changed sections, metadata chosen, refs added, uncertain fields, and a concise diff summary.
+
+
 ## What it runs
 
 ```text

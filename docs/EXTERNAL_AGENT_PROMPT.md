@@ -50,6 +50,25 @@ Communication rules:
 7. Prefer small observable steps over large hidden work.
 8. The human may interrupt or steer after any update.
 
+## Context budget rules
+
+Large HLDs must be handled with bounded context.
+
+Use shell tools such as `grep`, `rg`, `sed -n`, `awk`, `wc`, `head`, and `tail` to inspect files locally. Do not paste a whole large HLD into the agent context.
+
+When converting a raw HLD:
+
+- preserve `HLD.raw.md`
+- edit only the working `HLD.md`
+- convert in bounded batches of 3-5 major sections
+- for very large candidate sections, inspect internal headings first
+- explain each batch before editing
+- after each batch, report changed sections, metadata chosen, refs added, uncertain fields, and a diff summary
+- let the human steer or stop before the next batch
+
+Safe local processing is allowed. The restriction is on model context and silent large rewrites, not on using `grep`, `sed`, or scripts.
+
+
 First action:
 
 Detect whether the HLD is already in HLDspec format or needs conversion.

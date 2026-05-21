@@ -425,6 +425,15 @@ logs/hld_spec_downstream/<timestamp>/
 PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
 ```
 
+## Context budget
+
+Large HLDs should be processed with bounded context.
+
+Local scripts may read whole files. Agents should use bounded extraction (`grep`, `rg`, `sed -n`, `awk`, etc.), batch conversion, and human-in-loop reporting instead of loading or rewriting a whole HLD in one hidden pass.
+
+See [docs/CONTEXT_BUDGET.md](docs/CONTEXT_BUDGET.md).
+
+
 ## External agent prompt
 
 When using an agent from another project directory, use:

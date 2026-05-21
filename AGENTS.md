@@ -546,6 +546,43 @@ Beskeptic check for target-spec context:
 If a planned spec needs sections that are missing, the target-spec run must stop with `CONFLICT` instead of guessing.
 
 
+## Context budget protocol
+
+Large HLDs must be handled as a context-budget problem.
+
+Local scripts may read whole files. Agent/model context must be bounded.
+
+Do not paste or load the whole HLD into agent context by default.
+
+Use local tools for bounded inspection:
+
+```bash
+wc -l HLD.md
+grep -nE '^(#|##|###) ' HLD.md
+rg -n 'HLD-|REF HLD-|CONFLICTS_WITH|DEPENDS REF' HLD.md
+sed -n '120,220p' HLD.md
+awk '/^## HLD-/{print NR ":" $0}' HLD.md
+```
+
+`grep`, `rg`, `sed`, `awk`, `wc`, `head`, and `tail` are acceptable when their output is bounded and summarized.
+
+For raw HLD conversion:
+
+- preserve `HLD.raw.md`
+- edit only the working `HLD.md`
+- convert in bounded batches of 3-5 major sections
+- inspect very large candidate sections before splitting
+- do not rewrite the whole HLD in one hidden pass
+- do not invent refs, owners, resources, or spec mappings
+- use `HLD-SPECS: TBD` unless certain
+- after each batch, report changed sections, metadata chosen, refs added, uncertain fields, and a diff summary
+- let the human steer before continuing when interpretation is involved
+
+For future target-spec work, use a bounded target-spec context package. Do not use whole-HLD, all-specs, or all-logs context by default.
+
+See `docs/CONTEXT_BUDGET.md`.
+
+
 ## External project agent communication protocol
 
 When an agent is invoked from another project directory and told to use this HLDspec repository, the agent must keep the human in the loop throughout the work.

@@ -102,6 +102,10 @@ The system stores state.
             self.assertEqual(2, result.returncode, msg=result.stderr)
             self.assertTrue((workspace / "hld_readiness.json").exists())
             self.assertTrue((workspace / "HLD_CONVERSION_PROMPT.md").exists())
+            prompt = (workspace / "HLD_CONVERSION_PROMPT.md").read_text(encoding="utf-8")
+            self.assertIn("Do not paste the whole HLD into agent context", prompt)
+            self.assertIn("Convert in bounded batches of 3-5 major sections", prompt)
+            self.assertIn("grep", prompt)
             self.assertFalse((workspace / ".specify" / "sync" / "spec_build_plan.json").exists())
 
             readiness = json.loads((workspace / "hld_readiness.json").read_text(encoding="utf-8"))
