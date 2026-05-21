@@ -148,6 +148,62 @@ For conversion checkpoints, the relevant JSON artifact is:
 Do not ask the human what command to run after a checkpoint.
 
 
+## State-discovery invocation
+
+The human should be able to point the judge/orchestrator at the project with a minimal invocation:
+
+```text
+HLDspec
+```
+
+or, if the HLD path is needed:
+
+```text
+HLDspec ./Flow-System-HLD.md
+```
+
+This means the judge/orchestrator must discover the current HLDspec state and lead the process.
+
+The judge/orchestrator must not ask the human what command to run, what JSON to edit, or whether to generically continue.
+
+Required state-discovery order:
+
+1. Identify the project root and source HLD.
+2. Locate `.hldspec-first-run`.
+3. Read `~/code/HLDspec/AGENTS.md`.
+4. Read `~/code/HLDspec/docs/HLD_AGENT_CATCHUP.md` if present.
+5. Inspect checkpoint artifacts in this order:
+   - `.hldspec-first-run/.specify/sync/hld_conversion_decision_queue.md`
+   - `.hldspec-first-run/firstrun/.specify/sync/spec_build_plan_decision_queue.md`
+   - `.hldspec-first-run/firstrun/.specify/sync/hld_source_update_queue.md`
+   - `.hldspec-first-run/firstrun/.specify/sync/target_spec_work_order.md`
+   - `.hldspec-first-run/firstrun/.specify/sync/spec_branch_queue.md`
+   - `.hldspec-first-run/firstrun/.specify/sync/spec_build_plan_review.md`
+6. If a checkpoint contains `human_decision: TBD`, ask only those listed questions.
+7. After the human answers, update the relevant JSON artifact, rerun the same HLDspec command, and continue to the next safe checkpoint.
+8. If no checkpoint exists, run:
+
+```bash
+~/code/HLDspec/scripts/hldspec_run.sh <source-HLD.md>
+```
+
+The human owns decisions. The judge/orchestrator owns state discovery, command execution, queue updates, continuation, and reporting.
+
+Minimal acceptable human interaction:
+
+```text
+HLDspec
+```
+
+Then, only checkpoint answers such as:
+
+```text
+Q-001: SPLIT_AS_PROPOSED
+Q-002: SPLIT_AS_PROPOSED
+Q-003: KEEP_AS_ONE
+```
+
+
 ## Default HLDspec invocation contract
 
 Every project-level HLDspec invocation is handled as a judge/orchestrator run by default.

@@ -120,3 +120,29 @@ If target-spec generation is allowed, review:
 ```
 
 Process only the active next branch. Do not create branches automatically. Do not treat spec generation as file creation only.
+
+## Minimal state-discovery invocation
+
+The human may write only:
+
+```text
+HLDspec
+```
+
+or:
+
+```text
+HLDspec ./Flow-System-HLD.md
+```
+
+The judge/orchestrator must infer the current state from `.hldspec-first-run` and `.specify/sync` artifacts.
+
+Do not ask the human:
+- what command to run
+- what JSON to edit
+- whether to generically continue
+
+Ask only actual checkpoint questions found in the generated artifacts.
+
+After the human answers, update the relevant JSON artifact and rerun the same HLDspec command until the next safe checkpoint.
+
