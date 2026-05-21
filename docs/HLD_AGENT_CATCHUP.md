@@ -164,3 +164,32 @@ The human should not need to remember the process or know which command/file com
 
 If an artifact is missing because the workflow has not reached that stage yet, explain that clearly.
 
+## SpecKit planning and constitution checkpoint
+
+Before creating specs, branches, tasks, or implementation, HLDspec must orient the human around:
+
+```text
+product story map
+use cases
+user journeys
+spec candidates
+API versus functionality split
+common/shared capabilities
+architecture dependency graph
+constitution plan
+bottom-up implementation order
+```
+
+The judge/orchestrator must explain:
+
+```text
+what was extracted
+what depends on what
+what should be built first
+what must be decomposed more
+what constitution rules govern the work
+what decision the human needs to make
+```
+
+The human should not be asked to approve implementation until the plan and constitution are reviewed.
+

@@ -1588,6 +1588,71 @@ Do not run this as the first downstream step on a large/raw HLD:
 ./hld_spec_downstream.py --hld HLD.md --phase analyze
 ```
 
+## SpecKit planning and constitution contract
+
+Before target spec writing, branch creation, or implementation, HLDspec must build and discuss the plan with the human.
+
+HLDspec must extract from the HLD and planning artifacts:
+
+```text
+user stories
+use cases
+user journeys
+feature/spec candidates
+API/interface contracts
+processing/functionality behavior
+shared/common functionality
+architecture dependencies
+implementation dependencies
+```
+
+Required decomposition rules:
+
+```text
+1. Split API/interface contracts from processing behavior when they are mixed.
+2. Split user-facing journeys from backend/internal mechanics when they are mixed.
+3. Extract common/shared capabilities before dependent features.
+4. Keep source-of-truth, data model, and architecture constraints explicit.
+5. Build independent foundations before dependent features.
+6. Do not start implementation before the plan and constitution are reviewed with the human.
+```
+
+Required pre-work artifacts:
+
+```text
+.specify/sync/product_story_map.md
+.specify/sync/product_story_map.json
+.specify/sync/architecture_dependency_graph.md
+.specify/sync/architecture_dependency_graph.json
+.specify/sync/constitution_plan.md
+.specify/sync/constitution_plan.json
+.specify/sync/bottom_up_implementation_plan.md
+.specify/sync/bottom_up_implementation_plan.json
+```
+
+The constitution is not optional. It is the architecture and governance source of truth for the SpecKit process.
+
+The judge/orchestrator must stop and discuss these artifacts with the human before creating project specs, branches, tasks, or implementation files.
+
+Required checkpoint question:
+
+```text
+Does this plan and constitution correctly represent the architecture, dependencies, user journeys, and implementation order?
+```
+
+Allowed human decisions:
+
+```text
+APPROVE_PLAN
+MODIFY_PLAN
+DECOMPOSE_MORE
+FIX_CONSTITUTION
+REBUILD_DEPENDENCY_GRAPH
+```
+
+The judge/orchestrator may recommend a decision with evidence, but must not answer for the human.
+
+
 ## Spec Branch Queue
 
 Spec Kit work is branch-oriented. HLDspec must not treat target spec generation as only file creation.
