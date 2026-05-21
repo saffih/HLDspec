@@ -364,6 +364,79 @@ The consumer owns sync orchestration.
         self.assertIn("HLD-002", markdown)
         self.assertIn("HLD-003", markdown)
 
+    def test_plan_specs_clean_role_separated_hld_is_not_overflagged(self) -> None:
+        hld = """# Clean HLD
+
+## HLD-001 - Governance
+
+HLD-ID: HLD-001
+HLD-ROLE: governance
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: target constitution
+HLD-VERIFY: source-of-truth rules are captured
+
+The HLD is the source of truth.
+
+## HLD-002 - Data State
+
+HLD-ID: HLD-002
+HLD-ROLE: data
+HLD-STATUS: active
+HLD-RISK: MEDIUM
+HLD-SPECS: 002
+HLD-RESOURCES: data model, state ownership
+HLD-VERIFY: data ownership is explicit
+
+This section DEPENDS REF HLD-001.
+
+The system stores project state. Data ownership belongs to the data capability.
+
+## HLD-003 - API Contract
+
+HLD-ID: HLD-003
+HLD-ROLE: api
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: 003
+HLD-RESOURCES: API contract, producer, consumer
+HLD-VERIFY: API producer and consumer are named
+
+This section DEPENDS REF HLD-002.
+
+The API exposes state through an explicit producer and consumer contract.
+
+## HLD-004 - Processing Flow
+
+HLD-ID: HLD-004
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: MEDIUM
+HLD-SPECS: 004
+HLD-RESOURCES: processing workflow
+HLD-VERIFY: processing behavior is traceable to HLD anchors
+
+This section DEPENDS REF HLD-003.
+
+The processing workflow uses the API contract and does not own data persistence.
+"""
+        parsed = hld_map.parse_hld_text(hld, source_path="HLD.md")
+        self.assertEqual([], parsed.validation_errors)
+
+        with tempfile.TemporaryDirectory() as td:
+            plan, _ = hld_spec_sync.build_spec_build_plan(parsed, Path(td))
+
+        self.assertEqual("FIX", plan["plan_quality"]["decision"])
+        self.assertEqual("KEEP_PLAN", plan["plan_quality"]["recommendation"])
+        by_id = {item["planned_spec_id"]: item for item in plan["planned_specs"]}
+        self.assertEqual("data", by_id["002"]["layer"])
+        self.assertEqual("api", by_id["003"]["layer"])
+        self.assertEqual("processing", by_id["004"]["layer"])
+        self.assertEqual([], by_id["002"]["quality_flags"])
+        self.assertEqual([], by_id["003"]["quality_flags"])
+        self.assertEqual([], by_id["004"]["quality_flags"])
+
 
 if __name__ == "__main__":
     unittest.main()

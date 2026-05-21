@@ -785,22 +785,36 @@ def slugify_spec_title(title: str) -> str:
 
 def spec_layer_for_section(section: hld_map.HldSection) -> str:
     role = section.metadata_value("HLD-ROLE").strip().lower()
-    text = f"{section.title}\n{section.text}".lower()
+    role_layers = {
+        "governance": "governance",
+        "purpose": "governance",
+        "foundation": "foundation",
+        "data": "data",
+        "api": "api",
+        "ui": "api",
+        "processing": "processing",
+        "architecture": "processing",
+        "operations": "operations",
+        "risk": "operations",
+        "testing": "testing",
+        "feature": "feature",
+    }
+    if role in role_layers:
+        return role_layers[role]
 
-    if role in {"governance", "purpose"} or any(term in text for term in ("source of truth", "ownership", "policy", "constitution")):
+    text = f"{section.title}\n{section.metadata_value('HLD-RESOURCES')}".lower()
+    if any(term in text for term in ("source of truth", "policy", "constitution", "approval", "decision")):
         return "governance"
-    if role in {"data"} or any(term in text for term in ("data model", "state", "storage", "persistence", "schema", "migration")):
+    if any(term in text for term in ("data model", "storage", "persistence", "schema", "migration", "database")):
         return "data"
-    if role in {"api", "ui"} or any(term in text for term in ("api", "interface", "contract", "endpoint", "producer", "consumer")):
+    if any(term in text for term in ("api contract", "interface contract", "endpoint", "openapi", "grpc", "rest api")):
         return "api"
-    if role in {"processing", "architecture"} or any(term in text for term in ("flow", "sync", "pipeline", "orchestration", "processing")):
+    if any(term in text for term in ("pipeline", "orchestration", "workflow", "processing flow")):
         return "processing"
-    if role in {"operations", "risk"} or any(term in text for term in ("rollback", "recovery", "retry", "failure", "observability", "operations")):
+    if any(term in text for term in ("rollback", "recovery", "retry", "failure", "observability", "timeout")):
         return "operations"
-    if role in {"testing"} or any(term in text for term in ("test", "verify", "validation", "acceptance")):
+    if any(term in text for term in ("validation", "acceptance", "coverage", "test plan")):
         return "testing"
-    if role in {"foundation"}:
-        return "foundation"
     return "feature"
 
 
@@ -934,12 +948,44 @@ RESPONSIBILITY_GROUP_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 
 def detect_section_responsibility_groups(section: hld_map.HldSection) -> list[str]:
-    text = f"{section.title}\n{section.text}\n{section.metadata_value('HLD-RESOURCES')}".lower()
-    return sorted(
-        group
-        for group, keywords in RESPONSIBILITY_GROUP_KEYWORDS.items()
-        if any(keyword in text for keyword in keywords)
-    )
+    role = section.metadata_value("HLD-ROLE").strip().lower()
+    role_groups = {
+        "governance": "governance",
+        "purpose": "governance",
+        "data": "data_state",
+        "api": "api_contract",
+        "ui": "api_contract",
+        "processing": "processing",
+        "architecture": "processing",
+        "operations": "operations",
+        "risk": "operations",
+        "testing": "testing",
+    }
+
+    groups: set[str] = set()
+    if role in role_groups:
+        groups.add(role_groups[role])
+
+    # Use title/resources for responsibility ownership. Full body text may mention
+    # dependencies ("uses API", "does not own data") and should not by itself
+    # create mixed-responsibility flags.
+    text = f"{section.title}\n{section.metadata_value('HLD-RESOURCES')}".lower()
+
+    strong_signals: dict[str, tuple[str, ...]] = {
+        "governance": ("source of truth", "policy", "constitution", "approval", "decision"),
+        "data_state": ("data model", "storage", "persistence", "schema", "migration", "database"),
+        "api_contract": ("api contract", "interface contract", "endpoint", "openapi", "grpc", "rest api"),
+        "processing": ("pipeline", "orchestration", "workflow", "processing flow"),
+        "operations": ("rollback", "recovery", "retry", "failure", "observability", "timeout"),
+        "testing": ("validation", "acceptance", "coverage", "test plan"),
+        "performance": ("performance", "latency", "throughput", "scale", "scalability"),
+        "memory": ("memory", "context size", "context-size", "token budget"),
+    }
+    for group, keywords in strong_signals.items():
+        if any(keyword in text for keyword in keywords):
+            groups.add(group)
+
+    return sorted(groups)
 
 
 def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> None:
