@@ -46,6 +46,33 @@ Then call Python as:
 Do not make `uv` mandatory unless the repo explicitly adopts a `pyproject.toml`/locked environment.
 
 
+## Single-command project runner
+
+For project-level use, prefer the single command:
+
+```bash
+scripts/hldspec_run.sh <path-to-HLD.md> [workspace]
+```
+
+This command continues HLDspec to the next safe checkpoint.
+
+It may:
+- run the read-only first run
+- show the generated human decision queue
+- apply already answered conversion decisions to the working copy
+- rerun first-readonly on the converted working copy
+- report whether target-spec generation is allowed
+
+It must not:
+- modify the source HLD
+- answer human checkpoint questions
+- run downstream analysis
+- create tasks
+- run implementation work
+
+The judge/orchestrator should run this command and report its checkpoint output to the human.
+
+
 ## Simple project entrypoint
 
 When the human asks an agent to run HLDspec from a project repository, the agent should read:
