@@ -1257,6 +1257,14 @@ def main() -> int:
     ap.add_argument("--use-hld-map", action="store_true", help="Use HLD section map for bounded context selection.")
     ap.add_argument("--target-hld", default=None, help="Target one HLD section such as HLD-007 for map-aware runs.")
     ap.add_argument("--max-hld-chars", type=int, default=0, help="0 means no HLD truncation")
+    ap.add_argument(
+        "--allow-full-hld-context",
+        action="store_true",
+        help=(
+            "Allow downstream prompts to include the full HLD when --use-hld-map is not used "
+            "and --max-hld-chars is 0. Use only with explicit human approval."
+        ),
+    )
     ap.add_argument("--max-spec-chars", type=int, default=18000)
     ap.add_argument("--agent-timeout-seconds", type=int, default=0, help="0 means no timeout")
     args = ap.parse_args()
@@ -1302,6 +1310,14 @@ def main() -> int:
         raise SystemExit(str(exc)) from exc
     if args.allow_implementation and not implementation_roots:
         raise SystemExit("--allow-implementation requires at least one --implementation-root")
+
+    if not args.use_hld_map and args.max_hld_chars == 0 and not args.allow_full_hld_context:
+        raise SystemExit(
+            "Refusing to build an unbounded downstream prompt: --use-hld-map was not provided "
+            "and --max-hld-chars is 0. Use --use-hld-map --target-hld for bounded downstream "
+            "context, set --max-hld-chars to an explicit limit, or pass --allow-full-hld-context "
+            "only with explicit human approval."
+        )
 
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     logs_dir = workspace / "logs" / "hld_spec_downstream" / ts
@@ -1394,6 +1410,7 @@ def main() -> int:
             "skeptic": args.skeptic,
             "use_hld_map": args.use_hld_map,
             "target_hld": args.target_hld,
+            "allow_full_hld_context": args.allow_full_hld_context,
             "context_selection": context_selection,
         }
         write_text(logs_dir / "run_summary.json", json.dumps(summary, indent=2))
@@ -1485,6 +1502,7 @@ def main() -> int:
                 "skeptic": args.skeptic,
                 "use_hld_map": args.use_hld_map,
                 "target_hld": args.target_hld,
+                "allow_full_hld_context": args.allow_full_hld_context,
                 "context_selection": context_selection,
                 "staging": staging_info,
             }
@@ -1517,6 +1535,7 @@ def main() -> int:
         "skeptic": args.skeptic,
         "use_hld_map": args.use_hld_map,
         "target_hld": args.target_hld,
+        "allow_full_hld_context": args.allow_full_hld_context,
         "context_selection": context_selection,
         "staging": staging_info,
         "skeptic_conflicts_path": (

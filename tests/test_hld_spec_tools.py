@@ -949,6 +949,8 @@ HLD-RESOURCES: TBD
                 "custom",
                 "--agent-command",
                 "fake",
+                "--max-hld-chars",
+                "30000",
                 "--skeptic",
             ]
             try:

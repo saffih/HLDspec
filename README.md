@@ -360,6 +360,23 @@ Downstream writes are also phase-scoped: `analyze` writes downstream reports, `p
 ./hld_spec_downstream.py --hld ./hld.md --agent codex
 ```
 
+### Downstream context guard
+
+By default, `hld_spec_downstream.py` refuses to build an unbounded downstream prompt when `--use-hld-map` is not used and `--max-hld-chars` is `0`.
+
+Use one of these explicit choices:
+
+```bash
+# Preferred bounded HLD-map context
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase analyze --prompt-only
+
+# Explicit character bound
+./hld_spec_downstream.py --hld HLD.md --max-hld-chars 30000 --phase analyze --prompt-only
+
+# Explicit full-HLD override, only with human approval
+./hld_spec_downstream.py --hld HLD.md --allow-full-hld-context --phase analyze --prompt-only
+```
+
 Run only analysis:
 
 ```bash

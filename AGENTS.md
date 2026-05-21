@@ -620,6 +620,22 @@ Every subagent output must include what was inspected, what changed if anything,
 See `docs/CHUNKED_AGENT_PROTOCOL.md`.
 
 
+## Downstream context guard
+
+`hld_spec_downstream.py` must not build unbounded downstream prompts by default.
+
+If `--use-hld-map` is not used and `--max-hld-chars` is `0`, the run must stop unless `--allow-full-hld-context` is provided.
+
+Preferred safe modes:
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase analyze --prompt-only
+./hld_spec_downstream.py --hld HLD.md --max-hld-chars 30000 --phase analyze --prompt-only
+```
+
+Use `--allow-full-hld-context` only with explicit human approval.
+
+
 ## Context budget protocol
 
 Large HLDs must be handled as a context-budget problem.
