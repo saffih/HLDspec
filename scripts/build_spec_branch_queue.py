@@ -147,6 +147,17 @@ def render_md(queue: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+LEGACY_SUPPORTING_NOTICE = '**Legacy/supporting when SpecKit is available.** This artifact preserves bottom-up planning context, but it is not the controlling handoff. Use `hldspec_state.md`, `speckit_prework_package.md`, `speckit_invocation_queue.md`, and `speckit_proxy_dossier.md` for the current SpecKit flow.'
+
+def add_legacy_supporting_notice(markdown: str, title: str) -> str:
+    if "Legacy/supporting when SpecKit is available" in markdown:
+        return markdown
+    marker = f"# {title}\\n\\n"
+    if marker in markdown:
+        return markdown.replace(marker, marker + f"> {LEGACY_SUPPORTING_NOTICE}\\n\\n", 1)
+    return f"> {LEGACY_SUPPORTING_NOTICE}\\n\\n" + markdown
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build one-at-a-time Spec Kit branch queue from target spec work order.")
     parser.add_argument("target_spec_work_order_json")
@@ -163,7 +174,7 @@ def main() -> int:
     json_path = out_dir / "spec_branch_queue.json"
     md_path = out_dir / "spec_branch_queue.md"
     json_path.write_text(json.dumps(queue, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(render_md(queue), encoding="utf-8")
+    md_path.write_text(add_legacy_supporting_notice(render_md(queue), 'Spec Branch Queue'), encoding="utf-8")
 
     print("Spec branch queue generated:")
     print(f"- json: {json_path}")

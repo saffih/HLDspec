@@ -184,6 +184,17 @@ def render_md(work_order: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+LEGACY_SUPPORTING_NOTICE = '**Legacy/supporting when SpecKit is available.** This artifact preserves bottom-up planning context, but it is not the controlling handoff. Use `hldspec_state.md`, `speckit_prework_package.md`, `speckit_invocation_queue.md`, and `speckit_proxy_dossier.md` for the current SpecKit flow.'
+
+def add_legacy_supporting_notice(markdown: str, title: str) -> str:
+    if "Legacy/supporting when SpecKit is available" in markdown:
+        return markdown
+    marker = f"# {title}\\n\\n"
+    if marker in markdown:
+        return markdown.replace(marker, marker + f"> {LEGACY_SUPPORTING_NOTICE}\\n\\n", 1)
+    return f"> {LEGACY_SUPPORTING_NOTICE}\\n\\n" + markdown
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build bottom-up work order for target Spec Kit draft generation.")
     parser.add_argument("spec_build_plan_json")
@@ -200,7 +211,7 @@ def main() -> int:
     md_path = out_dir / "target_spec_work_order.md"
 
     json_path.write_text(json.dumps(work_order, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(render_md(work_order), encoding="utf-8")
+    md_path.write_text(add_legacy_supporting_notice(render_md(work_order), 'Target Spec Work Order'), encoding="utf-8")
 
     print("Target spec work order generated:")
     print(f"- json: {json_path}")

@@ -43,6 +43,19 @@ def hld_is_converted(path: Path) -> bool:
     return bool(re.search(r"^## HLD-\d{3}[A-Z]? - ", path.read_text(encoding="utf-8", errors="replace"), re.M))
 
 
+def has_first_run_artifacts(workspace: Path) -> bool:
+    sync = workspace / ".specify" / "sync"
+    return any(
+        (sync / name).exists()
+        for name in [
+            "spec_build_plan.json",
+            "spec_build_plan_review.md",
+            "speckit_prework_quality_review.json",
+            "speckit_prework_package.md",
+        ]
+    )
+
+
 def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]]:
     plan = load_json(plan_path)
     pq = plan.get("plan_quality", {}) if isinstance(plan, dict) else {}
@@ -80,7 +93,7 @@ def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]
 
 def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
     sync = workspace / ".specify" / "sync"
-    firstrun = workspace / "firstrun"
+    firstrun = workspace if has_first_run_artifacts(workspace) else workspace / "firstrun"
     fsync = firstrun / ".specify" / "sync"
 
     working_hld = workspace / "HLD.md"

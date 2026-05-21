@@ -1962,3 +1962,25 @@ spec_branch_queue
 
 They may remain for compatibility, but they are not the controlling checkpoint.
 
+## Legacy/supporting artifact wording
+
+When SpecKit is available, these artifacts are legacy/supporting rather than controlling:
+
+```text
+target_spec_work_order
+spec_branch_queue
+```
+
+Their generated markdown must clearly say:
+
+```text
+Legacy/supporting when SpecKit is available.
+```
+
+The controlling user-facing entry points are:
+
+```text
+hldspec_state.md
+speckit_prework_package.md
+```
+

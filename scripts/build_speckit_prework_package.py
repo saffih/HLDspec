@@ -30,14 +30,56 @@ def build_package(workspace: Path) -> dict[str, Any]:
     blockers = [f for f in findings if isinstance(f, dict) and str(f.get("severity", "")).upper() == "BLOCKER"]
     active = dossier.get("selected_feature", {}) if isinstance(dossier.get("selected_feature"), dict) else {}
     first = quality.get("case_to_present", {}).get("first_feature_case", {}) if isinstance(quality.get("case_to_present"), dict) else {}
+    current_stage = str(state.get("current_stage", ""))
+    approval_ready = current_stage == "SPECKIT_PREWORK_APPROVAL_GATE"
+    status = (
+        "REWORK_REQUIRED"
+        if blockers
+        else ("PENDING_HUMAN_REVIEW" if approval_ready else "BLOCKED_BY_CURRENT_CHECKPOINT")
+    )
+    approval_controlling_artifacts = [
+        ".specify/sync/hldspec_state.md",
+        ".specify/sync/speckit_prework_package.md",
+        ".specify/sync/speckit_prework_quality_review.md",
+        ".specify/sync/speckit_proxy_dossier.md",
+        ".specify/sync/speckit_invocation_queue.md",
+        ".specify/sync/constitution_update_plan.md",
+        ".specify/sync/feature_dependency_graph.md",
+    ]
+    supporting_artifacts = [
+        ".specify/sync/speckit_input_manifest.md",
+        ".specify/sync/spec_build_plan.md",
+        ".specify/sync/spec_build_plan_review.md",
+    ]
+    controlling_artifacts = (
+        approval_controlling_artifacts
+        if approval_ready
+        else (as_list(state.get("controlling_artifacts")) or [".specify/sync/hldspec_state.md"])
+    )
+    if not approval_ready:
+        supporting_artifacts = approval_controlling_artifacts + supporting_artifacts
+    checkpoint = (
+        {
+            "question": "Do you approve the constitution, dependency order, first feature, and SpecKit proxy handoff?",
+            "options": ["APPROVE_PLAN", "MODIFY_PLAN", "DECOMPOSE_MORE", "FIX_CONSTITUTION", "REBUILD_DEPENDENCY_GRAPH"],
+            "human_decision": "TBD",
+        }
+        if approval_ready
+        else {
+            "question": "Resolve the current HLDspec checkpoint before approving SpecKit prework.",
+            "options": [],
+            "human_decision": "NOT_APPLICABLE",
+        }
+    )
 
     return {
         "schema_version": 1,
-        "status": "REWORK_REQUIRED" if blockers else "PENDING_HUMAN_REVIEW",
+        "status": status,
         "purpose": "single human-facing package for reviewing SpecKit prework before SpecKit invocation",
         "state": {
-            "current_stage": state.get("current_stage", ""),
+            "current_stage": current_stage,
             "current_checkpoint": state.get("current_checkpoint", ""),
+            "next_allowed_actions": as_list(state.get("next_allowed_actions")),
         },
         "constitution_case": {
             "claim": "The constitution must protect HLD architecture before SpecKit creates feature artifacts.",
@@ -52,29 +94,13 @@ def build_package(workspace: Path) -> dict[str, Any]:
         "active_proxy_feature": active,
         "beskeptic_findings": findings,
         "feedback_impact_rules": quality.get("affected_artifact_policy", {}),
-        "controlling_artifacts": [
-            ".specify/sync/hldspec_state.md",
-            ".specify/sync/speckit_prework_package.md",
-            ".specify/sync/speckit_prework_quality_review.md",
-            ".specify/sync/speckit_proxy_dossier.md",
-            ".specify/sync/speckit_invocation_queue.md",
-            ".specify/sync/constitution_update_plan.md",
-            ".specify/sync/feature_dependency_graph.md",
-        ],
-        "supporting_artifacts": [
-            ".specify/sync/speckit_input_manifest.md",
-            ".specify/sync/spec_build_plan.md",
-            ".specify/sync/spec_build_plan_review.md",
-        ],
+        "controlling_artifacts": controlling_artifacts,
+        "supporting_artifacts": supporting_artifacts,
         "legacy_supporting_artifacts": [
             ".specify/sync/target_spec_work_order.md",
             ".specify/sync/spec_branch_queue.md",
         ],
-        "human_checkpoint": {
-            "question": "Do you approve the constitution, dependency order, first feature, and SpecKit proxy handoff?",
-            "options": ["APPROVE_PLAN", "MODIFY_PLAN", "DECOMPOSE_MORE", "FIX_CONSTITUTION", "REBUILD_DEPENDENCY_GRAPH"],
-            "human_decision": "TBD",
-        },
+        "human_checkpoint": checkpoint,
     }
 
 
@@ -96,6 +122,25 @@ def render_md(pkg: dict[str, Any]) -> str:
         f"- checkpoint: `{pkg['state'].get('current_checkpoint', '')}`",
         "- HLDspec has prepared SpecKit inputs but must not invoke SpecKit until this package is approved.",
         "",
+    ]
+
+    if pkg["status"] == "BLOCKED_BY_CURRENT_CHECKPOINT":
+        lines += [
+            "## Blocking checkpoint",
+            "",
+            "This package is evidence only right now. It is not approval-ready because an earlier HLDspec checkpoint is still controlling.",
+            "",
+            "Next allowed actions:",
+        ]
+        actions = pkg["state"].get("next_allowed_actions", [])
+        if actions:
+            for action in actions:
+                lines.append(f"- {action}")
+        else:
+            lines.append("- return to the current HLDspec checkpoint")
+        lines.append("")
+
+    lines += [
         "## Constitution case",
         "",
         pkg["constitution_case"]["claim"],
@@ -196,7 +241,7 @@ def render_md(pkg: dict[str, Any]) -> str:
     ]
     for option in checkpoint["options"]:
         lines.append(f"- {option}")
-    lines += ["", "Human decision: `TBD`", ""]
+    lines += ["", f"Human decision: `{checkpoint['human_decision']}`", ""]
     return "\n".join(lines)
 
 

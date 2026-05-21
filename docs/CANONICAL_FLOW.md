@@ -111,7 +111,7 @@ target_spec_work_order.md/json
 spec_branch_queue.md/json
 ```
 
-They are not the controlling checkpoint when SpecKit is available.
+They are not the controlling checkpoint when SpecKit is available. Their generated markdown must explicitly say `Legacy/supporting when SpecKit is available`.
 
 The controlling handoff is:
 
