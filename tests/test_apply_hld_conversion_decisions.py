@@ -136,6 +136,30 @@ class ApplyHldConversionDecisionsTests(unittest.TestCase):
             self.assertNotRegex(converted, r"^## HLD-\\d{3}[A-Z] - ", msg="split IDs must be normalized to numeric HLD IDs")
             self.assertTrue(hld.with_suffix(".md.pre-hldspec.bak").exists())
 
+    def test_refuses_reapplying_to_already_converted_hld(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            hld, _plan, queue = write_plan_and_queue(workspace, answered=True)
+            hld.write_text(
+                "## HLD-001 - Already Converted\n\nHLD-ID: HLD-001\nHLD-ROLE: architecture\nHLD-STATUS: active\nHLD-RISK: LOW\nHLD-SPECS: TBD\nHLD-RESOURCES: TBD\n\nBody.\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "apply_hld_conversion_decisions.py"),
+                    str(hld),
+                    str(queue),
+                ],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertIn("already appears to contain HLDspec", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -222,6 +223,18 @@ def build_conversion_sections(plan: dict[str, Any], queue: dict[str, Any]) -> li
     return renumber_sections_numeric(sections)
 
 
+def assert_input_not_already_converted(hld_path: Path) -> None:
+    text = hld_path.read_text(encoding="utf-8", errors="replace")
+    if re.search(r"^## HLD-\d{3}\s+-\s+", text, flags=re.MULTILINE) or re.search(
+        r"^HLD-ID:\s*HLD-\d{3}", text, flags=re.MULTILINE
+    ):
+        raise ValueError(
+            "Input HLD already appears to contain HLDspec anchors/metadata. "
+            "Restore the raw working copy before applying conversion decisions. "
+            "Example: cp HLD.md.pre-hldspec.bak HLD.md"
+        )
+
+
 def metadata_block(section: ConversionSection) -> list[str]:
     return [
         f"## {section.hld_id} - {section.title}",
@@ -279,6 +292,12 @@ def main() -> int:
     if not plan_path.exists():
         print(f"Missing conversion plan: {plan_path}")
         return 1
+
+    try:
+        assert_input_not_already_converted(hld_path)
+    except ValueError as exc:
+        print(f"Refusing to apply conversion decisions: {exc}")
+        return 2
 
     plan = load_json(plan_path)
     sections = build_conversion_sections(plan, queue)
