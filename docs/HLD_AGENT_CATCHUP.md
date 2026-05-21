@@ -193,3 +193,52 @@ what decision the human needs to make
 
 The human should not be asked to approve implementation until the plan and constitution are reviewed.
 
+## SpecKit prework handoff
+
+HLDspec prepares and orchestrates SpecKit input. It does not replace SpecKit.
+
+Before invoking SpecKit, review:
+
+```text
+speckit_input_manifest.md
+speckit_invocation_queue.md
+constitution_update_plan.md
+feature_dependency_graph.md
+```
+
+SpecKit should create and manage its own generated artifacts:
+
+```text
+spec.md
+checklists/requirements.md
+plan.md
+research.md
+data-model.md
+contracts/
+quickstart.md
+tasks.md
+```
+
+The judge/orchestrator must explain the extracted user stories/use cases/user journeys, dependency order, API-vs-processing splits, common foundations, and constitution implications before asking for approval.
+
+## SpecKit prework quality gate
+
+Before invoking SpecKit, read and present:
+
+```text
+speckit_prework_quality_review.md
+```
+
+Orient the human around:
+
+```text
+Where we are
+What was extracted
+Why the constitution protects the architecture
+Why the dependency order is correct
+Why the first feature is first
+What Beskeptic found
+What will be rebuilt if the human gives feedback
+What approval decision is needed
+```
+

@@ -1653,6 +1653,69 @@ REBUILD_DEPENDENCY_GRAPH
 The judge/orchestrator may recommend a decision with evidence, but must not answer for the human.
 
 
+## SpecKit ownership boundary and prework handoff
+
+HLDspec must use SpecKit instead of reimplementing SpecKit.
+
+HLDspec owns:
+
+```text
+HLD extraction
+user story / use case / user journey extraction
+architecture decomposition
+API/interface versus processing/functionality split
+shared/common foundation extraction
+feature dependency graph
+constitution update plan
+bottom-up SpecKit invocation order
+checkpoint/orchestration state
+```
+
+SpecKit owns:
+
+```text
+spec.md
+checklists/requirements.md
+clarification flow
+plan.md
+research.md
+data-model.md
+contracts/
+quickstart.md
+tasks.md
+implementation phase
+```
+
+HLDspec must not manually create final SpecKit feature specs when the real SpecKit workflow is available.
+
+Before invoking SpecKit, HLDspec must generate and discuss:
+
+```text
+.specify/sync/speckit_input_manifest.json
+.specify/sync/speckit_input_manifest.md
+.specify/sync/speckit_invocation_queue.json
+.specify/sync/speckit_invocation_queue.md
+.specify/sync/constitution_update_plan.json
+.specify/sync/constitution_update_plan.md
+.specify/sync/feature_dependency_graph.json
+.specify/sync/feature_dependency_graph.md
+```
+
+The constitution update plan is required because the SpecKit constitution governs later `specify`, `plan`, `tasks`, and `implement` phases.
+
+The judge/orchestrator must stop and discuss the manifest, dependency graph, constitution update plan, and invocation queue with the human before invoking SpecKit.
+
+Allowed human decisions:
+
+```text
+APPROVE_PLAN
+MODIFY_PLAN
+DECOMPOSE_MORE
+FIX_CONSTITUTION
+REBUILD_DEPENDENCY_GRAPH
+```
+
+
 ## Spec Branch Queue
 
 Spec Kit work is branch-oriented. HLDspec must not treat target spec generation as only file creation.
@@ -1745,4 +1808,44 @@ Rules:
 - Do not jump to a feature cluster manually.
 - Explain why expected later artifacts do not exist yet when the current checkpoint is earlier in the flow.
 - Ask only the generated checkpoint questions.
+
+## SpecKit prework quality gate
+
+Before invoking SpecKit, HLDspec must generate:
+
+```text
+.specify/sync/speckit_prework_quality_review.json
+.specify/sync/speckit_prework_quality_review.md
+```
+
+The judge/orchestrator must present:
+
+```text
+1. Constitution case
+2. Architecture/dependency case
+3. First-feature case
+4. Beskeptic findings
+5. Feedback impact rules
+6. Human approval question
+```
+
+The first-feature case must explain why the first feature is first, for example:
+
+```text
+Feature 001 is first because it has no dependencies and is the foundation/root feature.
+```
+
+If the human gives feedback, the judge/orchestrator must rebuild all affected artifacts, not patch only the visible markdown.
+
+Examples:
+
+```text
+constitution feedback -> rebuild constitution plan, manifest if boundaries change, dependency graph if affected, invocation queue, quality review
+dependency feedback -> rebuild dependency graph, invocation queue, quality review
+decomposition feedback -> update working HLD/HLD-SPECS mapping, rerun first_readonly, regenerate prework artifacts
+```
+
+The quality review must use Beskeptic to detect unclear architecture, weak decomposition, missing foundations, API/functionality mixing, and explanations that will not make sense to the human.
+
+SpecKit invocation remains blocked until this gate is approval-ready and the human approves.
 
