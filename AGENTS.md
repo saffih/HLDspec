@@ -485,7 +485,20 @@ Do not guess unresolved source-of-truth, ownership, API/interface, dependency, p
 
 ## Standard workflow
 
-### 1. Validate HLD structure
+HLDspec currently has two workflow levels:
+
+1. **Current supported workflow**: uses `--target-hld` to process one bounded HLD section at a time.
+2. **Intended bottom-up workflow**: will use `--plan-specs`, `--target-spec`, Coverage Gate, and Integration Gate once those commands are implemented.
+
+Do not confuse the two.
+
+The current supported workflow is safe for controlled use, but it is still section-driven. The intended workflow is capability/spec-driven.
+
+### Current supported workflow
+
+Use this today when the repo does not yet implement `--plan-specs`.
+
+#### 1. Validate HLD structure
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --hld-map-only
@@ -501,7 +514,14 @@ Review:
 
 Do not continue if the HLD map is invalid.
 
-### 2. Review HLD-to-spec prompt
+Run Beskeptic Cycles on these Key Aspects:
+
+- `hld_metadata`
+- `hld_refs`
+- `source_of_truth`
+- `testability`
+
+#### 2. Review bounded HLD-to-spec prompt
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
@@ -516,7 +536,18 @@ logs/hld_spec_sync/<timestamp>/prompt.md
 
 Confirm the prompt uses bounded HLD context and does not load the full HLD unnecessarily.
 
-### 3. Run HLD-to-spec sync
+Run Beskeptic Cycles on these Key Aspects:
+
+- `bounded_context`
+- `source_of_truth`
+- `hld_refs`
+- `coverage`
+- `integration`
+- `api_contract`
+- `performance`
+- `memory`
+
+#### 3. Run bounded HLD-to-spec sync
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
@@ -532,7 +563,20 @@ specs/<NNN-feature-slug>/spec.md
 .specify/sync/feature_graph.json
 ```
 
-### 4. Review spec-to-downstream prompt
+Run Beskeptic Cycles on these Key Aspects:
+
+- `spec_boundary`
+- `coverage`
+- `integration`
+- `api_contract`
+- `staged_write_safety`
+- `testability`
+- `performance`
+- `memory`
+
+If the run creates a monolithic spec, mixes responsibilities, misses API contracts, or fails to map HLD anchors, classify the issue as `DECOMPOSE` or `CONFLICT` before continuing.
+
+#### 4. Review spec-to-downstream prompt
 
 ```bash
 ./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan --prompt-only
@@ -545,7 +589,16 @@ logs/hld_spec_downstream/<timestamp>/context_selection.json
 logs/hld_spec_downstream/<timestamp>/prompt.md
 ```
 
-### 5. Run downstream planning
+Run Beskeptic Cycles on these Key Aspects:
+
+- `coverage`
+- `integration`
+- `api_contract`
+- `bottom_up_order`
+- `testability`
+- `dependency_order`
+
+#### 5. Run downstream planning
 
 ```bash
 ./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan
@@ -561,6 +614,147 @@ specs/<NNN-feature-slug>/data-model.md
 specs/<NNN-feature-slug>/quickstart.md
 logs/hld_spec_downstream/<timestamp>/run_summary.json
 ```
+
+Do not proceed downstream if source specs are missing coverage, have unresolved integration gaps, or lack required API/interface contracts.
+
+### Intended bottom-up workflow
+
+This is the target architecture. Use it once `--plan-specs`, `--target-spec`, `--coverage-check`, and `--integration-check` exist.
+
+#### 1. Generate a Format Report when the HLD is raw or huge
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-format-report
+```
+
+Review:
+
+```text
+logs/hld_spec_sync/<timestamp>/hld_format_report.md
+logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
+```
+
+#### 2. Validate the HLD Map
+
+```bash
+./hld_spec_sync.py --hld HLD.md --hld-map-only
+```
+
+#### 3. Create the Spec Build Plan
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --plan-specs
+```
+
+Expected outputs:
+
+```text
+.specify/sync/spec_build_plan.md
+.specify/sync/spec_build_plan.json
+```
+
+The Spec Build Plan must include:
+
+```text
+constitution_action: create|update|no_change|conflict
+planned specs
+spec layers
+source HLD Sections
+dependency order
+API/interface expectations
+coverage expectations
+integration expectations
+performance/memory concerns when relevant
+conflicts and user decisions needed
+```
+
+Run Beskeptic Cycles on these Key Aspects:
+
+- `spec_boundary`
+- `spec_decomposition`
+- `bottom_up_order`
+- `source_of_truth`
+- `dependency_order`
+- `api_contract`
+- `integration`
+- `coverage`
+- `performance`
+- `memory`
+- `user_decision`
+
+#### 4. Review one Target Spec prompt
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-spec 001 --prompt-only
+```
+
+Review that the prompt uses the Spec Build Plan and includes:
+
+```text
+source HLD Sections
+required refs
+relevant normal refs
+dependency specs
+target Spec Kit Constitution context
+API/interface expectations
+performance/memory expectations
+coverage expectations
+integration expectations
+```
+
+#### 5. Create or update one Target Spec
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --target-spec 001
+```
+
+Only the selected Target Spec and required sync metadata should change.
+
+#### 6. Run Coverage Gate
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --coverage-check --target-spec 001
+```
+
+Expected outputs:
+
+```text
+.specify/sync/coverage_matrix.json
+.specify/sync/coverage_report.md
+```
+
+Do not continue if HLD coverage is partial, stale, duplicated, wrong, or unresolved.
+
+#### 7. Run Integration Gate
+
+```bash
+./hld_spec_sync.py --hld HLD.md --use-hld-map --integration-check --target-spec 001
+```
+
+Expected outputs:
+
+```text
+.specify/sync/integration_matrix.json
+.specify/sync/integration_report.md
+```
+
+Do not continue if API contracts, producer/consumer relationships, data/state ownership, dependency edges, performance, memory, or reliability expectations are unresolved.
+
+#### 8. Continue downstream only after Coverage Gate and Integration Gate
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-spec 001 --phase plan --prompt-only
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-spec 001 --phase plan
+```
+
+### Required distinction
+
+Use `--target-hld` for the current supported bounded-section workflow.
+
+Use `--target-spec` only after the Spec Build Plan exists and the command is implemented.
+
+Do not pretend the intended bottom-up commands exist until code and tests support them.
+
 
 ## Resume behavior
 
@@ -645,18 +839,45 @@ When asked to "make an HLD workable":
 
 When asked to "update specs from HLD":
 
+Current supported path:
+
 1. Validate the HLD map.
-2. Run sync prompt-only first.
+2. Run sync prompt-only first with `--use-hld-map --target-hld`.
 3. Review `context_selection.json` and `prompt.md`.
 4. Run sync for the target HLD section.
+5. Beskeptic-check spec boundary, coverage, integration, API contract, performance, and memory concerns.
+
+Intended bottom-up path after `--plan-specs` exists:
+
+1. Validate the HLD map.
+2. Generate and review the Spec Build Plan.
+3. Select one Target Spec.
+4. Run target-spec prompt-only.
+5. Create/update that one Target Spec.
+6. Run Coverage Gate.
+7. Run Integration Gate.
+
 
 When asked to "catch up downstream artifacts for the next feature":
+
+Current supported path:
 
 1. Identify the target HLD section.
 2. Validate the HLD map.
 3. Run sync if specs are stale.
 4. Run downstream prompt-only.
 5. Run downstream phase `plan`, `tasks`, or `all` as requested.
+
+Intended bottom-up path after `--plan-specs`, `--target-spec`, Coverage Gate, and Integration Gate exist:
+
+1. Identify the Target Spec from the Spec Build Plan.
+2. Confirm Coverage Gate is clean or explicitly accepted.
+3. Confirm Integration Gate is clean or explicitly accepted.
+4. Run downstream prompt-only for the Target Spec.
+5. Run downstream phase `plan`, `tasks`, or `all` as requested.
+
+Do not generate downstream tasks from raw HLD assumptions when the relevant spec, API contract, or integration dependency is unresolved.
+
 
 ## Do not
 
