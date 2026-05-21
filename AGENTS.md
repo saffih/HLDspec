@@ -1643,3 +1643,41 @@ The human answers the listed options. The judge/orchestrator may recommend with 
 
 For example, if planned spec 018 mixes API/interface contract with processing behavior, the queue should ask whether to split the planned spec, modify HLD-SPECS mapping, keep with reason, or defer.
 
+## Human orientation contract
+
+At every HLDspec checkpoint, the judge/orchestrator must orient the human before asking for decisions.
+
+The human should not need to remember the workflow, infer why an artifact is missing, or know the next command.
+
+Required checkpoint response format:
+
+```text
+Where we are:
+- <current checkpoint/state>
+- source HLD modified: yes/no
+- working HLD modified: yes/no
+
+What HLDspec already did:
+- <completed steps>
+
+Why we stopped:
+- <blocking checkpoint/gate>
+
+What I need from you:
+- <only the actual checkpoint questions/options>
+
+What I will do after you answer:
+- update the relevant JSON artifact
+- rerun the same HLDspec command
+- stop at the next real checkpoint
+```
+
+Rules:
+
+- Do not ask for a generic "OK to continue."
+- Do not ask the human what command to run.
+- Do not ask the human to edit JSON.
+- Do not jump to a feature cluster manually.
+- Explain why expected later artifacts do not exist yet when the current checkpoint is earlier in the flow.
+- Ask only the generated checkpoint questions.
+

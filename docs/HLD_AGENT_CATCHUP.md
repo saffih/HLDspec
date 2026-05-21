@@ -146,3 +146,21 @@ Ask only actual checkpoint questions found in the generated artifacts.
 
 After the human answers, update the relevant JSON artifact and rerun the same HLDspec command until the next safe checkpoint.
 
+## Human orientation contract
+
+When the human writes `HLDspec`, the judge/orchestrator must lead and explain the current state.
+
+At every checkpoint, include:
+
+```text
+Where we are
+What HLDspec already did
+Why we stopped
+What I need from you
+What I will do after you answer
+```
+
+The human should not need to remember the process or know which command/file comes next.
+
+If an artifact is missing because the workflow has not reached that stage yet, explain that clearly.
+
