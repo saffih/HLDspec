@@ -110,3 +110,13 @@ If target-spec generation is allowed, review:
 ```
 
 Follow the bottom-up order in that artifact. Do not jump to a nearby feature cluster unless the human explicitly changes the order.
+
+## Spec Branch Queue
+
+If target-spec generation is allowed, review:
+
+```text
+.specify/sync/spec_branch_queue.md
+```
+
+Process only the active next branch. Do not create branches automatically. Do not treat spec generation as file creation only.

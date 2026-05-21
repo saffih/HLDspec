@@ -269,6 +269,7 @@ fi
 "${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_target_spec_work_order.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_branch_queue.py" "$WORKSPACE/.specify/sync/target_spec_work_order.json" "$WORKSPACE"
 
 if [ -e "$WORKSPACE/.specify/memory/constitution.md" ]; then
   echo "ERROR: read-only first run created target constitution unexpectedly" >&2
@@ -290,6 +291,7 @@ echo "- $WORKSPACE/.specify/sync/spec_build_plan.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan_review.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan_decision_queue.md"
 echo "- $WORKSPACE/.specify/sync/target_spec_work_order.md"
+echo "- $WORKSPACE/.specify/sync/spec_branch_queue.md"
 echo
 echo "Next:"
 echo "1. Read spec_build_plan_review.md."

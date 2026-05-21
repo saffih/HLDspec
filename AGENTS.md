@@ -1532,6 +1532,29 @@ Do not run this as the first downstream step on a large/raw HLD:
 ./hld_spec_downstream.py --hld HLD.md --phase analyze
 ```
 
+## Spec Branch Queue
+
+Spec Kit work is branch-oriented. HLDspec must not treat target spec generation as only file creation.
+
+When target-spec generation is allowed, HLDspec must generate:
+
+```text
+.specify/sync/spec_branch_queue.json
+.specify/sync/spec_branch_queue.md
+```
+
+The branch queue is derived from `target_spec_work_order.json`.
+
+Rules:
+
+- process one planned spec branch at a time
+- cache the branch name before writing files
+- do not create Git branches automatically
+- do not jump ahead in the queue unless the human explicitly changes the order
+- do not write project `specs/` without explicit human approval
+- workspace drafts may be written only under the first-run workspace unless separately approved
+
+
 ## Target Spec Work Order
 
 When target-spec generation is allowed, the judge/orchestrator must not choose an arbitrary feature cluster.
