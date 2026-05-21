@@ -560,6 +560,8 @@ The current primary workflow is read-only and safe for first real HLD runs. The 
 
 ### Current primary read-only workflow
 
+The first-run wrapper must self-detect HLD readiness. It first runs the HLD format report. If the input has no HLDspec markers, it must stop before HLD map / Spec Build Plan and write `HLD_CONVERSION_PROMPT.md` for conversion. Do not require the user to know in advance whether an HLD is raw or ready.
+
 Use this for the first real run on a project HLD:
 
 ```bash

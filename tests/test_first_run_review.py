@@ -68,6 +68,47 @@ class FirstRunReviewTests(unittest.TestCase):
             self.assertIn("Continue to target-spec generation: `false`", review)
             self.assertIn("Should planned spec 002 be split", review)
 
+    def test_first_run_detects_raw_hld_and_writes_conversion_prompt(self) -> None:
+        raw_hld = """# Raw HLD
+
+## Architecture
+
+The system has a producer and a consumer.
+
+## Data Model
+
+The system stores state.
+"""
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td) / "workspace"
+            source = Path(td) / "raw.md"
+            source.write_text(raw_hld, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts" / "first_run_readonly.sh"),
+                    str(source),
+                    str(workspace),
+                    "--force",
+                ],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(2, result.returncode, msg=result.stderr)
+            self.assertTrue((workspace / "hld_readiness.json").exists())
+            self.assertTrue((workspace / "HLD_CONVERSION_PROMPT.md").exists())
+            self.assertFalse((workspace / ".specify" / "sync" / "spec_build_plan.json").exists())
+
+            readiness = json.loads((workspace / "hld_readiness.json").read_text(encoding="utf-8"))
+            self.assertEqual("needs_conversion", readiness["status"])
+            self.assertEqual(0, readiness["existing_hldspec_section_count"])
+            self.assertGreaterEqual(readiness["candidate_major_section_count"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,22 @@ Optional explicit workspace:
 bash scripts/first_run_readonly.sh /path/to/HLD.md /tmp/my-hldspec-first-run --force
 ```
 
+## Automatic readiness detection
+
+`first_run_readonly.sh` first runs the HLD format report and decides whether the input already has HLDspec markers.
+
+If the input is raw or unconverted, it stops before HLD map / Spec Build Plan and writes:
+
+```text
+hld_readiness.json
+HLD_CONVERSION_PROMPT.md
+logs/hld_spec_sync/<timestamp>/hld_format_report.md
+logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
+```
+
+Convert `HLD.md` using the prompt, then rerun the script on the converted `HLD.md`.
+
+
 ## What it runs
 
 ```text
