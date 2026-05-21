@@ -6,6 +6,23 @@ This repository contains wrapper tools for turning a High-Level Design document 
 
 Do not bypass the wrappers unless explicitly instructed.
 
+## Limited agent run card
+
+When the agent has limited context/capacity, it should read this short file first:
+
+```text
+docs/LIMITED_AGENT_RUN_CARD.md
+```
+
+This run card overrides long-form reading order. It tells the agent the minimum safe workflow, context-budget rules, human-in-loop format, stop points, and first command.
+
+For simulator-style usage, use:
+
+```text
+docs/SIMULATOR_AGENT_PROMPT.md
+```
+
+
 ## Core rule
 
 `HLD.md` is the canonical source of truth.

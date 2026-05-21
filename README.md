@@ -425,6 +425,22 @@ logs/hld_spec_downstream/<timestamp>/
 PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
 ```
 
+## Limited agent run card
+
+For agents with limited context/capacity, start with:
+
+```text
+docs/LIMITED_AGENT_RUN_CARD.md
+```
+
+For the simulator project, use:
+
+```text
+docs/SIMULATOR_AGENT_PROMPT.md
+```
+
+
+
 ## Context budget
 
 Large HLDs should be processed with bounded context.

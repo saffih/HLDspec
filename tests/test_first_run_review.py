@@ -113,6 +113,15 @@ The system stores state.
             self.assertEqual(0, readiness["existing_hldspec_section_count"])
             self.assertGreaterEqual(readiness["candidate_major_section_count"], 2)
 
+    def test_limited_agent_run_card_contains_required_stop_points(self) -> None:
+        card = (ROOT / "docs" / "LIMITED_AGENT_RUN_CARD.md").read_text(encoding="utf-8")
+        self.assertIn("Do not load or paste the whole HLD", card)
+        self.assertIn("first_run_readonly.sh", card)
+        self.assertIn("3-5 major sections", card)
+        self.assertIn("Stop for human decision", card)
+        self.assertIn("DECOMPOSE", card)
+        self.assertIn("CONFLICT", card)
+
 
 if __name__ == "__main__":
     unittest.main()
