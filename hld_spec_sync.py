@@ -920,6 +920,183 @@ def build_cycle_record(
     }
 
 
+
+RESPONSIBILITY_GROUP_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "governance": ("source of truth", "ownership", "policy", "constitution", "approval", "decision"),
+    "data_state": ("data", "state", "storage", "persistence", "schema", "migration", "database"),
+    "api_contract": ("api", "interface", "contract", "endpoint", "producer", "consumer"),
+    "processing": ("flow", "pipeline", "sync", "processing", "orchestration", "workflow"),
+    "operations": ("rollback", "recovery", "retry", "failure", "observability", "operations", "timeout"),
+    "testing": ("test", "verify", "validation", "acceptance", "coverage"),
+    "performance": ("performance", "latency", "throughput", "scale", "scalability"),
+    "memory": ("memory", "context", "token", "large hld", "chunk"),
+}
+
+
+def detect_section_responsibility_groups(section: hld_map.HldSection) -> list[str]:
+    text = f"{section.title}\n{section.text}\n{section.metadata_value('HLD-RESOURCES')}".lower()
+    return sorted(
+        group
+        for group, keywords in RESPONSIBILITY_GROUP_KEYWORDS.items()
+        if any(keyword in text for keyword in keywords)
+    )
+
+
+def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> None:
+    sections_by_id = parsed_map.section_by_id()
+    planned_specs = plan.get("planned_specs", [])
+    if not isinstance(planned_specs, list):
+        plan["plan_quality"] = {
+            "decision": "CONFLICT",
+            "recommendation": "RESOLVE_CONFLICT",
+            "findings": ["planned_specs is not a list"],
+            "conflicts": ["planned_specs is not a list"],
+            "beskeptic_cycles": [],
+        }
+        return
+
+    findings: list[str] = []
+    conflicts: list[str] = []
+    cycles: list[dict[str, object]] = []
+
+    for item in planned_specs:
+        if not isinstance(item, dict):
+            findings.append("Non-object planned spec entry found.")
+            continue
+
+        spec_id = str(item.get("planned_spec_id", "unknown"))
+        source_ids = [str(source_id) for source_id in item.get("source_hld_sections", [])]
+        layers: set[str] = set()
+        roles: set[str] = set()
+        responsibilities: set[str] = set()
+        flags: set[str] = set()
+        spec_findings: list[str] = []
+        spec_unknowns: list[str] = []
+        explicit_hld_specs_count = 0
+
+        for source_id in source_ids:
+            section = sections_by_id.get(source_id)
+            if section is None:
+                flags.add("missing_source_hld_section")
+                conflicts.append(f"{spec_id}: source section {source_id} is missing from HLD map.")
+                continue
+
+            layers.add(spec_layer_for_section(section))
+            roles.add(section.metadata_value("HLD-ROLE", "unknown").strip().lower() or "unknown")
+            responsibilities.update(detect_section_responsibility_groups(section))
+
+            hld_specs_value = section.metadata_value("HLD-SPECS")
+            if hld_specs_value and hld_specs_value.upper() != "TBD":
+                explicit_hld_specs_count += 1
+
+            if section.metadata_value("HLD-RISK").upper() == "HIGH" and not section.metadata_value("HLD-VERIFY"):
+                flags.add("high_risk_missing_verify")
+                conflicts.append(f"{spec_id}: {source_id} is HIGH risk but has no HLD-VERIFY.")
+
+            if section.refs_by_kind("CONFLICTS_WITH"):
+                flags.add("conflict_refs_present")
+                conflicts.append(f"{spec_id}: {source_id} has CONFLICTS_WITH references.")
+
+        if len(layers) > 1:
+            flags.add("mixed_layers")
+            spec_findings.append(f"Planned spec combines multiple layers: {', '.join(sorted(layers))}.")
+        if len(roles) > 1:
+            flags.add("mixed_hld_roles")
+            spec_findings.append(f"Planned spec combines multiple HLD roles: {', '.join(sorted(roles))}.")
+        if len(responsibilities) >= 3:
+            flags.add("mixed_responsibilities")
+            spec_findings.append(f"Planned spec combines multiple responsibility groups: {', '.join(sorted(responsibilities))}.")
+        if {"api_contract", "processing"}.issubset(responsibilities):
+            flags.add("api_processing_boundary_needs_review")
+            spec_findings.append("API contract and processing behavior appear in the same planned spec.")
+        if {"data_state", "api_contract"}.issubset(responsibilities):
+            flags.add("data_api_boundary_needs_review")
+            spec_findings.append("Data/state ownership and API contract behavior appear in the same planned spec.")
+        if {"operations", "processing"}.issubset(responsibilities):
+            flags.add("operations_processing_boundary_needs_review")
+            spec_findings.append("Operations/failure behavior and processing behavior appear in the same planned spec.")
+        if len(source_ids) > 1 and explicit_hld_specs_count > 1 and flags:
+            flags.add("explicit_hld_specs_needs_review")
+            spec_findings.append("Existing HLD-SPECS mapping groups sections that the quality gate considers risky.")
+        if "performance" in responsibilities and not item.get("performance_expectations"):
+            flags.add("performance_expectation_missing")
+            spec_findings.append("Performance terms are present but performance expectations are missing.")
+        if "memory" in responsibilities and not item.get("memory_expectations"):
+            flags.add("memory_expectation_missing")
+            spec_findings.append("Memory/context terms are present but memory expectations are missing.")
+
+        boundary_risk = "low"
+        if flags & {
+            "mixed_layers",
+            "mixed_responsibilities",
+            "api_processing_boundary_needs_review",
+            "data_api_boundary_needs_review",
+            "operations_processing_boundary_needs_review",
+            "conflict_refs_present",
+            "high_risk_missing_verify",
+        }:
+            boundary_risk = "high"
+        elif flags:
+            boundary_risk = "medium"
+
+        item["quality_flags"] = sorted(flags)
+        item["layer_mix"] = sorted(layers)
+        item["role_mix"] = sorted(roles)
+        item["responsibility_mix"] = sorted(responsibilities)
+        item["boundary_risk"] = boundary_risk
+        item["requires_user_review"] = bool(flags)
+
+        if flags:
+            findings.append(f"{spec_id}: {', '.join(sorted(flags))}")
+
+        decision = "DECOMPOSE" if boundary_risk == "high" else "FIX"
+        recommendation = "SPLIT_PLANNED_SPEC" if boundary_risk == "high" else ("REVIEW_PLAN" if flags else "KEEP_PLAN")
+
+        cycles.append(
+            build_cycle_record(
+                step="plan_quality_gate",
+                key_aspects=[
+                    "spec_boundary",
+                    "spec_decomposition",
+                    "bottom_up_order",
+                    "api_contract",
+                    "coverage",
+                    "integration",
+                    "performance",
+                    "memory",
+                    "dependency_order",
+                ],
+                spotlight=f"Is planned spec {spec_id} safe to use as a target-spec boundary?",
+                decision=decision,
+                recommendation=recommendation,
+                evidence_levels=["OBSERVED", "INFERRED_RISK"] if flags else ["OBSERVED"],
+                unknowns=spec_unknowns,
+                findings=spec_findings,
+                verification="Review plan_quality and per-spec quality_flags before target-spec execution.",
+            )
+        )
+
+    if conflicts:
+        decision = "CONFLICT"
+        recommendation = "RESOLVE_CONFLICT"
+    elif any(isinstance(item, dict) and str(item.get("boundary_risk")) == "high" for item in planned_specs):
+        decision = "DECOMPOSE"
+        recommendation = "SPLIT_PLANNED_SPEC"
+    elif findings:
+        decision = "FIX"
+        recommendation = "REVIEW_PLAN"
+    else:
+        decision = "FIX"
+        recommendation = "KEEP_PLAN"
+
+    plan["plan_quality"] = {
+        "decision": decision,
+        "recommendation": recommendation,
+        "findings": findings,
+        "conflicts": conflicts,
+        "beskeptic_cycles": cycles,
+    }
+
 def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[dict[str, object], str]:
     sections_by_id = parsed_map.section_by_id()
     used_ids: set[str] = set()
@@ -1108,6 +1285,8 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
         ],
     }
 
+    apply_plan_quality(plan, parsed_map)
+
     md_lines = [
         "# Spec Build Plan",
         "",
@@ -1121,6 +1300,29 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
         "## Recommended order",
         "",
     ]
+    plan_quality = plan.get("plan_quality", {})
+    if isinstance(plan_quality, dict):
+        md_lines.extend(
+            [
+                "## Plan Quality Gate",
+                "",
+                f"- Decision: `{plan_quality.get('decision', '')}`",
+                f"- Recommendation: `{plan_quality.get('recommendation', '')}`",
+                "",
+            ]
+        )
+        findings = plan_quality.get("findings", [])
+        if findings:
+            md_lines.extend(["Findings:", ""])
+            for finding in findings:
+                md_lines.append(f"- {finding}")
+            md_lines.append("")
+        conflicts = plan_quality.get("conflicts", [])
+        if conflicts:
+            md_lines.extend(["Conflicts:", ""])
+            for conflict in conflicts:
+                md_lines.append(f"- {conflict}")
+            md_lines.append("")
     for spec_id in recommended_order:
         item = next(spec for spec in planned_specs if str(spec["planned_spec_id"]) == spec_id)
         md_lines.append(f"- `{spec_id}` {item['title']} ({item['layer']})")
@@ -1140,6 +1342,14 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
                 f"- Spec recommendation: `{item['recommendation']}`",
             ]
         )
+        quality_flags = item.get("quality_flags", [])
+        if quality_flags:
+            md_lines.append(f"- Quality flags: {', '.join(quality_flags)}")
+            md_lines.append(f"- Boundary risk: `{item.get('boundary_risk', '')}`")
+            md_lines.append(f"- Requires user review: `{item.get('requires_user_review', False)}`")
+            md_lines.append(f"- Layer mix: {', '.join(item.get('layer_mix', [])) or 'none'}")
+            md_lines.append(f"- Role mix: {', '.join(item.get('role_mix', [])) or 'none'}")
+            md_lines.append(f"- Responsibility mix: {', '.join(item.get('responsibility_mix', [])) or 'none'}")
         if item["user_decision_needed"]:
             md_lines.append(f"- User decision needed: {item['user_decision_needed']}")
         md_lines.extend(["", "Coverage expectations:"])

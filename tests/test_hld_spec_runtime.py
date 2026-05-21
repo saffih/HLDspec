@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -257,6 +260,54 @@ Defines processing flow.
         self.assertLess(plan["recommended_order"].index("001"), plan["recommended_order"].index("002"))
         self.assertIn("Beskeptic cycles", markdown)
         self.assertIn("API contract expectations", markdown)
+        self.assertIn("plan_quality", plan)
+        quality = plan["plan_quality"]
+        self.assertEqual("DECOMPOSE", quality["decision"])
+        self.assertEqual("SPLIT_PLANNED_SPEC", quality["recommendation"])
+        self.assertIn("quality_flags", by_id["002"])
+        self.assertIn("mixed_layers", by_id["002"]["quality_flags"])
+        self.assertIn("explicit_hld_specs_needs_review", by_id["002"]["quality_flags"])
+        self.assertTrue(by_id["002"]["requires_user_review"])
+
+    def test_plan_specs_cli_writes_plan_quality_and_no_specs(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td)
+            hld_path = workspace / "HLD.md"
+            hld_path.write_text(RUNTIME_HLD, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(Path(hld_spec_sync.__file__).resolve()),
+                    "--workspace",
+                    str(workspace),
+                    "--hld",
+                    "HLD.md",
+                    "--use-hld-map",
+                    "--plan-specs",
+                ],
+                cwd=workspace,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=result.stderr)
+            plan_json_path = workspace / ".specify" / "sync" / "spec_build_plan.json"
+            plan_md_path = workspace / ".specify" / "sync" / "spec_build_plan.md"
+            self.assertTrue(plan_json_path.exists())
+            self.assertTrue(plan_md_path.exists())
+            self.assertFalse((workspace / ".specify" / "memory" / "constitution.md").exists())
+            self.assertFalse((workspace / "specs").exists())
+
+            plan = json.loads(plan_json_path.read_text(encoding="utf-8"))
+            self.assertEqual("create", plan["constitution_action"])
+            self.assertIn("plan_quality", plan)
+            summaries = list((workspace / "logs" / "hld_spec_sync").glob("*/run_summary.json"))
+            self.assertEqual(1, len(summaries))
+            summary = json.loads(summaries[0].read_text(encoding="utf-8"))
+            self.assertEqual("plan-specs", summary["mode"])
 
 
 if __name__ == "__main__":
