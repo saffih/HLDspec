@@ -1479,3 +1479,18 @@ Do not run this as the first downstream step on a large/raw HLD:
 ./hld_spec_downstream.py --hld HLD.md --phase analyze
 ```
 
+## Spec Build Plan decision queue
+
+When `spec_build_plan_review.md` blocks target-spec generation, the judge/orchestrator must not decide the fix from its own read.
+
+HLDspec must generate:
+
+```text
+.specify/sync/spec_build_plan_decision_queue.json
+.specify/sync/spec_build_plan_decision_queue.md
+```
+
+The human answers the listed options. The judge/orchestrator may recommend with evidence, but must not record its recommendation as the human decision.
+
+For example, if planned spec 018 mixes API/interface contract with processing behavior, the queue should ask whether to split the planned spec, modify HLD-SPECS mapping, keep with reason, or defer.
+

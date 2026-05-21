@@ -266,6 +266,7 @@ fi
 "${PYTHON_RUN[@]}" "$ROOT/scripts/classify_hld_sections.py" "$WORKSPACE/HLD.md" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --use-hld-map --plan-specs
 "${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
 
 if [ -e "$WORKSPACE/.specify/memory/constitution.md" ]; then
   echo "ERROR: read-only first run created target constitution unexpectedly" >&2
@@ -285,6 +286,7 @@ echo "- $WORKSPACE/logs/hld_spec_sync/*/hld_format_report.md"
 echo "- $WORKSPACE/.specify/sync/hld_index.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan_review.md"
+echo "- $WORKSPACE/.specify/sync/spec_build_plan_decision_queue.md"
 echo
 echo "Next:"
 echo "1. Read spec_build_plan_review.md."
