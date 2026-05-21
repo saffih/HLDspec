@@ -70,7 +70,9 @@ Every first-run workspace should include:
 GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN
 ```
 
-Do not claim "real Beskeptic" from naming alone; the framework source and phase flow must be present in artifacts.
+Do not claim "real Beskeptic" from naming alone; the framework source, companion question bank, and phase flow must be present in artifacts.
+
+The framework cache must include both `skeptic.md` and the companion `skeptic-questions.md` domain question bank.
 
 
 ## Default HLDspec invocation contract

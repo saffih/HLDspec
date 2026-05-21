@@ -943,6 +943,15 @@ BESKEPTIC_FRAMEWORK = {
         "path": "skeptic.md",
         "url": "https://github.com/saffih/skeptic/blob/main/skeptic.md",
     },
+    "companion_sources": [
+        {
+            "repository": "saffih/skeptic",
+            "path": "skeptic-questions.md",
+            "url": "https://github.com/saffih/skeptic/blob/main/skeptic-questions.md",
+            "purpose": "target-relevant domain question bank",
+        }
+    ],
+    "question_bank": "saffih/skeptic/skeptic-questions.md",
     "phase_flow_text": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
     "phase_flow": [
         "GATE",
