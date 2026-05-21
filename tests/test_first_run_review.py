@@ -161,6 +161,14 @@ The system stores state.
         self.assertIn("Downstream-analysis subagent", agents)
         self.assertIn("--use-hld-map --target-hld", card)
 
+    def test_poc_includes_downstream_context_guard(self) -> None:
+        poc = (ROOT / "poc" / "run_poc.sh").read_text(encoding="utf-8")
+        self.assertIn("downstream_context_guard", poc)
+        self.assertIn("Refusing to build an unbounded downstream prompt", poc)
+        self.assertIn("--max-hld-chars 30000", poc)
+        self.assertIn("--use-hld-map", poc)
+        self.assertIn("--target-hld HLD-001", poc)
+
 
 if __name__ == "__main__":
     unittest.main()
