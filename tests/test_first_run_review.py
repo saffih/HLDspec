@@ -133,6 +133,17 @@ The system stores state.
         self.assertIn("Subagent output template", card)
         self.assertIn("human owns unresolved decisions", protocol.lower())
 
+    def test_agents_raw_hld_flow_uses_first_run_not_default_target_hld(self) -> None:
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        raw_section = agents.split("## Existing huge HLD or raw HLD not in HLDspec format", 1)[1]
+        raw_section = raw_section.split("## HLDspec operating rules vs target Spec Kit Constitution", 1)[0]
+        self.assertIn("Rerun the current primary first-run workflow", raw_section)
+        self.assertIn("spec_build_plan_review.md", raw_section)
+        self.assertIn("Use legacy `--target-hld` only when explicitly requested", raw_section)
+        self.assertIn("Do not create downstream artifacts from raw-HLD assumptions", raw_section)
+        self.assertNotIn("Sync one target section at a time", raw_section)
+        self.assertNotIn("Continue downstream only after the related spec exists", raw_section)
+
 
 if __name__ == "__main__":
     unittest.main()

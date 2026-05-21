@@ -194,32 +194,42 @@ Review:
 
 Do not continue if map validation fails.
 
-9. Run one bounded prompt before syncing.
+9. Rerun the current primary first-run workflow on the converted HLD.
 
 ```bash
-./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
+bash scripts/first_run_readonly.sh HLD.md /tmp/hldspec-first-run --force
 ```
 
 Review:
 
 ```text
-logs/hld_spec_sync/<timestamp>/context_selection.json
-logs/hld_spec_sync/<timestamp>/prompt.md
+/tmp/hldspec-first-run/.specify/sync/spec_build_plan_review.md
+/tmp/hldspec-first-run/.specify/sync/spec_build_plan.md
+/tmp/hldspec-first-run/.specify/sync/spec_build_plan.json
 ```
 
-10. Sync one target section at a time.
+10. Stop on plan-quality blockers.
 
-```bash
-./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
+Stop and ask the human before continuing when the review reports:
+
+```text
+DECOMPOSE
+CONFLICT
+SPLIT_PLANNED_SPEC
+RESOLVE_CONFLICT
 ```
 
-11. Continue downstream only after the related spec exists.
+Do not treat a blocked or decomposed plan as safe.
 
-```bash
-./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan --prompt-only
+11. Use legacy `--target-hld` only when explicitly requested.
 
-./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-003 --phase plan
-```
+The `--target-hld` flow is a controlled legacy workflow. It is not the default continuation after raw-HLD conversion.
+
+Before using it, the judge/orchestrator must explain why the first-run Spec Build Plan Review is insufficient for the current task and must get explicit human approval.
+
+12. Do not create downstream artifacts from raw-HLD assumptions.
+
+Downstream planning, tasks, research, data-model, quickstart, implementation, or target-constitution work must wait until the relevant plan/spec boundary is reviewed and accepted.
 
 ### Do not
 
@@ -227,7 +237,7 @@ logs/hld_spec_sync/<timestamp>/prompt.md
 - Do not tag every small subsection.
 - Do not invent spec IDs, owners, resources, or source-of-truth decisions.
 - Do not manually split the HLD into many canonical source files by default.
-- Do not run full-HLD sync when `--use-hld-map --target-hld` is appropriate.
+- Do not use legacy `--target-hld` as the default continuation after raw-HLD conversion.
 - Do not continue if `--hld-map-only` reports validation errors.
 - Do not use auto-conversion or auto-chunk execution without first reviewing a report or chunk plan.
 
@@ -241,7 +251,8 @@ The HLD is ready for HLDspec processing when:
 - cross-section relationships use `REF HLD-xxx`.
 - `./hld_spec_sync.py --hld HLD.md --hld-map-only` passes.
 - `hld_index.md` gives a useful overview of the design.
-- one `--prompt-only --target-hld` run shows bounded context instead of the full huge HLD.
+- `first_run_readonly.sh` on the converted HLD produces a Spec Build Plan Review.
+- blocked/decomposed/conflicting plan results are escalated to the human instead of continuing silently.
 
 
 ## HLDspec operating rules vs target Spec Kit Constitution
