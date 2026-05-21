@@ -66,3 +66,15 @@ Then rerun:
 
 The human should not need to provide this process again.
 
+## Decision source-of-truth rule
+
+Human checkpoint answers must be recorded in:
+
+```text
+.specify/sync/hld_decision_log.json
+.specify/sync/hld_decision_log.md
+.specify/sync/hld_source_decision_appendix.md
+```
+
+Do not apply the appendix to the source HLD unless the human explicitly approves that source-HLD write.
+

@@ -75,6 +75,37 @@ Do not claim "real Beskeptic" from naming alone; the framework source, companion
 The framework cache must include both `skeptic.md` and the companion `skeptic-questions.md` domain question bank.
 
 
+## HLD decision source-of-truth log
+
+Human checkpoint answers are architecture/process decisions. They must not live only in transient queue JSON.
+
+Whenever a human checkpoint exists or is answered, HLDspec must write:
+
+```text
+.specify/sync/hld_decision_log.json
+.specify/sync/hld_decision_log.md
+.specify/sync/hld_source_decision_appendix.md
+```
+
+The source HLD remains the source of truth only after the appendix is explicitly applied.
+
+Applying to the source HLD requires explicit human approval and must use:
+
+```bash
+scripts/apply_hld_decision_log_to_source.py <source-HLD.md> <hld_source_decision_appendix.md> --approved
+```
+
+The source appendix must be marker-bounded:
+
+```text
+<!-- HLDSPEC-DECISION-LOG:BEGIN -->
+...
+<!-- HLDSPEC-DECISION-LOG:END -->
+```
+
+Do not lose human feedback in workspace-only artifacts.
+
+
 ## Checkpoint continuation responsibility
 
 When HLDspec generates a human checkpoint, the human only supplies the decision answers.
