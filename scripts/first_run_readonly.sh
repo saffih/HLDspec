@@ -68,6 +68,9 @@ REPORT_JSON="$REPORT_DIR/suggested_hld_sections.json"
 python3 "$ROOT/scripts/build_hld_conversion_plan.py" "$REPORT_JSON" "$WORKSPACE" --source-hld "$HLD_SOURCE"
 CONVERSION_PLAN_JSON="$WORKSPACE/.specify/sync/hld_conversion_plan.json"
 CONVERSION_PLAN_MD="$WORKSPACE/.specify/sync/hld_conversion_plan.md"
+python3 "$ROOT/scripts/build_hld_conversion_decision_queue.py" "$CONVERSION_PLAN_JSON" "$WORKSPACE"
+CONVERSION_DECISION_QUEUE_JSON="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.json"
+CONVERSION_DECISION_QUEUE_MD="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.md"
 
 python3 - "$REPORT_JSON" "$WORKSPACE" "$HLD_SOURCE" <<'PY'
 import json
@@ -107,6 +110,8 @@ status = "hldspec_ready" if existing > 0 else "needs_conversion"
             "conversion_plan_status": conversion_status,
             "conversion_plan_json": str(workspace / ".specify" / "sync" / "hld_conversion_plan.json"),
             "conversion_plan_md": str(workspace / ".specify" / "sync" / "hld_conversion_plan.md"),
+            "conversion_decision_queue_json": str(workspace / ".specify" / "sync" / "hld_conversion_decision_queue.json"),
+            "conversion_decision_queue_md": str(workspace / ".specify" / "sync" / "hld_conversion_decision_queue.md"),
         },
         indent=2,
         sort_keys=True,
@@ -124,6 +129,8 @@ status = "hldspec_ready" if existing > 0 else "needs_conversion"
             f"CONVERSION_PLAN_STATUS={conversion_status}",
             f"CONVERSION_PLAN_JSON={workspace / '.specify' / 'sync' / 'hld_conversion_plan.json'}",
             f"CONVERSION_PLAN_MD={workspace / '.specify' / 'sync' / 'hld_conversion_plan.md'}",
+            f"CONVERSION_DECISION_QUEUE_JSON={workspace / '.specify' / 'sync' / 'hld_conversion_decision_queue.json'}",
+            f"CONVERSION_DECISION_QUEUE_MD={workspace / '.specify' / 'sync' / 'hld_conversion_decision_queue.md'}",
             f"REPORT_JSON={report_path}",
             f"REPORT_MD={report_path.with_name('hld_format_report.md')}",
         ]
@@ -153,9 +160,11 @@ Use the format report and conversion plan:
 {report_path}
 {workspace / '.specify' / 'sync' / 'hld_conversion_plan.md'}
 {workspace / '.specify' / 'sync' / 'hld_conversion_plan.json'}
+{workspace / '.specify' / 'sync' / 'hld_conversion_decision_queue.md'}
+{workspace / '.specify' / 'sync' / 'hld_conversion_decision_queue.json'}
 ```
 
-The conversion plan is the controlling artifact for chunk order and split stop decisions.
+The conversion plan is the controlling artifact for chunk order and split stop decisions. The decision queue is the human checkpoint; do not convert while blocking questions are still TBD.
 
 Task:
 
@@ -235,6 +244,8 @@ if [ "$STATUS" = "needs_conversion" ]; then
   echo "- $REPORT_JSON"
   echo "- $WORKSPACE/.specify/sync/hld_conversion_plan.md"
   echo "- $WORKSPACE/.specify/sync/hld_conversion_plan.json"
+  echo "- $WORKSPACE/.specify/sync/hld_conversion_decision_queue.md"
+  echo "- $WORKSPACE/.specify/sync/hld_conversion_decision_queue.json"
   echo "- $WORKSPACE/HLD_CONVERSION_PROMPT.md"
   echo
   echo "Convert $WORKSPACE/HLD.md to HLDspec format, then rerun:"
