@@ -23,6 +23,23 @@ docs/SIMULATOR_AGENT_PROMPT.md
 ```
 
 
+## Simple project entrypoint
+
+When the human asks an agent to run HLDspec from a project repository, the agent should read:
+
+```text
+docs/PROJECT_AGENT_PROMPT.md
+```
+
+The simple wrapper command is:
+
+```bash
+scripts/project_first_run.sh <path-to-HLD.md> [workspace]
+```
+
+The wrapper runs the read-only first-run workflow and prints the current checkpoint. It does not call an agent, edit the source HLD, create specs, create target constitution, or run downstream work.
+
+
 ## Core rule
 
 `HLD.md` is the canonical source of truth.

@@ -169,6 +169,49 @@ The system stores state.
         self.assertIn("--use-hld-map", poc)
         self.assertIn("--target-hld HLD-001", poc)
 
+    def test_project_agent_entrypoint_exists(self) -> None:
+        prompt = (ROOT / "docs" / "PROJECT_AGENT_PROMPT.md").read_text(encoding="utf-8")
+        wrapper = (ROOT / "scripts" / "project_first_run.sh").read_text(encoding="utf-8")
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+        self.assertIn("judge/orchestrator", prompt)
+        self.assertIn("project_first_run.sh", prompt)
+        self.assertIn("HUMAN_CHECKPOINT_REQUIRED", prompt)
+        self.assertIn("hld_conversion_decision_queue.md", prompt)
+        self.assertIn("Do not answer the queued questions yourself", prompt)
+
+        self.assertIn("first_run_readonly.sh", wrapper)
+        self.assertIn("Project first-run wrapper summary", wrapper)
+        self.assertIn("hld_conversion_decision_queue.json", wrapper)
+
+        self.assertIn("docs/PROJECT_AGENT_PROMPT.md", agents)
+
+    def test_project_first_run_wrapper_smoke_raw_hld(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            project = Path(td) / "project"
+            project.mkdir()
+            hld = project / "Flow-System-HLD.md"
+            hld.write_text("# Flow HLD\n\n## Architecture\n\nBody.\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts" / "project_first_run.sh"),
+                    str(hld),
+                    str(project / ".hldspec-first-run"),
+                ],
+                cwd=project,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(2, result.returncode, msg=result.stderr)
+            self.assertIn("Project first-run wrapper summary", result.stdout)
+            self.assertIn("raw HLD / conversion checkpoint", result.stdout)
+            self.assertTrue((project / ".hldspec-first-run" / "HLD_CONVERSION_PROMPT.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
