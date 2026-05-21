@@ -123,6 +123,29 @@ def split_plan_to_sections(
     return sections
 
 
+def renumber_sections_numeric(sections: list[ConversionSection]) -> list[ConversionSection]:
+    """HLD map accepts only numeric IDs like HLD-001.
+
+    Human-facing split proposals may use labels like HLD-009A for readability,
+    but executable conversion must emit valid numeric HLD IDs.
+    """
+    result: list[ConversionSection] = []
+    for idx, section in enumerate(sections, start=1):
+        result.append(
+            ConversionSection(
+                hld_id=f"HLD-{idx:03d}",
+                title=section.title,
+                start=section.start,
+                end=section.end,
+                role=section.role,
+                risk=section.risk,
+                specs=section.specs,
+                resources=section.resources,
+            )
+        )
+    return result
+
+
 def build_conversion_sections(plan: dict[str, Any], queue: dict[str, Any]) -> list[ConversionSection]:
     questions = question_map(queue)
     sections: list[ConversionSection] = []
@@ -191,15 +214,12 @@ def build_conversion_sections(plan: dict[str, Any], queue: dict[str, Any]) -> li
 
     sections.sort(key=lambda item: item.start)
     previous_end = 0
-    seen_ids: set[str] = set()
     for section in sections:
-        if section.hld_id in seen_ids:
-            raise ValueError(f"Duplicate HLD ID after conversion decisions: {section.hld_id}")
-        seen_ids.add(section.hld_id)
         if section.start <= previous_end:
             raise ValueError(f"Overlapping conversion section at {section.hld_id}: starts {section.start}, previous ended {previous_end}")
         previous_end = section.end
-    return sections
+
+    return renumber_sections_numeric(sections)
 
 
 def metadata_block(section: ConversionSection) -> list[str]:

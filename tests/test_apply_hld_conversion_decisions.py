@@ -127,12 +127,13 @@ class ApplyHldConversionDecisionsTests(unittest.TestCase):
             )
             self.assertEqual(0, result.returncode, msg=result.stderr)
             converted = hld.read_text(encoding="utf-8")
-            self.assertIn("## HLD-001A - A", converted)
-            self.assertIn("## HLD-001B - B", converted)
-            self.assertIn("## HLD-002 - Milestones", converted)
+            self.assertIn("## HLD-001 - A", converted)
+            self.assertIn("## HLD-002 - B", converted)
+            self.assertIn("## HLD-003 - Milestones", converted)
             self.assertIn("## Parent", converted)
             self.assertIn("### A", converted)
             self.assertIn("### B", converted)
+            self.assertNotRegex(converted, r"^## HLD-\\d{3}[A-Z] - ", msg="split IDs must be normalized to numeric HLD IDs")
             self.assertTrue(hld.with_suffix(".md.pre-hldspec.bak").exists())
 
 
