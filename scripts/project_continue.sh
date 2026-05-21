@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if command -v uv >/dev/null 2>&1; then
-  export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.hldspec-uv-cache}"
   PYTHON_RUN=(uv run python)
 else
   PYTHON_RUN=(python3)
@@ -168,11 +167,6 @@ if [ -f "$QUEUE" ]; then
     print_decision_queue "$QUEUE"
     echo "Open:"
     echo "- $WORK/.specify/sync/hld_conversion_decision_queue.md"
-    echo
-    echo "Continuation protocol:"
-    echo "- Human answers only the listed checkpoint questions."
-    echo "- Judge/orchestrator updates: $WORK/.specify/sync/hld_conversion_decision_queue.json"
-    echo "- Then reruns the same command: $ROOT/scripts/hldspec_run.sh $SOURCE_HLD"
     exit 2
   elif [ "$qrc" -ne 0 ]; then
     echo "ERROR: failed to inspect decision queue." >&2
