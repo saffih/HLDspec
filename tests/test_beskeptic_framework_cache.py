@@ -90,6 +90,18 @@ API body.
                 cycles[0]["framework"]["phase_flow_text"],
             )
 
+    def test_beskeptic_cache_includes_companion_question_bank(self) -> None:
+        cache = json.loads((ROOT / "docs" / "BESKEPTIC_FRAMEWORK_CACHE.json").read_text(encoding="utf-8"))
+        companion_paths = [item["path"] for item in cache.get("companion_sources", [])]
+        self.assertIn("skeptic-questions.md", companion_paths)
+        bank = cache["domain_question_bank"]
+        self.assertEqual("saffih/skeptic/skeptic-questions.md", bank["source"])
+        self.assertIn("SEC", bank["questions"])
+        self.assertIn("DAT", bank["questions"])
+        self.assertIn("ARC", bank["questions"])
+        self.assertGreaterEqual(len(bank["questions"]["SEC"]), 8)
+        self.assertIn("ACTION", bank["finding_classification"])
+
 
 if __name__ == "__main__":
     unittest.main()
