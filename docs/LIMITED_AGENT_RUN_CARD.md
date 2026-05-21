@@ -4,19 +4,30 @@ made by AI
 
 Use this when the agent has limited context/capacity.
 
-This file is the short operational card. Read it before longer docs.
+Read this short card before longer docs.
 
 ## Mission
 
 Use `~/HLDspec` to process a project HLD while keeping the human able to understand and steer.
 
-Default project example:
+## Role
 
-```bash
-cd /home/sio/embeddedPerformance/simulator
-HLD="./Simulator-System-HLD.md"
-WORK="$PWD/.hldspec-first-run"
-```
+You are the **judge/orchestrator**.
+
+You may use subagents, but only as bounded workers on specific chunks.
+
+You remain responsible for:
+
+- briefing subagents
+- limiting their context
+- reviewing their output
+- rejecting incomplete work
+- keeping a compact running summary
+- escalating unresolved decisions to the human
+
+Subagents do not own final decisions.
+
+The human owns unresolved decisions.
 
 ## Hard rules
 
@@ -30,9 +41,11 @@ WORK="$PWD/.hldspec-first-run"
 
 ## First command
 
-Run:
+From the project repo:
 
 ```bash
+HLD="./Simulator-System-HLD.md"
+WORK="$PWD/.hldspec-first-run"
 ~/HLDspec/scripts/first_run_readonly.sh "$HLD" "$WORK" --force
 ```
 
@@ -69,29 +82,24 @@ Open and summarize:
 sed -n '1,220p' "$WORK/HLD_CONVERSION_PROMPT.md"
 ```
 
-Then convert `"$WORK/HLD.md"` in batches.
+Then convert `"$WORK/HLD.md"` in chunks.
 
 ### Any other exit code
 
 Stop and report the error. Do not continue.
 
-## Conversion batch rule
+## Chunking rule
 
-Convert in small batches:
-
-```text
-3-5 major sections per batch
-```
-
-For very large sections:
+Use simple chunks:
 
 ```text
-inspect internal headings first
-explain whether splitting is needed
-ask before splitting if interpretation is involved
+Normal chunk: 1 major HLD section
+Small-section batch: 3-5 major sections when sections are small enough
+Large section: process alone
+Very large section: inspect internal headings first
 ```
 
-After each batch, report:
+After each chunk, report:
 
 ```text
 Sections converted:
@@ -100,7 +108,7 @@ Refs added:
 Uncertain fields:
 Files changed:
 Diff summary:
-Next proposed batch:
+Next proposed chunk:
 Human decision needed:
 ```
 
@@ -112,6 +120,39 @@ grep -nE '^(#|##|###) ' "$WORK/HLD.md" | head -80
 sed -n '120,220p' "$WORK/HLD.md"
 rg -n 'REF HLD-|DEPENDS REF|CONFLICTS_WITH|HLD-SPECS|HLD-ROLE' "$WORK/HLD.md"
 diff -u "$WORK/HLD.raw.md" "$WORK/HLD.md" | sed -n '1,220p'
+```
+
+## Subagent brief template
+
+Use this for every subagent:
+
+```text
+Role:
+Task:
+Chunk:
+Relevant context:
+Allowed files/commands:
+Forbidden actions:
+Context rule:
+Stop conditions:
+Required output:
+Evidence required:
+```
+
+## Subagent output template
+
+Require:
+
+```text
+What I inspected:
+What I changed, if anything:
+What I found:
+Evidence:
+Uncertainty:
+Risks:
+Recommended action:
+Files changed:
+Human decision needed:
 ```
 
 ## Metadata defaults
@@ -157,27 +198,27 @@ What it means:
 Next decision:
 ```
 
-## Stop points
+## Stop for human decision
 
-Stop for human decision before:
+Stop and ask the human before:
 
-- accepting `DECOMPOSE` or `CONFLICT`
-- splitting major HLD sections
-- choosing source of truth
-- choosing API/interface ownership
-- choosing data/state ownership
-- choosing performance/memory constraints
-- choosing failure/recovery behavior
-- creating/modifying specs
-- creating/modifying `.specify/memory/constitution.md`
+- accepting `DECOMPOSE`
+- accepting `CONFLICT`
+- accepting `SPLIT_PLANNED_SPEC`
+- accepting `RESOLVE_CONFLICT`
+- splitting major HLD sections when interpretation is involved
+- choosing architecture, source-of-truth, ownership, API, data/state, performance/memory, or failure/recovery behavior
+- creating or modifying specs
+- creating or modifying target constitution
 - creating downstream artifacts
 - modifying implementation files
+
 
 ## Minimal success path
 
 ```text
 1. Run first_run_readonly.sh.
-2. If raw, convert HLD.md in bounded batches.
+2. If raw, convert HLD.md in bounded chunks.
 3. Rerun first_run_readonly.sh on the converted HLD.md.
 4. Summarize spec_build_plan_review.md.
 5. Stop if blocked; ask the human.

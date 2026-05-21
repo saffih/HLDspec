@@ -1,10 +1,21 @@
-Read `~/HLDspec/docs/LIMITED_AGENT_RUN_CARD.md` first.
+Read these first:
 
-Use `~/HLDspec` to process `./Simulator-System-HLD.md`.
+```text
+~/HLDspec/docs/LIMITED_AGENT_RUN_CARD.md
+~/HLDspec/docs/CHUNKED_AGENT_PROTOCOL.md
+```
 
-Keep me in the loop. Before each major step, explain what you see, what it means, what you plan to do, the exact command/edit, expected result, and whether a human decision is needed. After each step, report what happened, files changed, what it means, and the next decision.
+Use `~/HLDspec` to process:
 
-Do not paste the whole HLD into context. Use bounded local inspection with grep/rg/sed/awk/wc. Preserve the original HLD. Edit only the working copy in `.hldspec-first-run`.
+```text
+./Simulator-System-HLD.md
+```
+
+You are the judge/orchestrator.
+
+Use subagents only as bounded workers on specific chunks. You remain responsible for briefing them, limiting their context, reviewing their output, synthesizing the result, and escalating unresolved decisions to the human.
+
+Do not paste the whole HLD into context. Use bounded local inspection with `grep`, `rg`, `sed -n`, `awk`, and `wc`.
 
 Start with:
 
@@ -14,6 +25,38 @@ WORK="$PWD/.hldspec-first-run"
 ~/HLDspec/scripts/first_run_readonly.sh "$HLD" "$WORK" --force
 ```
 
-If exit code is 2, summarize `.hldspec-first-run/HLD_CONVERSION_PROMPT.md` and convert `.hldspec-first-run/HLD.md` in batches of 3-5 major sections. After each batch, show what changed and wait if interpretation is involved.
+Before each major step, report:
 
-Stop before creating/modifying specs, target constitution, downstream artifacts, implementation files, or accepting DECOMPOSE/CONFLICT/SPLIT_PLANNED_SPEC/RESOLVE_CONFLICT as safe.
+```text
+What I see:
+What it means:
+What I plan to do:
+Command or edit:
+Expected result:
+Human decision needed:
+```
+
+After each major step, report:
+
+```text
+What happened:
+Files created or changed:
+What it means:
+Next decision:
+```
+
+If exit code is 2, summarize `.hldspec-first-run/HLD_CONVERSION_PROMPT.md` and convert `.hldspec-first-run/HLD.md` in chunks:
+
+```text
+Normal chunk: 1 major HLD section
+Small-section batch: 3-5 major sections when sections are small enough
+Large section: process alone
+Very large section: inspect internal headings first
+```
+
+After each chunk, report changed sections, metadata chosen, refs added, uncertainty, and diff summary.
+
+Stop before creating/modifying specs, target constitution, downstream artifacts, implementation files, or accepting `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT` as safe.
+
+
+Stop for human decision before accepting `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT`, or before creating/modifying specs, target constitution, downstream artifacts, or implementation files.

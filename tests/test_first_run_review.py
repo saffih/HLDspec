@@ -122,6 +122,17 @@ The system stores state.
         self.assertIn("DECOMPOSE", card)
         self.assertIn("CONFLICT", card)
 
+    def test_chunked_agent_protocol_contains_judge_subagent_rules(self) -> None:
+        protocol = (ROOT / "docs" / "CHUNKED_AGENT_PROTOCOL.md").read_text(encoding="utf-8")
+        card = (ROOT / "docs" / "LIMITED_AGENT_RUN_CARD.md").read_text(encoding="utf-8")
+        self.assertIn("judge/orchestrator", protocol)
+        self.assertIn("bounded workers", protocol)
+        self.assertIn("Human", protocol)
+        self.assertIn("Normal chunk: 1 major HLD section", card)
+        self.assertIn("Subagent brief template", card)
+        self.assertIn("Subagent output template", card)
+        self.assertIn("human owns unresolved decisions", protocol.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

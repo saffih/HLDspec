@@ -563,6 +563,52 @@ Beskeptic check for target-spec context:
 If a planned spec needs sections that are missing, the target-spec run must stop with `CONFLICT` instead of guessing.
 
 
+## Chunked judge/subagent protocol
+
+Use the simple chunked judge/subagent model for large HLD work.
+
+The main agent is the **judge/orchestrator**. It owns workflow quality, subagent briefing, context discipline, output review, final synthesis, and escalation.
+
+Subagents are **bounded workers**. They do not own final decisions.
+
+The human owns unresolved decisions.
+
+Default context protection is:
+
+```text
+proper chunks
++ bounded subagent briefs
++ judge/orchestrator review
++ human-in-loop stop points
+```
+
+Local scripts may read whole files. Agents and subagents should not load or paste the whole HLD into model context by default.
+
+Chunking defaults:
+
+- normal chunk: one major HLD section
+- small-section batch: 3-5 small major sections
+- large section: process alone
+- very large section: inspect internal headings first before editing or splitting
+
+The judge/orchestrator should keep only a compact running summary:
+
+```text
+Sections completed
+Open uncertainties
+Conflicts
+Decisions needed
+Potential splits
+Next chunk
+```
+
+Every subagent brief must include role, task, chunk, relevant context, allowed files/commands, forbidden actions, context rule, stop conditions, required output, and evidence required.
+
+Every subagent output must include what was inspected, what changed if anything, findings, evidence, uncertainty, risks, recommended action, files changed, and whether human decision is needed.
+
+See `docs/CHUNKED_AGENT_PROTOCOL.md`.
+
+
 ## Context budget protocol
 
 Large HLDs must be handled as a context-budget problem.

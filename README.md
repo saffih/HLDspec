@@ -425,6 +425,25 @@ logs/hld_spec_downstream/<timestamp>/
 PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
 ```
 
+## Chunked judge/subagent protocol
+
+For large HLDs and limited agents, use the simple chunked judge/subagent model:
+
+```text
+proper chunks
++ bounded subagent briefs
++ judge/orchestrator review
++ human-in-loop stop points
+```
+
+Start with:
+
+```text
+docs/LIMITED_AGENT_RUN_CARD.md
+docs/CHUNKED_AGENT_PROTOCOL.md
+```
+
+
 ## Limited agent run card
 
 For agents with limited context/capacity, start with:

@@ -69,6 +69,17 @@ When converting a raw HLD:
 Safe local processing is allowed. The restriction is on model context and silent large rewrites, not on using `grep`, `sed`, or scripts.
 
 
+## Judge/orchestrator and chunking rules
+
+The main agent is the judge/orchestrator. It may use subagents, but only as bounded workers on specific chunks.
+
+The judge/orchestrator remains responsible for briefing subagents, limiting their context, reviewing their output, keeping a compact running summary, synthesizing the result, and escalating unresolved decisions to the human.
+
+Subagents do not own final decisions. The human owns unresolved decisions.
+
+Use chunks instead of heavy token measurement.
+
+
 First action:
 
 Detect whether the HLD is already in HLDspec format or needs conversion.

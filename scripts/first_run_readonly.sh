@@ -154,6 +154,15 @@ into:
 Rules:
 
 - Preserve original design content.
+- Chunked judge/subagent rules:
+  - The main agent is the judge/orchestrator and remains responsible for the final synthesis.
+  - Subagents are bounded workers and do not own final decisions.
+  - Use subagents only for specific chunks or focused checks.
+  - Normal chunk: one major HLD section.
+  - Small-section batch: 3-5 major sections when sections are small enough.
+  - Large section: process alone.
+  - Very large section: inspect internal headings first.
+  - The judge/orchestrator keeps a compact running summary instead of accumulating the whole HLD.
 - Context budget rules:
   - Do not paste the whole HLD into agent context.
   - Use local tools such as `grep`, `rg`, `sed -n`, `awk`, and `wc` for bounded inspection.
