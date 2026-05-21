@@ -39,6 +39,8 @@ Use these terms consistently in docs, prompts, reports, logs, code comments, and
 | **Integration Gate** | Check that cross-spec relationships, API contracts, producer/consumer edges, data/state ownership, and failure behavior are explicit. |
 | **API Contract** | Explicit interface agreement between producer and consumer specs/components. |
 | **Integration Gap** | Missing, implicit, stale, or conflicting integration/API contract. |
+| **Section Card** | Compact routing/context summary for one HLD Section. Used to decide what full source evidence to fetch. It is not a replacement for the HLD Section text. |
+| **Target Spec Context** | Bounded evidence package used to build one target spec: Spec Build Plan entry, full related HLD Sections, required refs, relevant normal refs, and related constraints. |
 
 ## Key Aspect groups
 

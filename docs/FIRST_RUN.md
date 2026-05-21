@@ -71,6 +71,15 @@ The plan likely grouped too much into one spec. Typical causes:
 
 A conflict must be decided before moving forward.
 
+
+## Target-spec context note
+
+The Spec Build Plan Review does not mean one HLD section becomes one spec.
+
+The review tells you which HLD sections are related to each planned spec. When target-spec support exists, each target spec should be generated from the plan plus those explicitly related full HLD sections, not from the whole HLD and not from summaries alone.
+
+Section Cards, if introduced later, are routing/context-control aids only. They help decide what full source evidence to fetch. They do not replace the full HLD section text.
+
 ## Current boundary
 
 This is the full current safe cycle.

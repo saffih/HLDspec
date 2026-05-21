@@ -483,6 +483,69 @@ Decision needed:
 Do not guess unresolved source-of-truth, ownership, API/interface, dependency, performance/memory, coverage, or integration decisions.
 
 
+## Target-spec context rule
+
+A Target Spec must be designed from the Spec Build Plan plus explicitly selected full HLD source evidence.
+
+Correct model:
+
+```text
+HLD Sections
+-> HLD Map
+-> Spec Build Plan
+-> planned spec references related HLD Sections
+-> target-spec context selects those full related HLD Sections
+-> one focused Target Spec
+```
+
+Do not use this wrong model:
+
+```text
+one HLD Section -> one Spec
+```
+
+Do not use this wrong model either:
+
+```text
+Section Card or summary -> Spec
+```
+
+Section Cards, if introduced later, are routing/context-control aids only. They help decide what full source evidence to fetch. They do not replace the full HLD Section text.
+
+When target-spec support exists, a target-spec prompt must include:
+
+- the relevant Spec Build Plan entry
+- the full text of explicitly related HLD Sections
+- required refs from those sections
+- relevant normal refs when they affect the target spec
+- related API/interface sections when applicable
+- related data/state sections when applicable
+- related performance/memory sections when applicable
+- related reliability/failure-recovery sections when applicable
+- current target Spec Kit Constitution context when applicable
+- existing related specs only when needed and bounded
+
+A target-spec prompt must not include:
+
+- the whole HLD by default
+- all existing specs by default
+- Section Cards alone as source evidence
+- one arbitrary HLD section without its required and relevant related sections
+
+Beskeptic check for target-spec context:
+
+- `source_of_truth`: Is the full HLD evidence present?
+- `bounded_context`: Is irrelevant bulk excluded?
+- `spec_boundary`: Does the planned spec own one capability?
+- `hld_refs`: Were required refs and relevant normal refs included?
+- `api_contract`: Are API/interface sections included when needed?
+- `data_state_ownership`: Are data/state sections included when needed?
+- `performance` / `memory`: Are resource constraints included when relevant?
+- `reliability` / `failure_recovery`: Are failure sections included when relevant?
+
+If a planned spec needs sections that are missing, the target-spec run must stop with `CONFLICT` instead of guessing.
+
+
 ## Standard workflow
 
 HLDspec currently has two workflow levels:

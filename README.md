@@ -45,6 +45,15 @@ This runs HLD format report, HLD map, Spec Build Plan, Plan Quality Gate, and Sp
 See [docs/FIRST_RUN.md](docs/FIRST_RUN.md).
 
 
+## Target-spec context rule
+
+A target spec is designed from the Spec Build Plan plus explicitly related full HLD Sections.
+
+Do not assume one HLD Section becomes one spec. Do not generate a spec from summaries or Section Cards alone. Section Cards, if introduced later, are routing/context-control aids only.
+
+See [docs/TARGET_SPEC_CONTEXT.md](docs/TARGET_SPEC_CONTEXT.md).
+
+
 ## HLD input format
 
 For large HLDs, prefer one canonical `HLD.md` with stable, grepable section metadata instead of many manually maintained HLD source files.
