@@ -97,6 +97,47 @@ CONFLICTS_WITH REF HLD-011
 8. Mark unknown mappings as `TBD`; do not invent them.
 9. Mark unresolved design conflicts as `CONFLICT` or `CONFLICTS_WITH REF HLD-xxx`.
 
+
+
+## Applying approved HLD conversion decisions
+
+After the human checkpoint is answered, use:
+
+```bash
+scripts/apply_hld_conversion_decisions.py <working-HLD.md> <hld_conversion_decision_queue.json>
+```
+
+Rules:
+
+- Run only on the working HLD copy, never on the source HLD.
+- Refuse to run while any blocking question has `human_decision: TBD`.
+- Preserve all original content under inserted HLD anchors.
+- Add metadata only; do not summarize, delete, or reinterpret architecture.
+- Rerun `scripts/first_run_readonly.sh` after conversion.
+
+
+## Spec-boundary classification rule
+
+Do not assume one HLD section equals one target spec.
+
+After an HLD map exists, classify sections before spec planning:
+
+```bash
+scripts/classify_hld_sections.py HLD.md <workspace>
+```
+
+Generated artifacts:
+
+```text
+.specify/sync/hld_section_classification.json
+.specify/sync/hld_section_classification.md
+```
+
+Sections classified as `HLD_CONTEXT_ONLY`, `GOVERNANCE`, `RUNBOOK`, `REFERENCE`, `VERIFICATION_CONTEXT`, `APPENDIX`, or merge/context sections are preserved as HLD anchors but must not become standalone planned specs by default.
+
+If plan quality worsens after splitting, stop and consolidate HLD-SPECS mapping instead of splitting more.
+
+
 ## Existing huge HLD or raw HLD not in HLDspec format
 
 Use this workflow when the user provides a large existing HLD that is not yet in HLDspec format, or asks to make an HLD workable for spec sync.

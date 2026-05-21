@@ -140,3 +140,33 @@ Use the generated queue as the source of truth:
 .specify/sync/hld_conversion_decision_queue.json
 .specify/sync/hld_conversion_decision_queue.md
 ```
+
+
+## Spec-boundary rule
+
+Do not assume one HLD section equals one target spec.
+
+If the HLD is HLDspec-ready and first-run produces a Spec Build Plan, check whether section classification exists:
+
+```text
+.specify/sync/hld_section_classification.md
+```
+
+If plan quality gets worse after splitting, stop and report `OVER_SPLIT_REGRESSION`; do not keep splitting. The next action is HLD-SPECS consolidation or section classification review.
+
+
+## After human checkpoint answers
+
+When all blocking conversion questions are answered, apply decisions only to the working copy:
+
+```bash
+~/code/HLDspec/scripts/apply_hld_conversion_decisions.py   <workspace>/HLD.md   <workspace>/.specify/sync/hld_conversion_decision_queue.json
+```
+
+Then rerun:
+
+```bash
+~/code/HLDspec/scripts/first_run_readonly.sh   <workspace>/HLD.md   <workspace>/firstrun   --force
+```
+
+Do not apply conversion to the source HLD.
