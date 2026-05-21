@@ -90,3 +90,14 @@ Review:
 ```
 
 If the queue has items, report them as possible source-HLD updates and ask for explicit approval before modifying the source HLD.
+
+## Spec Build Plan checkpoint
+
+If target-spec generation is blocked, review:
+
+```text
+.specify/sync/spec_build_plan_decision_queue.md
+```
+
+The judge/orchestrator may explain its recommendation, but the human must answer the decision queue before any target-spec generation or HLD-SPECS remapping.
+

@@ -100,6 +100,7 @@ report_spec_gate() {
   echo "State: first-run review exists."
   echo "- review: $review"
   echo "- plan: $plan"
+  echo "- decision queue: $FIRSTRUN/.specify/sync/spec_build_plan_decision_queue.md"
   echo
 
   "${PYTHON_RUN[@]}" - "$review" "$plan" <<'PY'
@@ -140,7 +141,7 @@ if continue_true and decision == "FIX" and recommendation == "KEEP_PLAN" and not
     sys.exit(0)
 
 print()
-print("Next safe checkpoint: target-spec generation is blocked. Review spec_build_plan_review.md.")
+print("Next safe checkpoint: target-spec generation is blocked. Review spec_build_plan_review.md and spec_build_plan_decision_queue.md.")
 sys.exit(2)
 PY
 }
