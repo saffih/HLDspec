@@ -138,3 +138,13 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **SpecKit Prework Approval Gate** | Checkpoint after a green Spec Build Plan where the human reviews constitution, dependency graph, invocation queue, quality review, and proxy dossier before SpecKit is invoked. |
 | **Legacy Target Work Order** | Earlier HLDspec artifact for manual target-spec generation. It is not the controlling checkpoint when SpecKit is available. |
 
+## State and package terms
+
+| Term | Meaning |
+|---|---|
+| **HLDspec State** | Current machine-readable and human-readable summary of workflow stage, checkpoint, next allowed actions, and controlling artifacts. |
+| **SpecKit Prework Package** | Main human-facing review package that combines constitution case, dependency case, first-feature case, Beskeptic findings, feedback impact rules, and approval question. |
+| **Controlling Artifact** | Artifact the judge/orchestrator should use as the primary source for the current checkpoint. |
+| **Supporting Artifact** | Artifact used as evidence or detail behind the controlling artifact. |
+| **Legacy/Supporting Artifact** | Older or compatibility artifact that may be present but does not control the current workflow when SpecKit is available. |
+

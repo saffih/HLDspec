@@ -1921,3 +1921,44 @@ test coverage
 
 Use `--fail-on-blocker` in CI-like runs.
 
+## Current state and prework package
+
+HLDspec should expose one current-state artifact and one main human-facing SpecKit prework package.
+
+Current state:
+
+```text
+.specify/sync/hldspec_state.json
+.specify/sync/hldspec_state.md
+```
+
+Main human review package:
+
+```text
+.specify/sync/speckit_prework_package.json
+.specify/sync/speckit_prework_package.md
+```
+
+The judge/orchestrator should show the package first, then open supporting artifacts only when needed.
+
+Controlling handoff:
+
+```text
+hldspec_state
+speckit_prework_package
+speckit_prework_quality_review
+speckit_proxy_dossier
+speckit_invocation_queue
+constitution_update_plan
+feature_dependency_graph
+```
+
+Legacy/supporting artifacts when SpecKit is available:
+
+```text
+target_spec_work_order
+spec_branch_queue
+```
+
+They may remain for compatibility, but they are not the controlling checkpoint.
+

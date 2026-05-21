@@ -108,6 +108,8 @@ report_spec_gate() {
   echo "- feature dependency graph: $FIRSTRUN/.specify/sync/feature_dependency_graph.md"
   echo "- SpecKit prework quality review: $FIRSTRUN/.specify/sync/speckit_prework_quality_review.md"
   echo "- SpecKit proxy dossier: $FIRSTRUN/.specify/sync/speckit_proxy_dossier.md"
+echo "- SpecKit prework package: $FIRSTRUN/.specify/sync/speckit_prework_package.md"
+echo "- HLDspec state: $FIRSTRUN/.specify/sync/hldspec_state.md"
   echo
 
   "${PYTHON_RUN[@]}" - "$review" "$plan" "$prework_review" <<'PY'
@@ -171,7 +173,7 @@ if prework_status == "REWORK_REQUIRED" or blockers:
     sys.exit(2)
 
 print("Next safe checkpoint: SpecKit prework approval gate.")
-print("Present speckit_prework_quality_review.md and speckit_proxy_dossier.md to the human.")
+print("Present speckit_prework_package.md to the human; use quality review and proxy dossier as supporting evidence.")
 print("Explain the constitution case, architecture/dependency case, first-feature case, Beskeptic findings, and feedback impact rules.")
 print("Do not write specs manually from HLDspec.")
 print("Do not invoke SpecKit until the human approves this gate.")
