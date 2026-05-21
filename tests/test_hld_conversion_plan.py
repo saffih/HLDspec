@@ -113,6 +113,61 @@ class HldConversionPlanTests(unittest.TestCase):
             self.assertIn("conversion_plan_json", readiness)
             self.assertIn("conversion_plan_md", readiness)
 
+    def test_conversion_plan_keeps_all_split_boundaries_and_proposes_split_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            workspace = Path(td) / "workspace"
+            workspace.mkdir()
+            headings = [{"line": 1, "level": 1, "title": "Raw"}, {"line": 10, "level": 2, "title": "Large Parent"}]
+            suggestions = [
+                {
+                    "suggested_id": "HLD-009",
+                    "line": 10,
+                    "heading_level": 2,
+                    "title": "Large Parent",
+                    "role": "architecture",
+                    "risk": "MEDIUM",
+                    "approx_lines_until_next_candidate": 2000,
+                }
+            ]
+            for idx in range(1, 51):
+                headings.append({"line": 10 + (idx * 10), "level": 3, "title": f"Peer {idx}"})
+                headings.append({"line": 11 + (idx * 10), "level": 4, "title": f"Nested {idx}"})
+            report = {"headings": headings, "suggested_hld_sections": suggestions}
+            report_path = workspace / "suggested_hld_sections.json"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "build_hld_conversion_plan.py"),
+                    str(report_path),
+                    str(workspace),
+                    "--source-hld",
+                    "raw.md",
+                ],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=result.stderr)
+            plan = json.loads((workspace / ".specify" / "sync" / "hld_conversion_plan.json").read_text(encoding="utf-8"))
+            candidate = plan["candidates"][0]
+            self.assertEqual("STOP_SPLIT_DECISION_REQUIRED", candidate["recommended_action"])
+            self.assertEqual(100, len(candidate["split_candidate_headings"]))
+            self.assertEqual(50, len(candidate["split_boundary_headings"]))
+            self.assertEqual(50, len(candidate["proposed_split_plan"]))
+            self.assertEqual("HLD-009A", candidate["proposed_split_plan"][0]["proposed_hld_id"])
+            self.assertEqual("HLD-009B", candidate["proposed_split_plan"][1]["proposed_hld_id"])
+            self.assertEqual("HLD-00950", candidate["proposed_split_plan"][-1]["proposed_hld_id"])
+            report_md = (workspace / ".specify" / "sync" / "hld_conversion_plan.md").read_text(encoding="utf-8")
+            self.assertIn("Proposed split plan", report_md)
+            self.assertIn("HLD-009A - Peer 1", report_md)
+            self.assertIn("HLD-009B - Peer 2", report_md)
+            self.assertIn("HLD-00950 - Peer 50", report_md)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,12 +41,60 @@ def internal_headings_for(item: dict[str, Any], headings: list[dict[str, Any]], 
     return result
 
 
-def recommended_action(line_count: int) -> tuple[str, bool, str]:
+def split_boundary_headings(item: dict[str, Any], headings: list[dict[str, Any]], line_end: int) -> list[dict[str, Any]]:
+    internal = internal_headings_for(item, headings, line_end)
+    if not internal:
+        return []
+    child_level = min(as_int(heading.get("level"), 9) for heading in internal)
+    return [heading for heading in internal if as_int(heading.get("level"), 9) == child_level]
+
+
+def split_suffix(index: int) -> str:
+    if index < 26:
+        return chr(ord("A") + index)
+    return str(index + 1)
+
+
+def proposed_split_plan(boundaries: list[dict[str, Any]], parent_line_end: int, parent_id: str) -> list[dict[str, Any]]:
+    plan: list[dict[str, Any]] = []
+    for idx, heading in enumerate(boundaries):
+        start = as_int(heading.get("line"), 0)
+        if idx + 1 < len(boundaries):
+            end = as_int(boundaries[idx + 1].get("line"), parent_line_end + 1) - 1
+        else:
+            end = parent_line_end
+        plan.append(
+            {
+                "proposed_hld_id": f"{parent_id}{split_suffix(idx)}",
+                "title": str(heading.get("title", "")).strip(),
+                "source_line_start": start,
+                "source_line_end": end,
+                "source_line_count": max(1, end - start + 1),
+                "boundary_source": "first_internal_heading_level",
+                "heading_level": as_int(heading.get("level"), 0),
+            }
+        )
+    return plan
+
+
+def recommended_action(line_count: int, boundary_count: int) -> tuple[str, bool, str]:
     if line_count >= LARGE_SECTION_LINES:
+        if boundary_count >= 2:
+            return (
+                "STOP_SPLIT_DECISION_REQUIRED",
+                True,
+                (
+                    f"Candidate is {line_count} lines, above the {LARGE_SECTION_LINES}-line large-section threshold, "
+                    f"and has {boundary_count} peer internal headings that can be reviewed as split boundaries."
+                ),
+            )
         return (
-            "STOP_SPLIT_DECISION_REQUIRED",
+            "PROCEED_SINGLE_SECTION_REVIEW",
             True,
-            f"Candidate is {line_count} lines, above the {LARGE_SECTION_LINES}-line large-section threshold.",
+            (
+                f"Candidate is {line_count} lines, above the {LARGE_SECTION_LINES}-line large-section threshold, "
+                "but no clear peer internal split boundaries were detected. Review as one large section."
+            ),
         )
     return ("PROCEED_METADATA_ONLY", False, "Candidate is within metadata-only conversion bounds.")
 
@@ -73,12 +121,12 @@ def group_chunks(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         current = []
 
     for item in entries:
-        if item["recommended_action"] == "STOP_SPLIT_DECISION_REQUIRED":
+        if item["recommended_action"] in {"STOP_SPLIT_DECISION_REQUIRED", "PROCEED_SINGLE_SECTION_REVIEW"}:
             flush_current()
             chunks.append(
                 {
                     "chunk_id": f"chunk-{len(chunks) + 1:03d}",
-                    "status": "STOP_SPLIT_DECISION_REQUIRED",
+                    "status": item["recommended_action"],
                     "candidate_ids": [str(item["proposed_hld_id"])],
                     "source_line_start": item["source_line_start"],
                     "source_line_end": item["source_line_end"],
@@ -112,7 +160,6 @@ def build_plan(report: dict[str, Any], *, source_hld: str, report_json: str) -> 
         line_start = as_int(raw.get("line"), 0)
         line_count = candidate_line_count(raw)
         line_end = line_start + max(line_count, 1) - 1
-        action, human_required, reason = recommended_action(line_count)
         metadata = raw.get("metadata_skeleton")
         if not isinstance(metadata, dict):
             metadata = {}
@@ -120,6 +167,10 @@ def build_plan(report: dict[str, Any], *, source_hld: str, report_json: str) -> 
         proposed_id = str(raw.get("suggested_id", "")).strip()
         role = str(raw.get("role") or metadata.get("HLD-ROLE") or "architecture")
         risk = str(raw.get("risk") or metadata.get("HLD-RISK") or "MEDIUM")
+        internal = internal_headings_for(raw, headings, line_end)
+        boundaries = split_boundary_headings(raw, headings, line_end)
+        split_plan = proposed_split_plan(boundaries, line_end, proposed_id)
+        action, human_required, reason = recommended_action(line_count, len(boundaries))
 
         entries.append(
             {
@@ -134,7 +185,9 @@ def build_plan(report: dict[str, Any], *, source_hld: str, report_json: str) -> 
                 "recommended_action": action,
                 "human_decision_required": human_required,
                 "reason": reason,
-                "split_candidate_headings": internal_headings_for(raw, headings, line_end)[:40],
+                "split_candidate_headings": internal,
+                "split_boundary_headings": boundaries,
+                "proposed_split_plan": split_plan,
                 "metadata_skeleton": {
                     "HLD-ID": proposed_id,
                     "HLD-ROLE": role,
@@ -153,6 +206,8 @@ def build_plan(report: dict[str, Any], *, source_hld: str, report_json: str) -> 
     chunks = group_chunks(entries)
     if any(item["recommended_action"] == "STOP_SPLIT_DECISION_REQUIRED" for item in entries):
         status = "STOP_SPLIT_DECISION_REQUIRED"
+    elif any(item["recommended_action"] == "PROCEED_SINGLE_SECTION_REVIEW" for item in entries):
+        status = "PROCEED_SINGLE_SECTION_REVIEW"
     elif len(chunks) > 1:
         status = "PROCEED_CHUNKED_CONVERSION"
     else:
@@ -165,7 +220,7 @@ def build_plan(report: dict[str, Any], *, source_hld: str, report_json: str) -> 
         "large_section_threshold_lines": LARGE_SECTION_LINES,
         "candidate_count": len(entries),
         "large_candidate_section_count": sum(1 for item in entries if item["large_section"]),
-        "human_decision_required": status == "STOP_SPLIT_DECISION_REQUIRED",
+        "human_decision_required": status in {"STOP_SPLIT_DECISION_REQUIRED", "PROCEED_SINGLE_SECTION_REVIEW"},
         "candidates": entries,
         "chunks": chunks,
     }
@@ -188,8 +243,13 @@ def render_md(plan: dict[str, Any]) -> str:
 
     if plan["status"] == "STOP_SPLIT_DECISION_REQUIRED":
         lines += [
-            "At least one candidate section is too large for safe metadata-only conversion.",
-            "Do not auto-convert those sections until split boundaries are reviewed.",
+            "At least one candidate section is too large for safe metadata-only conversion and has peer internal headings that require split-boundary review.",
+            "Do not auto-convert those sections until split boundaries are accepted.",
+            "",
+        ]
+    elif plan["status"] == "PROCEED_SINGLE_SECTION_REVIEW":
+        lines += [
+            "At least one large candidate section has no clear peer split boundaries. Review whether to keep it as one large section.",
             "",
         ]
     elif plan["status"] == "PROCEED_CHUNKED_CONVERSION":
@@ -223,11 +283,33 @@ def render_md(plan: dict[str, Any]) -> str:
             f"- human decision required: `{str(item['human_decision_required']).lower()}`",
             f"- reason: {item['reason']}",
         ]
-        split_headings = item.get("split_candidate_headings") or []
-        if split_headings:
-            lines.append("- internal headings that may help split review:")
-            for heading in split_headings[:20]:
-                lines.append(f"  - line {heading['line']}: level {heading['level']} {heading['title']}")
+
+        split_plan = item.get("proposed_split_plan") or []
+        if split_plan:
+            lines += ["", "Proposed split plan:"]
+            for split in split_plan:
+                lines.append(
+                    f"- {split['proposed_hld_id']} - {split['title']} "
+                    f"(lines {split['source_line_start']}-{split['source_line_end']}, "
+                    f"{split['source_line_count']} lines)"
+                )
+
+        boundary_headings = item.get("split_boundary_headings") or []
+        if boundary_headings and not split_plan:
+            lines += ["", "Peer internal headings for review:"]
+            for heading in boundary_headings:
+                lines.append(f"- line {heading['line']}: level {heading['level']} {heading['title']}")
+
+        all_headings = item.get("split_candidate_headings") or []
+        if all_headings:
+            shown = {heading.get("line") for heading in boundary_headings}
+            nested = [heading for heading in all_headings if heading.get("line") not in shown]
+            if nested:
+                lines += ["", "Nested internal headings, shown for context:"]
+                for heading in nested[:40]:
+                    lines.append(f"- line {heading['line']}: level {heading['level']} {heading['title']}")
+                if len(nested) > 40:
+                    lines.append(f"- ... {len(nested) - 40} more nested headings omitted from markdown only; see JSON.")
         lines.append("")
 
     lines += [
