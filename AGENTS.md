@@ -794,13 +794,17 @@ Run Beskeptic Cycles on these Key Aspects:
 
 Review `spec_build_plan_review.md` before continuing. If the review says `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT`, stop and fix the HLD/spec mapping or ask the user for a decision.
 
-#### 4. Review one Target Spec prompt
+#### 4. Future: review one Target Spec prompt
+
+Not implemented yet. Do not run this command until code and tests support `--target-spec`.
+
+Future command shape:
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --target-spec 001 --prompt-only
 ```
 
-Review that the prompt uses the Spec Build Plan and includes:
+When implemented, review that the prompt uses the Spec Build Plan and includes:
 
 ```text
 source HLD Sections
@@ -814,21 +818,29 @@ coverage expectations
 integration expectations
 ```
 
-#### 5. Create or update one Target Spec
+#### 5. Future: create or update one Target Spec
+
+Not implemented yet. Do not run this command until code and tests support `--target-spec`.
+
+Future command shape:
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --target-spec 001
 ```
 
-Only the selected Target Spec and required sync metadata should change.
+When implemented, only the selected Target Spec and required sync metadata should change.
 
-#### 6. Run Coverage Gate
+#### 6. Future: run Coverage Gate
+
+Not implemented yet. Do not run this command until code and tests support `--coverage-check`.
+
+Future command shape:
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --coverage-check --target-spec 001
 ```
 
-Expected outputs:
+Expected future outputs:
 
 ```text
 .specify/sync/coverage_matrix.json
@@ -837,13 +849,17 @@ Expected outputs:
 
 Do not continue if HLD coverage is partial, stale, duplicated, wrong, or unresolved.
 
-#### 7. Run Integration Gate
+#### 7. Future: run Integration Gate
+
+Not implemented yet. Do not run this command until code and tests support `--integration-check`.
+
+Future command shape:
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --integration-check --target-spec 001
 ```
 
-Expected outputs:
+Expected future outputs:
 
 ```text
 .specify/sync/integration_matrix.json
@@ -852,7 +868,11 @@ Expected outputs:
 
 Do not continue if API contracts, producer/consumer relationships, data/state ownership, dependency edges, performance, memory, or reliability expectations are unresolved.
 
-#### 8. Continue downstream only after Coverage Gate and Integration Gate
+#### 8. Future: continue downstream only after Coverage Gate and Integration Gate
+
+Not implemented yet. Do not run target-spec downstream commands until `--target-spec`, Coverage Gate, and Integration Gate are implemented and tested.
+
+Future command shape:
 
 ```bash
 ./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-spec 001 --phase plan --prompt-only
@@ -951,7 +971,14 @@ When asked to "make an HLD workable":
 
 When asked to "update specs from HLD":
 
-Current supported path:
+Current primary read-only path:
+
+1. Run `bash scripts/first_run_readonly.sh /path/to/HLD.md`.
+2. Review `spec_build_plan_review.md`.
+3. If the review says `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT`, stop and fix the HLD/spec mapping or ask the user for a decision.
+4. Do not generate specs from the plan until the plan is clean or explicitly accepted.
+
+Current controlled legacy path, only when explicitly requested:
 
 1. Validate the HLD map.
 2. Run sync prompt-only first with `--use-hld-map --target-hld`.
@@ -959,20 +986,19 @@ Current supported path:
 4. Run sync for the target HLD section.
 5. Beskeptic-check spec boundary, coverage, integration, API contract, performance, and memory concerns.
 
-Intended bottom-up path after `--plan-specs` exists:
+Future bottom-up generation path after `--target-spec`, Coverage Gate, and Integration Gate exist:
 
-1. Validate the HLD map.
-2. Generate and review the Spec Build Plan.
-3. Select one Target Spec.
-4. Run target-spec prompt-only.
-5. Create/update that one Target Spec.
-6. Run Coverage Gate.
-7. Run Integration Gate.
+1. Generate and review the Spec Build Plan.
+2. Select one Target Spec from the accepted plan.
+3. Run target-spec prompt-only.
+4. Create/update that one Target Spec.
+5. Run Coverage Gate.
+6. Run Integration Gate.
 
 
 When asked to "catch up downstream artifacts for the next feature":
 
-Current supported path:
+Current controlled legacy path, only when explicitly requested:
 
 1. Identify the target HLD section.
 2. Validate the HLD map.
@@ -980,9 +1006,15 @@ Current supported path:
 4. Run downstream prompt-only.
 5. Run downstream phase `plan`, `tasks`, or `all` as requested.
 
-Intended bottom-up path after `--plan-specs`, `--target-spec`, Coverage Gate, and Integration Gate exist:
+Current primary read-only path:
 
-1. Identify the Target Spec from the Spec Build Plan.
+1. Run or review the Spec Build Plan Review.
+2. If the relevant spec boundary, API contract, coverage, or integration dependency is unresolved, stop.
+3. Do not create downstream artifacts from raw HLD assumptions.
+
+Future bottom-up path after `--target-spec`, Coverage Gate, and Integration Gate exist:
+
+1. Identify the Target Spec from the accepted Spec Build Plan.
 2. Confirm Coverage Gate is clean or explicitly accepted.
 3. Confirm Integration Gate is clean or explicitly accepted.
 4. Run downstream prompt-only for the Target Spec.
