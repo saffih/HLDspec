@@ -118,3 +118,15 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 - `SPLIT_SPEC`
 - `MERGE_SPEC`
 - `DEFER_SPEC`
+
+## SpecKit proxy terms
+
+| Term | Meaning |
+|---|---|
+| **SpecKit Proxy Protocol** | HLDspec protocol for delegating approved SpecKit work to a bounded subagent that uses SpecKit as a prepared client. |
+| **SpecKit Proxy Subagent** | Bounded subagent that invokes SpecKit phases using the proxy dossier, answers questions from evidence when safe, and escalates human-owned decisions. |
+| **SpecKit Proxy Dossier** | Generated evidence package containing selected feature, constitution context, dependency context, SpecKit input, question policy, and allowed evidence sources. |
+| **Answer From Evidence** | Question-answering mode where the proxy answers from HLD/prework/approved constitution evidence. |
+| **Answer From Reasonable Default** | Question-answering mode used only for safe non-architecture defaults. |
+| **Escalate To Human** | Question-answering mode for architecture, constitution, API, source-of-truth, data ownership, dependency, scope, split/merge, or implementation decisions. |
+

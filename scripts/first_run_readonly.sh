@@ -270,6 +270,7 @@ fi
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$WORKSPACE"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_proxy_dossier.py" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_target_spec_work_order.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_branch_queue.py" "$WORKSPACE/.specify/sync/target_spec_work_order.json" "$WORKSPACE"
 
@@ -297,6 +298,7 @@ echo "- $WORKSPACE/.specify/sync/speckit_invocation_queue.md"
 echo "- $WORKSPACE/.specify/sync/constitution_update_plan.md"
 echo "- $WORKSPACE/.specify/sync/feature_dependency_graph.md"
 echo "- $WORKSPACE/.specify/sync/speckit_prework_quality_review.md"
+echo "- $WORKSPACE/.specify/sync/speckit_proxy_dossier.md"
 echo "- $WORKSPACE/.specify/sync/target_spec_work_order.md"
 echo "- $WORKSPACE/.specify/sync/spec_branch_queue.md"
 echo

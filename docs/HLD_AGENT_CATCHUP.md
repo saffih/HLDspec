@@ -242,3 +242,14 @@ What will be rebuilt if the human gives feedback
 What approval decision is needed
 ```
 
+## SpecKit Proxy Protocol
+
+When SpecKit prework is approved, use:
+
+```text
+speckit_proxy_dossier.md
+docs/SPECKIT_PROXY_PROTOCOL.md
+```
+
+The proxy uses SpecKit as a prepared client and answers questions from evidence when safe. Human-owned architecture decisions are escalated back to the judge/human.
+

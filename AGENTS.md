@@ -1849,3 +1849,30 @@ The quality review must use Beskeptic to detect unclear architecture, weak decom
 
 SpecKit invocation remains blocked until this gate is approval-ready and the human approves.
 
+## SpecKit Proxy Protocol
+
+When HLDspec reaches an approved SpecKit prework gate, it must use a bounded SpecKit proxy subagent instead of manually creating SpecKit artifacts.
+
+Reference:
+
+```text
+docs/SPECKIT_PROXY_PROTOCOL.md
+```
+
+Before invoking SpecKit, generate:
+
+```text
+.specify/sync/speckit_proxy_dossier.json
+.specify/sync/speckit_proxy_dossier.md
+```
+
+The SpecKit proxy subagent receives the dossier and uses SpecKit in sequence:
+
+```text
+constitution if needed -> specify -> clarify -> plan -> tasks -> analyze if needed -> implement only after explicit approval
+```
+
+The proxy may answer SpecKit questions from evidence in the HLD/prework dossier. It must escalate questions affecting architecture, source of truth, constitution, API contract, security, data ownership, user-visible scope, dependency order, feature split/merge, or implementation approval.
+
+The judge/orchestrator remains responsible for final decisions, human checkpoints, affected-artifact rebuilds, and continuation.
+
