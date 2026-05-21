@@ -546,6 +546,65 @@ Beskeptic check for target-spec context:
 If a planned spec needs sections that are missing, the target-spec run must stop with `CONFLICT` instead of guessing.
 
 
+## External project agent communication protocol
+
+When an agent is invoked from another project directory and told to use this HLDspec repository, the agent must keep the human in the loop throughout the work.
+
+This is a communication and control rule, not a read-only-only rule.
+
+Before each major step, state:
+
+```text
+What I see:
+<observable state>
+
+What it means:
+<interpretation and uncertainty>
+
+What I plan to do:
+<next action>
+
+Command or edit:
+<exact command or file edit, if any>
+
+Expected result:
+<what should happen>
+
+Human decision needed:
+<yes/no and why>
+```
+
+After each major step, state:
+
+```text
+What happened:
+<result>
+
+Files created or changed:
+<paths>
+
+What it means:
+<interpretation>
+
+Next decision:
+<continue / stop / ask user / fix input / rerun>
+```
+
+Stop and ask for human decision before actions that:
+
+- create or modify specs
+- create or modify `.specify/memory/constitution.md`
+- create downstream plan/tasks/research/data-model/quickstart files
+- modify implementation files
+- choose between unresolved architecture options
+- decide source-of-truth, ownership, API contract, data/state ownership, performance/memory, or failure/recovery behavior
+- accept a `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT` result as safe to continue
+
+For safe diagnostic commands, the agent may run the command after explaining the purpose and expected output. The agent must still report the result and let the human steer.
+
+The human may interrupt, correct, or redirect after any update. Do not continue silently through long chains of actions.
+
+
 ## Standard workflow
 
 HLDspec currently has three workflow levels:

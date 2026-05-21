@@ -424,3 +424,13 @@ logs/hld_spec_downstream/<timestamp>/
 ```bash
 PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
 ```
+
+## External agent prompt
+
+When using an agent from another project directory, use:
+
+```text
+docs/EXTERNAL_AGENT_PROMPT.md
+```
+
+The protocol is human-in-the-loop: the agent explains what it sees, what it plans to do, the command or edit it will use, what happened, and where the human must decide.
