@@ -161,9 +161,17 @@ def render_md(queue: dict[str, Any]) -> str:
     lines += [
         "## How to answer",
         "",
-        "Edit the matching JSON file and replace `human_decision: TBD` with one of the listed options.",
+        "The human only answers the listed questions.",
+        "",
+        "The judge/orchestrator must edit the matching JSON file and replace `human_decision: TBD` with one of the listed options.",
         "",
         "Do not use free-text answers as the only record. Human notes may be added in `human_notes`.",
+        "",
+        "## After the human answers",
+        "",
+        "The judge/orchestrator must rerun the same HLDspec command and continue to the next safe checkpoint.",
+        "",
+        "The human should not need to provide the continuation command again.",
         "",
     ]
     return "\n".join(lines)

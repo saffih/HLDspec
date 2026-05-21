@@ -75,6 +75,26 @@ Do not claim "real Beskeptic" from naming alone; the framework source, companion
 The framework cache must include both `skeptic.md` and the companion `skeptic-questions.md` domain question bank.
 
 
+## Checkpoint continuation responsibility
+
+When HLDspec generates a human checkpoint, the human only supplies the decision answers.
+
+The judge/orchestrator must know the continuation process without being told again:
+
+1. update the relevant checkpoint JSON artifact with the human answers
+2. rerun the same `scripts/hldspec_run.sh <path-to-HLD.md>` command
+3. continue only to the next safe checkpoint
+4. report what changed and what checkpoint was reached
+
+For conversion checkpoints, the relevant JSON artifact is:
+
+```text
+.hldspec-first-run/.specify/sync/hld_conversion_decision_queue.json
+```
+
+Do not ask the human what command to run after a checkpoint.
+
+
 ## Default HLDspec invocation contract
 
 Every project-level HLDspec invocation is handled as a judge/orchestrator run by default.

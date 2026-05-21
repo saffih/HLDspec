@@ -51,6 +51,18 @@ class HldspecRunTests(unittest.TestCase):
         self.assertIn("Do not modify the source HLD", doc)
         self.assertIn("Default HLDspec invocation contract", agents)
 
+    def test_checkpoint_continuation_protocol_is_documented(self) -> None:
+        catchup = (ROOT / "docs" / "HLD_AGENT_CATCHUP.md").read_text(encoding="utf-8")
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        runner = (ROOT / "scripts" / "project_continue.sh").read_text(encoding="utf-8")
+
+        self.assertIn("Checkpoint continuation protocol", catchup)
+        self.assertIn("The human should not need to provide this process again", catchup)
+        self.assertIn("Checkpoint continuation responsibility", agents)
+        self.assertIn("Do not ask the human what command to run after a checkpoint", agents)
+        self.assertIn("Continuation protocol:", runner)
+        self.assertIn("Judge/orchestrator updates:", runner)
+
 
 if __name__ == "__main__":
     unittest.main()
