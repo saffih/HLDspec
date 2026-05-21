@@ -901,6 +901,7 @@ def build_cycle_record(
     verification: str = "",
 ) -> dict[str, object]:
     return {
+        "framework": BESKEPTIC_FRAMEWORK,
         "step": step,
         "key_aspects": key_aspects,
         "spotlight": spotlight,
@@ -933,6 +934,29 @@ def build_cycle_record(
         "outcome": "HANDLED" if decision == "FIX" else "CONFLICT",
     }
 
+
+
+BESKEPTIC_FRAMEWORK = {
+    "name": "Beskeptic / Skeptic",
+    "source": {
+        "repository": "saffih/skeptic",
+        "path": "skeptic.md",
+        "url": "https://github.com/saffih/skeptic/blob/main/skeptic.md",
+    },
+    "phase_flow_text": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
+    "phase_flow": [
+        "GATE",
+        "FUNDAMENTAL_SCAN",
+        "MAP",
+        "CONFIDENCE",
+        "STABILIZE",
+        "EVIDENCE",
+        "DECIDE",
+        "ACT",
+        "VERIFY",
+        "LEARN",
+    ],
+}
 
 
 RESPONSIBILITY_GROUP_KEYWORDS: dict[str, tuple[str, ...]] = {
@@ -1143,11 +1167,44 @@ def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> N
         "beskeptic_cycles": cycles,
     }
 
+
+def load_hld_section_classifications(workspace: Path) -> dict[str, dict[str, object]]:
+    path = workspace / SYNC_REL / "hld_section_classification.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(read_text(path))
+    except Exception:
+        return {}
+    sections = data.get("sections", []) if isinstance(data, dict) else []
+    result: dict[str, dict[str, object]] = {}
+    if not isinstance(sections, list):
+        return result
+    for item in sections:
+        if isinstance(item, dict) and item.get("hld_id"):
+            result[str(item["hld_id"])] = item
+    return result
+
+
+def section_is_plannable_by_classification(
+    section: hld_map.HldSection,
+    classifications: dict[str, dict[str, object]],
+) -> bool:
+    if spec_ids_from_section(section):
+        return True
+    item = classifications.get(section.id)
+    if not item:
+        return True
+    return bool(item.get("spec_candidate", True))
+
+
 def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[dict[str, object], str]:
     sections_by_id = parsed_map.section_by_id()
     used_ids: set[str] = set()
     planned: dict[str, dict[str, object]] = {}
     conflicts: list[dict[str, object]] = []
+    classifications = load_hld_section_classifications(workspace)
+    context_hld_sections: list[dict[str, object]] = []
 
     constitution_path = workspace / ".specify" / "memory" / "constitution.md"
     constitution_sections = [
@@ -1166,6 +1223,20 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
 
     for section in parsed_map.sections:
         explicit_ids = spec_ids_from_section(section)
+        classification = classifications.get(section.id, {})
+        if not explicit_ids and not section_is_plannable_by_classification(section, classifications):
+            context_hld_sections.append(
+                {
+                    "hld_id": section.id,
+                    "title": section.title,
+                    "section_kind": classification.get("section_kind", "HLD_CONTEXT_ONLY"),
+                    "recommended_action": classification.get("recommended_action", "KEEP_AS_CONTEXT"),
+                    "merge_with": classification.get("merge_with"),
+                    "reason": classification.get("reason", "Classified as non-spec context."),
+                }
+            )
+            continue
+
         if explicit_ids:
             spec_ids = explicit_ids
             used_ids.update(spec_ids)
@@ -1322,6 +1393,14 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
         ],
         "planned_specs": planned_specs,
         "recommended_order": recommended_order,
+        "context_hld_sections": context_hld_sections,
+        "classification_summary": {
+            "classification_file": str((workspace / SYNC_REL / "hld_section_classification.json").relative_to(workspace))
+            if classifications
+            else "",
+            "context_section_count": len(context_hld_sections),
+            "rule": "HLD sections are anchors; only spec_candidate sections become planned specs by default.",
+        },
         "conflicts": conflicts,
         "deferred": [
             {
@@ -1372,6 +1451,21 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
     for spec_id in recommended_order:
         item = next(spec for spec in planned_specs if str(spec["planned_spec_id"]) == spec_id)
         md_lines.append(f"- `{spec_id}` {item['title']} ({item['layer']})")
+
+    if context_hld_sections:
+        md_lines.extend([
+            "",
+            "## Context-only HLD sections",
+            "",
+            "These HLD sections are preserved as design anchors but are not planned as standalone target specs by default.",
+            "",
+        ])
+        for context in context_hld_sections:
+            md_lines.append(
+                f"- `{context['hld_id']}` {context['title']} "
+                f"({context['section_kind']} / {context['recommended_action']})"
+            )
+        md_lines.append("")
 
     md_lines.extend(["", "## Planned specs", ""])
     for item in planned_specs:

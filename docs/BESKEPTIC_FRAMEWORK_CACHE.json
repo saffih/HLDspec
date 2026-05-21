@@ -1,0 +1,59 @@
+{
+  "authoritative_source": {
+    "last_verified_sha": "37bbc47ea49ac7ddbfef1bdbfb2bad3fe1ffb5bd",
+    "path": "skeptic.md",
+    "repository": "saffih/skeptic",
+    "url": "https://github.com/saffih/skeptic/blob/main/skeptic.md"
+  },
+  "domain_checks": [
+    "SEC",
+    "CPX",
+    "REL",
+    "DAT",
+    "ARC",
+    "CFT"
+  ],
+  "evidence_levels": [
+    "OBSERVED",
+    "REPRODUCED",
+    "HISTORICAL",
+    "INFERRED_RISK"
+  ],
+  "hldspec_contract": [
+    "Use the authoritative Skeptic phase flow for all HLDspec Beskeptic cycles.",
+    "Record framework source and phase flow in generated workspace artifacts.",
+    "Do not call a finding fixed unless evidence and verification path are recorded.",
+    "Treat unresolved human decisions as CONFLICT or checkpoint blockers.",
+    "Use HLDspec cycles as bounded executable projections of Skeptic, not as a replacement for skeptic.md."
+  ],
+  "name": "Beskeptic / Skeptic",
+  "output_states": [
+    "FIX",
+    "CONFLICT",
+    "DECOMPOSE",
+    "NO_ACTION",
+    "PROVISIONAL"
+  ],
+  "phase_flow": [
+    "GATE",
+    "FUNDAMENTAL_SCAN",
+    "MAP",
+    "CONFIDENCE",
+    "STABILIZE",
+    "EVIDENCE",
+    "DECIDE",
+    "ACT",
+    "VERIFY",
+    "LEARN"
+  ],
+  "phase_flow_text": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
+  "schema_version": 1,
+  "thinkers": [
+    "CH",
+    "OM",
+    "FE",
+    "PO",
+    "KT",
+    "SH"
+  ]
+}

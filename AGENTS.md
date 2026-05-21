@@ -46,6 +46,33 @@ Then call Python as:
 Do not make `uv` mandatory unless the repo explicitly adopts a `pyproject.toml`/locked environment.
 
 
+## Real Beskeptic framework contract
+
+HLDspec must treat `saffih/skeptic/skeptic.md` as the authoritative Beskeptic/Skeptic framework.
+
+Cached framework contract:
+
+```text
+docs/BESKEPTIC_FRAMEWORK_CACHE.json
+docs/BESKEPTIC_FRAMEWORK_CACHE.md
+```
+
+Every first-run workspace should include:
+
+```text
+.specify/sync/beskeptic_framework_cache.json
+.specify/sync/beskeptic_framework_cache.md
+```
+
+`beskeptic_cycles` are valid only when they preserve the real Skeptic phase flow:
+
+```text
+GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN
+```
+
+Do not claim "real Beskeptic" from naming alone; the framework source and phase flow must be present in artifacts.
+
+
 ## Default HLDspec invocation contract
 
 Every project-level HLDspec invocation is handled as a judge/orchestrator run by default.

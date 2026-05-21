@@ -63,6 +63,8 @@ mkdir -p "$WORKSPACE"
 cp "$HLD_SOURCE" "$WORKSPACE/HLD.raw.md"
 cp "$HLD_SOURCE" "$WORKSPACE/HLD.md"
 
+"${PYTHON_RUN[@]}" "$ROOT/scripts/write_beskeptic_cache.py" "$WORKSPACE"
+
 echo "Workspace: $WORKSPACE"
 echo "Source HLD: $HLD_SOURCE"
 echo
