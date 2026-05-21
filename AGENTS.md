@@ -1890,3 +1890,34 @@ The next checkpoint is the SpecKit prework approval gate.
 
 HLDspec must present the prework quality review and proxy dossier, then wait for human approval before a SpecKit proxy subagent invokes SpecKit.
 
+## Beskeptic meta-review runner
+
+After substantial HLDspec workflow changes, run many bounded Beskeptic cycles over the repo:
+
+```bash
+python3 scripts/run_beskeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
+```
+
+Output:
+
+```text
+.hldspec-meta-review/hldspec_beskeptic_meta_review.json
+.hldspec-meta-review/hldspec_beskeptic_meta_review.md
+```
+
+The runner checks:
+
+```text
+repo baseline
+Beskeptic grounding
+canonical flow
+SpecKit ownership boundary
+judge-led review protocol
+constitution quality
+API contract vs processing decomposition
+runner safety
+test coverage
+```
+
+Use `--fail-on-blocker` in CI-like runs.
+

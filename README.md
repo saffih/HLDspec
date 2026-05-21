@@ -533,3 +533,12 @@ docs/EXTERNAL_AGENT_PROMPT.md
 ```
 
 The protocol is human-in-the-loop: the agent explains what it sees, what it plans to do, the command or edit it will use, what happened, and where the human must decide.
+
+## Beskeptic meta-review
+
+Run a broad HLDspec self-review after workflow changes:
+
+```bash
+python3 scripts/run_beskeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
+```
+
