@@ -3,6 +3,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if command -v uv >/dev/null 2>&1; then
+  PYTHON_RUN=(uv run python)
+else
+  PYTHON_RUN=(python3)
+fi
+
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -60,19 +67,19 @@ echo "Workspace: $WORKSPACE"
 echo "Source HLD: $HLD_SOURCE"
 echo
 
-python3 "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-format-report
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-format-report
 
 REPORT_DIR="$(ls -dt "$WORKSPACE"/logs/hld_spec_sync/* | head -1)"
 REPORT_JSON="$REPORT_DIR/suggested_hld_sections.json"
 
-python3 "$ROOT/scripts/build_hld_conversion_plan.py" "$REPORT_JSON" "$WORKSPACE" --source-hld "$HLD_SOURCE"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_conversion_plan.py" "$REPORT_JSON" "$WORKSPACE" --source-hld "$HLD_SOURCE"
 CONVERSION_PLAN_JSON="$WORKSPACE/.specify/sync/hld_conversion_plan.json"
 CONVERSION_PLAN_MD="$WORKSPACE/.specify/sync/hld_conversion_plan.md"
-python3 "$ROOT/scripts/build_hld_conversion_decision_queue.py" "$CONVERSION_PLAN_JSON" "$WORKSPACE"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_conversion_decision_queue.py" "$CONVERSION_PLAN_JSON" "$WORKSPACE"
 CONVERSION_DECISION_QUEUE_JSON="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.json"
 CONVERSION_DECISION_QUEUE_MD="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.md"
 
-python3 - "$REPORT_JSON" "$WORKSPACE" "$HLD_SOURCE" <<'PY'
+"${PYTHON_RUN[@]}" - "$REPORT_JSON" "$WORKSPACE" "$HLD_SOURCE" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -253,9 +260,10 @@ if [ "$STATUS" = "needs_conversion" ]; then
   exit 2
 fi
 
-python3 "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-map-only
-python3 "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --use-hld-map --plan-specs
-python3 "$ROOT/scripts/review_spec_build_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json"
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-map-only
+"${PYTHON_RUN[@]}" "$ROOT/scripts/classify_hld_sections.py" "$WORKSPACE/HLD.md" "$WORKSPACE"
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --use-hld-map --plan-specs
+"${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json"
 
 if [ -e "$WORKSPACE/.specify/memory/constitution.md" ]; then
   echo "ERROR: read-only first run created target constitution unexpectedly" >&2

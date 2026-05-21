@@ -23,6 +23,29 @@ docs/SIMULATOR_AGENT_PROMPT.md
 ```
 
 
+## Python runner preference
+
+Shell wrappers should prefer `uv run python` when `uv` is available and fall back to `python3` when it is not.
+
+Use this pattern in bash wrappers:
+
+```bash
+if command -v uv >/dev/null 2>&1; then
+  PYTHON_RUN=(uv run python)
+else
+  PYTHON_RUN=(python3)
+fi
+```
+
+Then call Python as:
+
+```bash
+"${PYTHON_RUN[@]}" script.py
+```
+
+Do not make `uv` mandatory unless the repo explicitly adopts a `pyproject.toml`/locked environment.
+
+
 ## Simple project entrypoint
 
 When the human asks an agent to run HLDspec from a project repository, the agent should read:

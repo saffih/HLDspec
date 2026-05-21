@@ -212,6 +212,20 @@ The system stores state.
             self.assertIn("raw HLD / conversion checkpoint", result.stdout)
             self.assertTrue((project / ".hldspec-first-run" / "HLD_CONVERSION_PROMPT.md").exists())
 
+    def test_shell_wrappers_prefer_uv_with_python3_fallback(self) -> None:
+        for rel in [
+            "scripts/first_run_readonly.sh",
+            "scripts/project_first_run.sh",
+            "poc/run_poc.sh",
+        ]:
+            path = ROOT / rel
+            if not path.exists():
+                continue
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("PYTHON_RUN=(uv run python)", text)
+            self.assertIn("PYTHON_RUN=(python3)", text)
+            self.assertIn("${PYTHON_RUN[@]}", text)
+
 
 if __name__ == "__main__":
     unittest.main()

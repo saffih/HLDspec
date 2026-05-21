@@ -3,6 +3,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if command -v uv >/dev/null 2>&1; then
+  PYTHON_RUN=(uv run python)
+else
+  PYTHON_RUN=(python3)
+fi
+
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -55,7 +62,7 @@ if [ "$rc" -eq 2 ]; then
   echo "- state: raw HLD / conversion checkpoint"
 
   if [ -f "$WORK/.specify/sync/hld_conversion_decision_queue.json" ]; then
-    python3 - "$WORK/.specify/sync/hld_conversion_decision_queue.json" <<'PY'
+    "${PYTHON_RUN[@]}" - "$WORK/.specify/sync/hld_conversion_decision_queue.json" <<'PY'
 import json
 import sys
 from pathlib import Path

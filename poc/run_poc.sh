@@ -2,6 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if command -v uv >/dev/null 2>&1; then
+  PYTHON_RUN=(uv run python)
+else
+  PYTHON_RUN=(python3)
+fi
+
 OUT="${1:-/tmp/hldspec-poc}"
 
 rm -rf "$OUT"
@@ -17,7 +24,7 @@ for hld in "$ROOT"/poc/hlds/*.md; do
   echo "== $case_name =="
   bash "$ROOT/scripts/first_run_readonly.sh" "$hld" "$workspace" --force >/tmp/hldspec-poc-${case_name}.log
 
-  python3 - "$workspace/.specify/sync/spec_build_plan.json" <<'PY'
+  "${PYTHON_RUN[@]}" - "$workspace/.specify/sync/spec_build_plan.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -64,7 +71,7 @@ printf '{"specs":[]}\n' > "$guard_workspace/.specify/sync/spec_index.json"
 printf '# Demo Spec\n' > "$guard_workspace/specs/001-demo/spec.md"
 
 set +e
-python3 "$ROOT/hld_spec_downstream.py" \
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_downstream.py" \
   --workspace "$guard_workspace" \
   --hld "$guard_workspace/HLD.md" \
   --phase analyze \
@@ -83,7 +90,7 @@ fi
 grep -q "Refusing to build an unbounded downstream prompt" "$guard_workspace/unbounded.out"
 echo "Unbounded downstream prompt: blocked"
 
-python3 "$ROOT/hld_spec_downstream.py" \
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_downstream.py" \
   --workspace "$guard_workspace" \
   --hld "$guard_workspace/HLD.md" \
   --phase analyze \
@@ -95,7 +102,7 @@ python3 "$ROOT/hld_spec_downstream.py" \
 grep -q "Prompt-only mode" "$guard_workspace/bounded_chars.out"
 echo "Explicit char-bound downstream prompt: passed"
 
-python3 "$ROOT/hld_spec_downstream.py" \
+"${PYTHON_RUN[@]}" "$ROOT/hld_spec_downstream.py" \
   --workspace "$guard_workspace" \
   --hld "$guard_workspace/HLD.md" \
   --use-hld-map \
