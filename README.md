@@ -32,6 +32,19 @@ Key rules:
 - API contracts, performance, memory, dependencies, data/state ownership, and reliability are first-class Key Aspects when relevant.
 
 
+## First read-only run
+
+To test a real HLD through the current safe cycle:
+
+```bash
+bash scripts/first_run_readonly.sh /path/to/HLD.md
+```
+
+This runs HLD format report, HLD map, Spec Build Plan, Plan Quality Gate, and Spec Build Plan Review. It does not call an agent, create specs, or create the target Spec Kit Constitution.
+
+See [docs/FIRST_RUN.md](docs/FIRST_RUN.md).
+
+
 ## HLD input format
 
 For large HLDs, prefer one canonical `HLD.md` with stable, grepable section metadata instead of many manually maintained HLD source files.
