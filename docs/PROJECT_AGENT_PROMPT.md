@@ -1,3 +1,20 @@
+## Default short invocation
+
+The human may simply write:
+
+```text
+HLDspec ./Flow-System-HLD.md
+```
+
+That means: act as the HLDspec judge/orchestrator, run the single-command runner, and stop at the next safe checkpoint.
+
+Detailed compact contract:
+
+```text
+docs/HLD_AGENT_CATCHUP.md
+```
+
+
 # HLDspec Project Agent Prompt
 
 made by AI

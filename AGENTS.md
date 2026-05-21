@@ -46,6 +46,31 @@ Then call Python as:
 Do not make `uv` mandatory unless the repo explicitly adopts a `pyproject.toml`/locked environment.
 
 
+## Default HLDspec invocation contract
+
+Every project-level HLDspec invocation is handled as a judge/orchestrator run by default.
+
+The human should be able to invoke HLDspec with a short prompt such as:
+
+```text
+HLDspec ./Flow-System-HLD.md
+```
+
+The external coding agent must then read:
+
+```text
+docs/HLD_AGENT_CATCHUP.md
+```
+
+and run:
+
+```bash
+scripts/hldspec_run.sh <path-to-HLD.md>
+```
+
+The agent owns orchestration, checkpoint reporting, bounded context, and subagent management if needed. The human owns generated decision checkpoints.
+
+
 ## Single-command project runner
 
 For project-level use, prefer the single command:
