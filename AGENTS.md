@@ -1203,3 +1203,81 @@ Do not generate downstream tasks from raw HLD assumptions when the relevant spec
 - Do not load the whole HLD into prompts when `--use-hld-map --target-hld` is appropriate.
 - Do not invent HLD IDs, spec IDs, owners, or source-of-truth decisions.
 - Do not silently resolve conflicts; mark them as `TBD`, `CONFLICT`, or `CONFLICTS_WITH REF HLD-xxx`.
+
+## Downstream analysis boundary
+
+`downstream_analysis.md` is not a first-run artifact.
+
+It is a bounded downstream-analysis artifact produced only after the upstream HLD/spec boundary is accepted.
+
+Do not run downstream analysis from raw-HLD assumptions.
+
+Correct ownership:
+
+```text
+Human
+-> owns unresolved decisions
+
+Judge/orchestrator
+-> owns process, scope, subagent briefing, context boundary, output review, synthesis, and escalation
+
+Downstream-analysis subagent
+-> performs bounded gap analysis for one accepted scope
+```
+
+The judge/orchestrator may delegate downstream analysis to a subagent only with a bounded brief.
+
+The downstream-analysis subagent must receive:
+
+```text
+Role:
+Task:
+Accepted scope:
+Relevant HLD sections:
+Relevant planned specs/specs:
+Relevant first-run review findings:
+Allowed files/commands:
+Forbidden actions:
+Context rule:
+Stop conditions:
+Required output:
+Evidence required:
+```
+
+The downstream-analysis subagent must not receive the full HLD by default.
+
+The subagent output may propose:
+
+```text
+.specify/sync/downstream/downstream_analysis.md
+.specify/sync/downstream/gap_closure_plan.md
+```
+
+The judge/orchestrator must review the proposal before accepting it.
+
+Stop for human decision before downstream work when there is unresolved:
+
+- architecture direction
+- source of truth
+- ownership
+- API/interface contract
+- data/state ownership
+- performance/memory behavior
+- failure/recovery behavior
+- spec boundary
+- implementation scope
+
+Safe downstream mode should be bounded by HLD map or by an explicit context limit.
+
+Preferred bounded command shape:
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase analyze --prompt-only
+```
+
+Do not run this as the first downstream step on a large/raw HLD:
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --phase analyze
+```
+

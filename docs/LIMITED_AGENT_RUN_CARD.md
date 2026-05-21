@@ -224,6 +224,32 @@ Stop and ask the human before:
 5. Stop if blocked; ask the human.
 ```
 
+## Downstream analysis boundary
+
+`downstream_analysis.md` is not a first-run artifact.
+
+Only consider downstream analysis after:
+
+```text
+1. HLD is converted if needed.
+2. first_run_readonly.sh has been rerun.
+3. spec_build_plan_review.md has been reviewed.
+4. DECOMPOSE / CONFLICT / SPLIT_PLANNED_SPEC / RESOLVE_CONFLICT are resolved or explicitly accepted by the human.
+```
+
+The judge/orchestrator owns downstream-analysis scope and may delegate the work to a bounded downstream-analysis subagent.
+
+Do not run downstream analysis from raw-HLD assumptions.
+
+Preferred bounded shape:
+
+```bash
+./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase analyze --prompt-only
+```
+
+Do not run unbounded downstream analysis on a large/raw HLD.
+
+
 ## Do not proceed to target-spec generation
 
 Target-spec generation is not the default next step. Use it only if HLDspec implements it, tests it, and the human explicitly approves.

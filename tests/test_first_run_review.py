@@ -144,6 +144,23 @@ The system stores state.
         self.assertNotIn("Sync one target section at a time", raw_section)
         self.assertNotIn("Continue downstream only after the related spec exists", raw_section)
 
+    def test_downstream_analysis_boundary_is_documented(self) -> None:
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        card = (ROOT / "docs" / "LIMITED_AGENT_RUN_CARD.md").read_text(encoding="utf-8")
+        protocol = (ROOT / "docs" / "CHUNKED_AGENT_PROTOCOL.md").read_text(encoding="utf-8")
+
+        for text in (agents, readme, card, protocol):
+            self.assertIn("downstream_analysis.md", text)
+            self.assertRegex(text, r"not (a first-run artifact|part of the first-run workflow)")
+            self.assertIn("raw-HLD assumptions", text)
+
+        self.assertIn("Safe default for limited agents and large/raw HLDs", readme)
+        self.assertIn("Do **not** start with full sync", readme)
+        self.assertLess(readme.index("Safe default for limited agents and large/raw HLDs"), readme.index("## Sync script"))
+        self.assertIn("Downstream-analysis subagent", agents)
+        self.assertIn("--use-hld-map --target-hld", card)
+
 
 if __name__ == "__main__":
     unittest.main()

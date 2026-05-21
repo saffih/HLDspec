@@ -174,6 +174,30 @@ Stop and ask the human before:
 - modifying implementation files
 - choosing architecture, ownership, API, data/state, performance/memory, or failure/recovery behavior
 
+## Downstream analysis as a bounded chunk task
+
+`downstream_analysis.md` is not a first-run artifact. It is produced only after the relevant upstream scope is accepted.
+
+Treat downstream analysis as a bounded delegated task:
+
+```text
+Judge/orchestrator
+-> chooses accepted scope
+-> briefs downstream-analysis subagent
+-> limits context
+-> reviews output
+-> escalates unresolved decisions
+
+Downstream-analysis subagent
+-> analyzes only the assigned accepted scope
+-> reports evidence, gaps, risks, uncertainty, and human decisions needed
+```
+
+Do not ask a downstream-analysis subagent to analyze the full HLD by default.
+
+Do not produce downstream artifacts from raw-HLD assumptions.
+
+
 ## Do not over-engineer
 
 Do not add numeric token measurement unless repeated failures show chunking is insufficient.

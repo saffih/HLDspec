@@ -92,6 +92,31 @@ See:
 For agent-facing repository instructions, see [AGENTS.md](AGENTS.md).
 
 Agents should use the wrapper scripts instead of manually editing generated Spec Kit artifacts.
+## Safe default for limited agents and large/raw HLDs
+
+For limited agents, simulator-style work, or any large/raw HLD, the default entrypoint is:
+
+```text
+docs/LIMITED_AGENT_RUN_CARD.md
+docs/SIMULATOR_AGENT_PROMPT.md
+scripts/first_run_readonly.sh
+```
+
+Do **not** start with full sync, `--target-hld`, downstream planning, or implementation commands.
+
+Safe order:
+
+```text
+first_run_readonly.sh
+-> if raw, convert HLD.md in chunks
+-> rerun first_run_readonly.sh
+-> review spec_build_plan_review.md
+-> stop on DECOMPOSE / CONFLICT / SPLIT_PLANNED_SPEC / RESOLVE_CONFLICT
+-> only then consider bounded downstream analysis
+```
+
+The full sync and downstream commands below are advanced/controlled workflows. Use them only after the first-run review is accepted or when explicitly requested by the human.
+
 
 ## Sync script
 
@@ -304,6 +329,19 @@ logs/hld_spec_sync/<timestamp>/
 ```
 
 ## Downstream script
+
+Do not run downstream planning, tasks, or implementation from raw-HLD assumptions.
+
+For large/raw HLDs and limited-agent runs, downstream work must wait until:
+
+```text
+HLD is converted
+first-run Spec Build Plan Review is accepted
+relevant plan/spec boundary is clear
+downstream analysis is bounded by accepted scope
+```
+
+`downstream_analysis.md` is a bounded downstream artifact, not a first-run artifact.
 
 `hld_spec_downstream.py` continues after sync. It reads the HLD, constitution, native Spec Kit specs, and `.specify/sync/` reports, then drives downstream closure work:
 
