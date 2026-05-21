@@ -65,6 +65,10 @@ python3 "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-for
 REPORT_DIR="$(ls -dt "$WORKSPACE"/logs/hld_spec_sync/* | head -1)"
 REPORT_JSON="$REPORT_DIR/suggested_hld_sections.json"
 
+python3 "$ROOT/scripts/build_hld_conversion_plan.py" "$REPORT_JSON" "$WORKSPACE" --source-hld "$HLD_SOURCE"
+CONVERSION_PLAN_JSON="$WORKSPACE/.specify/sync/hld_conversion_plan.json"
+CONVERSION_PLAN_MD="$WORKSPACE/.specify/sync/hld_conversion_plan.md"
+
 python3 - "$REPORT_JSON" "$WORKSPACE" "$HLD_SOURCE" <<'PY'
 import json
 import sys
@@ -78,10 +82,15 @@ report = json.loads(report_path.read_text(encoding="utf-8"))
 existing = int(report.get("existing_hldspec_section_count", 0) or 0)
 suggestions = report.get("suggested_hld_sections", [])
 candidate_count = len(suggestions) if isinstance(suggestions, list) else 0
+conversion_plan_path = workspace / ".specify" / "sync" / "hld_conversion_plan.json"
+conversion_plan = json.loads(conversion_plan_path.read_text(encoding="utf-8")) if conversion_plan_path.exists() else {}
 large_sections = [
     item for item in suggestions
-    if isinstance(item, dict) and int(item.get("line_count", 0) or 0) >= 400
+    if isinstance(item, dict)
+    and int((item.get("line_count") or item.get("approx_lines_until_next_candidate") or item.get("approx_lines") or 0) or 0) >= 400
 ]
+large_section_count = int(conversion_plan.get("large_candidate_section_count", len(large_sections)) or 0)
+conversion_status = str(conversion_plan.get("status", "UNKNOWN"))
 
 status = "hldspec_ready" if existing > 0 else "needs_conversion"
 
@@ -94,7 +103,10 @@ status = "hldspec_ready" if existing > 0 else "needs_conversion"
             "format_report_md": str(report_path.with_name("hld_format_report.md")),
             "existing_hldspec_section_count": existing,
             "candidate_major_section_count": candidate_count,
-            "large_candidate_section_count": len(large_sections),
+            "large_candidate_section_count": large_section_count,
+            "conversion_plan_status": conversion_status,
+            "conversion_plan_json": str(workspace / ".specify" / "sync" / "hld_conversion_plan.json"),
+            "conversion_plan_md": str(workspace / ".specify" / "sync" / "hld_conversion_plan.md"),
         },
         indent=2,
         sort_keys=True,
@@ -108,7 +120,10 @@ status = "hldspec_ready" if existing > 0 else "needs_conversion"
             f"STATUS={status}",
             f"EXISTING_HLDSPEC_SECTIONS={existing}",
             f"CANDIDATE_MAJOR_SECTIONS={candidate_count}",
-            f"LARGE_CANDIDATE_SECTIONS={len(large_sections)}",
+            f"LARGE_CANDIDATE_SECTIONS={large_section_count}",
+            f"CONVERSION_PLAN_STATUS={conversion_status}",
+            f"CONVERSION_PLAN_JSON={workspace / '.specify' / 'sync' / 'hld_conversion_plan.json'}",
+            f"CONVERSION_PLAN_MD={workspace / '.specify' / 'sync' / 'hld_conversion_plan.md'}",
             f"REPORT_JSON={report_path}",
             f"REPORT_MD={report_path.with_name('hld_format_report.md')}",
         ]
@@ -128,14 +143,19 @@ Detected:
 
 - existing HLDspec sections: {existing}
 - candidate major sections: {candidate_count}
-- large candidate sections: {len(large_sections)}
+- large candidate sections: {large_section_count}
+- conversion plan status: {conversion_status}
 
-Use the format report:
+Use the format report and conversion plan:
 
 ```text
 {report_path.with_name('hld_format_report.md')}
 {report_path}
+{workspace / '.specify' / 'sync' / 'hld_conversion_plan.md'}
+{workspace / '.specify' / 'sync' / 'hld_conversion_plan.json'}
 ```
+
+The conversion plan is the controlling artifact for chunk order and split stop decisions.
 
 Task:
 
@@ -205,6 +225,7 @@ echo "HLD readiness: $STATUS"
 echo "- existing HLDspec sections: $EXISTING_HLDSPEC_SECTIONS"
 echo "- candidate major sections: $CANDIDATE_MAJOR_SECTIONS"
 echo "- large candidate sections: $LARGE_CANDIDATE_SECTIONS"
+echo "- conversion plan status: ${CONVERSION_PLAN_STATUS:-UNKNOWN}"
 
 if [ "$STATUS" = "needs_conversion" ]; then
   echo
@@ -212,6 +233,8 @@ if [ "$STATUS" = "needs_conversion" ]; then
   echo "Open these files:"
   echo "- $REPORT_MD"
   echo "- $REPORT_JSON"
+  echo "- $WORKSPACE/.specify/sync/hld_conversion_plan.md"
+  echo "- $WORKSPACE/.specify/sync/hld_conversion_plan.json"
   echo "- $WORKSPACE/HLD_CONVERSION_PROMPT.md"
   echo
   echo "Convert $WORKSPACE/HLD.md to HLDspec format, then rerun:"
