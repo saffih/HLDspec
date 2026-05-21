@@ -765,6 +765,431 @@ def build_hld_format_report(hld_text: str, *, source_path: str) -> tuple[dict[st
 
     return report, "\n".join(md_lines)
 
+
+SPEC_LAYER_ORDER = {
+    "governance": 0,
+    "foundation": 1,
+    "data": 2,
+    "api": 3,
+    "processing": 4,
+    "operations": 5,
+    "testing": 6,
+    "feature": 7,
+}
+
+
+def slugify_spec_title(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    return slug or "planned-spec"
+
+
+def spec_layer_for_section(section: hld_map.HldSection) -> str:
+    role = section.metadata_value("HLD-ROLE").strip().lower()
+    text = f"{section.title}\n{section.text}".lower()
+
+    if role in {"governance", "purpose"} or any(term in text for term in ("source of truth", "ownership", "policy", "constitution")):
+        return "governance"
+    if role in {"data"} or any(term in text for term in ("data model", "state", "storage", "persistence", "schema", "migration")):
+        return "data"
+    if role in {"api", "ui"} or any(term in text for term in ("api", "interface", "contract", "endpoint", "producer", "consumer")):
+        return "api"
+    if role in {"processing", "architecture"} or any(term in text for term in ("flow", "sync", "pipeline", "orchestration", "processing")):
+        return "processing"
+    if role in {"operations", "risk"} or any(term in text for term in ("rollback", "recovery", "retry", "failure", "observability", "operations")):
+        return "operations"
+    if role in {"testing"} or any(term in text for term in ("test", "verify", "validation", "acceptance")):
+        return "testing"
+    if role in {"foundation"}:
+        return "foundation"
+    return "feature"
+
+
+def section_key_aspect_hints(section: hld_map.HldSection) -> list[str]:
+    text = f"{section.title}\n{section.text}\n{section.metadata_value('HLD-RESOURCES')}".lower()
+    aspects: set[str] = {"spec_boundary", "coverage", "source_of_truth"}
+
+    if any(term in text for term in ("api", "interface", "contract", "endpoint", "producer", "consumer")):
+        aspects.update({"api_contract", "integration", "producer_consumer"})
+    if any(term in text for term in ("data", "state", "storage", "persistence", "schema", "migration")):
+        aspects.add("data_state_ownership")
+    if any(term in text for term in ("performance", "latency", "throughput", "scale", "scalability")):
+        aspects.update({"performance", "scalability"})
+    if any(term in text for term in ("memory", "context", "token", "large hld", "chunk")):
+        aspects.update({"memory", "bounded_context"})
+    if any(term in text for term in ("failure", "retry", "recovery", "rollback", "timeout")):
+        aspects.update({"reliability", "failure_recovery"})
+    if section.required_refs():
+        aspects.add("dependency_order")
+    if section.references:
+        aspects.add("hld_refs")
+    if section.metadata_value("HLD-RISK").upper() == "HIGH":
+        aspects.update({"testability", "verification_path"})
+
+    return sorted(aspects)
+
+
+def section_has_mixed_responsibilities(section: hld_map.HldSection) -> bool:
+    text = f"{section.title}\n{section.text}".lower()
+    groups = 0
+    signals = [
+        ("governance", ("source of truth", "ownership", "policy", "constitution")),
+        ("data", ("data", "state", "storage", "persistence", "schema")),
+        ("api", ("api", "interface", "contract", "endpoint", "producer", "consumer")),
+        ("processing", ("flow", "pipeline", "sync", "processing", "orchestration")),
+        ("operations", ("rollback", "recovery", "retry", "failure", "observability")),
+        ("testing", ("test", "verify", "validation", "acceptance")),
+    ]
+    for _, keywords in signals:
+        if any(keyword in text for keyword in keywords):
+            groups += 1
+    return groups >= 3
+
+
+def spec_ids_from_section(section: hld_map.HldSection) -> list[str]:
+    values = hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))
+    result: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized or normalized.upper() == "TBD" or normalized.lower() == "constitution":
+            continue
+        if re.fullmatch(r"\d{1,3}", normalized):
+            result.append(normalized.zfill(3))
+        else:
+            result.append(normalized)
+    return sorted(dict.fromkeys(result))
+
+
+def planned_spec_id_for_tbd(section: hld_map.HldSection, used_ids: set[str]) -> str:
+    preferred_match = re.search(r"HLD-(\d{3})", section.id)
+    preferred = preferred_match.group(1) if preferred_match else ""
+    if preferred and preferred not in used_ids:
+        used_ids.add(preferred)
+        return preferred
+
+    next_num = 1
+    while f"{next_num:03d}" in used_ids:
+        next_num += 1
+    planned = f"{next_num:03d}"
+    used_ids.add(planned)
+    return planned
+
+
+def build_cycle_record(
+    *,
+    step: str,
+    key_aspects: list[str],
+    spotlight: str,
+    decision: str,
+    recommendation: str,
+    evidence_levels: list[str],
+    unknowns: list[str] | None = None,
+    findings: list[str] | None = None,
+    verification: str = "",
+) -> dict[str, object]:
+    return {
+        "step": step,
+        "key_aspects": key_aspects,
+        "spotlight": spotlight,
+        "gate": {
+            "done_testable": True,
+            "scope_tractable": True,
+            "wrong_answer_cost": "medium",
+        },
+        "fundamental_scan": {
+            "source_of_truth_clear": True,
+            "boundary_clear": decision != "DECOMPOSE",
+            "interfaces_checked": "api_contract" in key_aspects or "integration" in key_aspects,
+        },
+        "map": {
+            "findings": findings or [],
+            "unknowns": unknowns or [],
+            "assumptions": [],
+            "skipped_areas": [],
+        },
+        "confidence": {
+            "thinkers_considered": ["CH", "OM", "FE", "PO", "KT", "SH"],
+            "domain_checks": sorted({"ARC", "DAT" if "data_state_ownership" in key_aspects else "CFT", "REL" if "reliability" in key_aspects else "CFT"}),
+            "confidence": "adequate" if decision == "FIX" else "weak",
+        },
+        "stabilized_issues": findings or [],
+        "evidence_levels": evidence_levels,
+        "decision": decision,
+        "recommendation": recommendation,
+        "verification": verification,
+        "outcome": "HANDLED" if decision == "FIX" else "CONFLICT",
+    }
+
+
+def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[dict[str, object], str]:
+    sections_by_id = parsed_map.section_by_id()
+    used_ids: set[str] = set()
+    planned: dict[str, dict[str, object]] = {}
+    conflicts: list[dict[str, object]] = []
+
+    constitution_path = workspace / ".specify" / "memory" / "constitution.md"
+    constitution_sections = [
+        section.id
+        for section in parsed_map.sections
+        if "constitution" in [item.lower() for item in hld_map.split_metadata_list(section.metadata_value("HLD-SPECS"))]
+        or section.metadata_value("HLD-ROLE").lower() == "governance"
+        or "source of truth" in section.text.lower()
+    ]
+    if not constitution_path.exists():
+        constitution_action = "create"
+    elif constitution_sections:
+        constitution_action = "update"
+    else:
+        constitution_action = "no_change"
+
+    for section in parsed_map.sections:
+        explicit_ids = spec_ids_from_section(section)
+        if explicit_ids:
+            spec_ids = explicit_ids
+            used_ids.update(spec_ids)
+        else:
+            spec_ids = [planned_spec_id_for_tbd(section, used_ids)]
+
+        for spec_id in spec_ids:
+            if spec_id not in planned:
+                layer = spec_layer_for_section(section)
+                title = section.title
+                planned[spec_id] = {
+                    "planned_spec_id": spec_id,
+                    "slug": f"{spec_id}-{slugify_spec_title(title)}",
+                    "title": title,
+                    "layer": layer,
+                    "source_hld_sections": [],
+                    "depends_on_specs": [],
+                    "blocks_specs": [],
+                    "api_contract_expectations": [],
+                    "coverage_expectations": [],
+                    "integration_expectations": [],
+                    "performance_expectations": [],
+                    "memory_expectations": [],
+                    "beskeptic_cycles": [],
+                    "decision": "FIX",
+                    "recommendation": "KEEP_SPEC",
+                    "user_decision_needed": "",
+                }
+
+            item = planned[spec_id]
+            source_sections = item["source_hld_sections"]
+            assert isinstance(source_sections, list)
+            source_sections.append(section.id)
+
+            key_aspects = section_key_aspect_hints(section)
+            findings: list[str] = []
+            unknowns: list[str] = []
+            decision = "FIX"
+            recommendation = "KEEP_SPEC"
+
+            if section_has_mixed_responsibilities(section):
+                decision = "DECOMPOSE"
+                recommendation = "SPLIT_SPEC"
+                findings.append("Section appears to mix three or more responsibility groups; spec boundary needs review.")
+
+            if section.refs_by_kind("CONFLICTS_WITH"):
+                decision = "CONFLICT"
+                recommendation = "DEFER_SPEC"
+                unknowns.append("HLD section has CONFLICTS_WITH references that require user/architecture decision.")
+
+            if section.metadata_value("HLD-SPECS").upper() == "TBD":
+                findings.append("HLD-SPECS is TBD; planned spec is proposed and must be reviewed before target-spec execution.")
+
+            cycle = build_cycle_record(
+                step="spec_build_plan",
+                key_aspects=key_aspects,
+                spotlight=f"Should {section.id} feed planned spec {spec_id}, and is the boundary safe?",
+                decision=decision,
+                recommendation=recommendation,
+                evidence_levels=["OBSERVED", "INFERRED_RISK"] if findings or unknowns else ["OBSERVED"],
+                unknowns=unknowns,
+                findings=findings,
+                verification="Review spec_build_plan.md before creating target specs.",
+            )
+            cycles = item["beskeptic_cycles"]
+            assert isinstance(cycles, list)
+            cycles.append(cycle)
+
+            if decision == "CONFLICT":
+                conflicts.append(
+                    {
+                        "issue": f"{section.id} has unresolved conflict references",
+                        "key_aspect": "user_decision",
+                        "source_hld_sections": [section.id],
+                        "evidence_checked": [parsed_map.source_path],
+                        "decision_needed": "Resolve CONFLICTS_WITH references before target-spec execution.",
+                    }
+                )
+            if item["decision"] != "CONFLICT":
+                item["decision"] = decision if decision in {"DECOMPOSE", "CONFLICT"} else item["decision"]
+            if recommendation != "KEEP_SPEC":
+                item["recommendation"] = recommendation
+
+    section_to_specs: dict[str, list[str]] = {}
+    for spec_id, item in planned.items():
+        for section_id in item["source_hld_sections"]:
+            section_to_specs.setdefault(str(section_id), []).append(spec_id)
+
+    for spec_id, item in planned.items():
+        depends: set[str] = set()
+        for section_id in item["source_hld_sections"]:
+            section = sections_by_id.get(str(section_id))
+            if not section:
+                continue
+            for ref_target in section.required_refs() + section.normal_refs():
+                for dep_spec in section_to_specs.get(ref_target, []):
+                    if dep_spec != spec_id:
+                        depends.add(dep_spec)
+        item["depends_on_specs"] = sorted(depends)
+
+    for spec_id, item in planned.items():
+        for dep in item["depends_on_specs"]:
+            if dep in planned:
+                blocks = planned[dep]["blocks_specs"]
+                assert isinstance(blocks, list)
+                if spec_id not in blocks:
+                    blocks.append(spec_id)
+
+    for item in planned.values():
+        source_ids = [str(s) for s in item["source_hld_sections"]]
+        item["coverage_expectations"] = [
+            f"{source_id} HLD anchors and related refs are represented in this spec."
+            for source_id in source_ids
+        ]
+        cycles = item["beskeptic_cycles"]
+        assert isinstance(cycles, list)
+        if any("api_contract" in cycle["key_aspects"] for cycle in cycles):
+            item["api_contract_expectations"] = [
+                "Explicit producer/consumer API or interface contract is defined or referenced."
+            ]
+        if any("integration" in cycle["key_aspects"] for cycle in cycles):
+            item["integration_expectations"] = [
+                "Cross-spec dependencies, feature graph edges, and integration assumptions are explicit."
+            ]
+        if any("performance" in cycle["key_aspects"] for cycle in cycles):
+            item["performance_expectations"] = [
+                "Performance or scalability assumptions are explicit, or marked not applicable with reason."
+            ]
+        if any("memory" in cycle["key_aspects"] or "bounded_context" in cycle["key_aspects"] for cycle in cycles):
+            item["memory_expectations"] = [
+                "Memory/context-size assumptions are explicit, or marked not applicable with reason."
+            ]
+
+    planned_specs = sorted(
+        planned.values(),
+        key=lambda item: (
+            SPEC_LAYER_ORDER.get(str(item["layer"]), 99),
+            str(item["planned_spec_id"]),
+        ),
+    )
+    recommended_order = [str(item["planned_spec_id"]) for item in planned_specs]
+
+    plan: dict[str, object] = {
+        "schema_version": 1,
+        "source_hld": parsed_map.source_path,
+        "constitution_action": constitution_action,
+        "required_constitution_rules": [
+            "HLD.md is the design source of truth.",
+            "HLD Sections are design source units, not specs.",
+            "Specs are capability units.",
+            "Specs are built bottom-up.",
+            "Coverage Gate and Integration Gate are required before downstream work.",
+            "API contracts are first-class when specs interact.",
+        ],
+        "planned_specs": planned_specs,
+        "recommended_order": recommended_order,
+        "conflicts": conflicts,
+        "deferred": [
+            {
+                "issue": "target-spec, coverage-check, and integration-check execution are not implemented yet",
+                "decision": "DECOMPOSE",
+            }
+        ],
+    }
+
+    md_lines = [
+        "# Spec Build Plan",
+        "",
+        f"Source HLD: `{parsed_map.source_path}`",
+        f"Constitution action: `{constitution_action}`",
+        "",
+        "## Status",
+        "",
+        "Read-only plan. No agent call. No spec writes.",
+        "",
+        "## Recommended order",
+        "",
+    ]
+    for spec_id in recommended_order:
+        item = next(spec for spec in planned_specs if str(spec["planned_spec_id"]) == spec_id)
+        md_lines.append(f"- `{spec_id}` {item['title']} ({item['layer']})")
+
+    md_lines.extend(["", "## Planned specs", ""])
+    for item in planned_specs:
+        md_lines.extend(
+            [
+                f"### {item['planned_spec_id']} - {item['title']}",
+                "",
+                f"- Slug: `{item['slug']}`",
+                f"- Layer: `{item['layer']}`",
+                f"- Source HLD Sections: {', '.join(item['source_hld_sections'])}",
+                f"- Depends on specs: {', '.join(item['depends_on_specs']) or 'none'}",
+                f"- Blocks specs: {', '.join(item['blocks_specs']) or 'none'}",
+                f"- Skeptic decision: `{item['decision']}`",
+                f"- Spec recommendation: `{item['recommendation']}`",
+            ]
+        )
+        if item["user_decision_needed"]:
+            md_lines.append(f"- User decision needed: {item['user_decision_needed']}")
+        md_lines.extend(["", "Coverage expectations:"])
+        for expectation in item["coverage_expectations"]:
+            md_lines.append(f"- {expectation}")
+        if item["api_contract_expectations"]:
+            md_lines.extend(["", "API contract expectations:"])
+            for expectation in item["api_contract_expectations"]:
+                md_lines.append(f"- {expectation}")
+        if item["integration_expectations"]:
+            md_lines.extend(["", "Integration expectations:"])
+            for expectation in item["integration_expectations"]:
+                md_lines.append(f"- {expectation}")
+        if item["performance_expectations"]:
+            md_lines.extend(["", "Performance expectations:"])
+            for expectation in item["performance_expectations"]:
+                md_lines.append(f"- {expectation}")
+        if item["memory_expectations"]:
+            md_lines.extend(["", "Memory expectations:"])
+            for expectation in item["memory_expectations"]:
+                md_lines.append(f"- {expectation}")
+
+        md_lines.extend(["", "Beskeptic cycles:"])
+        for cycle in item["beskeptic_cycles"]:
+            md_lines.append(
+                f"- {cycle['decision']} / {cycle['recommendation']}: {cycle['spotlight']} "
+                f"[aspects: {', '.join(cycle['key_aspects'])}]"
+            )
+        md_lines.append("")
+
+    if conflicts:
+        md_lines.extend(["## Conflicts", ""])
+        for conflict in conflicts:
+            md_lines.append(f"- {conflict['issue']}: {conflict['decision_needed']}")
+        md_lines.append("")
+
+    md_lines.extend(
+        [
+            "## Next safe steps",
+            "",
+            "1. Review this plan manually.",
+            "2. Resolve any `CONFLICT` items.",
+            "3. Do not run target-spec until `--target-spec` exists and is tested.",
+            "4. Use this plan to implement the next read-only or prompt-only step.",
+            "",
+        ]
+    )
+
+    return plan, "\n".join(md_lines)
+
 def load_current_state(workspace: Path, mode: str, max_existing_spec_chars: int, max_existing_specs: int) -> dict[str, str]:
     if mode == "greenfield":
         return {
@@ -1722,6 +2147,7 @@ def main() -> int:
     ap.add_argument("--no-apply-write-blocks", action="store_true")
     ap.add_argument("--hld-map-only", action="store_true", help="Parse/validate HLD map artifacts and exit without agent.")
     ap.add_argument("--hld-format-report", action="store_true", help="Write a read-only report to help convert a raw/huge HLD into HLDspec format and exit without agent.")
+    ap.add_argument("--plan-specs", action="store_true", help="Write a read-only bottom-up Spec Build Plan and exit without agent.")
     ap.add_argument("--use-hld-map", action="store_true", help="Use HLD section map for bounded context selection.")
     ap.add_argument("--target-hld", default=None, help="Target one HLD section such as HLD-003 for map-aware runs.")
     ap.add_argument("--resume", action="store_true", help="Resume a map-aware target run when section hashes still match.")
@@ -1736,6 +2162,9 @@ def main() -> int:
 
     if args.model is None:
         args.model = DEFAULT_AGENT_MODELS.get(args.agent)
+
+    if args.plan_specs:
+        args.use_hld_map = True
 
     workspace = Path(args.workspace).resolve()
     hld_path = Path(args.hld)
@@ -1796,6 +2225,33 @@ def main() -> int:
                 if key != "sections":
                     print(f"- {key}: {value}")
             print(f"- sections: {len(map_outputs['sections'])}")
+            return 0
+        if args.plan_specs:
+            plan_json, plan_md = build_spec_build_plan(parsed_hld_map, workspace)
+            plan_json_path = workspace / SYNC_REL / "spec_build_plan.json"
+            plan_md_path = workspace / SYNC_REL / "spec_build_plan.md"
+            write_text(plan_json_path, json.dumps(plan_json, indent=2, sort_keys=True))
+            write_text(plan_md_path, plan_md)
+            write_text(
+                logs_dir / "run_summary.json",
+                json.dumps(
+                    {
+                        "mode": "plan-specs",
+                        "hld": str(hld_path),
+                        "outputs": {
+                            "spec_build_plan_json": str(plan_json_path.relative_to(workspace)),
+                            "spec_build_plan_md": str(plan_md_path.relative_to(workspace)),
+                        },
+                        "planned_specs": len(plan_json.get("planned_specs", [])),
+                        "conflicts": len(plan_json.get("conflicts", [])),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+            )
+            print("Spec Build Plan generated:")
+            print(f"- plan: {plan_md_path}")
+            print(f"- json: {plan_json_path}")
             return 0
         if args.restart_map_run:
             write_run_state(workspace, {"sections": {}})

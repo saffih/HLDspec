@@ -199,6 +199,65 @@ Some data text.
         self.assertIn("HLD-001", markdown)
         self.assertIn("Do not", markdown)
 
+    def test_plan_specs_is_read_only_and_orders_bottom_up(self) -> None:
+        hld = """# Plan HLD
+
+## HLD-001 - Governance
+
+HLD-ID: HLD-001
+HLD-ROLE: governance
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+HLD-VERIFY: target constitution captures source-of-truth rules
+
+Defines source of truth and ownership.
+
+## HLD-002 - API Contract
+
+HLD-ID: HLD-002
+HLD-ROLE: api
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: 002
+HLD-RESOURCES: TBD
+HLD-VERIFY: API producer and consumer contract is explicit
+
+This section DEPENDS REF HLD-001.
+Defines API producer and consumer contract.
+
+## HLD-003 - Processing
+
+HLD-ID: HLD-003
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: MEDIUM
+HLD-SPECS: 002
+HLD-RESOURCES: TBD
+
+This section REF HLD-002.
+Defines processing flow.
+"""
+        parsed = hld_map.parse_hld_text(hld, source_path="HLD.md")
+        self.assertEqual([], parsed.validation_errors)
+
+        with tempfile.TemporaryDirectory() as td:
+            plan, markdown = hld_spec_sync.build_spec_build_plan(parsed, Path(td))
+
+        self.assertEqual("create", plan["constitution_action"])
+        self.assertIn("planned_specs", plan)
+        planned_specs = plan["planned_specs"]
+        self.assertIsInstance(planned_specs, list)
+        by_id = {item["planned_spec_id"]: item for item in planned_specs}
+        self.assertIn("001", by_id)
+        self.assertIn("002", by_id)
+        self.assertEqual(["HLD-002", "HLD-003"], by_id["002"]["source_hld_sections"])
+        self.assertIn("001", by_id["002"]["depends_on_specs"])
+        self.assertLess(plan["recommended_order"].index("001"), plan["recommended_order"].index("002"))
+        self.assertIn("Beskeptic cycles", markdown)
+        self.assertIn("API contract expectations", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()
