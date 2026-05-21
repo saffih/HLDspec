@@ -101,6 +101,7 @@ report_spec_gate() {
   echo "- review: $review"
   echo "- plan: $plan"
   echo "- decision queue: $FIRSTRUN/.specify/sync/spec_build_plan_decision_queue.md"
+  echo "- target work order: $FIRSTRUN/.specify/sync/target_spec_work_order.md"
   echo
 
   "${PYTHON_RUN[@]}" - "$review" "$plan" <<'PY'
@@ -137,7 +138,7 @@ print(f"Continue to target-spec generation: {continue_true and not continue_fals
 if continue_true and decision == "FIX" and recommendation == "KEEP_PLAN" and not conflicts and not bad:
     print()
     print("Next safe checkpoint: target-spec generation is allowed.")
-    print("Write target specs only under the first-run workspace unless separately approved.")
+    print("Write target specs only under the first-run workspace, and follow target_spec_work_order.md bottom-up unless separately approved.")
     sys.exit(0)
 
 print()

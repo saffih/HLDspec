@@ -101,3 +101,12 @@ If target-spec generation is blocked, review:
 
 The judge/orchestrator may explain its recommendation, but the human must answer the decision queue before any target-spec generation or HLD-SPECS remapping.
 
+## Target Spec Work Order
+
+If target-spec generation is allowed, review:
+
+```text
+.specify/sync/target_spec_work_order.md
+```
+
+Follow the bottom-up order in that artifact. Do not jump to a nearby feature cluster unless the human explicitly changes the order.

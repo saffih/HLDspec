@@ -1532,6 +1532,23 @@ Do not run this as the first downstream step on a large/raw HLD:
 ./hld_spec_downstream.py --hld HLD.md --phase analyze
 ```
 
+## Target Spec Work Order
+
+When target-spec generation is allowed, the judge/orchestrator must not choose an arbitrary feature cluster.
+
+HLDspec must generate:
+
+```text
+.specify/sync/target_spec_work_order.json
+.specify/sync/target_spec_work_order.md
+```
+
+The work order is bottom-up: dependencies before dependents, using `depends_on_specs` from `spec_build_plan.json`.
+
+The judge/orchestrator must follow this order unless the human explicitly changes it.
+
+Before writing specs, show the proposed file list from the work order and get human approval.
+
 ## Spec Build Plan decision queue
 
 When `spec_build_plan_review.md` blocks target-spec generation, the judge/orchestrator must not decide the fix from its own read.
