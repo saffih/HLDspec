@@ -548,18 +548,58 @@ If a planned spec needs sections that are missing, the target-spec run must stop
 
 ## Standard workflow
 
-HLDspec currently has two workflow levels:
+HLDspec currently has three workflow levels:
 
-1. **Current supported workflow**: uses `--target-hld` to process one bounded HLD section at a time.
-2. **Intended bottom-up workflow**: will use `--plan-specs`, `--target-spec`, Coverage Gate, and Integration Gate once those commands are implemented.
+1. **Current primary read-only workflow**: uses `scripts/first_run_readonly.sh` to run HLD format report, HLD map, Spec Build Plan, Plan Quality Gate, and Spec Build Plan Review.
+2. **Current controlled legacy workflow**: uses `--target-hld` to process one bounded HLD section at a time. Use only when explicitly needed and after reviewing the plan/gate output.
+3. **Intended bottom-up generation workflow**: will use `--target-spec`, Coverage Gate, and Integration Gate after the Spec Build Plan is clean or explicitly accepted.
 
-Do not confuse the two.
+Do not confuse the three.
 
-The current supported workflow is safe for controlled use, but it is still section-driven. The intended workflow is capability/spec-driven.
+The current primary workflow is read-only and safe for first real HLD runs. The controlled legacy workflow is still section-driven. The intended generation workflow is capability/spec-driven.
 
-### Current supported workflow
+### Current primary read-only workflow
 
-Use this today when the repo does not yet implement `--plan-specs`.
+Use this for the first real run on a project HLD:
+
+```bash
+bash scripts/first_run_readonly.sh /path/to/HLD.md
+```
+
+This produces:
+
+```text
+logs/hld_spec_sync/<timestamp>/hld_format_report.md
+.specify/sync/hld_index.md
+.specify/sync/spec_build_plan.md
+.specify/sync/spec_build_plan_review.md
+.specify/sync/spec_build_plan.json
+```
+
+It must not call an agent, create specs, or create the target Spec Kit Constitution.
+
+Review `spec_build_plan_review.md` before any generation or downstream step.
+
+Run Beskeptic Cycles on these Key Aspects:
+
+- `hld_structure`
+- `hld_metadata`
+- `spec_boundary`
+- `spec_decomposition`
+- `bottom_up_order`
+- `api_contract`
+- `coverage`
+- `integration`
+- `performance`
+- `memory`
+- `user_decision`
+
+### Current controlled legacy target-HLD workflow
+
+Use this only when explicitly needed for bounded legacy sync or controlled comparison.
+
+Do not use it as the default first run now that `--plan-specs` and the first-run workflow exist.
+
 
 #### 1. Validate HLD structure
 
@@ -680,9 +720,9 @@ logs/hld_spec_downstream/<timestamp>/run_summary.json
 
 Do not proceed downstream if source specs are missing coverage, have unresolved integration gaps, or lack required API/interface contracts.
 
-### Intended bottom-up workflow
+### Intended bottom-up generation workflow
 
-This is the target architecture. Use it once `--plan-specs`, `--target-spec`, `--coverage-check`, and `--integration-check` exist.
+This is the target architecture after the read-only plan is reviewed. `--plan-specs` exists now. `--target-spec`, `--coverage-check`, and `--integration-check` are not yet implemented and must not be treated as available.
 
 #### 1. Generate a Format Report when the HLD is raw or huge
 
@@ -703,10 +743,16 @@ logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
 ./hld_spec_sync.py --hld HLD.md --hld-map-only
 ```
 
-#### 3. Create the Spec Build Plan
+#### 3. Create or refresh the Spec Build Plan
 
 ```bash
 ./hld_spec_sync.py --hld HLD.md --use-hld-map --plan-specs
+```
+
+For first real runs, prefer the wrapper:
+
+```bash
+bash scripts/first_run_readonly.sh /path/to/HLD.md
 ```
 
 Expected outputs:
@@ -744,6 +790,9 @@ Run Beskeptic Cycles on these Key Aspects:
 - `performance`
 - `memory`
 - `user_decision`
+
+
+Review `spec_build_plan_review.md` before continuing. If the review says `DECOMPOSE`, `CONFLICT`, `SPLIT_PLANNED_SPEC`, or `RESOLVE_CONFLICT`, stop and fix the HLD/spec mapping or ask the user for a decision.
 
 #### 4. Review one Target Spec prompt
 
