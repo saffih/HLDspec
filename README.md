@@ -9,6 +9,29 @@ chmod +x hld_spec_sync.py
 chmod +x hld_spec_downstream.py
 ```
 
+## Operating rules, terminology, and target constitution
+
+HLDspec operating rules live in [AGENTS.md](AGENTS.md).
+
+Canonical names are defined in [TERMINOLOGY.md](TERMINOLOGY.md).
+
+Important distinction:
+
+- HLDspec repo operating rules are not `.specify/memory/constitution.md`.
+- `.specify/memory/constitution.md` is the target Spec Kit Constitution inside the workspace being processed.
+- `hld_spec_sync.py` should create, update, leave unchanged, or report conflict for the target Spec Kit Constitution during sync.
+
+Key rules:
+
+- HLDspec uses the real Skeptic Framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`.
+- A Beskeptic Cycle is HLDspec's operational use of the real Skeptic flow on selected Key Aspects.
+- HLD Sections are design source units, not specs.
+- Specs are capability units.
+- Specs must be planned bottom-up with a Spec Build Plan before multi-spec work.
+- Coverage Gates and Integration Gates are required before downstream work.
+- API contracts, performance, memory, dependencies, data/state ownership, and reliability are first-class Key Aspects when relevant.
+
+
 ## HLD input format
 
 For large HLDs, prefer one canonical `HLD.md` with stable, grepable section metadata instead of many manually maintained HLD source files.

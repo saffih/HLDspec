@@ -227,6 +227,262 @@ The HLD is ready for HLDspec processing when:
 - one `--prompt-only --target-hld` run shows bounded context instead of the full huge HLD.
 
 
+## HLDspec operating rules vs target Spec Kit Constitution
+
+Do not create `.specify/memory/constitution.md` inside this HLDspec repo as the repo's own constitution.
+
+Use these sources instead:
+
+1. `AGENTS.md` = operational rules for agents working in this repo.
+2. `TERMINOLOGY.md` = canonical names.
+3. `HLD_FORMAT.md` = HLD input contract.
+4. `HLD_GENERATION.md` = HLD authoring guidance.
+5. `README.md` = user-facing usage.
+
+The path `.specify/memory/constitution.md` means the **target Spec Kit Constitution** in the workspace being processed by HLDspec.
+
+`hld_spec_sync.py` must handle the target Spec Kit Constitution as an output artifact:
+
+- if the target constitution exists, read it and update it safely when the HLD requires changes
+- if the target constitution does not exist, create it from the HLD and Spec Build Plan
+- if the HLD and current constitution conflict, report a conflict instead of guessing
+- never assume the target constitution already exists
+- never treat HLDspec repo operating rules as the target workspace constitution
+
+Future `--plan-specs` output should include a constitution action:
+
+```json
+{
+  "constitution_action": "create|update|no_change|conflict",
+  "required_constitution_rules": [],
+  "conflicts": []
+}
+```
+
+## Beskeptic Cycles and Key Aspects
+
+Use the real Skeptic Framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`.
+
+A **Beskeptic Cycle** is HLDspec's operational use of the real Skeptic flow on one workflow step and selected Key Aspects.
+
+Do not invent a replacement framework.
+
+Real Skeptic flow:
+
+```text
+GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN
+```
+
+Top-level Skeptic decisions:
+
+- `FIX`
+- `DECOMPOSE`
+- `CONFLICT`
+
+Final outcomes:
+
+- `HANDLED`
+- `CONFLICT`
+
+Read-only Razor diagnostics may use:
+
+- `PASS`
+- `ACTION`
+- `CONFLICT`
+
+Spec-specific labels are recommendations under a Skeptic decision, not replacements for Skeptic decisions:
+
+- `KEEP_SPEC`
+- `FIX_SPEC`
+- `SPLIT_SPEC`
+- `MERGE_SPEC`
+- `DEFER_SPEC`
+
+### Key Aspects
+
+A **Key Aspect** is the specific concern a Beskeptic Cycle is aimed at.
+
+Core:
+
+- `scope_done`
+- `source_of_truth`
+- `ownership`
+- `testability`
+- `user_decision`
+
+HLD:
+
+- `hld_structure`
+- `hld_metadata`
+- `hld_refs`
+- `bounded_context`
+- `resume_invalidation`
+
+Spec:
+
+- `spec_boundary`
+- `spec_decomposition`
+- `bottom_up_order`
+- `coverage`
+- `feature_graph`
+
+Integration and API:
+
+- `integration`
+- `api_contract`
+- `producer_consumer`
+- `dependency_order`
+- `data_state_ownership`
+
+Runtime and resource:
+
+- `performance`
+- `memory`
+- `latency`
+- `scalability`
+- `reliability`
+- `failure_recovery`
+
+Execution safety:
+
+- `staged_write_safety`
+- `reversibility`
+- `blast_radius`
+- `verification_path`
+
+### Required Key Aspects by workflow step
+
+Format Report:
+
+- `hld_structure`
+- `source_of_truth`
+- `scope_done`
+- `user_decision`
+
+HLD Map Validation:
+
+- `hld_metadata`
+- `hld_refs`
+- `source_of_truth`
+- `testability`
+
+Spec Build Plan:
+
+- `spec_boundary`
+- `spec_decomposition`
+- `bottom_up_order`
+- `source_of_truth`
+- `dependency_order`
+- `api_contract`
+- `integration`
+- `coverage`
+- `performance`
+- `memory`
+- `user_decision`
+
+Target Spec Prompt:
+
+- `bounded_context`
+- `source_of_truth`
+- `hld_refs`
+- `dependency_order`
+- `coverage`
+- `integration`
+- `api_contract`
+- `performance`
+- `memory`
+
+Target Spec Generation:
+
+- `spec_boundary`
+- `coverage`
+- `integration`
+- `api_contract`
+- `staged_write_safety`
+- `testability`
+- `performance`
+- `memory`
+
+Coverage Gate:
+
+- `coverage`
+- `hld_refs`
+- `feature_graph`
+- `source_of_truth`
+
+Integration Gate:
+
+- `integration`
+- `api_contract`
+- `producer_consumer`
+- `dependency_order`
+- `data_state_ownership`
+- `feature_graph`
+- `performance`
+- `memory`
+- `reliability`
+- `failure_recovery`
+- `user_decision`
+
+Downstream Planning and Tasks:
+
+- `coverage`
+- `integration`
+- `api_contract`
+- `bottom_up_order`
+- `testability`
+- `dependency_order`
+
+Implementation:
+
+- `scope_done`
+- `reversibility`
+- `testability`
+- `integration`
+- `staged_write_safety`
+- `performance`
+- `memory`
+- `reliability`
+- `blast_radius`
+- `user_decision`
+
+Resume:
+
+- `resume_invalidation`
+- `bounded_context`
+- `hld_refs`
+- `source_of_truth`
+
+### User Escalation format
+
+If evidence cannot resolve a conflict, ask the user with:
+
+```text
+Conflict:
+<short issue>
+
+Key Aspect:
+<canonical key aspect>
+
+Why it matters:
+<what becomes unsafe or incorrect>
+
+Option A:
+<thesis and tradeoff>
+
+Option B:
+<antithesis and tradeoff>
+
+Evidence checked:
+<files/artifacts checked>
+
+Decision needed:
+<specific question for the user>
+```
+
+Do not guess unresolved source-of-truth, ownership, API/interface, dependency, performance/memory, coverage, or integration decisions.
+
+
 ## Standard workflow
 
 ### 1. Validate HLD structure
