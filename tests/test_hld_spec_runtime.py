@@ -309,6 +309,61 @@ Defines processing flow.
             summary = json.loads(summaries[0].read_text(encoding="utf-8"))
             self.assertEqual("plan-specs", summary["mode"])
 
+    def test_plan_specs_conflict_refs_do_not_crash_markdown(self) -> None:
+        hld = """# Conflict HLD
+
+## HLD-001 - Governance
+
+HLD-ID: HLD-001
+HLD-ROLE: governance
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: target constitution
+HLD-VERIFY: source-of-truth rules are captured
+
+The HLD is the source of truth.
+
+## HLD-002 - Producer Owned Sync
+
+HLD-ID: HLD-002
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: 002
+HLD-RESOURCES: sync ownership
+HLD-VERIFY: ownership conflict is resolved before generation
+
+This section CONFLICTS_WITH REF HLD-003.
+
+The producer owns sync orchestration.
+
+## HLD-003 - Consumer Owned Sync
+
+HLD-ID: HLD-003
+HLD-ROLE: processing
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: 003
+HLD-RESOURCES: sync ownership
+HLD-VERIFY: ownership conflict is resolved before generation
+
+This section CONFLICTS_WITH REF HLD-002.
+
+The consumer owns sync orchestration.
+"""
+        parsed = hld_map.parse_hld_text(hld, source_path="HLD.md")
+        self.assertEqual([], parsed.validation_errors)
+
+        with tempfile.TemporaryDirectory() as td:
+            plan, markdown = hld_spec_sync.build_spec_build_plan(parsed, Path(td))
+
+        self.assertIn("plan_quality", plan)
+        self.assertEqual("CONFLICT", plan["plan_quality"]["decision"])
+        self.assertIn("Conflicts", markdown)
+        self.assertIn("HLD-002", markdown)
+        self.assertIn("HLD-003", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()

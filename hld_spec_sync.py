@@ -1317,10 +1317,10 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
             for finding in findings:
                 md_lines.append(f"- {finding}")
             md_lines.append("")
-        conflicts = plan_quality.get("conflicts", [])
-        if conflicts:
+        plan_quality_conflicts = plan_quality.get("conflicts", [])
+        if plan_quality_conflicts:
             md_lines.extend(["Conflicts:", ""])
-            for conflict in conflicts:
+            for conflict in plan_quality_conflicts:
                 md_lines.append(f"- {conflict}")
             md_lines.append("")
     for spec_id in recommended_order:
