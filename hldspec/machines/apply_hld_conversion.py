@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
-from hldspec.command_runner import CommandRunner
+from hldspec.command_runner import CommandResult, CommandRunner
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -25,12 +27,17 @@ class ApplyHldConversionMachine:
 
     def run(self, context: MachineContext) -> MachineResult:
         if not context.repo_root or not context.workspace:
-            return error_result(machine=self.name, state="MISSING_CONTEXT", message="repo_root and workspace are required")
+            return error_result(
+                machine=self.name,
+                state="MISSING_CONTEXT",
+                message="repo_root and workspace are required",
+            )
 
         repo_root = Path(context.repo_root)
         workspace = Path(context.workspace)
+        sync = workspace / ".specify" / "sync"
         working_hld = workspace / "HLD.md"
-        queue_json = workspace / ".specify" / "sync" / "hld_conversion_decision_queue.json"
+        queue_json = sync / "hld_conversion_decision_queue.json"
         apply_script = repo_root / "scripts" / "apply_hld_conversion_decisions.py"
 
         if not working_hld.exists():
@@ -71,21 +78,54 @@ class ApplyHldConversionMachine:
             )
 
         if not apply_script.exists():
-            return error_result(machine=self.name, state="APPLY_SCRIPT_MISSING", message=f"missing: {apply_script}")
+            return error_result(
+                machine=self.name,
+                state="APPLY_SCRIPT_MISSING",
+                message=f"missing: {apply_script}",
+            )
 
         before_source_hash = self._source_hash(context.source_hld)
-        result = self.runner.run([sys.executable, str(apply_script), str(working_hld), str(queue_json)], cwd=repo_root, capture=True)
+        result = self.runner.run(
+            [sys.executable, str(apply_script), str(working_hld), str(queue_json)],
+            cwd=repo_root,
+            capture=True,
+        )
+        debug_artifacts = self._write_command_debug(sync, result)
+
+        if result.returncode == 2:
+            message = self._combined_output(result) or "apply_hld_conversion_decisions.py refused conversion with rc=2"
+            return blocked_result(
+                machine=self.name,
+                state="APPLY_REFUSED",
+                kind=CheckpointKind.HLD_CONVERSION_DECISIONS,
+                blocking_reason=message,
+                controlling_artifacts=(
+                    ArtifactRef(path=str(queue_json), role="decision_queue"),
+                    *debug_artifacts,
+                ),
+                forbidden_actions=(
+                    "Do not modify the source HLD.",
+                    "Do not invoke SpecKit.",
+                    "Fix the decision queue and rerun HLDspec.",
+                ),
+                errors=(message,),
+            )
 
         if result.returncode != 0:
+            message = self._combined_output(result) or f"apply_hld_conversion_decisions.py failed with rc={result.returncode}"
             return error_result(
                 machine=self.name,
                 state="APPLY_FAILED",
-                message=f"apply_hld_conversion_decisions.py failed with rc={result.returncode}: {result.stderr[-1000:]}",
+                message=message,
             )
 
         after_source_hash = self._source_hash(context.source_hld)
         if before_source_hash is not None and after_source_hash is not None and before_source_hash != after_source_hash:
-            return error_result(machine=self.name, state="SOURCE_HLD_MUTATED", message="source HLD changed during conversion apply")
+            return error_result(
+                machine=self.name,
+                state="SOURCE_HLD_MUTATED",
+                message="source HLD changed during conversion apply",
+            )
 
         if not self._is_converted_hld(working_hld):
             return blocked_result(
@@ -93,7 +133,10 @@ class ApplyHldConversionMachine:
                 state="WORKING_HLD_NOT_CONVERTED",
                 kind=CheckpointKind.HLD_CONVERSION_DECISIONS,
                 blocking_reason="Apply command completed but the working HLD still does not contain HLD section markers.",
-                controlling_artifacts=(ArtifactRef(path=str(working_hld), role="working_hld"),),
+                controlling_artifacts=(
+                    ArtifactRef(path=str(working_hld), role="working_hld"),
+                    *debug_artifacts,
+                ),
                 forbidden_actions=("Do not invoke SpecKit.",),
             )
 
@@ -101,7 +144,10 @@ class ApplyHldConversionMachine:
             machine=self.name,
             state="WORKING_HLD_CONVERTED",
             actions_run=("apply_hld_conversion_decisions.py",),
-            artifacts_written=(ArtifactRef(path=str(working_hld), role="working_hld"),),
+            artifacts_written=(
+                ArtifactRef(path=str(working_hld), role="working_hld"),
+                *debug_artifacts,
+            ),
         )
 
     @staticmethod
@@ -124,6 +170,51 @@ class ApplyHldConversionMachine:
         path = Path(source_hld)
         if not path.exists():
             return None
-        import hashlib
-
         return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    @staticmethod
+    def _combined_output(result: CommandResult) -> str:
+        parts = []
+        if result.stdout.strip():
+            parts.append("stdout:\n" + result.stdout.strip())
+        if result.stderr.strip():
+            parts.append("stderr:\n" + result.stderr.strip())
+        return "\n\n".join(parts).strip()
+
+    @staticmethod
+    def _write_command_debug(sync: Path, result: CommandResult) -> tuple[ArtifactRef, ...]:
+        sync.mkdir(parents=True, exist_ok=True)
+        json_path = sync / "apply_hld_conversion_command.json"
+        md_path = sync / "apply_hld_conversion_command.md"
+
+        payload: dict[str, Any] = {
+            "command": list(result.command),
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+        json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+        md_path.write_text(
+            "# Apply HLD Conversion Command\n\n"
+            "made by AI\n\n"
+            f"Return code: `{result.returncode}`\n\n"
+            "## Command\n\n"
+            "```text\n"
+            + " ".join(result.command)
+            + "\n```\n\n"
+            "## stdout\n\n"
+            "```text\n"
+            + (result.stdout or "")
+            + "\n```\n\n"
+            "## stderr\n\n"
+            "```text\n"
+            + (result.stderr or "")
+            + "\n```\n",
+            encoding="utf-8",
+        )
+
+        return (
+            ArtifactRef(path=str(json_path), role="apply_command_debug_json", required=False),
+            ArtifactRef(path=str(md_path), role="apply_command_debug_report", required=False),
+        )

@@ -488,3 +488,16 @@ Stop and ask for human decision when:
 - do not invoke SpecKit prematurely
 - do not spend paid agent credits on deterministic local commands
 ```
+
+## Apply-step debug requirement
+
+`ApplyHldConversionMachine` must preserve legacy apply-script stdout/stderr.
+
+Debug artifacts:
+
+```text
+workspace/.specify/sync/apply_hld_conversion_command.json
+workspace/.specify/sync/apply_hld_conversion_command.md
+```
+
+`KEEP_AS_ONE` decisions must include `approved_keep_reason`.
