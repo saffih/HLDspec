@@ -49,6 +49,8 @@ def main() -> int:
         "tests_v2/test_state_machine_contract.py",
         "tests_v2/test_machine_result_renderer.py",
         "tests_v2/test_raw_hld_conversion_machine.py",
+        "tests_v2/test_todo_v2_plan.py",
+        "docs/TODO_V2.md",
         "tests_v2/test_project_machine.py",
         "docs/HLDSPEC_PROJECT_MACHINE_V2.md",
         "scripts/hldspec_v2.py",
