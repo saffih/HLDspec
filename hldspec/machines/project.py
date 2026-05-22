@@ -1,68 +1,93 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+from hldspec.command_runner import CommandRunner
+from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
+from hldspec.machines.approval_gate import ApprovalGateMachine
 from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
-from hldspec.state_machine import (
-    MachineContext,
-    MachineResult,
-    MachineStatus,
-    continue_result,
-)
+from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
+from hldspec.machines.speckit_prework import SpeckitPreworkMachine
+from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
 
 
 class ProjectMachine:
-    """Top-level HLDspec V2 coordinator.
-
-    ProjectMachine owns orchestration between sub-machines.
-    It does not own detailed gate/checkpoint policy.
-
-    Current V2 slice:
-    - delegate raw/converted HLD state to RawHldConversionMachine
-    - preserve checkpoint/status semantics
-    - expose a top-level MachineResult contract for the CLI
-    """
-
     name = "ProjectMachine"
 
-    def __init__(self, raw_hld_conversion: RawHldConversionMachine | None = None) -> None:
-        self.raw_hld_conversion = raw_hld_conversion or RawHldConversionMachine()
+    def __init__(self, runner: CommandRunner | None = None) -> None:
+        self.runner = runner or CommandRunner()
+        self.raw = RawHldConversionMachine()
+        self.apply = ApplyHldConversionMachine(self.runner)
+        self.plan = SpecBuildPlanMachine()
+        self.prework = SpeckitPreworkMachine()
+        self.approval = ApprovalGateMachine()
 
     def run(self, context: MachineContext) -> MachineResult:
-        raw_result = self.raw_hld_conversion.run(context)
+        if not context.repo_root or not context.workspace or not context.source_hld:
+            return error_result(machine=self.name, state="MISSING_CONTEXT", message="repo_root, source_hld, and workspace are required")
 
-        if raw_result.status in {
-            MachineStatus.STOP_CHECKPOINT,
-            MachineStatus.BLOCKED,
-            MachineStatus.ERROR,
-        }:
-            return MachineResult(
-                machine=self.name,
-                state=raw_result.state,
-                status=raw_result.status,
-                checkpoint=raw_result.checkpoint,
-                actions_run=(f"{raw_result.machine}:{raw_result.status.value}", *raw_result.actions_run),
-                artifacts_written=raw_result.artifacts_written,
-                errors=raw_result.errors,
-            )
+        repo = Path(context.repo_root)
+        workspace = Path(context.workspace)
+        working_hld = workspace / "HLD.md"
+
+        if not working_hld.exists():
+            first = self._run_script(repo, "project_first_run.sh", context.source_hld, str(workspace))
+            if first.returncode not in {0, 2}:
+                return error_result(machine=self.name, state="FIRST_RUN_FAILED", message=f"project_first_run.sh failed rc={first.returncode}: {first.stderr[-1000:]}")
+
+        raw_result = self.raw.run(context)
+        if raw_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            return self._wrap(raw_result)
 
         if raw_result.status == MachineStatus.CONTINUE:
-            return continue_result(
-                machine=self.name,
-                state="RAW_HLD_CONVERSION_READY_TO_APPLY",
-                actions_run=(f"{raw_result.machine}:{raw_result.state}", *raw_result.actions_run),
-                artifacts_written=raw_result.artifacts_written,
-            )
+            apply_result = self.apply.run(context)
+            if apply_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+                return self._wrap(apply_result)
+        else:
+            apply_result = raw_result
 
-        if raw_result.status == MachineStatus.DONE:
-            return continue_result(
-                machine=self.name,
-                state="RAW_HLD_CONVERSION_COMPLETE",
-                actions_run=(f"{raw_result.machine}:{raw_result.state}", *raw_result.actions_run),
-                artifacts_written=raw_result.artifacts_written,
-            )
+        first_readonly = self._ensure_first_readonly(repo, context)
+        if first_readonly is not None:
+            return first_readonly
 
+        plan_result = self.plan.run(context)
+        if plan_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            return self._wrap(plan_result)
+
+        prework_result = self.prework.run(context)
+        if prework_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            return self._wrap(prework_result)
+
+        approval_result = self.approval.run(context)
+        return self._wrap(approval_result)
+
+    def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
+        workspace = Path(context.workspace or ".")
+        review = workspace / "firstrun" / ".specify" / "sync" / "spec_build_plan_review.md"
+        if review.exists():
+            return None
+
+        working_hld = workspace / "HLD.md"
+        firstrun = workspace / "firstrun"
+        result = self._run_script(repo, "first_run_readonly.sh", str(working_hld), str(firstrun), "--force")
+        if result.returncode not in {0, 2}:
+            return error_result(machine=self.name, state="FIRST_READONLY_FAILED", message=f"first_run_readonly.sh failed rc={result.returncode}: {result.stderr[-1000:]}")
+        return None
+
+    def _run_script(self, repo: Path, name: str, *args: str):
+        script = repo / "scripts" / name
+        if not script.exists():
+            return self.runner.run([sys.executable, "-c", f"import sys; print('missing {script}', file=sys.stderr); sys.exit(1)"], cwd=repo, capture=True)
+        return self.runner.run(["bash", str(script), *args], cwd=repo, capture=True)
+
+    def _wrap(self, result: MachineResult) -> MachineResult:
         return MachineResult(
             machine=self.name,
-            state="UNKNOWN",
-            status=MachineStatus.ERROR,
-            errors=(f"Unhandled sub-machine status: {raw_result.status.value}",),
+            state=result.state,
+            status=result.status,
+            checkpoint=result.checkpoint,
+            actions_run=(f"{result.machine}:{result.status.value}", *result.actions_run),
+            artifacts_written=result.artifacts_written,
+            errors=result.errors,
         )

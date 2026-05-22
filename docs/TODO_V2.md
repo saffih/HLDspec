@@ -32,6 +32,7 @@ ApplyHldConversionMachine
 SpecBuildPlanMachine
 SpeckitPreworkMachine
 ApprovalGateMachine
+HLDspec V2 Flow Test Runner
 ```
 
 ## Active test layout
@@ -449,6 +450,10 @@ Status: implemented in current V2 full slice.
 ### Leap 4: V2 runner migration
 
 Status: partially implemented through `scripts/hldspec_v2.py`; legacy wrappers remain reference/compatibility only.
+
+### Leap 5: Flow test readiness
+
+Status: implemented by `scripts/hldspec_v2_flow_test.py`.
 
 ## Remaining next leaps
 

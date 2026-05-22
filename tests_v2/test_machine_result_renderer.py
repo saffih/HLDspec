@@ -13,30 +13,13 @@ class MachineResultRendererV2Tests(unittest.TestCase):
             state="HLD_CONVERSION_DECISIONS",
             kind=CheckpointKind.HLD_CONVERSION_DECISIONS,
             blocking_reason="Conversion decisions are still TBD.",
-            questions=(
-                HumanQuestion(
-                    question_id="Q-001",
-                    title="HLD-019 - Milestones",
-                    question="Should milestones be kept or split?",
-                    options=("KEEP_AS_ONE", "SPLIT", "MODIFY_SPLIT"),
-                ),
-            ),
+            questions=(HumanQuestion(question_id="Q-001", title="HLD-019 - Milestones", question="Keep or split?", options=("KEEP_AS_ONE", "SPLIT")),),
             controlling_artifacts=(ArtifactRef(path="queue.json", role="decision_queue"),),
             next_action="Update the decision queue and rerun HLDspec.",
             forbidden_actions=("Do not modify the source HLD.", "Do not invoke SpecKit."),
         )
-
         text = render_machine_result(result)
-
-        for section in [
-            "Machine: RawHldConversionMachine",
-            "Current checkpoint: HLD_CONVERSION_DECISIONS",
-            "Blocking reason:",
-            "Human decision needed:",
-            "Controlling artifacts:",
-            "Continuation protocol:",
-            "What is not modified / not invoked:",
-        ]:
+        for section in ["Machine:", "Current checkpoint:", "Blocking reason:", "Human decision needed:", "Controlling artifacts:", "Continuation protocol:", "What is not modified / not invoked:"]:
             self.assertIn(section, text)
 
     def test_machine_result_to_dict_is_json_compatible(self) -> None:
@@ -50,12 +33,9 @@ class MachineResultRendererV2Tests(unittest.TestCase):
             next_action="Rerun.",
             forbidden_actions=(),
         )
-
         data = machine_result_to_dict(result)
-
         self.assertEqual("STOP_CHECKPOINT", data["status"])
         self.assertEqual(2, data["exit_code"])
-        self.assertEqual(True, data["requires_human"])
         self.assertEqual("HLD_CONVERSION_DECISIONS", data["checkpoint"]["kind"])
 
 

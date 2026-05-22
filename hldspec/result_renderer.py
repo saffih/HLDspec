@@ -2,12 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from hldspec.state_machine import (
-    ArtifactRef,
-    Checkpoint,
-    HumanQuestion,
-    MachineResult,
-)
+from hldspec.state_machine import ArtifactRef, Checkpoint, HumanQuestion, MachineResult
 
 
 DEFAULT_FORBIDDEN_ACTIONS = (

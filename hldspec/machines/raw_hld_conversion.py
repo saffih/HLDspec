@@ -24,11 +24,7 @@ class RawHldConversionMachine:
 
     def run(self, context: MachineContext) -> MachineResult:
         if not context.workspace:
-            return error_result(
-                machine=self.name,
-                state="NO_WORKSPACE",
-                message="workspace is required",
-            )
+            return error_result(machine=self.name, state="NO_WORKSPACE", message="workspace is required")
 
         workspace = Path(context.workspace)
         working_hld = workspace / "HLD.md"
@@ -39,15 +35,10 @@ class RawHldConversionMachine:
             return blocked_result(
                 machine=self.name,
                 state="NO_WORKING_HLD",
+                kind=CheckpointKind.HLD_CONVERSION_DECISIONS,
                 blocking_reason="Working HLD does not exist. Run the read-only first run before conversion.",
-                controlling_artifacts=(
-                    ArtifactRef(path=str(working_hld), role="working_hld", required=True),
-                ),
-                forbidden_actions=(
-                    "Do not modify the source HLD.",
-                    "Do not invoke SpecKit.",
-                    "Do not implement app code.",
-                ),
+                controlling_artifacts=(ArtifactRef(path=str(working_hld), role="working_hld", required=True),),
+                forbidden_actions=("Do not modify the source HLD.", "Do not invoke SpecKit.", "Do not implement app code."),
             )
 
         if self._is_converted_hld(working_hld):
@@ -55,19 +46,16 @@ class RawHldConversionMachine:
                 machine=self.name,
                 state="WORKING_HLD_CONVERTED",
                 actions_run=("detected converted working HLD",),
-                artifacts_written=(
-                    ArtifactRef(path=str(working_hld), role="working_hld", required=True),
-                ),
+                artifacts_written=(ArtifactRef(path=str(working_hld), role="working_hld", required=True),),
             )
 
         if not queue_json.exists():
             return blocked_result(
                 machine=self.name,
                 state="CONVERSION_QUEUE_MISSING",
+                kind=CheckpointKind.HLD_CONVERSION_DECISIONS,
                 blocking_reason="Working HLD is raw but the conversion decision queue is missing.",
-                controlling_artifacts=(
-                    ArtifactRef(path=str(queue_json), role="decision_queue", required=True),
-                ),
+                controlling_artifacts=(ArtifactRef(path=str(queue_json), role="decision_queue", required=True),),
                 forbidden_actions=(
                     "Do not convert mechanically without a decision queue.",
                     "Do not modify the source HLD.",
@@ -91,20 +79,14 @@ class RawHldConversionMachine:
                     ArtifactRef(path=str(queue_md), role="decision_queue_report", required=False),
                 ),
                 next_action="Judge/orchestrator updates the decision queue, then reruns HLDspec.",
-                forbidden_actions=(
-                    "Do not modify the source HLD.",
-                    "Do not invoke SpecKit.",
-                    "Do not implement app code.",
-                ),
+                forbidden_actions=("Do not modify the source HLD.", "Do not invoke SpecKit.", "Do not implement app code."),
             )
 
         return continue_result(
             machine=self.name,
             state="HLD_CONVERSION_DECISIONS_ANSWERED",
             actions_run=("all conversion decisions are answered",),
-            artifacts_written=(
-                ArtifactRef(path=str(queue_json), role="decision_queue_json", required=True),
-            ),
+            artifacts_written=(ArtifactRef(path=str(queue_json), role="decision_queue_json", required=True),),
         )
 
     @staticmethod

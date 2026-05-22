@@ -19,6 +19,7 @@ class CheckpointKind(str, Enum):
     SPECKIT_PREWORK_MISSING = "SPECKIT_PREWORK_MISSING"
     SPECKIT_PREWORK_REWORK = "SPECKIT_PREWORK_REWORK"
     SPECKIT_PREWORK_APPROVAL_GATE = "SPECKIT_PREWORK_APPROVAL_GATE"
+    SOURCE_UPDATE_APPROVAL = "SOURCE_UPDATE_APPROVAL"
 
 
 class ExitCode(int, Enum):
@@ -124,6 +125,7 @@ def human_checkpoint(
     next_action: str,
     forbidden_actions: tuple[str, ...],
     actions_run: tuple[str, ...] = (),
+    artifacts_written: tuple[ArtifactRef, ...] = (),
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
@@ -138,6 +140,7 @@ def human_checkpoint(
             forbidden_actions=forbidden_actions,
         ),
         actions_run=actions_run,
+        artifacts_written=artifacts_written,
     )
 
 
@@ -145,20 +148,23 @@ def blocked_result(
     *,
     machine: str,
     state: str,
+    kind: CheckpointKind,
     blocking_reason: str,
     controlling_artifacts: tuple[ArtifactRef, ...] = (),
     forbidden_actions: tuple[str, ...] = (),
+    errors: tuple[str, ...] = (),
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
         state=state,
         status=MachineStatus.BLOCKED,
         checkpoint=Checkpoint(
-            kind=CheckpointKind.SPEC_BUILD_PLAN_CHECKPOINT,
+            kind=kind,
             blocking_reason=blocking_reason,
             controlling_artifacts=controlling_artifacts,
             forbidden_actions=forbidden_actions,
         ),
+        errors=errors,
     )
 
 
