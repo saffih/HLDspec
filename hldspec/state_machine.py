@@ -55,11 +55,22 @@ class Checkpoint:
     next_action: str = ""
     forbidden_actions: tuple[str, ...] = ()
 
-    def has_open_questions(self) -> bool:
-        return any(
-            question.blocking and question.current_decision == "TBD"
+    def open_questions(self) -> tuple[HumanQuestion, ...]:
+        return tuple(
+            question
             for question in self.human_questions
+            if question.blocking and question.current_decision == "TBD"
         )
+
+    def answered_questions(self) -> tuple[HumanQuestion, ...]:
+        return tuple(
+            question
+            for question in self.human_questions
+            if question.current_decision != "TBD"
+        )
+
+    def has_open_questions(self) -> bool:
+        return bool(self.open_questions())
 
 
 @dataclass(frozen=True)
@@ -73,14 +84,14 @@ class MachineResult:
     errors: tuple[str, ...] = ()
 
     def exit_code(self) -> ExitCode:
-        if self.status == MachineStatus.DONE:
-            return ExitCode.OK
-        if self.status == MachineStatus.CONTINUE:
+        if self.status in {MachineStatus.DONE, MachineStatus.CONTINUE}:
             return ExitCode.OK
         if self.status == MachineStatus.STOP_CHECKPOINT:
             return ExitCode.HUMAN_CHECKPOINT_REQUIRED
         if self.status == MachineStatus.BLOCKED:
             return ExitCode.GATE_BLOCKED
+        if self.status == MachineStatus.ERROR:
+            return ExitCode.TOOL_ERROR
         return ExitCode.TOOL_ERROR
 
     def requires_human(self) -> bool:
@@ -99,7 +110,6 @@ class StateMachine(Protocol):
     name: str
 
     def run(self, context: MachineContext) -> MachineResult:
-        """Run one machine step and return a structured result."""
         ...
 
 
@@ -152,6 +162,22 @@ def blocked_result(
     )
 
 
+def continue_result(
+    *,
+    machine: str,
+    state: str,
+    actions_run: tuple[str, ...] = (),
+    artifacts_written: tuple[ArtifactRef, ...] = (),
+) -> MachineResult:
+    return MachineResult(
+        machine=machine,
+        state=state,
+        status=MachineStatus.CONTINUE,
+        actions_run=actions_run,
+        artifacts_written=artifacts_written,
+    )
+
+
 def done_result(
     *,
     machine: str,
@@ -165,4 +191,13 @@ def done_result(
         status=MachineStatus.DONE,
         actions_run=actions_run,
         artifacts_written=artifacts_written,
+    )
+
+
+def error_result(*, machine: str, state: str, message: str) -> MachineResult:
+    return MachineResult(
+        machine=machine,
+        state=state,
+        status=MachineStatus.ERROR,
+        errors=(message,),
     )

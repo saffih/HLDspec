@@ -227,3 +227,10 @@ residual_risk
 - Do not implement application code.
 - Do not rewrite every script in one unverified patch.
 ```
+
+## Active rewrite test layout
+
+```text
+tests_v2/ = active V2 contract and machine tests
+tests_legacy/ = preserved legacy tests, not active during V2 rewrite
+```

@@ -110,3 +110,10 @@ The V2 rewrite is not ready until:
 - Flow reaches a clear checkpoint
 - checkpoint output asks the real human question
 ```
+
+## Active rewrite test layout
+
+```text
+tests_v2/ = active V2 contract and machine tests
+tests_legacy/ = preserved legacy tests, not active during V2 rewrite
+```

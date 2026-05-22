@@ -1,1 +1,1 @@
-"""HLDspec core package."""
+"""HLDspec V2 core package."""
