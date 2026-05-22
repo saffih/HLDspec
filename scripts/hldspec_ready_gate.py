@@ -27,6 +27,7 @@ REQUIRED_FILES = [
     "AGENTS.md",
     "hld_spec_sync.py",
     "hldspec/state_machine.py",
+    "hldspec/result_renderer.py",
     "scripts/hldspec_run.sh",
     "scripts/project_continue.sh",
     "scripts/render_hldspec_checkpoint.py",
