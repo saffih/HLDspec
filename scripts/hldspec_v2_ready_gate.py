@@ -35,6 +35,14 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     required = [
+        "tests_v2/test_role_review_machine.py",
+        "tests_v2/test_agent_roles_doc.py",
+        "docs/HLDSPEC_V2_AGENT_ROLES.md",
+        "tests_v2/test_raw_hld_chunk_scan.py",
+        "docs/HLDSPEC_V2_ROLE_REVIEWS.md",
+        "hldspec/machines/role_review.py",
+        "hldspec/role_review_contract.py",
+        "hldspec/raw_hld.py",
         "docs/ARCHITECTURE_V2.md",
         "docs/TEST_STRATEGY_V2.md",
         "docs/TODO_V2.md",

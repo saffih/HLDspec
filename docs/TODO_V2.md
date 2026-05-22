@@ -545,3 +545,57 @@ product_handoff.md
 ```
 
 These are generated from existing sync artifacts and do not invoke SpecKit.
+
+## Role-review mode policy
+
+Default:
+
+```text
+HLDSPEC_ROLE_REVIEWS=on
+```
+
+Modes:
+
+```text
+on
+  require architecture/product/governance review artifacts.
+
+local
+  generate deterministic heuristic role reviews from raw HLD chunks and scan findings.
+
+off
+  tests only. Requires HLDSPEC_TEST_DISABLE_ROLE_REVIEWS=1.
+```
+
+Required artifacts:
+
+```text
+raw_hld_chunks.jsonl
+raw_hld_scan_findings.jsonl
+architecture_review.json/md
+product_review.json/md
+governance_review.json/md
+role_review_summary.json/md
+```
+
+## Agent and subagent role contract
+
+The authoritative role/instruction document is:
+
+```text
+docs/HLDSPEC_V2_AGENT_ROLES.md
+```
+
+Each agent/subagent must define:
+
+```text
+goal
+owned concerns
+allowed inputs
+instructions
+forbidden actions
+outputs
+introspection checklist
+```
+
+The introspection checklist must confirm that the instructions match the role goal and that evidence supports every finding.
