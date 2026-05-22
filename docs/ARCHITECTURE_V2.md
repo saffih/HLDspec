@@ -234,3 +234,10 @@ residual_risk
 tests_v2/ = active V2 contract and machine tests
 tests_legacy/ = preserved legacy tests, not active during V2 rewrite
 ```
+
+## Implemented V2 slices
+
+```text
+ProjectMachine -> RawHldConversionMachine
+scripts/hldspec_v2.py -> ProjectMachine CLI adapter
+```
