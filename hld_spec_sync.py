@@ -843,20 +843,10 @@ def section_key_aspect_hints(section: hld_map.HldSection) -> list[str]:
 
 
 def section_has_mixed_responsibilities(section: hld_map.HldSection) -> bool:
-    text = f"{section.title}\n{section.text}".lower()
-    groups = 0
-    signals = [
-        ("governance", ("source of truth", "ownership", "policy", "constitution")),
-        ("data", ("data", "state", "storage", "persistence", "schema")),
-        ("api", ("api", "interface", "contract", "endpoint", "producer", "consumer")),
-        ("processing", ("flow", "pipeline", "sync", "processing", "orchestration")),
-        ("operations", ("rollback", "recovery", "retry", "failure", "observability")),
-        ("testing", ("test", "verify", "validation", "acceptance")),
-    ]
-    for _, keywords in signals:
-        if any(keyword in text for keyword in keywords):
-            groups += 1
-    return groups >= 3
+    responsibilities = set(detect_section_responsibility_groups(section))
+    split_relevant = responsibilities - {"performance", "memory", "testing"}
+    return len(split_relevant) >= 3
+
 
 
 def spec_ids_from_section(section: hld_map.HldSection) -> list[str]:
@@ -989,7 +979,6 @@ def detect_section_responsibility_groups(section: hld_map.HldSection) -> list[st
         "api": "api_contract",
         "ui": "api_contract",
         "processing": "processing",
-        "architecture": "processing",
         "operations": "operations",
         "risk": "operations",
         "testing": "testing",
@@ -999,26 +988,93 @@ def detect_section_responsibility_groups(section: hld_map.HldSection) -> list[st
     if role in role_groups:
         groups.add(role_groups[role])
 
-    # Use title/resources for responsibility ownership. Full body text may mention
-    # dependencies ("uses API", "does not own data") and should not by itself
-    # create mixed-responsibility flags.
-    text = f"{section.title}\n{section.metadata_value('HLD-RESOURCES')}".lower()
+    # Use title/resources for responsibility ownership.
+    #
+    # Important:
+    # - Do not treat generic HLD-ROLE=architecture as processing ownership.
+    # - Do not use full body text for ownership detection because clean sections
+    #   often mention dependencies such as "uses the API" or "reads state"
+    #   without owning those responsibilities.
+    text = f"{section.title}\\n{section.metadata_value('HLD-RESOURCES')}".lower()
 
-    strong_signals: dict[str, tuple[str, ...]] = {
-        "governance": ("source of truth", "policy", "constitution", "approval", "decision"),
-        "data_state": ("data model", "storage", "persistence", "schema", "migration", "database"),
-        "api_contract": ("api contract", "interface contract", "endpoint", "openapi", "grpc", "rest api"),
-        "processing": ("pipeline", "orchestration", "workflow", "processing flow"),
-        "operations": ("rollback", "recovery", "retry", "failure", "observability", "timeout"),
-        "testing": ("validation", "acceptance", "coverage", "test plan"),
-        "performance": ("performance", "latency", "throughput", "scale", "scalability"),
-        "memory": ("memory", "context size", "context-size", "token budget"),
+    ownership_signals: dict[str, tuple[str, ...]] = {
+        "governance": (
+            "governance",
+            "source of truth",
+            "policy",
+            "constitution",
+            "approval",
+            "decision",
+            "constraint",
+        ),
+        "data_state": (
+            "data",
+            "state",
+            "data model",
+            "storage",
+            "persistence",
+            "schema",
+            "migration",
+            "database",
+        ),
+        "api_contract": (
+            "api",
+            "interface",
+            "contract",
+            "endpoint",
+            "openapi",
+            "grpc",
+            "rest api",
+            "request",
+            "response",
+        ),
+        "processing": (
+            "process",
+            "processing",
+            "pipeline",
+            "orchestration",
+            "workflow",
+            "processing flow",
+            "runtime behavior",
+        ),
+        "operations": (
+            "rollback",
+            "recovery",
+            "retry",
+            "failure",
+            "observability",
+            "timeout",
+            "operations",
+            "runbook",
+        ),
+        "testing": (
+            "test",
+            "validation",
+            "acceptance",
+            "coverage",
+            "test plan",
+            "verify",
+        ),
+        "performance": (
+            "performance",
+            "latency",
+            "throughput",
+            "scale",
+            "scalability",
+        ),
+        "memory": (
+            "memory",
+            "context size",
+            "context-size",
+            "token budget",
+        ),
     }
-    for group, keywords in strong_signals.items():
+    for group, keywords in ownership_signals.items():
         if any(keyword in text for keyword in keywords):
             groups.add(group)
 
     return sorted(groups)
+
 
 
 def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> None:
