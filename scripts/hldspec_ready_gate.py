@@ -37,6 +37,7 @@ REQUIRED_FILES = [
     "scripts/build_speckit_prework_package.py",
     "scripts/build_speckit_proxy_dossier.py",
     "scripts/review_spec_build_plan.py",
+    "scripts/review_constitution_rule_quality.py",
     "docs/CANONICAL_FLOW.md",
     "docs/CONTEXT_TAILORING_PROTOCOL.md",
     "docs/SPECKIT_PROXY_PROTOCOL.md",
