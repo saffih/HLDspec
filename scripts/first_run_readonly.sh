@@ -81,6 +81,7 @@ CONVERSION_PLAN_MD="$WORKSPACE/.specify/sync/hld_conversion_plan.md"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_conversion_decision_queue.py" "$CONVERSION_PLAN_JSON" "$WORKSPACE"
 CONVERSION_DECISION_QUEUE_JSON="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.json"
 CONVERSION_DECISION_QUEUE_MD="$WORKSPACE/.specify/sync/hld_conversion_decision_queue.md"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_raw_hld_marking_plan.py" "$CONVERSION_PLAN_JSON" "$WORKSPACE" --source-hld "$HLD_SOURCE"
 
 "${PYTHON_RUN[@]}" - "$REPORT_JSON" "$WORKSPACE" "$HLD_SOURCE" <<'PY'
 import json
@@ -256,6 +257,9 @@ if [ "$STATUS" = "needs_conversion" ]; then
   echo "- $WORKSPACE/.specify/sync/hld_conversion_plan.json"
   echo "- $WORKSPACE/.specify/sync/hld_conversion_decision_queue.md"
   echo "- $WORKSPACE/.specify/sync/hld_conversion_decision_queue.json"
+  echo "- $WORKSPACE/.specify/sync/raw_hld_marking_plan.md"
+  echo "- $WORKSPACE/.specify/sync/raw_hld_marking_plan.json"
+  echo "- $WORKSPACE/RAW_HLD_MARKING_PROMPT.md"
   echo "- $WORKSPACE/HLD_CONVERSION_PROMPT.md"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_state.py" "$WORKSPACE" --source-hld "$HLD_SOURCE"
   echo "- $WORKSPACE/.specify/sync/hldspec_state.md"
