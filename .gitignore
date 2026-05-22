@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 .hldspec-ready-gate/
 .hldspec-uv-cache/
+.hldspec-architecture-review/
