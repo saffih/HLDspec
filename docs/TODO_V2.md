@@ -455,3 +455,366 @@ Add ApplyHldConversionMachine
 ```
 
 Implement only the working-HLD conversion action.
+
+## Operating model: roles, subagents, and context
+
+### Core idea
+
+HLDspec V2 is not only a script rewrite.
+
+It is a controlled agent/workflow system for using the right context, right role, right cost, and right checkpoint for each task.
+
+The system must help a limited agent work correctly without loading the whole repo or the whole HLD every time.
+
+### Primary roles
+
+```text
+Judge / orchestrator
+  owns the top-level state machine, checkpoint decisions, human questions, and safety boundaries
+
+Product reviewer
+  checks user value, feature boundaries, personas, use cases, acceptance criteria, and whether something is actually a spec
+
+Architecture reviewer
+  checks responsibilities, boundaries, coupling, decoupling, dependencies, source of truth, and whether architecture constraints are preserved
+
+Governance reviewer
+  checks constitution impact, assumptions, conflicts, policy decisions, source-HLD safety, and approval gates
+
+Interface contract reviewer
+  checks APIs, CLI, events, request/response contracts, consumer dependencies, compatibility, and error contracts
+
+Data/state reviewer
+  checks data ownership, persistence, mutation rules, source of truth, and dependent consumers
+
+Processing behavior reviewer
+  checks workflows, runtime behavior, validation, algorithms, failure modes, and observable outcomes
+
+Security reviewer
+  checks auth, permissions, secrets, token handling, exposure risks, and safety constraints
+
+Operations reviewer
+  checks deployment, rollback, observability, runbooks, environment assumptions, and recovery concerns
+
+RunSkeptic reviewer
+  applies the actual RunSkeptic framework strictly and returns PASS / ACTION / CONFLICT with evidence fields
+
+Uncle Bob / SOLID reviewer
+  checks SRP, OCP, DIP, ISP, testability, seams, interfaces, contracts, and refactor quality
+```
+
+### Subagent rules
+
+Subagents are not free-form chat helpers.
+
+They are bounded review units with explicit input, output, cost, and stop rules.
+
+Each subagent must receive only:
+
+```text
+- the current candidate section or artifact
+- the role-specific questions
+- relevant prior decisions
+- required output schema
+- explicit forbidden actions
+```
+
+Each subagent must return:
+
+```text
+role
+scope reviewed
+observed evidence
+evidence level
+confidence
+findings
+unknowns
+human questions
+recommended state transition
+residual risk
+```
+
+Subagents must not:
+
+```text
+- inspect the entire repo unless explicitly needed
+- rewrite unrelated files
+- invoke SpecKit
+- modify source HLDs
+- implement application code
+- ask vague questions
+- continue past a human checkpoint
+```
+
+### Bloat guard
+
+The simpler the task, the stricter and smaller the prompt should be.
+
+The weaker or cheaper the agent can be, the better, if it is sufficient for the task.
+
+Rules:
+
+```text
+simple deterministic task
+  -> local script or weak/cheap agent
+
+single-file classification
+  -> narrow subagent with only that section and role questions
+
+cross-artifact consistency check
+  -> bounded reviewer with explicit artifact list
+
+architecture conflict or source-HLD mutation risk
+  -> judge/orchestrator + RunSkeptic + human checkpoint
+
+SpecKit invocation
+  -> only after explicit approval gate
+```
+
+Bloat guard must support delegation:
+
+```text
+Top-level judge can delegate to a subagent.
+Subagent can delegate to an even smaller reviewer if that reduces context/cost safely.
+Delegation must preserve evidence, scope, and stop conditions.
+```
+
+### Context tailoring
+
+Context must be assembled by task type.
+
+Do not load everything by default.
+
+Context packs:
+
+```text
+Raw HLD marking context
+  source section, parent heading, neighboring headings, candidate ID, current conversion action, role questions
+
+Conversion decision context
+  decision queue item, split proposal, source excerpt, evidence, prior answered decisions
+
+Spec build plan context
+  planned spec, dependencies, quality flags, evidence section IDs, conflicting requirements
+
+Constitution context
+  proposed rule, HLD evidence, violation example, enforced SpecKit phase, affected artifacts, open questions
+
+Prework approval context
+  prework package, quality review, proxy dossier, dependency graph, first-feature case, feedback impact rules
+
+RunSkeptic context
+  exact artifact under review, actual RunSkeptic framework, issue hypothesis, tests/evidence, residual risk
+```
+
+### Prompt and personality guidance
+
+Prompts should be role-specific and strict.
+
+Default style:
+
+```text
+- direct
+- evidence-based
+- no filler
+- no broad exploration unless required
+- ask only real checkpoint questions
+- do not summarize the whole repo
+- report current state, blocker, decision needed, artifacts, next action
+```
+
+For limited agents:
+
+```text
+- read the shortest run card first
+- do not read long docs unless directed by state machine
+- run the assigned command
+- inspect only controlling artifacts
+- stop at checkpoint
+```
+
+For judge/orchestrator:
+
+```text
+- owns global consistency
+- may invoke bounded subagents
+- must consolidate findings
+- must keep the human in the loop at checkpoints
+- must never hide blockers behind generic "continue"
+```
+
+### Checkpoint communication standard
+
+Every checkpoint must say:
+
+```text
+Current checkpoint:
+Blocking reason:
+Human decision needed:
+Allowed options:
+Controlling artifacts:
+Already answered decisions:
+Continuation protocol:
+What happens after the answer:
+What is not modified / not invoked:
+```
+
+Answered questions must be separated from active blocking questions.
+
+The active question list must include only open blocking questions.
+
+### Source-HLD safety
+
+There are three different artifacts:
+
+```text
+source HLD
+  original user/project file, never modified implicitly
+
+working HLD
+  workspace copy used for HLDspec conversion and metadata
+
+source update queue
+  explicit proposed updates that may affect source HLD later
+```
+
+Rules:
+
+```text
+- source HLD mutation is a separate risk class
+- source HLD updates require explicit approval
+- conversion applies only to working HLD
+- source-HLD-affecting updates go to SourceUpdateMachine
+- no machine may silently write to the source HLD
+```
+
+### SpecKit safety
+
+SpecKit is blocked until explicit approval.
+
+Before SpecKit:
+
+```text
+- raw HLD conversion complete
+- spec build plan green
+- prework quality green
+- constitution case documented
+- dependency/architecture case documented
+- first-feature case documented
+- feedback impact rules documented
+- human approval captured
+```
+
+Forbidden before approval:
+
+```text
+- do not invoke SpecKit
+- do not write final specs manually
+- do not implement app code
+```
+
+### RunSkeptic use
+
+RunSkeptic must be applied as a strict recipe, not as vague skepticism.
+
+For HLDspec work, RunSkeptic findings must include:
+
+```text
+observed_evidence
+evidence_level
+confidence
+unknowns
+verification
+residual_risk
+PASS / ACTION / CONFLICT
+```
+
+RunSkeptic must be used for:
+
+```text
+- architecture changes
+- test deletion/replacement
+- source-HLD mutation policy
+- SpecKit approval
+- contract changes
+- large refactors
+```
+
+### Uncle Bob / SOLID use
+
+Uncle Bob / SOLID review must be used for code architecture.
+
+Required checks:
+
+```text
+SRP
+  one reason to change per machine/module
+
+OCP
+  add behavior through new machine/renderer/checklist, not shell prose rewrite
+
+DIP
+  shell depends on stable Python CLI; machines depend on contracts, not concrete scripts
+
+ISP
+  narrow contracts: MachineResult, Checkpoint, ArtifactRef, HumanQuestion
+
+Testability
+  test transitions and contracts, not exact implementation strings
+```
+
+### Product correctness guard
+
+HLDspec must not produce fake specs.
+
+A section should become a spec only when it has clear product capability, interface contract, data/state responsibility, processing behavior, or implementation-relevant constraint.
+
+Context-only sections should remain context, governance, constitution, or planning material.
+
+Examples likely not standalone specs unless they contain real requirements:
+
+```text
+milestones
+background
+overview
+status
+notes
+principles
+```
+
+Unknown section rule:
+
+```text
+unknown / neutral section
+  -> primary_role = TBD
+  -> evidence_level = unknown
+  -> no architecture default
+  -> human/judge review required
+```
+
+### Current strategic direction
+
+The next big leaps should prioritize product correctness and workflow safety, not adapter plumbing.
+
+Priority order:
+
+```text
+1. ApplyHldConversionMachine
+2. SourceUpdateMachine
+3. SpecBuildPlanMachine
+4. SpeckitPreworkMachine
+5. ApprovalGateMachine
+6. V2 runner migration
+7. Replace/delete legacy tests only when covered by stronger V2 tests
+```
+
+### What not to do
+
+```text
+- do not keep patching old shell wording
+- do not build thin adapters with no product value
+- do not delete all tests without replacements
+- do not run old brittle tests as active V2 gates
+- do not invoke SpecKit prematurely
+- do not spend paid agent credits on deterministic local commands
+```
