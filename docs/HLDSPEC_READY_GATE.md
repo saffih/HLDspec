@@ -54,3 +54,18 @@ uv run python scripts/hldspec_ready_gate.py \
 `READY_FOR_PAID_AGENT_TEST` means HLDspec is ready for the next bounded paid-agent test.
 
 `NOT_READY` means fix the listed blockers before spending credits.
+
+## Agent command integration
+
+The readiness gate is phase 0 of the full agent command:
+
+```text
+HLDspec <path-to-HLD>
+```
+
+The agent must run this gate before spending paid agent/SpecKit credits.
+
+If the gate is NOT_READY, stop and fix HLDspec first.
+
+If the gate is READY_FOR_PAID_AGENT_TEST, continue to one bounded target-HLD checkpoint run.
+

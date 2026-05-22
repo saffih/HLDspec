@@ -6,6 +6,34 @@ This repository contains wrapper tools for turning a High-Level Design document 
 
 Do not bypass the wrappers unless explicitly instructed.
 
+## HLDspec agent command
+
+When the user says:
+
+```text
+HLDspec <path-to-HLD>
+```
+
+follow:
+
+```text
+docs/HLDSPEC_AGENT_COMMAND.md
+```
+
+This is the full judge/orchestrator protocol.
+
+Important distinction:
+
+```text
+hldspec_run.sh = local tool runner
+HLDspec <path-to-HLD> = agent-led protocol that drives the tool runner
+```
+
+The agent must run the local readiness gate first, then use scripts as tools, inspect artifacts, delegate bounded subagents when useful, mark the working HLD, and stop at real checkpoints.
+
+Do not invoke SpecKit, create final specs, implement app code, or modify the source HLD before the required human approval gate.
+
+
 ## Limited agent run card
 
 When the agent has limited context/capacity, it should read this short file first:
