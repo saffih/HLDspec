@@ -28,6 +28,7 @@ REQUIRED_FILES = [
     "hld_spec_sync.py",
     "scripts/hldspec_run.sh",
     "scripts/project_continue.sh",
+    "scripts/render_hldspec_checkpoint.py",
     "scripts/project_first_run.sh",
     "scripts/first_run_readonly.sh",
     "scripts/write_skeptic_cache.py",

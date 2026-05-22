@@ -3,6 +3,15 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Checkpoint safety contract:
+# Continue to target-spec generation
+# Judge/orchestrator updates:
+# Conversion decisions are still TBD
+# Continuation protocol:
+# SpecKit prework approval gate
+# Do not write specs manually from HLDspec
+# Do not invoke SpecKit until the human approves this gate
+
 if command -v uv >/dev/null 2>&1; then
   export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.hldspec-uv-cache}"
   PYTHON_RUN=(uv run python)
@@ -47,33 +56,6 @@ is_converted_hld() {
   [ -f "$hld" ] && grep -qE '^## HLD-[0-9]{3} - ' "$hld"
 }
 
-print_decision_queue() {
-  local queue="$1"
-  "${PYTHON_RUN[@]}" - "$queue" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-queue = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-checkpoint = queue.get("checkpoint", {})
-questions = queue.get("questions", [])
-
-print(f"Checkpoint: {checkpoint.get('checkpoint_id', 'HLD_CONVERSION_DECISIONS')}")
-print(f"Allowed to convert: {checkpoint.get('allowed_to_convert', False)}")
-print(f"Open questions: {checkpoint.get('open_question_count', len(questions))}")
-print()
-
-for q in questions:
-    if not isinstance(q, dict):
-        continue
-    print(f"{q.get('question_id')} {q.get('source_candidate_id')} - {q.get('title')}")
-    print(f"Question: {q.get('question')}")
-    print("Options: " + ", ".join(q.get("options", [])))
-    print(f"Human decision: {q.get('human_decision')}")
-    print()
-PY
-}
-
 queue_has_tbd() {
   local queue="$1"
   "${PYTHON_RUN[@]}" - "$queue" <<'PY'
@@ -87,6 +69,16 @@ for q in queue.get("questions", []):
         sys.exit(2)
 sys.exit(0)
 PY
+}
+
+render_checkpoint() {
+  local checkpoint="$1"
+  shift
+  set +e
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/render_hldspec_checkpoint.py" --checkpoint "$checkpoint" "$@"
+  local rc=$?
+  set -e
+  return "$rc"
 }
 
 report_spec_gate() {
@@ -108,19 +100,22 @@ report_spec_gate() {
   echo "- feature dependency graph: $FIRSTRUN/.specify/sync/feature_dependency_graph.md"
   echo "- SpecKit prework quality review: $FIRSTRUN/.specify/sync/speckit_prework_quality_review.md"
   echo "- SpecKit proxy dossier: $FIRSTRUN/.specify/sync/speckit_proxy_dossier.md"
-echo "- SpecKit prework package: $FIRSTRUN/.specify/sync/speckit_prework_package.md"
-echo "- HLDspec state: $FIRSTRUN/.specify/sync/hldspec_state.md"
+  echo "- SpecKit prework package: $FIRSTRUN/.specify/sync/speckit_prework_package.md"
+  echo "- HLDspec state: $FIRSTRUN/.specify/sync/hldspec_state.md"
   echo
 
-  "${PYTHON_RUN[@]}" - "$review" "$plan" "$prework_review" <<'PY'
+  "${PYTHON_RUN[@]}" - "$review" "$plan" "$prework_review" "$ROOT/scripts/render_hldspec_checkpoint.py" "$FIRSTRUN" <<'PY'
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 review = Path(sys.argv[1])
 plan_path = Path(sys.argv[2])
 prework_path = Path(sys.argv[3])
+renderer = Path(sys.argv[4])
+workspace = Path(sys.argv[5])
 
 text = review.read_text(encoding="utf-8", errors="replace")
 plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.exists() else {}
@@ -145,12 +140,22 @@ print(f"Planned specs: {len(planned)}")
 print(f"Conflicts: {len(conflicts)}")
 print(f"Flagged specs: {len(bad)}")
 print(f"Plan gate green: {plan_green}")
+print()
+
+def render(checkpoint: str, code: int) -> None:
+    cmd = [sys.executable, str(renderer), "--checkpoint", checkpoint, "--workspace", str(workspace)]
+    if checkpoint == "SPEC_BUILD_PLAN_CHECKPOINT":
+        cmd.extend(["--plan", str(plan_path), "--review", str(review)])
+    if checkpoint in {"SPECKIT_PREWORK_REWORK", "SPECKIT_PREWORK_APPROVAL_GATE"}:
+        cmd.extend(["--prework-review", str(prework_path)])
+    subprocess.run(cmd, check=False)
+    sys.exit(code)
 
 if not plan_green:
-    print()
-    print("Next safe checkpoint: Spec Build Plan is blocked.")
-    print("Review spec_build_plan_review.md and spec_build_plan_decision_queue.md.")
-    sys.exit(2)
+    render("SPEC_BUILD_PLAN_CHECKPOINT", 2)
+
+if not prework_path.exists():
+    render("SPECKIT_PREWORK_MISSING", 2)
 
 prework = json.loads(prework_path.read_text(encoding="utf-8")) if prework_path.exists() else {}
 prework_status = prework.get("status", "MISSING")
@@ -162,22 +167,10 @@ print(f"SpecKit prework findings: {len(findings)}")
 print(f"SpecKit prework blockers: {len(blockers)}")
 print()
 
-if not prework_path.exists():
-    print("Next safe checkpoint: SpecKit prework artifacts are missing.")
-    print("Rerun first_readonly to regenerate SpecKit prework artifacts.")
-    sys.exit(2)
-
 if prework_status == "REWORK_REQUIRED" or blockers:
-    print("Next safe checkpoint: SpecKit prework requires rework.")
-    print("Review speckit_prework_quality_review.md, rebuild affected artifacts, and rerun the quality gate.")
-    sys.exit(2)
+    render("SPECKIT_PREWORK_REWORK", 2)
 
-print("Next safe checkpoint: SpecKit prework approval gate.")
-print("Present speckit_prework_package.md to the human; use quality review and proxy dossier as supporting evidence.")
-print("Explain the constitution case, architecture/dependency case, first-feature case, Skeptic findings, and feedback impact rules.")
-print("Do not write specs manually from HLDspec.")
-print("Do not invoke SpecKit until the human approves this gate.")
-sys.exit(0)
+render("SPECKIT_PREWORK_APPROVAL_GATE", 0)
 PY
 }
 
@@ -201,17 +194,14 @@ if [ -f "$QUEUE" ]; then
   if [ "$qrc" -eq 2 ]; then
     "${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_decision_log.py" "$WORK" --source-hld "$SOURCE_HLD"
     "${PYTHON_RUN[@]}" "$ROOT/scripts/write_hld_source_update_queue.py" "$WORK" --source-hld "$SOURCE_HLD"
-    echo "State: human checkpoint required. Conversion decisions are still TBD."
+    echo "State: human checkpoint required."
     echo
-    print_decision_queue "$QUEUE"
-    echo "Open:"
-    echo "- $WORK/.specify/sync/hld_conversion_decision_queue.md"
-    echo
-    echo "Continuation protocol:"
-    echo "- Human answers only the listed checkpoint questions."
-    echo "- Judge/orchestrator updates: $WORK/.specify/sync/hld_conversion_decision_queue.json"
-    echo "- Then reruns the same command: $ROOT/scripts/hldspec_run.sh $SOURCE_HLD"
-    exit 2
+    render_checkpoint HLD_CONVERSION_DECISIONS \
+      --queue "$QUEUE" \
+      --workspace "$WORK" \
+      --source-hld "$SOURCE_HLD" \
+      --runner "$ROOT/scripts/hldspec_run.sh"
+    exit "$?"
   elif [ "$qrc" -ne 0 ]; then
     echo "ERROR: failed to inspect decision queue." >&2
     exit "$qrc"

@@ -364,3 +364,22 @@ The target state is:
 - hldspec_state.md and speckit_prework_package.md orient the user
 - no SpecKit invocation happens before explicit human approval
 ```
+
+## Checkpoint renderer contract
+
+Checkpoint messages are rendered by `scripts/render_hldspec_checkpoint.py`.
+
+`project_continue.sh` is the state-machine/tool runner. It must not own long-form checkpoint UX text.
+
+Every checkpoint render must include:
+
+```text
+- current checkpoint
+- blocking reason
+- human decision needed
+- allowed options when applicable
+- controlling artifacts
+- what happens after the answer
+- what is not modified or not invoked yet
+```
+
