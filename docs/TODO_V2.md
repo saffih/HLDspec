@@ -518,3 +518,19 @@ FIX_PLAN
 ACCEPT_WITH_RATIONALE
 STOP_FOR_MANUAL_REDESIGN
 ```
+
+## Spec-plan gate decision requirement
+
+A non-green spec build plan may continue only if `spec_build_plan_gate_decision.json` explicitly records:
+
+```text
+decision = ACCEPT_WITH_RATIONALE
+rationale = non-empty
+accepted_flagged_specs = every flagged planned spec id
+```
+
+Helper:
+
+```text
+scripts/hldspec_v2_answer_spec_plan_gate.py
+```
