@@ -54,6 +54,8 @@ def main() -> int:
         "tests_v2/test_v2_full_slice.py",
         "tests_v2/test_hldspec_v2_flow_test_doc.py",
         "tests_v2/test_answer_conversion_queue.py",
+        "tests_v2/test_spec_build_plan_debug.py",
+        "docs/HLDSPEC_V2_SPEC_PLAN_DEBUG.md",
         "tests_v2/test_apply_hld_conversion_debug.py",
         "docs/HLDSPEC_V2_APPLY_DEBUG.md",
         "scripts/hldspec_v2_answer_conversion_queue.py",

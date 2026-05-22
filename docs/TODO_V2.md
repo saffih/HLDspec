@@ -501,3 +501,20 @@ workspace/.specify/sync/apply_hld_conversion_command.md
 ```
 
 `KEEP_AS_ONE` decisions must include `approved_keep_reason`.
+
+## Spec-plan debug requirement
+
+When `SpecBuildPlanMachine` blocks, it must write:
+
+```text
+workspace/firstrun/.specify/sync/spec_build_plan_quality_debug.json
+workspace/firstrun/.specify/sync/spec_build_plan_quality_debug.md
+```
+
+The checkpoint must show flagged planned specs and ask for:
+
+```text
+FIX_PLAN
+ACCEPT_WITH_RATIONALE
+STOP_FOR_MANUAL_REDESIGN
+```
