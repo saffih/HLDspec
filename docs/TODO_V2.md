@@ -534,3 +534,14 @@ Helper:
 ```text
 scripts/hldspec_v2_answer_spec_plan_gate.py
 ```
+
+## Consolidated handoff docs requirement
+
+Before `SPECKIT_PREWORK_APPROVAL_GATE`, V2 must generate:
+
+```text
+architecture_handoff.md
+product_handoff.md
+```
+
+These are generated from existing sync artifacts and do not invoke SpecKit.

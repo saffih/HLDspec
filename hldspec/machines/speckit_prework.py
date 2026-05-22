@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hldspec.handoff_docs import write_handoff_docs
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -65,15 +66,19 @@ class SpeckitPreworkMachine:
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
             )
 
+        architecture_handoff, product_handoff = write_handoff_docs(sync)
+
         return continue_result(
             machine=self.name,
             state="SPECKIT_PREWORK_READY_FOR_APPROVAL",
-            actions_run=("validated Speckit prework quality gate",),
+            actions_run=("validated Speckit prework quality gate", "generated consolidated handoff docs"),
             artifacts_written=(
                 ArtifactRef(path=str(package), role="speckit_prework_package"),
                 ArtifactRef(path=str(review_json), role="quality_review_json"),
                 ArtifactRef(path=str(proxy), role="speckit_proxy_dossier", required=False),
                 ArtifactRef(path=str(state), role="hldspec_state", required=False),
+                ArtifactRef(path=str(architecture_handoff), role="architecture_handoff", required=False),
+                ArtifactRef(path=str(product_handoff), role="product_handoff", required=False),
             ),
         )
 

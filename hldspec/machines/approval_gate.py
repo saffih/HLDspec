@@ -25,12 +25,14 @@ class ApprovalGateMachine:
             blocking_reason="Prework is ready for human approval before SpecKit is invoked.",
             questions=(),
             controlling_artifacts=(
+                ArtifactRef(path=str(sync / "architecture_handoff.md"), role="architecture_handoff", required=False),
+                ArtifactRef(path=str(sync / "product_handoff.md"), role="product_handoff", required=False),
                 ArtifactRef(path=str(sync / "speckit_prework_package.md"), role="speckit_prework_package"),
                 ArtifactRef(path=str(sync / "speckit_prework_quality_review.md"), role="quality_review_report", required=False),
                 ArtifactRef(path=str(sync / "speckit_proxy_dossier.md"), role="proxy_dossier", required=False),
                 ArtifactRef(path=str(sync / "hldspec_state.md"), role="hldspec_state", required=False),
             ),
-            next_action="Human approves, rejects, or requests changes. Only after approval may SpecKit be invoked.",
+            next_action="Human reviews architecture_handoff.md, product_handoff.md, and prework package, then approves, rejects, or requests changes. Only after approval may SpecKit be invoked.",
             forbidden_actions=(
                 "Do not write final specs manually from HLDspec.",
                 "Do not invoke SpecKit until the human approves this gate.",
