@@ -19,7 +19,7 @@ HLDspec owns:
 - feature dependency graph
 - SpecKit invocation queue
 - SpecKit proxy dossier
-- Beskeptic quality review
+- Skeptic quality review
 - human checkpoints and rebuild loops
 
 SpecKit owns:
@@ -121,7 +121,7 @@ speckit_proxy_dossier.md/json
 speckit_prework_quality_review.md/json
 ```
 
-## Beskeptic rule
+## RunSkeptic rule
 
 If HLDspec artifacts disagree about the next step, classify as:
 

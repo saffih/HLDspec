@@ -237,7 +237,7 @@ What was extracted
 Why the constitution protects the architecture
 Why the dependency order is correct
 Why the first feature is first
-What Beskeptic found
+What RunSkeptic found
 What will be rebuilt if the human gives feedback
 What approval decision is needed
 ```

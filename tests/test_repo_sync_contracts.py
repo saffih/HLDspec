@@ -25,7 +25,7 @@ class RepoSyncContractTests(unittest.TestCase):
 
     def test_required_checkpoint_scripts_exist(self) -> None:
         for rel in [
-            "scripts/write_beskeptic_cache.py",
+            "scripts/write_skeptic_cache.py",
             "scripts/write_hld_decision_log.py",
             "scripts/write_hld_source_update_queue.py",
             "scripts/build_spec_plan_decision_queue.py",

@@ -258,7 +258,7 @@ Defines processing flow.
         self.assertEqual(["HLD-002", "HLD-003"], by_id["002"]["source_hld_sections"])
         self.assertIn("001", by_id["002"]["depends_on_specs"])
         self.assertLess(plan["recommended_order"].index("001"), plan["recommended_order"].index("002"))
-        self.assertIn("Beskeptic cycles", markdown)
+        self.assertIn("RunSkeptic reviews", markdown)
         self.assertIn("API contract expectations", markdown)
         self.assertIn("plan_quality", plan)
         quality = plan["plan_quality"]

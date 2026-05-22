@@ -224,7 +224,7 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
         "speckit_proxy_dossier_ready",
         [
             "judge presents speckit_prework_package.md",
-            "judge explains constitution case, dependency case, first-feature case, Beskeptic findings",
+            "judge explains constitution case, dependency case, first-feature case, Skeptic findings",
             "human approves or requests modifications",
             "after approval, SpecKit proxy subagent invokes SpecKit in sequence",
         ],

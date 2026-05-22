@@ -24,7 +24,7 @@ Important distinction:
 Key rules:
 
 - HLDspec uses the real Skeptic Framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`.
-- A Beskeptic Cycle is HLDspec's operational use of the real Skeptic flow on selected Key Aspects.
+- A RunSkeptic review is HLDspec's operational use of the real Skeptic flow on selected Key Aspects.
 - HLD Sections are design source units, not specs.
 - Specs are capability units.
 - Specs must be planned bottom-up with a Spec Build Plan before multi-spec work.
@@ -534,12 +534,12 @@ docs/EXTERNAL_AGENT_PROMPT.md
 
 The protocol is human-in-the-loop: the agent explains what it sees, what it plans to do, the command or edit it will use, what happened, and where the human must decide.
 
-## Beskeptic meta-review
+## RunSkeptic meta-review
 
 Run a broad HLDspec self-review after workflow changes:
 
 ```bash
-python3 scripts/run_beskeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
+python3 scripts/run_skeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
 ```
 
 ## Convert a raw HLD to HLDspec format

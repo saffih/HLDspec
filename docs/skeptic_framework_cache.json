@@ -101,17 +101,18 @@
     "HISTORICAL",
     "INFERRED_RISK"
   ],
+  "formal_invocation": "RunSkeptic",
   "hldspec_contract": [
-    "Use the authoritative Skeptic phase flow for all HLDspec Beskeptic cycles.",
+    "Use the authoritative Skeptic phase flow for all HLDspec RunSkeptic reviews.",
     "Record framework source and phase flow in generated workspace artifacts.",
     "Do not call a finding fixed unless evidence and verification path are recorded.",
     "Treat unresolved human decisions as CONFLICT or checkpoint blockers.",
     "Use HLDspec cycles as bounded executable projections of Skeptic, not as a replacement for skeptic.md.",
     "Cache the companion domain question bank from skeptic-questions.md, not only skeptic.md.",
     "Use domain questions selectively, following Skeptic relevance rules.",
-    "Record selected domain checks in generated Beskeptic cycle records."
+    "Record selected domain checks in generated RunSkeptic review records."
   ],
-  "name": "Beskeptic / Skeptic",
+  "name": "RunSkeptic / Skeptic",
   "output_states": [
     "FIX",
     "CONFLICT",

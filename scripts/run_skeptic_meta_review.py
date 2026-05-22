@@ -59,7 +59,7 @@ def scan_required_files(root: Path, cycles: list[Cycle]) -> None:
         "scripts/first_run_readonly.sh",
         "scripts/project_continue.sh",
         "scripts/hldspec_run.sh",
-        "scripts/write_beskeptic_cache.py",
+        "scripts/write_skeptic_cache.py",
         "scripts/build_hld_conversion_plan.py",
         "scripts/build_hld_conversion_decision_queue.py",
         "scripts/apply_hld_conversion_decisions.py",
@@ -84,15 +84,15 @@ def scan_required_files(root: Path, cycles: list[Cycle]) -> None:
         )
 
 
-def scan_beskeptic(root: Path, cycles: list[Cycle]) -> None:
+def scan_RunSkeptic(root: Path, cycles: list[Cycle]) -> None:
     agents = read(root / "AGENTS.md")
     terms = read(root / "TERMINOLOGY.md")
-    cache_script = read(root / "scripts/write_beskeptic_cache.py")
+    cache_script = read(root / "scripts/write_skeptic_cache.py")
 
     checks = [
         (
             "BES-001",
-            "Beskeptic source",
+            "RunSkeptic source",
             "saffih/skeptic/skeptic.md",
             "AGENTS.md",
             agents,
@@ -100,7 +100,7 @@ def scan_beskeptic(root: Path, cycles: list[Cycle]) -> None:
         ),
         (
             "BES-002",
-            "Beskeptic phase flow",
+            "RunSkeptic phase flow",
             "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
             "AGENTS.md",
             agents,
@@ -108,7 +108,7 @@ def scan_beskeptic(root: Path, cycles: list[Cycle]) -> None:
         ),
         (
             "BES-003",
-            "Beskeptic question bank",
+            "RunSkeptic question bank",
             "skeptic-questions.md",
             "AGENTS.md",
             agents,
@@ -116,17 +116,17 @@ def scan_beskeptic(root: Path, cycles: list[Cycle]) -> None:
         ),
         (
             "BES-004",
-            "Beskeptic terminology",
-            "Beskeptic Cycle",
+            "RunSkeptic terminology",
+            "RunSkeptic review",
             "TERMINOLOGY.md",
             terms,
-            "Beskeptic terminology is defined.",
+            "RunSkeptic terminology is defined.",
         ),
         (
             "BES-005",
-            "Beskeptic cache writer",
+            "RunSkeptic cache writer",
             "skeptic-questions",
-            "scripts/write_beskeptic_cache.py",
+            "scripts/write_skeptic_cache.py",
             cache_script,
             "Cache writer appears to include the question bank.",
         ),
@@ -137,14 +137,14 @@ def scan_beskeptic(root: Path, cycles: list[Cycle]) -> None:
         add(
             cycles,
             cycle_id=cid,
-            area="Beskeptic",
+            area="RunSkeptic",
             aspect="verification_path",
             spotlight=spotlight,
             decision="FIX",
             severity="PASS" if ok else "ACTION",
-            finding=ok_finding if ok else f"Missing expected Beskeptic marker: {phrase}",
+            finding=ok_finding if ok else f"Missing expected RunSkeptic marker: {phrase}",
             evidence=[f"{rel}: {'contains' if ok else 'missing'} {phrase!r}"],
-            recommendation="Keep." if ok else "Update cache/docs so Beskeptic is grounded in the real framework.",
+            recommendation="Keep." if ok else "Update cache/docs so RunSkeptic is grounded in the real framework.",
             affected_artifacts=[rel],
         )
 
@@ -459,7 +459,7 @@ def scan_test_coverage(root: Path, cycles: list[Cycle]) -> None:
 def build_cycles(root: Path) -> list[Cycle]:
     cycles: list[Cycle] = []
     scan_required_files(root, cycles)
-    scan_beskeptic(root, cycles)
+    scan_RunSkeptic(root, cycles)
     scan_canonical_flow(root, cycles)
     scan_speckit_boundary(root, cycles)
     scan_judge_protocol(root, cycles)
@@ -487,7 +487,7 @@ def summarize(cycles: list[Cycle]) -> dict[str, object]:
 
 def render_md(cycles: list[Cycle], summary: dict[str, object]) -> str:
     lines = [
-        "# HLDspec Beskeptic Meta Review",
+        "# HLDspec RunSkeptic Meta Review",
         "",
         "made by AI",
         "",
@@ -547,7 +547,7 @@ def render_md(cycles: list[Cycle], summary: dict[str, object]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run many Beskeptic meta-review cycles over the HLDspec repo.")
+    parser = argparse.ArgumentParser(description="Run many RunSkeptic meta-review cycles over the HLDspec repo.")
     parser.add_argument("--repo", default=".", help="Path to HLDspec repo root.")
     parser.add_argument("--output-dir", default=".hldspec-meta-review", help="Output directory for reports.")
     parser.add_argument("--fail-on-blocker", action="store_true")
@@ -567,13 +567,13 @@ def main() -> int:
         "cycles": [asdict(cycle) for cycle in cycles],
     }
 
-    json_path = out / "hldspec_beskeptic_meta_review.json"
-    md_path = out / "hldspec_beskeptic_meta_review.md"
+    json_path = out / "hldspec_skeptic_meta_review.json"
+    md_path = out / "hldspec_skeptic_meta_review.md"
 
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(render_md(cycles, summary), encoding="utf-8")
 
-    print("HLDspec Beskeptic meta review generated:")
+    print("HLDspec RunSkeptic meta review generated:")
     print(f"- json: {json_path}")
     print(f"- report: {md_path}")
     print(f"- status: {summary['status']}")

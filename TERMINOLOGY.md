@@ -17,11 +17,12 @@ Use these terms consistently in docs, prompts, reports, logs, code comments, and
 
 | Term | Meaning |
 |---|---|
-| **Skeptic Framework** | The real framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`. |
-| **Beskeptic Cycle** | HLDspec's operational use of the real Skeptic Framework on one workflow step and selected Key Aspects. |
+| **Skeptic Framework** | The real framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`; current `skeptic.md` is the runtime source of truth. |
+| **RunSkeptic** | Formal invocation string for applying the Skeptic Framework. |
+| **RunSkeptic review** | HLDspec's operational use of the real Skeptic Framework on one workflow step and selected Key Aspects. |
 | **Key Aspect** | Canonical concern being checked, such as `spec_boundary`, `api_contract`, `performance`, or `resume_invalidation`. |
-| **Skeptic Spotlight** | The exact artifact part, question, dependency, interface, assumption, or conflict being examined in a Beskeptic Cycle. |
-| **Cycle Record** | Compact record of evidence, confidence, decision, recommendation, verification, and outcome from a Beskeptic Cycle. |
+| **Skeptic Spotlight** | The exact artifact part, question, dependency, interface, assumption, or conflict being examined in a RunSkeptic review. |
+| **Cycle Record** | Compact record of evidence, confidence, decision, recommendation, verification, and outcome from a RunSkeptic review. |
 | **User Escalation** | Structured user handoff when evidence cannot resolve a conflict. |
 
 ## Architecture terms
@@ -143,7 +144,7 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | Term | Meaning |
 |---|---|
 | **HLDspec State** | Current machine-readable and human-readable summary of workflow stage, checkpoint, next allowed actions, and controlling artifacts. |
-| **SpecKit Prework Package** | Main human-facing review package that combines constitution case, dependency case, first-feature case, Beskeptic findings, feedback impact rules, and approval question. |
+| **SpecKit Prework Package** | Main human-facing review package that combines constitution case, dependency case, first-feature case, Skeptic findings, feedback impact rules, and approval question. |
 | **Controlling Artifact** | Artifact the judge/orchestrator should use as the primary source for the current checkpoint. |
 | **Supporting Artifact** | Artifact used as evidence or detail behind the controlling artifact. |
 | **Legacy/Supporting Artifact** | Older or compatibility artifact that may be present but does not control the current workflow when SpecKit is available. |

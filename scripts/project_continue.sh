@@ -174,7 +174,7 @@ if prework_status == "REWORK_REQUIRED" or blockers:
 
 print("Next safe checkpoint: SpecKit prework approval gate.")
 print("Present speckit_prework_package.md to the human; use quality review and proxy dossier as supporting evidence.")
-print("Explain the constitution case, architecture/dependency case, first-feature case, Beskeptic findings, and feedback impact rules.")
+print("Explain the constitution case, architecture/dependency case, first-feature case, Skeptic findings, and feedback impact rules.")
 print("Do not write specs manually from HLDspec.")
 print("Do not invoke SpecKit until the human approves this gate.")
 sys.exit(0)

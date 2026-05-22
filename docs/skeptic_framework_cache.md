@@ -1,8 +1,8 @@
-# Beskeptic Framework Cache
+# RunSkeptic Framework Cache
 
 made by AI
 
-This file records the authoritative Skeptic/Beskeptic framework HLDspec must use.
+This file records the authoritative Skeptic/RunSkeptic framework HLDspec must use.
 
 ## Authoritative source
 
@@ -93,6 +93,6 @@ CFT3. Test mocks so much it only tests the mock?
 
 ## HLDspec rule
 
-HLDspec may use bounded Beskeptic cycle records inside plans and reviews, but those records must identify this cache, preserve the real Skeptic phase flow, and cache the companion domain question bank.
+HLDspec may use bounded RunSkeptic review records inside plans and reviews, but those records must identify this cache, preserve the real Skeptic phase flow, and cache the companion domain question bank.
 
-HLDspec must not treat vague `beskeptic_cycles` naming as enough evidence that the real framework was used.
+HLDspec must not treat vague `RunSkeptic_cycles` naming as enough evidence that the real framework was used.

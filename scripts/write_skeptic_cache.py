@@ -7,12 +7,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CACHE_JSON = ROOT / "docs" / "BESKEPTIC_FRAMEWORK_CACHE.json"
-CACHE_MD = ROOT / "docs" / "BESKEPTIC_FRAMEWORK_CACHE.md"
+CACHE_JSON = ROOT / "docs" / "skeptic_framework_cache.json"
+CACHE_MD = ROOT / "docs" / "skeptic_framework_cache.md"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Write the HLDspec Beskeptic framework cache into a workspace.")
+    parser = argparse.ArgumentParser(description="Write the HLDspec RunSkeptic framework cache into a workspace.")
     parser.add_argument("workspace")
     args = parser.parse_args()
 
@@ -20,14 +20,14 @@ def main() -> int:
     out_dir = workspace / ".specify" / "sync"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    json_out = out_dir / "beskeptic_framework_cache.json"
-    md_out = out_dir / "beskeptic_framework_cache.md"
+    json_out = out_dir / "skeptic_framework_cache.json"
+    md_out = out_dir / "skeptic_framework_cache.md"
 
     json_out.write_text(CACHE_JSON.read_text(encoding="utf-8"), encoding="utf-8")
     md_out.write_text(CACHE_MD.read_text(encoding="utf-8"), encoding="utf-8")
 
     cache = json.loads(json_out.read_text(encoding="utf-8"))
-    print("Beskeptic framework cache written:")
+    print("RunSkeptic framework cache written:")
     print(f"- json: {json_out}")
     print(f"- report: {md_out}")
     print(f"- source: {cache['authoritative_source']['repository']}/{cache['authoritative_source']['path']}")

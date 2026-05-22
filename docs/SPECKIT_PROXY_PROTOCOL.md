@@ -52,7 +52,7 @@ dependency context
 API/interface notes
 processing/functionality notes
 shared/common dependencies
-Beskeptic findings
+Skeptic findings
 allowed evidence sources
 question-answering policy
 escalation policy
@@ -215,7 +215,7 @@ change dependency order without judge approval
 invoke implementation without explicit approval
 skip constitution checks
 create multiple features in one SpecKit specify invocation
-continue when a blocking Beskeptic finding remains
+continue when a blocking RunSkeptic finding remains
 ```
 
 ## Success criteria

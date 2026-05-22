@@ -94,7 +94,7 @@ class SpeckitPreworkQualityReviewTests(unittest.TestCase):
             self.assertIn("Constitution case", report)
             self.assertIn("Architecture and dependency case", report)
             self.assertIn("First feature case", report)
-            self.assertIn("Beskeptic findings", report)
+            self.assertIn("Skeptic findings", report)
             self.assertIn("The judge/orchestrator must rebuild affected artifacts", report)
 
 

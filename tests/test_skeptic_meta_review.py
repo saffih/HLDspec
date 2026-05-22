@@ -11,14 +11,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class BeskepticMetaReviewTests(unittest.TestCase):
+class RunSkepticMetaReviewTests(unittest.TestCase):
     def test_meta_review_generates_many_cycles(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             out = Path(td)
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(ROOT / "scripts" / "run_beskeptic_meta_review.py"),
+                    str(ROOT / "scripts" / "run_skeptic_meta_review.py"),
                     "--repo",
                     str(ROOT),
                     "--output-dir",
@@ -32,12 +32,12 @@ class BeskepticMetaReviewTests(unittest.TestCase):
             )
 
             self.assertEqual(0, result.returncode, msg=result.stderr)
-            report = json.loads((out / "hldspec_beskeptic_meta_review.json").read_text(encoding="utf-8"))
+            report = json.loads((out / "hldspec_skeptic_meta_review.json").read_text(encoding="utf-8"))
             self.assertGreaterEqual(report["summary"]["total_cycles"], 40)
 
             areas = {cycle["area"] for cycle in report["cycles"]}
             for expected in {
-                "Beskeptic",
+                "RunSkeptic",
                 "canonical flow",
                 "SpecKit boundary",
                 "judge protocol",
@@ -48,8 +48,8 @@ class BeskepticMetaReviewTests(unittest.TestCase):
             }:
                 self.assertIn(expected, areas)
 
-            md = (out / "hldspec_beskeptic_meta_review.md").read_text(encoding="utf-8")
-            self.assertIn("HLDspec Beskeptic Meta Review", md)
+            md = (out / "hldspec_skeptic_meta_review.md").read_text(encoding="utf-8")
+            self.assertIn("HLDspec RunSkeptic Meta Review", md)
             self.assertIn("Highest priority findings", md)
 
 

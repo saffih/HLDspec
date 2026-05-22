@@ -70,7 +70,7 @@ Task type:
 - ARCHITECTURE_DECISION
 - HUMAN_CHECKPOINT
 - SPECKIT_PROXY
-- BESKEPTIC_REVIEW
+- RUNSKEPTIC_REVIEW
 
 Required capability:
 - level_0_deterministic
@@ -184,7 +184,7 @@ Use only for:
 ```text
 repeated contradictions
 canonical flow redesign
-deep Beskeptic meta-review
+deep RunSkeptic meta-review
 HLDspec vs SpecKit ownership boundary conflicts
 large process failures that lower levels could not resolve
 ```
@@ -290,7 +290,7 @@ Escalation rule:
 | API-vs-processing split review | 3 | architecture-sensitive |
 | constitution rule review | 3 | evidence required |
 | dependency graph review | 3 | architecture-sensitive |
-| Beskeptic meta-review | 3-4 | use 4 only for major conflicts |
+| RunSkeptic meta-review | 3-4 | use 4 only for major conflicts |
 | SpecKit proxy run | 2-3 | one feature at a time |
 | implementation approval | judge only | human-owned gate |
 

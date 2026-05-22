@@ -11,9 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class BeskepticFrameworkCacheTests(unittest.TestCase):
-    def test_beskeptic_framework_cache_declares_real_skeptic_source(self) -> None:
-        cache = json.loads((ROOT / "docs" / "BESKEPTIC_FRAMEWORK_CACHE.json").read_text(encoding="utf-8"))
+class RunSkepticFrameworkCacheTests(unittest.TestCase):
+    def test_skeptic_framework_cache_declares_real_skeptic_source(self) -> None:
+        cache = json.loads((ROOT / "docs" / "skeptic_framework_cache.json").read_text(encoding="utf-8"))
         self.assertEqual("saffih/skeptic", cache["authoritative_source"]["repository"])
         self.assertEqual("skeptic.md", cache["authoritative_source"]["path"])
         self.assertEqual(
@@ -28,7 +28,7 @@ class BeskepticFrameworkCacheTests(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(ROOT / "scripts" / "write_beskeptic_cache.py"),
+                    str(ROOT / "scripts" / "write_skeptic_cache.py"),
                     td,
                 ],
                 cwd=ROOT,
@@ -38,12 +38,12 @@ class BeskepticFrameworkCacheTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(0, result.returncode, msg=result.stderr)
-            workspace_cache = Path(td) / ".specify" / "sync" / "beskeptic_framework_cache.json"
+            workspace_cache = Path(td) / ".specify" / "sync" / "skeptic_framework_cache.json"
             self.assertTrue(workspace_cache.exists())
             data = json.loads(workspace_cache.read_text(encoding="utf-8"))
             self.assertEqual("saffih/skeptic", data["authoritative_source"]["repository"])
 
-    def test_first_run_writes_beskeptic_cache_and_cycles_reference_framework(self) -> None:
+    def test_first_run_writes_RunSkeptic_cache_and_cycles_reference_framework(self) -> None:
         hld = '''# HLD
 
 ## HLD-001 - API
@@ -79,10 +79,10 @@ API body.
             )
             self.assertEqual(0, result.returncode, msg=result.stderr + result.stdout)
 
-            cache_path = workspace / ".specify" / "sync" / "beskeptic_framework_cache.json"
+            cache_path = workspace / ".specify" / "sync" / "skeptic_framework_cache.json"
             self.assertTrue(cache_path.exists())
             plan = json.loads((workspace / ".specify" / "sync" / "spec_build_plan.json").read_text(encoding="utf-8"))
-            cycles = plan["plan_quality"]["beskeptic_cycles"]
+            cycles = plan["plan_quality"]["RunSkeptic_cycles"]
             self.assertTrue(cycles)
             self.assertEqual("saffih/skeptic", cycles[0]["framework"]["source"]["repository"])
             self.assertEqual(
@@ -90,8 +90,8 @@ API body.
                 cycles[0]["framework"]["phase_flow_text"],
             )
 
-    def test_beskeptic_cache_includes_companion_question_bank(self) -> None:
-        cache = json.loads((ROOT / "docs" / "BESKEPTIC_FRAMEWORK_CACHE.json").read_text(encoding="utf-8"))
+    def test_RunSkeptic_cache_includes_companion_question_bank(self) -> None:
+        cache = json.loads((ROOT / "docs" / "skeptic_framework_cache.json").read_text(encoding="utf-8"))
         companion_paths = [item["path"] for item in cache.get("companion_sources", [])]
         self.assertIn("skeptic-questions.md", companion_paths)
         bank = cache["domain_question_bank"]

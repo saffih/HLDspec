@@ -92,7 +92,7 @@ def build_package(workspace: Path) -> dict[str, Any]:
         },
         "first_feature_case": first or active,
         "active_proxy_feature": active,
-        "beskeptic_findings": findings,
+        "RunSkeptic_findings": findings,
         "feedback_impact_rules": quality.get("affected_artifact_policy", {}),
         "controlling_artifacts": controlling_artifacts,
         "supporting_artifacts": supporting_artifacts,
@@ -183,13 +183,13 @@ def render_md(pkg: dict[str, Any]) -> str:
         f"- short name: `{active.get('short_name', '')}`",
         "- proxy must use SpecKit in sequence: constitution if needed -> specify -> clarify -> plan -> tasks -> implement only after approval.",
         "",
-        "## Beskeptic findings",
+        "## Skeptic findings",
         "",
     ]
 
-    findings = pkg.get("beskeptic_findings", [])
+    findings = pkg.get("RunSkeptic_findings", [])
     if not findings:
-        lines.append("No Beskeptic findings recorded.")
+        lines.append("No Skeptic findings recorded.")
     for finding in findings:
         if not isinstance(finding, dict):
             continue
@@ -197,7 +197,7 @@ def render_md(pkg: dict[str, Any]) -> str:
             f"### {finding.get('id', '')} - {finding.get('area', '')}",
             "",
             f"- severity: `{finding.get('severity', '')}`",
-            f"- decision: `{finding.get('beskeptic_decision', '')}`",
+            f"- decision: `{finding.get('RunSkeptic_decision', '')}`",
             f"- finding: {finding.get('finding', '')}",
             f"- recommendation: {finding.get('recommendation', '')}",
             "",

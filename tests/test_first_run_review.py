@@ -24,7 +24,7 @@ class FirstRunReviewTests(unittest.TestCase):
                             "recommendation": "SPLIT_PLANNED_SPEC",
                             "findings": ["002: mixed_layers"],
                             "conflicts": [],
-                            "beskeptic_cycles": [],
+                            "RunSkeptic_cycles": [],
                         },
                         "planned_specs": [
                             {

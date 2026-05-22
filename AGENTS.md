@@ -46,35 +46,57 @@ Then call Python as:
 Do not make `uv` mandatory unless the repo explicitly adopts a `pyproject.toml`/locked environment.
 
 
-## Real Beskeptic framework contract
+## Real RunSkeptic framework contract
 
-HLDspec must treat `saffih/skeptic/skeptic.md` as the authoritative Beskeptic/Skeptic framework.
+HLDspec must treat `saffih/skeptic/skeptic.md` as the authoritative RunSkeptic framework.
 
 Cached framework contract:
 
 ```text
-docs/BESKEPTIC_FRAMEWORK_CACHE.json
-docs/BESKEPTIC_FRAMEWORK_CACHE.md
+docs/skeptic_framework_cache.json
+docs/skeptic_framework_cache.md
 ```
 
 Every first-run workspace should include:
 
 ```text
-.specify/sync/beskeptic_framework_cache.json
-.specify/sync/beskeptic_framework_cache.md
+.specify/sync/skeptic_framework_cache.json
+.specify/sync/skeptic_framework_cache.md
 ```
 
-`beskeptic_cycles` are valid only when they preserve the real Skeptic phase flow:
+`RunSkeptic_cycles` are valid only when they preserve the real Skeptic phase flow:
 
 ```text
 GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN
 ```
 
-Do not claim "real Beskeptic" from naming alone; the framework source, companion question bank, and phase flow must be present in artifacts.
+Do not claim "real RunSkeptic" from naming alone; the framework source, companion question bank, and phase flow must be present in artifacts.
 
 The framework cache must include both `skeptic.md` and the companion `skeptic-questions.md` domain question bank.
 
 
+
+## RunSkeptic framework contract
+
+`RunSkeptic` is the formal invocation string for the Skeptic framework.
+
+HLDspec must treat the current `saffih/skeptic/skeptic.md` as the runtime source of truth.
+
+When `RunSkeptic` is invoked:
+
+```text
+1. Read the actual current skeptic.md before analysis.
+2. Do not use memory, summaries, previous variants, or generated replacements as substitutes.
+3. Apply the current recipe exactly and in order.
+4. Show which major Skeptic steps were run.
+5. Show evidence for material findings.
+6. Use the exact output categories from skeptic.md.
+7. Do not modify files unless DECIDE says FIX and edits are explicitly allowed.
+8. Verify the recommendation against the framework.
+9. State unresolved conflicts, unknowns, skipped areas, and missing evidence.
+```
+
+Do not use alternate framework names in HLDspec-authored instructions. Use `RunSkeptic`.
 
 ## Source-HLD-affecting feedback
 
@@ -578,11 +600,11 @@ Future `--plan-specs` output should include a constitution action:
 }
 ```
 
-## Beskeptic Cycles and Key Aspects
+## RunSkeptic Cycles and Key Aspects
 
 Use the real Skeptic Framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`.
 
-A **Beskeptic Cycle** is HLDspec's operational use of the real Skeptic flow on one workflow step and selected Key Aspects.
+A **RunSkeptic review** is HLDspec's operational use of the real Skeptic flow on one workflow step and selected Key Aspects.
 
 Do not invent a replacement framework.
 
@@ -619,7 +641,7 @@ Spec-specific labels are recommendations under a Skeptic decision, not replaceme
 
 ### Key Aspects
 
-A **Key Aspect** is the specific concern a Beskeptic Cycle is aimed at.
+A **Key Aspect** is the specific concern a RunSkeptic review is aimed at.
 
 Core:
 
@@ -851,7 +873,7 @@ A target-spec prompt must not include:
 - Section Cards alone as source evidence
 - one arbitrary HLD section without its required and relevant related sections
 
-Beskeptic check for target-spec context:
+RunSkeptic check for target-spec context:
 
 - `source_of_truth`: Is the full HLD evidence present?
 - `bounded_context`: Is irrelevant bulk excluded?
@@ -1059,7 +1081,7 @@ It must not call an agent, create specs, or create the target Spec Kit Constitut
 
 Review `spec_build_plan_review.md` before any generation or downstream step.
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `hld_structure`
 - `hld_metadata`
@@ -1096,7 +1118,7 @@ Review:
 
 Do not continue if the HLD map is invalid.
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `hld_metadata`
 - `hld_refs`
@@ -1118,7 +1140,7 @@ logs/hld_spec_sync/<timestamp>/prompt.md
 
 Confirm the prompt uses bounded HLD context and does not load the full HLD unnecessarily.
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `bounded_context`
 - `source_of_truth`
@@ -1145,7 +1167,7 @@ specs/<NNN-feature-slug>/spec.md
 .specify/sync/feature_graph.json
 ```
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `spec_boundary`
 - `coverage`
@@ -1171,7 +1193,7 @@ logs/hld_spec_downstream/<timestamp>/context_selection.json
 logs/hld_spec_downstream/<timestamp>/prompt.md
 ```
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `coverage`
 - `integration`
@@ -1256,7 +1278,7 @@ performance/memory concerns when relevant
 conflicts and user decisions needed
 ```
 
-Run Beskeptic Cycles on these Key Aspects:
+Run RunSkeptic Cycles on these Key Aspects:
 
 - `spec_boundary`
 - `spec_decomposition`
@@ -1463,7 +1485,7 @@ Current controlled legacy path, only when explicitly requested:
 2. Run sync prompt-only first with `--use-hld-map --target-hld`.
 3. Review `context_selection.json` and `prompt.md`.
 4. Run sync for the target HLD section.
-5. Beskeptic-check spec boundary, coverage, integration, API contract, performance, and memory concerns.
+5. RunSkeptic-check spec boundary, coverage, integration, API contract, performance, and memory concerns.
 
 Future bottom-up generation path after `--target-spec`, Coverage Gate, and Integration Gate exist:
 
@@ -1824,7 +1846,7 @@ The judge/orchestrator must present:
 1. Constitution case
 2. Architecture/dependency case
 3. First-feature case
-4. Beskeptic findings
+4. Skeptic findings
 5. Feedback impact rules
 6. Human approval question
 ```
@@ -1845,7 +1867,7 @@ dependency feedback -> rebuild dependency graph, invocation queue, quality revie
 decomposition feedback -> update working HLD/HLD-SPECS mapping, rerun first_readonly, regenerate prework artifacts
 ```
 
-The quality review must use Beskeptic to detect unclear architecture, weak decomposition, missing foundations, API/functionality mixing, and explanations that will not make sense to the human.
+The quality review must use RunSkeptic to detect unclear architecture, weak decomposition, missing foundations, API/functionality mixing, and explanations that will not make sense to the human.
 
 SpecKit invocation remains blocked until this gate is approval-ready and the human approves.
 
@@ -1890,26 +1912,26 @@ The next checkpoint is the SpecKit prework approval gate.
 
 HLDspec must present the prework quality review and proxy dossier, then wait for human approval before a SpecKit proxy subagent invokes SpecKit.
 
-## Beskeptic meta-review runner
+## RunSkeptic meta-review runner
 
-After substantial HLDspec workflow changes, run many bounded Beskeptic cycles over the repo:
+After substantial HLDspec workflow changes, run many bounded RunSkeptic reviews over the repo:
 
 ```bash
-python3 scripts/run_beskeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
+python3 scripts/run_skeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
 ```
 
 Output:
 
 ```text
-.hldspec-meta-review/hldspec_beskeptic_meta_review.json
-.hldspec-meta-review/hldspec_beskeptic_meta_review.md
+.hldspec-meta-review/hldspec_skeptic_meta_review.json
+.hldspec-meta-review/hldspec_skeptic_meta_review.md
 ```
 
 The runner checks:
 
 ```text
 repo baseline
-Beskeptic grounding
+RunSkeptic grounding
 canonical flow
 SpecKit ownership boundary
 judge-led review protocol

@@ -37,7 +37,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "area": "feature extraction",
                 "finding": "No SpecKit features were extracted.",
                 "recommendation": "Rebuild the SpecKit input manifest from the HLD before approval.",
-                "beskeptic_decision": "DECOMPOSE",
+                "RunSkeptic_decision": "DECOMPOSE",
             }
         )
 
@@ -49,7 +49,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "area": "dependency graph",
                 "finding": "No independent/root feature exists; every feature depends on another feature.",
                 "recommendation": "Review the dependency graph for a cycle or missing foundation feature.",
-                "beskeptic_decision": "CONFLICT",
+                "RunSkeptic_decision": "CONFLICT",
             }
         )
 
@@ -62,7 +62,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                     "area": "SpecKit input",
                     "finding": f"{feature_name(feature)} has no natural-language input for /speckit.specify.",
                     "recommendation": "Add a clear feature description before invoking SpecKit.",
-                    "beskeptic_decision": "FIX",
+                    "RunSkeptic_decision": "FIX",
                 }
             )
         if "SPLIT_API_CONTRACT_FROM_PROCESSING" in as_list(feature.get("decomposition_flags")):
@@ -73,7 +73,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                     "area": "decomposition",
                     "finding": f"{feature_name(feature)} may mix API/interface contract with processing behavior.",
                     "recommendation": "Judge should explain whether this is split, sequenced, or intentionally kept together before approval.",
-                    "beskeptic_decision": "DECOMPOSE",
+                    "RunSkeptic_decision": "DECOMPOSE",
                 }
             )
         if "EXTRACT_COMMON_FOUNDATION" in as_list(feature.get("decomposition_flags")) and as_list(feature.get("depends_on_features")):
@@ -84,7 +84,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                     "area": "common foundation",
                     "finding": f"{feature_name(feature)} is a common/foundation candidate but has dependencies.",
                     "recommendation": "Verify whether the common foundation should be earlier or split into a root foundation.",
-                    "beskeptic_decision": "DECOMPOSE",
+                    "RunSkeptic_decision": "DECOMPOSE",
                 }
             )
 
@@ -97,7 +97,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "area": "constitution",
                 "finding": "No constitution rules were proposed.",
                 "recommendation": "Generate constitution rules that protect HLD architecture before invoking SpecKit.",
-                "beskeptic_decision": "FIX",
+                "RunSkeptic_decision": "FIX",
             }
         )
 
@@ -110,7 +110,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "area": "approval state",
                 "finding": "Constitution checkpoint already has a human decision.",
                 "recommendation": "Ensure the review reflects the latest human decision and affected artifacts were rebuilt.",
-                "beskeptic_decision": "VERIFY",
+                "RunSkeptic_decision": "VERIFY",
             }
         )
 
@@ -125,7 +125,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "area": "ordering",
                 "finding": "SpecKit invocation queue order does not match dependency graph bottom-up order.",
                 "recommendation": "Rebuild the invocation queue from the dependency graph.",
-                "beskeptic_decision": "FIX",
+                "RunSkeptic_decision": "FIX",
             }
         )
 
@@ -158,7 +158,7 @@ def build_review(workspace: Path) -> dict[str, Any]:
         "schema_version": 1,
         "status": status,
         "review_type": "SPECKIT_PREWORK_QUALITY_GATE",
-        "beskeptic_method": {
+        "RunSkeptic_method": {
             "flow": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
             "purpose": "Detect unclear architecture, weak decomposition, missing foundations, and user-confusing explanations before SpecKit invocation.",
             "decision_policy": "BLOCKER findings require rebuild; ACTION findings require explicit judge explanation before human approval.",
@@ -236,11 +236,11 @@ def render_md(review: dict[str, Any]) -> str:
         "",
         "The judge/orchestrator must present the constitution case, architecture/dependency case, and first-feature case to the human.",
         "",
-        "## Beskeptic review method",
+        "## RunSkeptic review method",
         "",
-        f"- flow: `{review['beskeptic_method']['flow']}`",
-        f"- purpose: {review['beskeptic_method']['purpose']}",
-        f"- decision policy: {review['beskeptic_method']['decision_policy']}",
+        f"- flow: `{review['RunSkeptic_method']['flow']}`",
+        f"- purpose: {review['RunSkeptic_method']['purpose']}",
+        f"- decision policy: {review['RunSkeptic_method']['decision_policy']}",
         "",
         "## Constitution case",
         "",
@@ -272,7 +272,7 @@ def render_md(review: dict[str, Any]) -> str:
         f"- why first: {case['first_feature_case']['why_first']}",
         f"- depends on: {', '.join(case['first_feature_case']['depends_on']) or 'none'}",
         "",
-        "## Beskeptic findings",
+        "## Skeptic findings",
         "",
     ]
 
@@ -283,7 +283,7 @@ def render_md(review: dict[str, Any]) -> str:
             f"### {finding['id']} - {finding['area']}",
             "",
             f"- severity: `{finding['severity']}`",
-            f"- Beskeptic decision: `{finding['beskeptic_decision']}`",
+            f"- RunSkeptic decision: `{finding['RunSkeptic_decision']}`",
             f"- finding: {finding['finding']}",
             f"- recommendation: {finding['recommendation']}",
             "",

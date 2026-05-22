@@ -97,7 +97,7 @@ def build_review(plan: dict[str, Any], plan_path: Path) -> str:
             "recommendation": "RESOLVE_CONFLICT",
             "findings": ["Plan has no plan_quality object."],
             "conflicts": ["Plan Quality Gate did not run."],
-            "beskeptic_cycles": [],
+            "RunSkeptic_cycles": [],
         }
 
     planned_specs = [spec for spec in as_list(plan.get("planned_specs")) if isinstance(spec, dict)]

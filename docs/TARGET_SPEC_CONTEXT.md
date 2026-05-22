@@ -56,7 +56,7 @@ They are useful for:
 - reducing context before planning
 - deciding which full HLD sections to fetch
 - showing key aspects quickly
-- helping Beskeptic spotlights choose evidence
+- helping RunSkeptic spotlights choose evidence
 
 They are not source evidence for final target-spec generation.
 
@@ -77,7 +77,7 @@ When `--target-spec` exists, it should build a bounded evidence package containi
 - target Spec Kit Constitution context when applicable
 - existing related specs only when needed and bounded
 
-## Beskeptic stop conditions
+## RunSkeptic stop conditions
 
 Stop with `CONFLICT` when:
 

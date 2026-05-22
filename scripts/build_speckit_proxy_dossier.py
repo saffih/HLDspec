@@ -88,7 +88,7 @@ def build_dossier(workspace: Path) -> dict[str, Any]:
         },
         "quality_context": {
             "quality_status": quality.get("status", ""),
-            "beskeptic_findings": quality.get("findings", []),
+            "RunSkeptic_findings": quality.get("findings", []),
             "first_feature_case": quality.get("case_to_present", {}).get("first_feature_case", {}),
         },
         "allowed_evidence_sources": [
