@@ -244,7 +244,7 @@ It may:
 - show the generated human decision queue
 - apply already answered conversion decisions to the working copy
 - rerun first-readonly on the converted working copy
-- report whether target-spec generation is allowed
+- report whether the SpecKit prework approval gate is reached
 
 It must not:
 - modify the source HLD
@@ -2024,4 +2024,35 @@ HLDspec should use the weakest sufficient agent, the smallest sufficient context
 The simpler the task, the stricter the prompt and the weaker/cheaper the agent should be.
 
 Subagents may delegate only to narrower, stricter, lower-authority subagents, and the parent must verify the result.
+
+## Current state entry points and legacy/supporting artifacts
+
+For current HLDspec -> SpecKit work, the first user-facing artifacts are:
+
+```text
+hldspec_state.md
+speckit_prework_package.md
+```
+
+The judge/orchestrator should inspect and present those before opening older planning artifacts.
+
+When SpecKit is available, these artifacts are legacy/supporting, not controlling:
+
+```text
+target_spec_work_order.md/json
+spec_branch_queue.md/json
+```
+
+Generated markdown for those artifacts must say:
+
+```text
+Legacy/supporting when SpecKit is available.
+```
+
+The green post-plan checkpoint is the SpecKit prework approval gate, not manual target-spec generation.
+
+The judge/orchestrator must present:
+- current stage and checkpoint from `hldspec_state.md`
+- constitution/dependency/first-feature case from `speckit_prework_package.md`
+- only real human checkpoint questions
 
