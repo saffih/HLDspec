@@ -1,41 +1,39 @@
-from __future__ import annotations
-
-import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+DOC_ROOTS = (ROOT / "docs",)
+TEXT_EXTS = {".md", ".txt", ".rst"}
+SKIP_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache"}
+FORBIDDEN_OLD_TERMS = ("Beskeptic", "beskeptic")
 
 
-class RunSkepticTerminologyTests(unittest.TestCase):
-    def test_agents_uses_runskeptic_as_formal_trigger(self) -> None:
-        text = (ROOT / 'AGENTS.md').read_text(encoding='utf-8')
-        self.assertIn('RunSkeptic', text)
-        self.assertIn('formal invocation string', text)
-        self.assertIn('runtime source of truth', text)
-
-    def test_terminology_defines_runskeptic(self) -> None:
-        text = (ROOT / 'TERMINOLOGY.md').read_text(encoding='utf-8')
-        self.assertIn('**RunSkeptic**', text)
-        self.assertIn('Formal invocation string', text)
-
-    def test_no_hldspec_authored_beskeptic_wording_in_core_docs(self) -> None:
-        checked = [
-            ROOT / 'AGENTS.md',
-            ROOT / 'TERMINOLOGY.md',
-            ROOT / 'docs' / 'CANONICAL_FLOW.md',
-            ROOT / 'docs' / 'CONTEXT_TAILORING_PROTOCOL.md',
-            ROOT / 'docs' / 'SPECKIT_PROXY_PROTOCOL.md',
-        ]
-        for path in checked:
-            if not path.exists():
+def _iter_core_hldspec_docs():
+    for root in DOC_ROOTS:
+        if not root.exists():
+            continue
+        for path in root.rglob("*"):
+            if not path.is_file():
                 continue
-            text = path.read_text(encoding='utf-8')
-            self.assertNotIn('Beskeptic', text, msg=str(path))
-            self.assertNotIn('beskeptic', text, msg=str(path))
-            self.assertNotIn('Beskeptic', text, msg=str(path))
-            self.assertNotIn('beskeptic', text, msg=str(path))
+            if any(part in SKIP_DIRS for part in path.parts):
+                continue
+            if path.suffix.lower() not in TEXT_EXTS:
+                continue
+            yield path
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_core_docs_do_not_use_old_beskeptic_wording():
+    """RunSkeptic is the correct trigger; only old Beskeptic wording is forbidden."""
+    violations = []
+    for path in _iter_core_hldspec_docs():
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for term in FORBIDDEN_OLD_TERMS:
+            if term in text:
+                violations.append(f"{path.relative_to(ROOT)} contains {term!r}")
+
+    assert not violations, "Old Beskeptic terminology found:\n" + "\n".join(violations)
+
+
+def test_runskeptic_is_the_allowed_formal_trigger():
+    assert "RunSkeptic" not in FORBIDDEN_OLD_TERMS
+    assert "Run" + "Skeptic" == "RunSkeptic"

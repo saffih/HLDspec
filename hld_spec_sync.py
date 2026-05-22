@@ -901,7 +901,7 @@ def build_cycle_record(
     verification: str = "",
 ) -> dict[str, object]:
     return {
-        "framework": BESKEPTIC_FRAMEWORK,
+        "framework": RUNSKEPTIC_FRAMEWORK,
         "step": step,
         "key_aspects": key_aspects,
         "spotlight": spotlight,
@@ -936,8 +936,8 @@ def build_cycle_record(
 
 
 
-BESKEPTIC_FRAMEWORK = {
-    "name": "Beskeptic / Skeptic",
+RUNSKEPTIC_FRAMEWORK = {
+    "name": "RunSkeptic / Skeptic",
     "source": {
         "repository": "saffih/skeptic",
         "path": "skeptic.md",
@@ -1030,7 +1030,7 @@ def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> N
             "recommendation": "RESOLVE_CONFLICT",
             "findings": ["planned_specs is not a list"],
             "conflicts": ["planned_specs is not a list"],
-            "beskeptic_cycles": [],
+            "RunSkeptic_cycles": [],
         }
         return
 
@@ -1173,7 +1173,7 @@ def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> N
         "recommendation": recommendation,
         "findings": findings,
         "conflicts": conflicts,
-        "beskeptic_cycles": cycles,
+        "RunSkeptic_cycles": cycles,
     }
 
 
@@ -1269,7 +1269,7 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
                     "integration_expectations": [],
                     "performance_expectations": [],
                     "memory_expectations": [],
-                    "beskeptic_cycles": [],
+                    "RunSkeptic_cycles": [],
                     "decision": "FIX",
                     "recommendation": "KEEP_SPEC",
                     "user_decision_needed": "",
@@ -1310,7 +1310,7 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
                 findings=findings,
                 verification="Review spec_build_plan.md before creating target specs.",
             )
-            cycles = item["beskeptic_cycles"]
+            cycles = item["RunSkeptic_cycles"]
             assert isinstance(cycles, list)
             cycles.append(cycle)
 
@@ -1360,7 +1360,7 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
             f"{source_id} HLD anchors and related refs are represented in this spec."
             for source_id in source_ids
         ]
-        cycles = item["beskeptic_cycles"]
+        cycles = item["RunSkeptic_cycles"]
         assert isinstance(cycles, list)
         if any("api_contract" in cycle["key_aspects"] for cycle in cycles):
             item["api_contract_expectations"] = [
@@ -1521,8 +1521,8 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
             for expectation in item["memory_expectations"]:
                 md_lines.append(f"- {expectation}")
 
-        md_lines.extend(["", "Beskeptic cycles:"])
-        for cycle in item["beskeptic_cycles"]:
+        md_lines.extend(["", "RunSkeptic reviews:"])
+        for cycle in item["RunSkeptic_cycles"]:
             md_lines.append(
                 f"- {cycle['decision']} / {cycle['recommendation']}: {cycle['spotlight']} "
                 f"[aspects: {', '.join(cycle['key_aspects'])}]"

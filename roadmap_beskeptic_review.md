@@ -1,4 +1,4 @@
-# HLDspec Roadmap Beskeptic Self-Review
+# HLDspec Roadmap RunSkeptic Self-Review
 
 made by AI
 
@@ -35,7 +35,7 @@ GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE
 HLDspec term:
 
 ```text
-Beskeptic Cycle = HLDspec operational use of the real Skeptic flow on selected Key Aspects.
+RunSkeptic review = HLDspec operational use of the real Skeptic flow on selected Key Aspects.
 ```
 
 Top-level decisions:
@@ -598,7 +598,7 @@ It must add:
     "recommendation": "KEEP_PLAN|REVIEW_PLAN|SPLIT_PLANNED_SPEC|RESOLVE_CONFLICT",
     "findings": [],
     "conflicts": [],
-    "beskeptic_cycles": []
+    "RunSkeptic_cycles": []
   }
 }
 ```

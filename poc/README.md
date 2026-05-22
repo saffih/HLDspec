@@ -68,7 +68,7 @@ For each case:
 /tmp/hldspec-poc/<case>/.specify/sync/spec_build_plan.json
 ```
 
-## Beskeptic use
+## RunSkeptic use
 
 Use the POC to test changes before touching a real project HLD.
 
