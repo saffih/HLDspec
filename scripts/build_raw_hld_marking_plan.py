@@ -28,18 +28,19 @@ ROLE_KEYWORDS: dict[str, list[str]] = {
     ],
     "processing_behavior": [
         "process", "workflow", "behavior", "execute", "runtime",
-        "algorithm", "decision", "validation", "step",
+        "algorithm", "decision", "validation", "step", "processing",
     ],
     "governance_context": [
-        "assumption", "decision log", "conflict", "source of truth",
-        "constraint", "policy", "scope", "constitution", "governance",
+        "governance", "assumption", "decision log", "conflict", "source of truth",
+        "constraint", "policy", "scope", "constitution",
     ],
     "security": [
         "security", "auth", "permission", "secret", "token", "access",
+        "credential", "encryption",
     ],
     "operations": [
-        "runbook", "deployment", "monitor", "observability", "logging",
-        "alert", "environment", "operation",
+        "runbook", "deployment", "deploy", "monitor", "observability", "logging",
+        "alert", "environment", "operation", "rollback", "recovery",
     ],
 }
 
@@ -98,6 +99,13 @@ class MarkingItem:
     suggested_risk: str
     suggested_specs: str
     suggested_resources: str
+    candidate_hld_metadata: dict[str, Any]
+    evidence_excerpt: str
+    evidence_level: str
+    split_keep_recommendation: str
+    refs: list[str]
+    depends_ref: list[str]
+    conflicts_with_ref: list[str]
     marking_questions: list[str]
     subagents: list[str]
     judge_notes: list[str]
@@ -116,20 +124,45 @@ def source_slice(lines: list[str], start: int, end: int) -> str:
     return "\n".join(lines[start - 1 : max(start - 1, end)])
 
 
+def text_lines(text: str, title: str) -> list[str]:
+    lines = [title.strip()] if title.strip() else []
+    lines.extend(line.strip() for line in text.splitlines() if line.strip())
+    return lines
+
+
+def first_keyword_evidence(text: str, title: str, roles: list[str]) -> str:
+    for line in text_lines(text, title):
+        low = line.lower()
+        for role in roles:
+            for keyword in ROLE_KEYWORDS.get(role, []):
+                if keyword in low:
+                    return line[:300]
+    return ""
+
+
 def matches(text: str, keywords: list[str]) -> bool:
     low = text.lower()
     return any(keyword in low for keyword in keywords)
 
 
+def role_evidence_text(text: str, title: str) -> str:
+    lines = [title]
+    for line in text.splitlines():
+        stripped = line.strip()
+        if re.search(r"\b(REF|DEPENDS\s+REF|CONFLICTS_WITH\s+REF)\s+HLD-\d{3}\b", stripped, flags=re.I):
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)
+
+
 def infer_roles(text: str, title: str) -> list[str]:
-    haystack = f"{title}\n{text}"
-    roles = [role for role, keywords in ROLE_KEYWORDS.items() if matches(haystack, keywords)]
-    if not roles:
-        roles = ["architecture"]
-    return roles
+    haystack = role_evidence_text(text, title)
+    return [role for role, keywords in ROLE_KEYWORDS.items() if matches(haystack, keywords)]
 
 
 def choose_primary_role(roles: list[str]) -> str:
+    if not roles:
+        return "TBD"
     order = [
         "governance_context",
         "product_context",
@@ -143,10 +176,12 @@ def choose_primary_role(roles: list[str]) -> str:
     for role in order:
         if role in roles:
             return role
-    return roles[0] if roles else "architecture"
+    return roles[0]
 
 
 def infer_risk(roles: list[str], text: str) -> str:
+    if not roles:
+        return "TBD"
     if "security" in roles or "interface_contract" in roles or "data_model" in roles:
         return "HIGH"
     if len(roles) >= 3:
@@ -154,6 +189,26 @@ def infer_risk(roles: list[str], text: str) -> str:
     if re.search(r"\b(conflict|source of truth|must|critical|failure|risk|constraint)\b", text, re.I):
         return "MEDIUM"
     return "LOW"
+
+
+def evidence_level_for(roles: list[str], evidence_excerpt: str, notes: list[str]) -> str:
+    if evidence_excerpt and roles:
+        return "observed"
+    if roles:
+        return "inferred_risk"
+    return "unknown"
+
+
+def split_keep_for(roles: list[str]) -> str:
+    if not roles:
+        return "TBD"
+    if {"interface_contract", "processing_behavior"}.issubset(roles):
+        return "SPLIT"
+    if {"interface_contract", "data_model"}.issubset(roles):
+        return "SPLIT"
+    if len(set(roles)) >= 3:
+        return "SPLIT"
+    return "KEEP"
 
 
 def subagents_for(roles: list[str]) -> list[str]:
@@ -171,6 +226,13 @@ def subagents_for(roles: list[str]) -> list[str]:
 
 
 def questions_for(roles: list[str]) -> list[str]:
+    if not roles:
+        return [
+            "What is this section responsible for?",
+            "Is this section product context, architecture, API, data/state, processing, governance, security, operations, or non-spec context?",
+            "Should the judge leave HLD metadata as TBD until human review?",
+        ]
+
     questions: list[str] = []
     for role in roles:
         questions.extend(PERSPECTIVE_QUESTIONS.get(role, []))
@@ -181,6 +243,55 @@ def questions_for(roles: list[str]) -> list[str]:
             unique.append(question)
             seen.add(question)
     return unique
+
+
+def extract_refs(text: str) -> tuple[list[str], list[str], list[str]]:
+    refs: set[str] = set()
+    depends: set[str] = set()
+    conflicts: set[str] = set()
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        for match in re.finditer(r"\bDEPENDS\s+REF\s+(HLD-\d{3})\b", stripped, flags=re.I):
+            depends.add(match.group(1).upper())
+        for match in re.finditer(r"\bCONFLICTS_WITH\s+REF\s+(HLD-\d{3})\b", stripped, flags=re.I):
+            conflicts.add(match.group(1).upper())
+
+        if not re.search(r"\b(DEPENDS|CONFLICTS_WITH)\s+REF\b", stripped, flags=re.I):
+            for match in re.finditer(r"\bREF\s+(HLD-\d{3})\b", stripped, flags=re.I):
+                refs.add(match.group(1).upper())
+
+    return sorted(refs), sorted(depends), sorted(conflicts)
+
+
+def metadata_for(
+    *,
+    candidate_id: str,
+    primary_role: str,
+    risk: str,
+    resources: str,
+    refs: list[str],
+    depends_ref: list[str],
+    conflicts_with_ref: list[str],
+    evidence_level: str,
+) -> dict[str, Any]:
+    verify = (
+        "TBD - insufficient evidence; judge/human review required before assigning metadata."
+        if primary_role == "TBD" or evidence_level == "unknown"
+        else "Verify section role, dependencies, resources, and split/keep decision against HLD evidence."
+    )
+    return {
+        "HLD-ID": candidate_id or "TBD",
+        "HLD-ROLE": primary_role,
+        "HLD-STATUS": "active" if primary_role != "TBD" else "TBD",
+        "HLD-RISK": risk,
+        "HLD-SPECS": "TBD",
+        "HLD-RESOURCES": resources,
+        "HLD-VERIFY": verify,
+        "REF": refs,
+        "DEPENDS_REF": depends_ref,
+        "CONFLICTS_WITH_REF": conflicts_with_ref,
+    }
 
 
 def build_marking_item(candidate: dict[str, Any], source_lines: list[str]) -> MarkingItem:
@@ -194,9 +305,13 @@ def build_marking_item(candidate: dict[str, Any], source_lines: list[str]) -> Ma
     roles = infer_roles(text, title)
     primary_role = choose_primary_role(roles)
     risk = infer_risk(roles, text)
+    refs, depends_ref, conflicts_with_ref = extract_refs(text)
+    resources = ", ".join(roles) if roles else "TBD"
     agents = subagents_for(roles)
 
     notes: list[str] = []
+    if not roles:
+        notes.append("Insufficient evidence; do not assign architecture role without judge/human review.")
     if "interface_contract" in roles and "processing_behavior" in roles:
         notes.append("Check whether API/interface contract should be separated from processing behavior.")
     if "data_model" in roles and "interface_contract" in roles:
@@ -205,6 +320,23 @@ def build_marking_item(candidate: dict[str, Any], source_lines: list[str]) -> Ma
         notes.append("Product/use-case evidence exists but may be context for another primary role.")
     if "governance_context" in roles:
         notes.append("May belong in constitution/prework rather than a feature spec.")
+    if conflicts_with_ref:
+        notes.append("Explicit conflict references require human decision before downstream SpecKit work.")
+
+    evidence_excerpt = first_keyword_evidence(text, title, roles)
+    evidence_level = evidence_level_for(roles, evidence_excerpt, notes)
+    split_keep_recommendation = split_keep_for(roles)
+
+    metadata = metadata_for(
+        candidate_id=candidate_id,
+        primary_role=primary_role,
+        risk=risk,
+        resources=resources,
+        refs=refs,
+        depends_ref=depends_ref,
+        conflicts_with_ref=conflicts_with_ref,
+        evidence_level=evidence_level,
+    )
 
     return MarkingItem(
         candidate_id=candidate_id,
@@ -216,7 +348,14 @@ def build_marking_item(candidate: dict[str, Any], source_lines: list[str]) -> Ma
         primary_role=primary_role,
         suggested_risk=risk,
         suggested_specs="TBD",
-        suggested_resources="TBD",
+        suggested_resources=resources,
+        candidate_hld_metadata=metadata,
+        evidence_excerpt=evidence_excerpt,
+        evidence_level=evidence_level,
+        split_keep_recommendation=split_keep_recommendation,
+        refs=refs,
+        depends_ref=depends_ref,
+        conflicts_with_ref=conflicts_with_ref,
         marking_questions=questions_for(roles),
         subagents=agents,
         judge_notes=notes,
@@ -245,6 +384,7 @@ def build_plan(conversion_plan: dict[str, Any], source_text: str, *, source_hld:
             "Ask only real checkpoint questions when interpretation affects split/role/dependency/constitution.",
             "Do not create SpecKit specs during marking.",
             "Do not modify the source HLD.",
+            "Do not default unknown sections to architecture; use TBD until evidence is sufficient.",
         ],
         "subagent_contract": {
             "judge_orchestrator": "Owns final marking decisions, human questions, and source-HLD safety.",
@@ -308,11 +448,23 @@ def render_md(plan: dict[str, Any]) -> str:
             f"- source lines: {item['source_line_start']}-{item['source_line_end']}",
             f"- conversion action: `{item['current_conversion_action']}`",
             f"- primary role: `{item['primary_role']}`",
-            f"- suggested roles: {', '.join(item['suggested_roles'])}",
+            f"- suggested roles: {', '.join(item['suggested_roles']) or 'none'}",
             f"- suggested risk: `{item['suggested_risk']}`",
+            f"- evidence level: `{item['evidence_level']}`",
+            f"- evidence excerpt: {item['evidence_excerpt'] or 'none'}",
+            f"- split/keep recommendation: `{item['split_keep_recommendation']}`",
+            f"- refs: {', '.join(item['refs']) or 'none'}",
+            f"- depends refs: {', '.join(item['depends_ref']) or 'none'}",
+            f"- conflicts refs: {', '.join(item['conflicts_with_ref']) or 'none'}",
             f"- suggested specs: `{item['suggested_specs']}`",
             f"- suggested resources: `{item['suggested_resources']}`",
-            f"- subagents: {', '.join(item['subagents'])}",
+            f"- subagents: {', '.join(item['subagents']) or 'none'}",
+            "",
+            "Candidate HLD metadata:",
+            "",
+            "```json",
+            json.dumps(item["candidate_hld_metadata"], indent=2, sort_keys=True),
+            "```",
             "",
             "Questions:",
         ]
@@ -344,6 +496,7 @@ def render_prompt(plan: dict[str, Any]) -> str:
         "- Do not create final specs manually.\n"
         "- Use bounded subagents only for candidate sections and perspective questions.\n"
         "- Ask the human only real checkpoint questions.\n"
+        "- Do not default unknown sections to architecture; use TBD until evidence is sufficient.\n"
         "- Final output should guide HLD metadata: HLD-ROLE, HLD-RISK, HLD-SPECS, HLD-RESOURCES, HLD-VERIFY, refs, split/keep decisions.\n\n"
         "Open:\n"
         f"- {plan['source_hld']}\n"
