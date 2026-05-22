@@ -23,9 +23,18 @@ The system must support:
 - future bounded agent orchestration
 ```
 
-## Current rewrite decision
+## Current implemented slice
 
-Legacy tests are preserved but moved aside during V2 rewrite.
+```text
+ProjectMachine
+RawHldConversionMachine
+ApplyHldConversionMachine
+SpecBuildPlanMachine
+SpeckitPreworkMachine
+ApprovalGateMachine
+```
+
+## Active test layout
 
 ```text
 tests_legacy/ = old tests, kept for reference
@@ -49,8 +58,8 @@ V2 gate passes
 hldspec/
   state_machine.py
   result_renderer.py
-  artifacts.py
   command_runner.py
+  artifacts.py
   checkpoints.py
   machines/
     project.py
@@ -64,17 +73,6 @@ hldspec/
     runskeptic_review.py
     constitution_quality.py
 ```
-
-Scripts become adapters:
-
-```text
-scripts/hldspec_v2.py
-scripts/hldspec_v2_ready_gate.py
-scripts/project_continue.sh
-scripts/hldspec_run.sh
-```
-
-Shell scripts should become compatibility wrappers only.
 
 ## Shared contracts
 
@@ -136,326 +134,6 @@ Continuation protocol:
 What is not modified / not invoked:
 ```
 
-## Machines and responsibilities
-
-### ProjectMachine
-
-Status: started
-
-Owns:
-
-```text
-- top-level coordination
-- selecting the next sub-machine
-- preserving sub-machine MachineResult semantics
-```
-
-Does not own:
-
-```text
-- detailed checkpoint policy
-- SpecKit invocation details
-- source-HLD mutation logic
-```
-
-### RawHldConversionMachine
-
-Status: started
-
-Owns:
-
-```text
-- raw/converted working HLD detection
-- conversion decision queue inspection
-- open human questions
-- STOP_CHECKPOINT when decisions are TBD
-- CONTINUE when all decisions are answered
-```
-
-Must never:
-
-```text
-- modify the source HLD
-- invoke SpecKit
-- implement app code
-```
-
-### ApplyHldConversionMachine
-
-Status: next
-
-Owns:
-
-```text
-- apply answered conversion decisions
-- modify only the working HLD under workspace
-- write conversion/apply artifacts
-- preserve source HLD unchanged
-```
-
-Tests needed:
-
-```text
-answered queue + raw working HLD -> converted working HLD
-source HLD remains unchanged
-missing queue -> BLOCKED
-TBD queue -> STOP_CHECKPOINT, not apply
-invalid decision -> BLOCKED
-```
-
-### SpecBuildPlanMachine
-
-Status: planned
-
-Owns:
-
-```text
-- inspect spec_build_plan.json
-- inspect spec_build_plan_review.md
-- determine plan gate green / blocked
-- identify conflicts and flagged specs
-```
-
-Outputs:
-
-```text
-CONTINUE when plan is green
-BLOCKED when plan quality fails
-STOP_CHECKPOINT when human decision is needed
-```
-
-### SpeckitPreworkMachine
-
-Status: planned
-
-Owns:
-
-```text
-- constitution update plan
-- feature dependency graph
-- SpecKit input manifest
-- SpecKit invocation queue
-- proxy dossier
-- prework package
-- prework quality review
-```
-
-Outputs:
-
-```text
-SPECKIT_PREWORK_MISSING
-SPECKIT_PREWORK_REWORK
-SPECKIT_PREWORK_APPROVAL_GATE
-```
-
-### ApprovalGateMachine
-
-Status: planned
-
-Owns:
-
-```text
-- approve / reject / request changes
-- post-approval allowed next action
-- explicit block on SpecKit until approval
-```
-
-### SourceUpdateMachine
-
-Status: planned
-
-Owns:
-
-```text
-- source-HLD-affecting update queue
-- decision appendix
-- explicit source-edit approval
-```
-
-Important:
-
-```text
-source HLD mutation is a separate risk class
-source HLD must never be changed implicitly
-```
-
-### ReadyGateMachine
-
-Status: planned
-
-Owns:
-
-```text
-- V2 required files
-- tests_v2
-- generated output ignored
-- optional target-HLD dry run
-```
-
-### RunSkepticReviewMachine
-
-Status: planned
-
-Owns:
-
-```text
-- strict RunSkeptic execution contract
-- evidence fields
-- PASS / ACTION / CONFLICT result shape
-```
-
-### ConstitutionQualityMachine
-
-Status: planned
-
-Owns:
-
-```text
-- constitution rule completeness
-- HLD evidence
-- violation examples
-- SpecKit phase enforcement
-- unresolved open questions
-```
-
-## Current active next leaps
-
-### Leap 1: ApplyHldConversionMachine
-
-Implement the first true action machine.
-
-Scope:
-
-```text
-hldspec/machines/apply_hld_conversion.py
-tests_v2/test_apply_hld_conversion_machine.py
-docs/HLDSPEC_APPLY_HLD_CONVERSION_MACHINE.md
-```
-
-Expected behavior:
-
-```text
-RawHldConversionMachine returns CONTINUE
-ProjectMachine delegates to ApplyHldConversionMachine
-ApplyHldConversionMachine applies decisions to working HLD only
-ProjectMachine returns CONTINUE / WORKING_HLD_CONVERTED
-```
-
-Non-goals:
-
-```text
-- no SpecKit
-- no source HLD edits
-- no app code
-```
-
-### Leap 2: SpecBuildPlanMachine
-
-After conversion is applied, inspect the first-readonly plan artifacts.
-
-Scope:
-
-```text
-hldspec/machines/spec_build_plan.py
-tests_v2/test_spec_build_plan_machine.py
-docs/HLDSPEC_SPEC_BUILD_PLAN_MACHINE.md
-```
-
-Expected behavior:
-
-```text
-missing review -> BLOCKED or need first-readonly
-bad plan -> BLOCKED / SPEC_BUILD_PLAN_CHECKPOINT
-green plan -> CONTINUE
-```
-
-### Leap 3: SpeckitPreworkMachine
-
-Move prework readiness into a dedicated machine.
-
-Scope:
-
-```text
-hldspec/machines/speckit_prework.py
-tests_v2/test_speckit_prework_machine.py
-docs/HLDSPEC_SPECKIT_PREWORK_MACHINE.md
-```
-
-### Leap 4: V2 runner migration
-
-Only after the machines are tested:
-
-```text
-scripts/project_continue.sh -> wrapper only
-scripts/hldspec_run.sh -> wrapper only
-scripts/hldspec_v2.py -> active project runner
-```
-
-## Test strategy
-
-Run only active V2 tests during the rewrite:
-
-```bash
-uv run python -m unittest discover -s tests_v2 -v
-```
-
-Run V2 ready gate:
-
-```bash
-uv run python scripts/hldspec_v2_ready_gate.py \
-  --repo . \
-  --output-dir .hldspec-v2-ready-gate \
-  --fail-on-not-ready
-```
-
-Legacy tests are reference material only during the V2 rewrite.
-
-## Quality rules
-
-Every patch must:
-
-```text
-- touch one architecture seam or one full vertical slice
-- run tests_v2
-- run hldspec_v2_ready_gate.py
-- commit only intended files
-- preserve source-HLD safety
-- not invoke SpecKit unless explicitly approved
-```
-
-## Stop conditions
-
-Stop and ask for human decision when:
-
-```text
-- conversion decision is TBD
-- source-HLD update is proposed
-- plan quality has conflict
-- SpecKit prework requires rework
-- SpecKit invocation is requested
-- implementation/code generation would start
-```
-
-## Current known risks
-
-```text
-- old tests may encode useful behavior but brittle implementation checks
-- V2 may drift unless legacy behaviors are reviewed before deletion
-- applying conversion must be very careful not to touch source HLD
-- SpecKit approval must remain explicit
-- generated artifacts must not pollute git status
-```
-
-## Next command after this TODO is committed
-
-Start Leap 1:
-
-```text
-Add ApplyHldConversionMachine
-```
-
-Implement only the working-HLD conversion action.
-
 ## Operating model: roles, subagents, and context
 
 ### Core idea
@@ -505,9 +183,7 @@ Uncle Bob / SOLID reviewer
 
 ### Subagent rules
 
-Subagents are not free-form chat helpers.
-
-They are bounded review units with explicit input, output, cost, and stop rules.
+Subagents are bounded review units with explicit input, output, cost, and stop rules.
 
 Each subagent must receive only:
 
@@ -607,42 +283,6 @@ RunSkeptic context
   exact artifact under review, actual RunSkeptic framework, issue hypothesis, tests/evidence, residual risk
 ```
 
-### Prompt and personality guidance
-
-Prompts should be role-specific and strict.
-
-Default style:
-
-```text
-- direct
-- evidence-based
-- no filler
-- no broad exploration unless required
-- ask only real checkpoint questions
-- do not summarize the whole repo
-- report current state, blocker, decision needed, artifacts, next action
-```
-
-For limited agents:
-
-```text
-- read the shortest run card first
-- do not read long docs unless directed by state machine
-- run the assigned command
-- inspect only controlling artifacts
-- stop at checkpoint
-```
-
-For judge/orchestrator:
-
-```text
-- owns global consistency
-- may invoke bounded subagents
-- must consolidate findings
-- must keep the human in the loop at checkpoints
-- must never hide blockers behind generic "continue"
-```
-
 ### Checkpoint communication standard
 
 Every checkpoint must say:
@@ -663,7 +303,7 @@ Answered questions must be separated from active blocking questions.
 
 The active question list must include only open blocking questions.
 
-### Source-HLD safety
+## Source-HLD safety
 
 There are three different artifacts:
 
@@ -688,7 +328,7 @@ Rules:
 - no machine may silently write to the source HLD
 ```
 
-### SpecKit safety
+## SpecKit safety
 
 SpecKit is blocked until explicit approval.
 
@@ -713,7 +353,7 @@ Forbidden before approval:
 - do not implement app code
 ```
 
-### RunSkeptic use
+## RunSkeptic use
 
 RunSkeptic must be applied as a strict recipe, not as vague skepticism.
 
@@ -740,7 +380,7 @@ RunSkeptic must be used for:
 - large refactors
 ```
 
-### Uncle Bob / SOLID use
+## Uncle Bob / SOLID use
 
 Uncle Bob / SOLID review must be used for code architecture.
 
@@ -763,7 +403,7 @@ Testability
   test transitions and contracts, not exact implementation strings
 ```
 
-### Product correctness guard
+## Product correctness guard
 
 HLDspec must not produce fake specs.
 
@@ -792,23 +432,48 @@ unknown / neutral section
   -> human/judge review required
 ```
 
-### Current strategic direction
+## Current active next leaps
 
-The next big leaps should prioritize product correctness and workflow safety, not adapter plumbing.
+### Leap 1: ApplyHldConversionMachine
 
-Priority order:
+Status: implemented in current V2 full slice.
+
+### Leap 2: SpecBuildPlanMachine
+
+Status: implemented in current V2 full slice.
+
+### Leap 3: SpeckitPreworkMachine
+
+Status: implemented in current V2 full slice.
+
+### Leap 4: V2 runner migration
+
+Status: partially implemented through `scripts/hldspec_v2.py`; legacy wrappers remain reference/compatibility only.
+
+## Remaining next leaps
 
 ```text
-1. ApplyHldConversionMachine
-2. SourceUpdateMachine
-3. SpecBuildPlanMachine
-4. SpeckitPreworkMachine
-5. ApprovalGateMachine
-6. V2 runner migration
-7. Replace/delete legacy tests only when covered by stronger V2 tests
+SourceUpdateMachine
+SpecBoundaryMachine
+RunSkepticReviewMachine
+ConstitutionQualityMachine
+V2 runner migration
 ```
 
-### What not to do
+## Stop conditions
+
+Stop and ask for human decision when:
+
+```text
+- conversion decision is TBD
+- source-HLD update is proposed
+- plan quality has conflict
+- SpecKit prework requires rework
+- SpecKit invocation is requested
+- implementation/code generation would start
+```
+
+## What not to do
 
 ```text
 - do not keep patching old shell wording
