@@ -231,3 +231,14 @@ plan passes constitution checks
 tasks are dependency ordered and independently testable
 no implementation starts without approval
 ```
+
+## Context tailoring and bloat guard
+
+This protocol must use the shared context-tailoring rules:
+
+```text
+docs/CONTEXT_TAILORING_PROTOCOL.md
+```
+
+Use the weakest sufficient agent, the smallest sufficient context, and the strictest sufficient prompt. If a subtask can be done by a deterministic tool, script, grep, or lower-cost bounded agent, do not spend high-reasoning budget on it.
+

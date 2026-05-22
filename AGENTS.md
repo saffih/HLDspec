@@ -1984,3 +1984,44 @@ hldspec_state.md
 speckit_prework_package.md
 ```
 
+## Raw HLD conversion utility
+
+Use this utility when a human explicitly asks to convert a raw HLD into HLDspec format without modifying the source HLD:
+
+```bash
+python3 scripts/convert_hld_to_hldspec.py <raw-HLD.md> --default-flow-splits
+```
+
+The converter:
+
+```text
+- writes a separate output file by default
+- refuses to overwrite unless --overwrite is passed
+- adds HLD-ID / HLD-ROLE / HLD-STATUS / HLD-RISK / HLD-SPECS / HLD-RESOURCES / HLD-VERIFY metadata
+- can split selected top-level sections by their ### subsections
+- validates headings, metadata, and duplicate IDs
+- writes a conversion index
+```
+
+This is a utility for explicit conversion/debugging. The judge/orchestrator should still prefer the natural `scripts/hldspec_run.sh` flow for normal project runs.
+
+## Context Tailoring Protocol
+
+Use the shared context-tailoring protocol whenever the judge/orchestrator delegates work to a subagent.
+
+Reference:
+
+```text
+docs/CONTEXT_TAILORING_PROTOCOL.md
+```
+
+Core rule:
+
+```text
+HLDspec should use the weakest sufficient agent, the smallest sufficient context, and the strictest sufficient prompt.
+```
+
+The simpler the task, the stricter the prompt and the weaker/cheaper the agent should be.
+
+Subagents may delegate only to narrower, stricter, lower-authority subagents, and the parent must verify the result.
+

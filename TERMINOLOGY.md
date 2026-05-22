@@ -148,3 +148,16 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **Supporting Artifact** | Artifact used as evidence or detail behind the controlling artifact. |
 | **Legacy/Supporting Artifact** | Older or compatibility artifact that may be present but does not control the current workflow when SpecKit is available. |
 
+## Context tailoring terms
+
+| Term | Meaning |
+|---|---|
+| **Context Tailoring** | Giving each task only the context, role, goals, rules, evidence, and output schema needed for that task. |
+| **Bloat Guard** | Rule that prevents overloading agents with unnecessary context, authority, reasoning level, or historical discussion. |
+| **Cost-Fit Delegation** | Choosing the lowest-cost agent and smallest context package that can reliably complete a task. |
+| **Weakest Sufficient Agent** | The least capable/cheapest agent that can safely complete the task. |
+| **Smallest Sufficient Context** | The minimum file set, section set, or evidence bundle needed to complete the task. |
+| **Strictest Sufficient Prompt** | The narrowest prompt that still lets the agent complete the task correctly. |
+| **Task Context Package** | The bounded package given to a delegated agent: task, level, personality, context, forbidden actions, output schema, stop condition, and escalation rule. |
+| **Nested Delegation** | A subagent delegating a narrower, lower-authority task to another subagent, then verifying the result. |
+
