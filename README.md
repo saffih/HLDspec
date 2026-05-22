@@ -542,3 +542,11 @@ Run a broad HLDspec self-review after workflow changes:
 python3 scripts/run_beskeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
 ```
 
+## Convert a raw HLD to HLDspec format
+
+```bash
+python3 scripts/convert_hld_to_hldspec.py ./Flow-System-HLD.md --default-flow-splits
+```
+
+This writes a separate converted file and conversion index. It does not modify the source HLD unless an explicit output path points to the source and `--overwrite` is used.
+
