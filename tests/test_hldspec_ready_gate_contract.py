@@ -18,7 +18,10 @@ class HldspecReadyGateContractTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
 
         self.assertIn("READY_FOR_PAID_AGENT_TEST", text)
+        self.assertIn("rc=2 is accepted", text)
         self.assertIn("full_unittest_discovery", text)
+        self.assertIn("run_flow_checkpoint_check", text)
+        self.assertIn("test_module_has_tests", text)
         self.assertIn("test_raw_hld_marking_plan", text)
         self.assertIn("test_spec_build_plan_quality_gate_fixtures", text)
 
@@ -65,6 +68,7 @@ class HldspecReadyGateContractTests(unittest.TestCase):
     def test_ready_gate_doc_exists(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_READY_GATE.md").read_text(encoding="utf-8")
         self.assertIn("READY_FOR_PAID_AGENT_TEST", text)
+        self.assertIn("rc=2 is accepted", text)
         self.assertIn("Do not spend paid agent/SpecKit credits", text)
 
 

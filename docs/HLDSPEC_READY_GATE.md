@@ -69,3 +69,8 @@ If the gate is NOT_READY, stop and fix HLDspec first.
 
 If the gate is READY_FOR_PAID_AGENT_TEST, continue to one bounded target-HLD checkpoint run.
 
+## Flow checkpoint exit code
+
+`rc=2 is accepted when checkpoint artifacts exist`.
+
+This means the Flow dry run reached a safe HLDspec checkpoint that requires human review, such as raw-HLD conversion decisions or SpecKit prework approval. It is not treated as a readiness failure when the expected checkpoint artifacts were written.

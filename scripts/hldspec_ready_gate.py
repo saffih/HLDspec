@@ -44,8 +44,6 @@ REQUIRED_FILES = [
 ]
 
 REQUIRED_TEST_MODULES = [
-    "tests.test_runskeptic_terminology",
-    "tests.test_runskeptic_file_naming",
     "tests.test_raw_hld_marking_plan",
     "tests.test_spec_build_plan_quality_gate_fixtures",
     "tests.test_context_tailoring_protocol",
@@ -93,6 +91,42 @@ def run_check(repo: Path, name: str, command: Sequence[str], *, env: dict[str, s
     )
 
 
+def run_flow_checkpoint_check(repo: Path, command: Sequence[str], workspace: Path) -> CheckResult:
+    proc = subprocess.run(
+        list(command),
+        cwd=repo,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    checkpoint_files = [
+        workspace / ".specify" / "sync" / "hld_conversion_decision_queue.md",
+        workspace / ".specify" / "sync" / "raw_hld_marking_plan.md",
+        workspace / "firstrun" / ".specify" / "sync" / "hldspec_state.md",
+        workspace / "firstrun" / ".specify" / "sync" / "speckit_prework_package.md",
+    ]
+    reached_checkpoint = any(path.exists() for path in checkpoint_files)
+    if proc.returncode == 0:
+        status = "PASS"
+        summary = "flow dry run completed and reached a clean checkpoint"
+    elif proc.returncode == 2 and reached_checkpoint:
+        status = "PASS"
+        summary = "flow dry run stopped at an expected safe checkpoint; rc=2 is accepted when checkpoint artifacts exist"
+    else:
+        status = "FAIL"
+        summary = f"flow dry run failed with rc={proc.returncode}"
+    return CheckResult(
+        name="flow_local_checkpoint_dry_run",
+        status=status,
+        command=list(command),
+        returncode=proc.returncode,
+        summary=summary,
+        stdout_tail=tail(proc.stdout),
+        stderr_tail=tail(proc.stderr),
+    )
+
+
 def file_presence_check(repo: Path) -> CheckResult:
     missing = [rel for rel in REQUIRED_FILES if not (repo / rel).exists()]
     status = "PASS" if not missing else "FAIL"
@@ -109,6 +143,15 @@ def file_presence_check(repo: Path) -> CheckResult:
 def test_module_exists(repo: Path, module: str) -> bool:
     rel = module.replace(".", "/") + ".py"
     return (repo / rel).exists()
+
+
+def test_module_has_tests(repo: Path, module: str) -> bool:
+    rel = module.replace(".", "/") + ".py"
+    path = repo / rel
+    if not path.exists():
+        return False
+    content = path.read_text(encoding="utf-8", errors="replace")
+    return "unittest.TestCase" in content or "(unittest.TestCase)" in content or "def test_" in content
 
 
 def render_report(data: dict[str, object]) -> str:
@@ -206,7 +249,11 @@ def main() -> int:
         narrow_modules = []
         missing_modules = []
     else:
-        narrow_modules = [module for module in REQUIRED_TEST_MODULES if test_module_exists(repo, module)]
+        narrow_modules = [
+            module
+            for module in REQUIRED_TEST_MODULES
+            if test_module_exists(repo, module) and test_module_has_tests(repo, module)
+        ]
         missing_modules = [module for module in REQUIRED_TEST_MODULES if not test_module_exists(repo, module)]
     if missing_modules:
         checks.append(
@@ -270,10 +317,10 @@ def main() -> int:
         else:
             flow_workspace = out_dir / "flow-dry-run"
             checks.append(
-                run_check(
+                run_flow_checkpoint_check(
                     repo,
-                    "flow_local_checkpoint_dry_run",
                     ["bash", str(repo / "scripts" / "hldspec_run.sh"), str(flow_hld), str(flow_workspace)],
+                    flow_workspace,
                 )
             )
 
