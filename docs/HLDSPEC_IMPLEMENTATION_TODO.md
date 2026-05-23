@@ -76,13 +76,18 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: Validated queue answer writer added.
 - DONE: Source-HLD update queue is regenerated after conversion answers.
 - DONE: Interview answer regression tests added.
+- DONE: SpecKit proxy dry-run RunSkeptic review added in docs/HLDSPEC_RUNSKEPTIC_PROXY_DRY_RUN_REVIEW.md.
+- DONE: Explicit SpecKit prework approval recorder added.
+- DONE: Guarded one-phase SpecKit proxy dry-run added.
+- DONE: Proxy refuses without prework approval.
+- DONE: Proxy refuses implementation phase.
+- DONE: SpecKit proxy dry-run regression tests added.
 
 ## Next patch
 
-- TODO: Harden bounded SpecKit proxy dossier against interview-approved queue state.
-- TODO: Add one-phase SpecKit proxy dry-run mode.
-- TODO: Add tests that proxy refuses to run without prework approval.
-- TODO: Keep implementation blocked until explicit human approval.
+- TODO: Run real end-to-end smoke on a real HLD workspace using hldspec_prework, hldspec_status, hldspec_interview, approval, and hldspec_speckit_proxy dry-run.
+- TODO: Decide whether to add real one-phase SpecKit execution behind explicit approval.
+- TODO: If approved, implement real execution for one phase only and keep implementation blocked.
 
 ## Later product wrappers
 
@@ -107,7 +112,7 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - Prework package readiness: medium-high.
 - Status wrapper readiness: medium-high.
 - Interview wrapper readiness: medium; flag-based answer recording is implemented and tested.
-- SpecKit proxy readiness: low; next bounded patch after interview stabilization.
+- SpecKit proxy readiness: medium; guarded dry-run exists, real execution is still deferred.
 
 ## Rule
 
