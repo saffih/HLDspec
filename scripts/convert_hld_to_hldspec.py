@@ -4,8 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Optional
 
 
 REQUIRED_FIELDS = [
@@ -27,7 +28,7 @@ class ConvertedSection:
     risk: str
     source_start_line: int
     source_end_line: int
-    original_parent: str | None = None
+    original_parent: Optional[str] = None
 
 
 def clean_title(title: str) -> str:
@@ -94,7 +95,7 @@ def verify_text(role: str) -> str:
 
 def top_level_sections(lines: list[str]) -> list[tuple[int, int, str]]:
     heads = [(idx, clean_title(line[3:])) for idx, line in enumerate(lines) if line.startswith("## ")]
-    sections: list[tuple[int, int, str]] = []
+    sections = []
     for pos, (start, title) in enumerate(heads):
         end = heads[pos + 1][0] if pos + 1 < len(heads) else len(lines)
         sections.append((start, end, title))
@@ -102,8 +103,12 @@ def top_level_sections(lines: list[str]) -> list[tuple[int, int, str]]:
 
 
 def split_parent_sections(lines: list[str], start: int, end: int) -> list[tuple[int, int, str]]:
-    subheads = [(idx, clean_title(line[4:])) for idx, line in enumerate(lines[start + 1 : end], start=start + 1) if line.startswith("### ")]
-    chunks: list[tuple[int, int, str]] = []
+    subheads = [
+        (idx, clean_title(line[4:]))
+        for idx, line in enumerate(lines[start + 1 : end], start=start + 1)
+        if line.startswith("### ")
+    ]
+    chunks = []
     for pos, (chunk_start, subtitle) in enumerate(subheads):
         chunk_end = subheads[pos + 1][0] if pos + 1 < len(subheads) else end
         chunks.append((chunk_start, chunk_end, clean_split_title(subtitle)))
@@ -133,14 +138,15 @@ def convert_raw_hld(raw_text: str, split_sections: set[str]) -> tuple[str, list[
     if not sections:
         raise ValueError("No top-level '## ' sections found; cannot convert to HLDspec format.")
 
-    out: list[str] = []
+    out = []
     first_top = sections[0][0]
     out.extend(lines[:first_top])
+
     if "made by AI" not in "\n".join(out[:20]):
         insert_at = 1 if out else 0
         out[insert_at:insert_at] = ["", "<!-- made by AI -->", ""]
 
-    converted: list[ConvertedSection] = []
+    converted = []
     counter = 1
 
     for start, end, title in sections:
@@ -148,6 +154,7 @@ def convert_raw_hld(raw_text: str, split_sections: set[str]) -> tuple[str, list[
 
         if chunks:
             out.append("")
+            # Do not include a raw "## <parent>" string here; tests verify original top-level headings are removed.
             out.append(f"<!-- Original parent section split for HLDspec conversion: {title} -->")
             for chunk_start, chunk_end, subtitle in chunks:
                 hld_id = f"HLD-{counter:03d}"
@@ -176,8 +183,8 @@ def convert_raw_hld(raw_text: str, split_sections: set[str]) -> tuple[str, list[
 
 def validate_hldspec(text: str) -> dict[str, object]:
     lines = text.splitlines()
-    headers: list[tuple[int, str, str]] = []
-    bad_headers: list[tuple[int, str]] = []
+    headers = []
+    bad_headers = []
 
     for idx, line in enumerate(lines, start=1):
         if not line.startswith("## "):
@@ -188,9 +195,9 @@ def validate_hldspec(text: str) -> dict[str, object]:
         else:
             bad_headers.append((idx, line))
 
-    missing: list[tuple[str, str]] = []
-    seen: dict[str, int] = {}
-    duplicates: list[tuple[str, int, int]] = []
+    missing = []
+    seen = {}
+    duplicates = []
 
     for pos, (start, hld_id, _header) in enumerate(headers):
         end = headers[pos + 1][0] - 1 if pos + 1 < len(headers) else len(lines)
