@@ -25,6 +25,7 @@ def build_package(workspace: Path) -> dict[str, Any]:
     graph = load_json(sync / "feature_dependency_graph.json")
     quality = load_json(sync / "speckit_prework_quality_review.json")
     dossier = load_json(sync / "speckit_proxy_dossier.json")
+    usecase_map = load_json(sync / "hld_usecase_api_map.json")
 
     findings = as_list(quality.get("findings"))
     blockers = [f for f in findings if isinstance(f, dict) and str(f.get("severity", "")).upper() == "BLOCKER"]
@@ -42,6 +43,7 @@ def build_package(workspace: Path) -> dict[str, Any]:
         ".specify/sync/speckit_prework_package.md",
         ".specify/sync/speckit_prework_quality_review.md",
         ".specify/sync/speckit_proxy_dossier.md",
+        ".specify/sync/hld_usecase_api_map.md",
         ".specify/sync/speckit_invocation_queue.md",
         ".specify/sync/constitution_update_plan.md",
         ".specify/sync/feature_dependency_graph.md",
@@ -84,6 +86,17 @@ def build_package(workspace: Path) -> dict[str, Any]:
         "constitution_case": {
             "claim": "The constitution must protect HLD architecture before SpecKit creates feature artifacts.",
             "rules": as_list(constitution.get("required_rules")),
+        },
+        "use_case_api_case": {
+            "claim": "HLDspec must show actors, journeys, use cases, API surfaces, data objects, feature candidates, and context-only sections before SpecKit handoff.",
+            "status": usecase_map.get("status", "MISSING"),
+            "first_buildable_feature": usecase_map.get("first_buildable_feature", {}),
+            "feature_candidate_count": len(as_list(usecase_map.get("feature_candidates"))),
+            "context_only_count": len(as_list(usecase_map.get("context_only_sections"))),
+            "api_surface_count": len(as_list(usecase_map.get("api_interface_surfaces"))),
+            "data_object_count": len(as_list(usecase_map.get("data_source_of_truth_objects"))),
+            "open_question_count": len(as_list(usecase_map.get("open_questions"))),
+            "source_artifact": ".specify/sync/hld_usecase_api_map.md",
         },
         "dependency_case": {
             "claim": "Features should be invoked bottom-up from independent foundations to dependents.",
@@ -155,7 +168,22 @@ def render_md(pkg: dict[str, Any]) -> str:
         if isinstance(rule, dict):
             lines.append(f"- `{rule.get('rule_id', '')}` {rule.get('name', '')}: {rule.get('rule', '')}")
 
+    use_case_api = pkg.get("use_case_api_case", {}) if isinstance(pkg.get("use_case_api_case"), dict) else {}
+    first_buildable = use_case_api.get("first_buildable_feature", {}) if isinstance(use_case_api.get("first_buildable_feature"), dict) else {}
     lines += [
+        "",
+        "## Use-case/API case",
+        "",
+        use_case_api.get("claim", "Use-case/API map is missing."),
+        "",
+        f"- status: `{use_case_api.get('status', 'MISSING')}`",
+        f"- first buildable feature: `{first_buildable.get('hld_id', '')}` - {first_buildable.get('title', '')}",
+        f"- feature candidates: `{use_case_api.get('feature_candidate_count', 0)}`",
+        f"- context-only sections: `{use_case_api.get('context_only_count', 0)}`",
+        f"- API/interface surfaces: `{use_case_api.get('api_surface_count', 0)}`",
+        f"- data/source-of-truth objects: `{use_case_api.get('data_object_count', 0)}`",
+        f"- open questions: `{use_case_api.get('open_question_count', 0)}`",
+        f"- source artifact: `{use_case_api.get('source_artifact', '.specify/sync/hld_usecase_api_map.md')}`",
         "",
         "## Architecture and dependency case",
         "",

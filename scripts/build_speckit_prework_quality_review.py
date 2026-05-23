@@ -19,7 +19,7 @@ def feature_name(item: dict[str, Any]) -> str:
     return str(item.get("feature_name") or item.get("title") or item.get("planned_spec_id") or item.get("feature_id") or "unknown")
 
 
-def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any]) -> list[dict[str, Any]]:
+def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
@@ -28,6 +28,46 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
         deps = as_list(feature.get("depends_on_features"))
         if not deps:
             roots.append(feature)
+
+    if not usecase_map:
+        findings.append(
+            {
+                "id": "QG-009",
+                "severity": "ACTION",
+                "area": "use-case/API map",
+                "finding": "No hld_usecase_api_map artifact was found for the prework gate.",
+                "recommendation": "Run build_hld_usecase_api_map before approving SpecKit handoff.",
+                "RunSkeptic_decision": "FIX",
+            }
+        )
+    else:
+        feature_candidates = as_list(usecase_map.get("feature_candidates"))
+        context_ids = {str(item.get("hld_id")) for item in as_list(usecase_map.get("context_only_sections")) if isinstance(item, dict)}
+        map_status = str(usecase_map.get("status", ""))
+        if map_status == "REWORK_REQUIRED" or not feature_candidates:
+            findings.append(
+                {
+                    "id": "QG-010",
+                    "severity": "BLOCKER",
+                    "area": "use-case/API map",
+                    "finding": "Use-case/API map did not identify any buildable feature candidates.",
+                    "recommendation": "Rebuild HLD classification or add buildable API/data/processing/UI/system sections before SpecKit handoff.",
+                    "RunSkeptic_decision": "DECOMPOSE",
+                }
+            )
+        first_feature_for_map = roots[0] if roots else (features[0] if features else {})
+        first_source_ids = {str(item) for item in as_list(first_feature_for_map.get("source_hld_sections"))}
+        if first_source_ids & context_ids:
+            findings.append(
+                {
+                    "id": "QG-011",
+                    "severity": "BLOCKER",
+                    "area": "first feature selection",
+                    "finding": "First SpecKit feature is sourced from a context-only HLD section.",
+                    "recommendation": "Rebuild the spec build plan so the first feature is an independently buildable API/data/processing/UI/system foundation.",
+                    "RunSkeptic_decision": "FIX",
+                }
+            )
 
     if not features:
         findings.append(
@@ -146,8 +186,9 @@ def build_review(workspace: Path) -> dict[str, Any]:
     queue = load_json(sync / "speckit_invocation_queue.json")
     constitution = load_json(sync / "constitution_update_plan.json")
     graph = load_json(sync / "feature_dependency_graph.json")
+    usecase_map = load_json(sync / "hld_usecase_api_map.json")
 
-    findings = build_findings(manifest, graph, constitution, queue)
+    findings = build_findings(manifest, graph, constitution, queue, usecase_map)
     status = determine_status(findings)
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]

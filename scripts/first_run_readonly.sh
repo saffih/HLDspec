@@ -271,6 +271,7 @@ fi
 
 "${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --hld-map-only
 "${PYTHON_RUN[@]}" "$ROOT/scripts/classify_hld_sections.py" "$WORKSPACE/HLD.md" "$WORKSPACE"
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_usecase_api_map.py" "$WORKSPACE/HLD.md" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/hld_spec_sync.py" --workspace "$WORKSPACE" --hld HLD.md --use-hld-map --plan-specs
 "${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$WORKSPACE/.specify/sync/spec_build_plan.json"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$WORKSPACE/.specify/sync/spec_build_plan.json" "$WORKSPACE"
@@ -298,6 +299,7 @@ echo
 echo "Open these files:"
 echo "- $WORKSPACE/logs/hld_spec_sync/*/hld_format_report.md"
 echo "- $WORKSPACE/.specify/sync/hld_index.md"
+echo "- $WORKSPACE/.specify/sync/hld_usecase_api_map.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan_review.md"
 echo "- $WORKSPACE/.specify/sync/spec_build_plan_decision_queue.md"
