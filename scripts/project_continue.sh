@@ -91,6 +91,8 @@ rebuild_post_plan_artifacts() {
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_product_manager_pack.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_architect_pack.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_answer_pack.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_answer_dossier.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_orchestration_state.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_state.py" "$FIRSTRUN" --source-hld "$SOURCE_HLD"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_package.py" "$FIRSTRUN"
@@ -118,6 +120,9 @@ report_spec_gate() {
   echo "- SpecKit prework quality review: $FIRSTRUN/.specify/sync/speckit_prework_quality_review.md"
   echo "- SpecKit proxy dossier: $FIRSTRUN/.specify/sync/speckit_proxy_dossier.md"
   echo "- SpecKit prework package: $FIRSTRUN/.specify/sync/speckit_prework_package.md"
+  echo "- SpecKit Answer Dossier: $FIRSTRUN/.specify/sync/speckit_answer_dossier.md"
+  echo "- Answer Dossier quality review: $FIRSTRUN/.specify/sync/hld_answer_dossier_quality_review.md"
+  echo "- Interface contract map: $FIRSTRUN/.specify/sync/interface_contract_map.md"
   echo "- HLDspec state: $FIRSTRUN/.specify/sync/hldspec_state.md"
   echo
 

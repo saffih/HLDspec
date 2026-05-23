@@ -19,7 +19,7 @@ def feature_name(item: dict[str, Any]) -> str:
     return str(item.get("feature_name") or item.get("title") or item.get("planned_spec_id") or item.get("feature_id") or "unknown")
 
 
-def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any]) -> list[dict[str, Any]]:
+def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any], dossier_quality: dict[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
@@ -169,6 +169,42 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
             }
         )
 
+    if not dossier_quality:
+        findings.append(
+            {
+                "id": "QG-012",
+                "severity": "BLOCKER",
+                "area": "Answer Dossier",
+                "finding": "No HLD Answer Dossier quality review was found.",
+                "recommendation": "Run build_hld_answer_dossier.py before approving SpecKit prework.",
+                "RunSkeptic_decision": "FIX",
+            }
+        )
+    else:
+        dossier_status = str(dossier_quality.get("status", "MISSING"))
+        if dossier_status == "REWORK_REQUIRED":
+            findings.append(
+                {
+                    "id": "QG-013",
+                    "severity": "BLOCKER",
+                    "area": "Answer Dossier",
+                    "finding": "HLD Answer Dossier quality gate requires rework.",
+                    "recommendation": "Fix hld_answer_dossier_quality_review findings before SpecKit approval.",
+                    "RunSkeptic_decision": "FIX",
+                }
+            )
+        elif dossier_status == "APPROVAL_READY_WITH_ACTIONS":
+            findings.append(
+                {
+                    "id": "QG-014",
+                    "severity": "ACTION",
+                    "area": "Answer Dossier",
+                    "finding": "HLD Answer Dossier is present but has action findings.",
+                    "recommendation": "Judge should explicitly review the action findings before approval.",
+                    "RunSkeptic_decision": "VERIFY",
+                }
+            )
+
     return findings
 
 
@@ -187,8 +223,9 @@ def build_review(workspace: Path) -> dict[str, Any]:
     constitution = load_json(sync / "constitution_update_plan.json")
     graph = load_json(sync / "feature_dependency_graph.json")
     usecase_map = load_json(sync / "hld_usecase_api_map.json")
+    dossier_quality = load_json(sync / "hld_answer_dossier_quality_review.json")
 
-    findings = build_findings(manifest, graph, constitution, queue, usecase_map)
+    findings = build_findings(manifest, graph, constitution, queue, usecase_map, dossier_quality)
     status = determine_status(findings)
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
