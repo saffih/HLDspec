@@ -86,12 +86,17 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: Real-HLD smoke wrapper added in scripts/hldspec_smoke.sh.
 - DONE: Readiness review added in scripts/run_hldspec_readiness_review.py.
 - DONE: Smoke/readiness regression tests added.
+- DONE: Product Manager pack added for use cases, user stories, acceptance criteria, and product open questions.
+- DONE: Architect pack added for API/data/dependency/constitution boundaries and architecture open questions.
+- DONE: SpecKit answer pack added from Product Manager and Architect packs.
+- DONE: Proxy dry-run now refuses missing or blocked answer pack.
+- DONE: PM/Architect answer-pack regression tests added.
 
 ## Next patch
 
-- TODO: Run scripts/hldspec_smoke.sh on a real HLD and inspect hldspec_readiness_review.md.
-- TODO: Decide whether the real one-phase SpecKit execution patch is approved or deferred.
-- TODO: If approved, implement real execution for one phase only and keep implementation blocked.
+- TODO: Run scripts/hldspec_smoke.sh on a real HLD and inspect Product Manager, Architect, answer-pack, and readiness artifacts.
+- TODO: Resolve blocking PMQ/ARQ questions through hldspec_interview-compatible queues.
+- TODO: Decide whether the real one-phase SpecKit execution patch is approved or deferred only after answer pack is READY.
 
 ## Later product wrappers
 

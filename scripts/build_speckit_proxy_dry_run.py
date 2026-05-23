@@ -30,7 +30,12 @@ def find_sync(workspace: Path) -> Path:
     direct = workspace / ".specify" / "sync"
     nested = workspace / "firstrun" / ".specify" / "sync"
     for sync in (direct, nested):
-        if any((sync / name).exists() for name in ("speckit_prework_package.json", "speckit_proxy_dossier.json", "hldspec_state.json")):
+        if any((sync / name).exists() for name in (
+            "speckit_prework_package.json",
+            "speckit_proxy_dossier.json",
+            "hldspec_state.json",
+            "speckit_answer_pack.json",
+        )):
             return sync
     return direct
 
@@ -74,16 +79,19 @@ def selected_feature(dossier: dict[str, Any], queue: dict[str, Any]) -> dict[str
     return {}
 
 
-def phase_prompt(phase: str, dossier: dict[str, Any]) -> str:
+def phase_prompt(phase: str, dossier: dict[str, Any], answer_pack: dict[str, Any]) -> str:
     selected = dossier.get("selected_feature", {}) if isinstance(dossier.get("selected_feature"), dict) else {}
     specify_input = str(dossier.get("speckit_specify_input", "")).strip()
     feature_id = selected.get("feature_id", "")
     feature_name = selected.get("feature_name", "")
+    answer_path_note = "Use speckit_answer_pack.json/md, Product Manager pack, and Architect pack as the answer source."
+
     if phase == "constitution":
-        return "Prepare or update the SpecKit constitution from the approved HLDspec constitution context only. Do not implement."
+        return "Prepare or update the SpecKit constitution from the approved HLDspec constitution answers only. Do not implement. " + answer_path_note
     if phase == "specify":
         return "\n".join([
             f"Run only SpecKit specify for feature {feature_id} - {feature_name}.",
+            answer_path_note,
             "Use this approved HLDspec input:",
             "",
             specify_input or "TBD",
@@ -91,7 +99,7 @@ def phase_prompt(phase: str, dossier: dict[str, Any]) -> str:
             "Stop after the specify phase and report changed files/questions. Do not plan, create tasks, or implement.",
         ])
     if phase == "clarify":
-        return "Run only SpecKit clarify for the active feature. Answer only from approved evidence; escalate architecture/API/data/dependency questions. Do not implement."
+        return "Run only SpecKit clarify for the active feature. Answer only from speckit_answer_pack. Escalate all blocking questions. Do not implement."
     if phase == "plan":
         return "Run only SpecKit plan for the active feature after specify/clarify are complete. Stop after plan outputs. Do not create tasks or implement."
     if phase == "tasks":
@@ -108,12 +116,17 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
     quality = load_json(sync / "speckit_prework_quality_review.json")
     dossier = load_json(sync / "speckit_proxy_dossier.json")
     queue = load_json(sync / "speckit_invocation_queue.json")
+    answer_pack = load_json(sync / "speckit_answer_pack.json")
 
     phase_ok, normalized_phase, phase_error = normalize_phase(phase)
     blockers = blockers_from_quality(quality)
     decision = approval_decision(package)
     state_stage = str(state.get("current_stage", ""))
     feature = selected_feature(dossier, queue)
+    answer_status = str(answer_pack.get("status", "MISSING"))
+    answer_blockers = answer_pack.get("blocking_open_questions", [])
+    if not isinstance(answer_blockers, list):
+        answer_blockers = []
 
     refusal_reasons: list[str] = []
     status = "DRY_RUN_READY"
@@ -143,6 +156,13 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
         refusal_reasons.append("no selected feature found in proxy dossier or invocation queue")
         status = "REFUSED_NO_FEATURE"
 
+    if not answer_pack:
+        refusal_reasons.append("missing speckit_answer_pack.json; build Product Manager and Architect packs first")
+        status = "REFUSED_ANSWER_PACK_MISSING"
+    elif answer_status != "READY" or answer_blockers:
+        refusal_reasons.append(f"answer pack status is {answer_status} with {len(answer_blockers)} blocking open questions")
+        status = "REFUSED_ANSWER_PACK_BLOCKED"
+
     return {
         "schema_version": 1,
         "status": status,
@@ -164,12 +184,17 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
             "current_stage": state_stage,
             "state_path": str(sync / "hldspec_state.json"),
         },
+        "answer_pack": {
+            "status": answer_status,
+            "blocking_open_questions": len(answer_blockers),
+            "path": str(sync / "speckit_answer_pack.json"),
+        },
         "selected_feature": feature,
         "would_run": [] if refusal_reasons else [
             {
                 "phase": normalized_phase,
                 "mode": "DRY_RUN_ONLY",
-                "prompt": phase_prompt(normalized_phase, dossier),
+                "prompt": phase_prompt(normalized_phase, dossier, answer_pack),
                 "stop_condition": "stop after this single phase and write a phase completion report",
             }
         ],
@@ -177,7 +202,9 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
             "Do not invoke implementation.",
             "Do not run more than one SpecKit phase.",
             "Do not modify source HLD.",
-            "Escalate architecture/API/data/dependency/constitution questions.",
+            "Use Product Manager pack for product/user-story questions.",
+            "Use Architect pack for API/data/dependency/constitution questions.",
+            "Escalate unanswered blocking PMQ/ARQ questions.",
             "Report changed files and next readiness after the phase.",
         ],
     }
@@ -194,6 +221,8 @@ def render_md(data: dict[str, Any]) -> str:
         f"Dry run: `{str(data.get('dry_run')).lower()}`",
         f"Implementation allowed: `{str(data.get('implementation_allowed')).lower()}`",
         f"Will invoke SpecKit: `{str(data.get('will_invoke_speckit')).lower()}`",
+        f"Answer pack status: `{data.get('answer_pack', {}).get('status', '')}`",
+        f"Answer pack blocking questions: `{data.get('answer_pack', {}).get('blocking_open_questions', '')}`",
         "",
     ]
     reasons = data.get("refusal_reasons", [])

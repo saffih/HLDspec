@@ -27,7 +27,7 @@ approve = load_module("approve_hldspec_prework", "scripts/approve_hldspec_prewor
 
 
 class SpeckitProxyDryRunTest(unittest.TestCase):
-    def make_workspace(self) -> Path:
+    def make_workspace(self, *, answer_status: str = "READY", blocking: list | None = None) -> Path:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         workspace = Path(tmp.name)
@@ -68,6 +68,10 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
             encoding="utf-8",
         )
         (sync / "speckit_invocation_queue.json").write_text(json.dumps({"items": []}), encoding="utf-8")
+        (sync / "speckit_answer_pack.json").write_text(
+            json.dumps({"status": answer_status, "blocking_open_questions": blocking or []}),
+            encoding="utf-8",
+        )
         return workspace
 
     def test_refuses_without_prework_approval(self) -> None:
@@ -77,7 +81,7 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
         self.assertFalse(dry_run["will_invoke_speckit"])
         self.assertFalse(dry_run["implementation_allowed"])
 
-    def test_approved_prework_allows_one_phase_dry_run(self) -> None:
+    def test_approved_prework_allows_one_phase_dry_run_when_answer_pack_ready(self) -> None:
         workspace = self.make_workspace()
         record = approve.approve_prework(workspace, "APPROVE_PLAN", "Approved for dry-run.")
         self.assertEqual(record["status"], "APPROVED")
@@ -87,6 +91,13 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
         self.assertEqual(len(dry_run["would_run"]), 1)
         self.assertFalse(dry_run["will_invoke_speckit"])
         self.assertFalse(dry_run["implementation_allowed"])
+
+    def test_refuses_when_answer_pack_has_blocking_questions(self) -> None:
+        workspace = self.make_workspace(answer_status="BLOCKED_OPEN_QUESTIONS", blocking=[{"question_id": "PMQ-001"}])
+        approve.approve_prework(workspace, "APPROVE_PLAN")
+        dry_run = proxy.build_dry_run(workspace, "specify")
+        self.assertEqual(dry_run["status"], "REFUSED_ANSWER_PACK_BLOCKED")
+        self.assertIn("answer pack status", " ".join(dry_run["refusal_reasons"]))
 
     def test_implementation_phase_is_forbidden_even_after_approval(self) -> None:
         workspace = self.make_workspace()
