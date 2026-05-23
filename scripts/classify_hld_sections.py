@@ -30,8 +30,25 @@ CONTEXT_TITLE_TERMS = (
     "timeline",
     "changelog",
     "history",
+    "stakeholder",
+    "stakeholder analysis",
+    "persona",
+    "personas",
+    "user persona",
+    "user personas",
+    "business case",
+    "business case foundation",
+    "executive summary",
+    "assumption",
+    "assumptions",
 )
 
+
+GOVERNANCE_TITLE_TERMS = (
+    "decision log",
+    "open conflict",
+    "open conflicts",
+)
 SPEC_TITLE_TERMS = (
     "api",
     "interface",
@@ -85,7 +102,12 @@ def classify_section(section: hld_map.HldSection, previous_spec_candidate: str |
             "explicit_hld_specs": specs,
         }
 
-    if role == "governance" or "source of truth" in lower_text or "constitution" in lower_title:
+    if (
+        role == "governance"
+        or "source of truth" in lower_text
+        or "constitution" in lower_title
+        or any(term in lower_title for term in GOVERNANCE_TITLE_TERMS)
+    ):
         return {
             "hld_id": section.id,
             "title": title,
@@ -105,7 +127,7 @@ def classify_section(section: hld_map.HldSection, previous_spec_candidate: str |
             "spec_candidate": False,
             "recommended_action": "KEEP_AS_CONTEXT",
             "merge_with": previous_spec_candidate,
-            "reason": "Title indicates context, status, history, appendix, milestone, or verification material rather than an independently implementable capability.",
+            "reason": "Title indicates context, stakeholder/persona/business-case material, status, history, appendix, milestone, or verification material rather than an independently implementable capability.",
             "explicit_hld_specs": [],
         }
 
