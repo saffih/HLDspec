@@ -47,8 +47,13 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --execute)
-      echo "ERROR: execution mode is not implemented. This wrapper is dry-run only." >&2
-      exit 2
+      APPROVAL="$WORKSPACE/.specify/sync/speckit_prework_approval.json"
+      if [ ! -f "$APPROVAL" ]; then
+        echo "ERROR: no approval record found at $APPROVAL" >&2
+        exit 2
+      fi
+      "${PYTHON_RUN[@]}" "$ROOT/scripts/hldspec_invoke_speckit_feature.py" "$WORKSPACE"
+      shift
       ;;
     *)
       echo "ERROR: unknown argument: $1" >&2

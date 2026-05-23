@@ -46,6 +46,28 @@ def approve_prework(workspace: Path, decision: str, notes: str = "") -> dict[str
     if options and decision not in options:
         raise ValueError(f"Invalid prework decision: {decision}. Allowed: {', '.join(options)}")
 
+    def load_blockers(filename: str) -> list[dict[str, Any]]:
+        path = sync / filename
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        except Exception:
+            raw = {}
+        data = raw if isinstance(raw, dict) else {}
+        return [
+            f for f in data.get("findings", [])
+            if isinstance(f, dict) and str(f.get("severity", "")).upper() == "BLOCKER"
+        ]
+
+    blockers = (
+        load_blockers("hld_answer_dossier_quality_review.json")
+        + load_blockers("speckit_prework_quality_review.json")
+    )
+    if blockers:
+        ids = [str(b.get("id", "?")) for b in blockers]
+        raise ValueError(
+            f"Cannot approve: {len(blockers)} BLOCKER finding(s) must be resolved first: {', '.join(ids)}"
+        )
+
     checkpoint["human_decision"] = decision
     if notes:
         checkpoint["human_notes"] = notes

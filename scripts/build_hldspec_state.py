@@ -45,15 +45,22 @@ def hld_is_converted(path: Path) -> bool:
 
 def has_first_run_artifacts(workspace: Path) -> bool:
     sync = workspace / ".specify" / "sync"
-    return any(
-        (sync / name).exists()
-        for name in [
-            "spec_build_plan.json",
-            "spec_build_plan_review.md",
-            "speckit_prework_quality_review.json",
-            "speckit_prework_package.md",
-        ]
-    )
+    required = [
+        "spec_build_plan.json",
+        "spec_build_plan_review.md",
+        "speckit_prework_quality_review.json",
+        "speckit_prework_package.md",
+    ]
+    for name in required:
+        p = sync / name
+        if not p.exists():
+            return False
+        if name.endswith(".json"):
+            try:
+                json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                return False
+    return True
 
 
 def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]]:
