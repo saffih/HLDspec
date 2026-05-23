@@ -17,6 +17,8 @@ REQUIRED_FOUNDATION_ARTIFACTS = [
     ".specify/sync/speckit_prework_quality_review.json",
     ".specify/sync/speckit_prework_package.json",
     ".specify/sync/hldspec_state.json",
+    ".specify/sync/hldspec_junior_task_packets.json",
+    ".specify/sync/hldspec_orchestration_state.json",
     ".specify/sync/speckit_product_manager_pack.json",
     ".specify/sync/speckit_architect_pack.json",
     ".specify/sync/speckit_answer_pack.json",

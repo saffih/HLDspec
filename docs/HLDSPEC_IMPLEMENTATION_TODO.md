@@ -91,12 +91,19 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: SpecKit answer pack added from Product Manager and Architect packs.
 - DONE: Proxy dry-run now refuses missing or blocked answer pack.
 - DONE: PM/Architect answer-pack regression tests added.
+- DONE: Orchestration contract added in docs/HLDSPEC_ORCHESTRATION_CONTRACT.md.
+- DONE: Junior subagent task packet builder added.
+- DONE: Judge promotion ledger command added.
+- DONE: Orchestration state builder added.
+- DONE: Proxy dry-run now refuses unpromoted answer packs.
+- DONE: Orchestration promotion regression tests added.
 
 ## Next patch
 
-- TODO: Run scripts/hldspec_smoke.sh on a real HLD and inspect Product Manager, Architect, answer-pack, and readiness artifacts.
+- TODO: Run scripts/hldspec_smoke.sh on a real HLD and inspect junior task packets, orchestration state, PM/Architect packs, answer pack, and readiness artifacts.
 - TODO: Resolve blocking PMQ/ARQ questions through hldspec_interview-compatible queues.
-- TODO: Decide whether the real one-phase SpecKit execution patch is approved or deferred only after answer pack is READY.
+- TODO: Promote PM pack, Architect pack, and answer pack only after review.
+- TODO: Decide whether real one-phase SpecKit execution is approved only after answer pack is READY and ACCEPTED.
 
 ## Later product wrappers
 

@@ -72,6 +72,10 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
             json.dumps({"status": answer_status, "blocking_open_questions": blocking or []}),
             encoding="utf-8",
         )
+        (sync / "hldspec_promotion_ledger.json").write_text(
+            json.dumps({"schema_version": 1, "promotions": {"speckit_answer_pack": {"promotion_status": "ACCEPTED"}}}),
+            encoding="utf-8",
+        )
         return workspace
 
     def test_refuses_without_prework_approval(self) -> None:
