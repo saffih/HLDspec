@@ -134,6 +134,7 @@ Therefore, missing PM/Architect/answer-pack/proxy files in `/tmp/hldspec-smoke/.
 - DONE: Checkpoint question guide added as a formal read-only process step.
 - DONE: Question guide explains current checkpoint questions but does not answer, edit, convert, promote, invoke SpecKit, or implement.
 - DONE: Agent-first start prompt/context generator added for the minimal trigger `HLDspec /absolute/path/to/HLD.md`.
+- DONE: Minimal trigger UX repaired: default output is now short, with full context kept in generated files.
 
 ## Immediate current gate
 
@@ -158,7 +159,7 @@ Do not inspect PM/Architect/answer-pack/proxy files in the base smoke workspace 
 
 ## Next patch
 
-Run and validate the agent-first entrypoint on the real HLD smoke path.
+Run and validate the minimal-trigger agent workflow on the real HLD smoke path.
 
 Target command:
 
@@ -201,7 +202,7 @@ Expected behavior:
 - Product/Architect answer-pack readiness: medium; generated and tested, but depends on conversion and first-readonly reaching later stages.
 - Orchestration promotion readiness: medium; gates exist, but need full real-HLD smoke after conversion passes.
 - SpecKit proxy readiness: medium; guarded dry-run exists, real execution is still deferred.
-- Agent-first UX readiness: medium-low; prompt/context generator exists, but full real-HLD agent workflow must still be smoke-tested.
+- Agent-first UX readiness: medium; minimal trigger and internal context generator exist, but full real-HLD agent workflow must still be smoke-tested.
 
 ## Rule
 

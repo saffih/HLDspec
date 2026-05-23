@@ -4,13 +4,32 @@ made by AI
 
 ## User trigger
 
-The intended user-facing trigger is:
+The intended user-facing trigger is intentionally small:
 
 ```text
 HLDspec /absolute/path/to/HLD.md
 ```
 
-Optional flags may exist later, but the core trigger must be enough for a user to start the process.
+Optional:
+
+```text
+HLDspec /absolute/path/to/HLD.md --workspace /path/to/workspace
+```
+
+The human should not paste the full orchestration contract. The full contract lives in repo docs and generated context files.
+
+## Minimal trigger rule
+
+When an HLDspec-capable agent receives the minimal trigger, it must:
+
+1. identify the source HLD path
+2. create or reuse a workspace
+3. run or read the generated HLDspec start context
+4. use HLDspec tools internally
+5. stop at the current gate/checkpoint
+6. ask the human only real checkpoint questions
+
+The start script may generate full context files, but it must print a short human-facing trigger by default.
 
 ## Product shape
 

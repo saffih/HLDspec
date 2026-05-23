@@ -20,6 +20,13 @@ def default_workspace(source_hld: Path) -> Path:
     return Path("/tmp") / f"hldspec-agent-{safe_name(source_hld.stem)}"
 
 
+def normalize_path(path: Path) -> Path:
+    try:
+        return path.resolve()
+    except Exception:
+        return path.absolute()
+
+
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as fh:
@@ -91,8 +98,7 @@ def current_state(workspace: Path) -> dict[str, Any]:
 
 def allowed_commands(repo: Path, source_hld: Path, workspace: Path, state: dict[str, Any]) -> list[str]:
     stage = str(state.get("current_stage", "NOT_STARTED"))
-    base = f"cd {repo}"
-    commands = [base]
+    commands = [f"cd {repo}"]
 
     if stage == "NOT_STARTED":
         commands.append(f"bash scripts/hldspec_smoke.sh {source_hld} {workspace} --force")
@@ -123,10 +129,14 @@ def next_action(state: dict[str, Any]) -> str:
     return "Inspect hldspec_state.md and follow the listed next allowed actions."
 
 
+def minimal_trigger(source_hld: Path, workspace: Path) -> str:
+    return f"HLDspec {source_hld} --workspace {workspace}"
+
+
 def build_context(source_hld: Path, workspace: Path, repo: Path, *, force: bool = False) -> dict[str, Any]:
-    source_hld = source_hld.resolve()
-    workspace = workspace.resolve()
-    repo = repo.resolve()
+    source_hld = normalize_path(source_hld)
+    workspace = normalize_path(workspace)
+    repo = normalize_path(repo)
 
     if not source_hld.exists():
         raise FileNotFoundError(f"source HLD not found: {source_hld}")
@@ -136,10 +146,12 @@ def build_context(source_hld: Path, workspace: Path, repo: Path, *, force: bool 
     workspace_info = prepare_workspace(source_hld, workspace, force=force)
     state = current_state(workspace)
     commands = allowed_commands(repo, source_hld, workspace, state)
+    trigger = minimal_trigger(source_hld, workspace)
 
     return {
-        "schema_version": 1,
-        "trigger": f"HLDspec {source_hld}",
+        "schema_version": 2,
+        "trigger": trigger,
+        "minimal_human_prompt": trigger,
         "source_hld": str(source_hld),
         "source_hld_read_only": True,
         "workspace": str(workspace),
@@ -150,6 +162,10 @@ def build_context(source_hld: Path, workspace: Path, repo: Path, *, force: bool 
         "blocking_questions": state.get("blocking_questions", []),
         "allowed_internal_commands": commands,
         "next_safe_action": next_action(state),
+        "agent_bootstrap_rule": (
+            "When an agent receives the minimal trigger, it must read the generated context files if available, "
+            "run HLDspec tools internally, preserve source read-only, and stop at gates/checkpoints."
+        ),
         "forbidden_actions": [
             "Do not edit the source HLD.",
             "Do not invoke SpecKit.",
@@ -168,17 +184,22 @@ def build_context(source_hld: Path, workspace: Path, repo: Path, *, force: bool 
     }
 
 
+def render_minimal_trigger(context: dict[str, Any]) -> str:
+    return str(context["minimal_human_prompt"]).strip() + "\n"
+
+
 def render_prompt(context: dict[str, Any]) -> str:
     lines = [
-        "# HLDspec Orchestrator Agent Start",
+        "# HLDspec Orchestrator Agent Context",
         "",
         "made by AI",
         "",
-        "You are the HLDspec Orchestrator Agent.",
+        "This file is internal context for the HLDspec Orchestrator Agent.",
+        "The human-facing prompt is intentionally minimal:",
         "",
-        "## Trigger",
-        "",
-        f"`{context['trigger']}`",
+        "```text",
+        str(context["minimal_human_prompt"]),
+        "```",
         "",
         "## Source and workspace",
         "",
@@ -204,11 +225,7 @@ def render_prompt(context: dict[str, Any]) -> str:
     else:
         lines.append("- none")
 
-    lines += [
-        "",
-        "## Blocking questions",
-        "",
-    ]
+    lines += ["", "## Blocking questions", ""]
     blockers = context.get("blocking_questions") or []
     if blockers:
         for item in blockers:
@@ -219,11 +236,7 @@ def render_prompt(context: dict[str, Any]) -> str:
     else:
         lines.append("- none")
 
-    lines += [
-        "",
-        "## Allowed internal commands",
-        "",
-    ]
+    lines += ["", "## Allowed internal commands", ""]
     for cmd in context.get("allowed_internal_commands", []):
         lines.append(f"```bash\n{cmd}\n```")
 
@@ -254,28 +267,33 @@ def render_prompt(context: dict[str, Any]) -> str:
         "## If later stages are reached",
         "",
         "Build/use Product Manager pack, Architect pack, answer pack, orchestration state, and proxy dry-run only after earlier gates pass.",
-        "Do not invoke real SpecKit from this start prompt.",
+        "Do not invoke real SpecKit from this start context.",
         "",
     ]
     return "\n".join(lines)
 
 
-def write_outputs(context: dict[str, Any], workspace: Path) -> tuple[Path, Path]:
+def write_outputs(context: dict[str, Any], workspace: Path) -> tuple[Path, Path, Path]:
     sync = workspace / ".specify" / "sync"
     sync.mkdir(parents=True, exist_ok=True)
     json_path = sync / "hldspec_agent_start_context.json"
-    md_path = sync / "hldspec_agent_start_prompt.md"
+    md_path = sync / "hldspec_agent_start_context.md"
+    trigger_path = sync / "hldspec_agent_trigger.txt"
     json_path.write_text(json.dumps(context, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(render_prompt(context), encoding="utf-8")
-    return json_path, md_path
+    trigger_path.write_text(render_minimal_trigger(context), encoding="utf-8")
+    # Backward-compatible path. It is now internal context, not the thing the human must paste.
+    (sync / "hldspec_agent_start_prompt.md").write_text(render_prompt(context), encoding="utf-8")
+    return json_path, md_path, trigger_path
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build HLDspec agent-first start prompt/context.")
+    parser = argparse.ArgumentParser(description="Build HLDspec agent-first minimal trigger and internal context.")
     parser.add_argument("source_hld")
     parser.add_argument("--workspace", default="")
     parser.add_argument("--repo", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--force", action="store_true", help="Refresh workspace HLD.raw.md and HLD.md from source.")
+    parser.add_argument("--print-context", action="store_true", help="Print full internal context after the minimal trigger.")
     args = parser.parse_args()
 
     source = Path(args.source_hld).expanduser()
@@ -283,13 +301,19 @@ def main() -> int:
     repo = Path(args.repo).expanduser()
 
     context = build_context(source, workspace, repo, force=args.force)
-    json_path, md_path = write_outputs(context, workspace)
+    json_path, md_path, trigger_path = write_outputs(context, Path(context["workspace"]))
 
-    print("HLDspec agent-start context generated:")
+    print("HLDspec minimal agent trigger:")
+    print(render_minimal_trigger(context).strip())
+    print()
+    print("Internal context generated:")
     print(f"- json: {json_path}")
-    print(f"- prompt: {md_path}")
+    print(f"- context: {md_path}")
+    print(f"- trigger: {trigger_path}")
     print(f"- stage: {context['current_stage']}")
-    print(f"- workspace: {workspace}")
+    if args.print_context:
+        print()
+        print(render_prompt(context))
     return 0
 
 

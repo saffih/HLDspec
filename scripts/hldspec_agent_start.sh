@@ -15,13 +15,13 @@ run_python() {
 usage() {
   cat <<'EOF'
 Usage:
-  hldspec_agent_start.sh <source-HLD.md> [--workspace /path/to/workspace] [--force]
+  hldspec_agent_start.sh <source-HLD.md> [--workspace /path/to/workspace] [--force] [--print-context]
 
 User-facing meaning:
   HLDspec /absolute/path/to/HLD.md
 
-Generates an agent-start prompt/context for the HLDspec Orchestrator Agent.
-It does not invoke SpecKit, create final specs, implement, or edit the source HLD.
+Generates a minimal agent trigger plus internal context files.
+Default output is intentionally short.
 EOF
 }
 
@@ -35,6 +35,7 @@ shift
 
 WORKSPACE=""
 FORCE=0
+PRINT_CONTEXT=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -48,6 +49,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --force)
       FORCE=1
+      shift
+      ;;
+    --print-context)
+      PRINT_CONTEXT=1
       shift
       ;;
     *)
@@ -65,27 +70,8 @@ fi
 if [ "$FORCE" = "1" ]; then
   ARGS+=(--force)
 fi
+if [ "$PRINT_CONTEXT" = "1" ]; then
+  ARGS+=(--print-context)
+fi
 
 run_python "${ARGS[@]}"
-
-if [ -n "$WORKSPACE" ]; then
-  PROMPT="$WORKSPACE/.specify/sync/hldspec_agent_start_prompt.md"
-else
-  PROMPT="$(run_python - <<PY
-from pathlib import Path
-import re
-source = Path("$SOURCE_HLD").expanduser()
-text = re.sub(r"[^A-Za-z0-9_.-]+", "-", source.stem.strip()).strip("-._") or "hld"
-print(Path("/tmp") / f"hldspec-agent-{text}" / ".specify" / "sync" / "hldspec_agent_start_prompt.md")
-PY
-)"
-fi
-
-echo
-echo "Open this prompt with the HLDspec Orchestrator Agent:"
-echo "$PROMPT"
-echo
-
-if [ -f "$PROMPT" ]; then
-  cat "$PROMPT"
-fi
