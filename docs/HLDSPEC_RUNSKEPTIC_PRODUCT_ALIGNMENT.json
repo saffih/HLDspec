@@ -1,0 +1,31 @@
+{
+  "RunSkeptic_method": {
+    "cycles": [
+      "product_goal_and_source_of_truth",
+      "use_cases_and_command_api",
+      "first_run_artifact_flow",
+      "state_and_checkpoint_flow",
+      "prework_and_speckit_handoff",
+      "tests_and_context_preservation"
+    ],
+    "flow": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
+    "source": "saffih/skeptic/skeptic.md"
+  },
+  "deferred_items": [
+    "interactive hldspec_interview wrapper",
+    "source-HLD-affecting feedback queue",
+    "one-phase-at-a-time SpecKit proxy execution",
+    "changing unknown section default from SPEC_CANDIDATE to REVIEW_NEEDED"
+  ],
+  "findings": [],
+  "goal": {
+    "source_docs": [
+      "docs/HLDSPEC_USE_CASES_AND_API.md",
+      "docs/HLDSPEC_USER_STORIES.md"
+    ],
+    "summary": "HLDspec should be a judge-led product that converts/inspects HLDs, classifies sections, extracts use-case/API evidence, builds safe SpecKit prework, stops at human checkpoints, and never invokes implementation without approval."
+  },
+  "review_type": "HLDSPEC_PRODUCT_ALIGNMENT_RUNSKEPTIC",
+  "schema_version": 1,
+  "status": "PASS_WITH_DEFERRED_ITEMS"
+}

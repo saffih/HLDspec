@@ -77,7 +77,7 @@ def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]
     green = (
         allowed
         and not blocked
-        and pq.get("decision") == "FIX"
+        and pq.get("decision") in {"PASS", "FIX", "HANDLED"}
         and pq.get("recommendation") == "KEEP_PLAN"
         and not conflicts
         and not flagged

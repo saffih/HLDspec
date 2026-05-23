@@ -132,7 +132,7 @@ for spec in planned:
 
 continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", text, re.I))
 continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", text, re.I))
-plan_green = continue_true and not continue_false and decision == "FIX" and recommendation == "KEEP_PLAN" and not conflicts and not bad
+plan_green = continue_true and not continue_false and decision in {"PASS", "FIX", "HANDLED"} and recommendation == "KEEP_PLAN" and not conflicts and not bad
 
 print(f"Plan quality decision: {decision}")
 print(f"Recommendation: {recommendation}")

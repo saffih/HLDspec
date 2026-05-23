@@ -65,12 +65,19 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: Prework package includes use-case/API case.
 - DONE: Prework quality gate can block context-only first feature when map evidence shows the issue.
 - DONE: Gap review from current state to product goal documented in docs/HLDSPEC_RUNSKEPTIC_GAP_REVIEW.md.
+- DONE: Product alignment RunSkeptic cycles added in docs/HLDSPEC_RUNSKEPTIC_PRODUCT_ALIGNMENT.md.
+- DONE: Executable product alignment review added in scripts/run_hldspec_alignment_review.py.
+- DONE: hldspec_status wrapper added.
+- DONE: hldspec_prework wrapper added.
+- DONE: State/continue gates accept PASS / KEEP_PLAN as a green clean plan.
+- DONE: Status/alignment regression test added.
 
 ## Next patch
 
-- TODO: Add hldspec_status wrapper.
-- TODO: Harden hldspec_state output contract.
-- TODO: Add status tests for conversion checkpoint, prework approval gate, and missing workspace.
+- TODO: Add hldspec_interview wrapper.
+- TODO: Add answer recording into controlling JSON queues.
+- TODO: Add source-HLD-affecting feedback queue.
+- TODO: Add tests for conversion-question and spec-plan-question answering.
 
 ## Later product wrappers
 
@@ -93,8 +100,8 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - Planner gate readiness: high after plan-level regression passes.
 - Use-case/API map readiness: medium; executable and tested, but heuristic.
 - Prework package readiness: medium-high.
-- Status wrapper readiness: low.
-- Interview wrapper readiness: low.
+- Status wrapper readiness: medium-high.
+- Interview wrapper readiness: low; next bounded patch.
 - SpecKit proxy readiness: low.
 
 ## Rule
