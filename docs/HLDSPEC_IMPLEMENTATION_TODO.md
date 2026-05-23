@@ -71,13 +71,18 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: hldspec_prework wrapper added.
 - DONE: State/continue gates accept PASS / KEEP_PLAN as a green clean plan.
 - DONE: Status/alignment regression test added.
+- DONE: Interview checkpoint RunSkeptic review added in docs/HLDSPEC_RUNSKEPTIC_INTERVIEW_CHECKPOINT_REVIEW.md.
+- DONE: hldspec_interview wrapper added.
+- DONE: Validated queue answer writer added.
+- DONE: Source-HLD update queue is regenerated after conversion answers.
+- DONE: Interview answer regression tests added.
 
 ## Next patch
 
-- TODO: Add hldspec_interview wrapper.
-- TODO: Add answer recording into controlling JSON queues.
-- TODO: Add source-HLD-affecting feedback queue.
-- TODO: Add tests for conversion-question and spec-plan-question answering.
+- TODO: Harden bounded SpecKit proxy dossier against interview-approved queue state.
+- TODO: Add one-phase SpecKit proxy dry-run mode.
+- TODO: Add tests that proxy refuses to run without prework approval.
+- TODO: Keep implementation blocked until explicit human approval.
 
 ## Later product wrappers
 
@@ -101,8 +106,8 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - Use-case/API map readiness: medium; executable and tested, but heuristic.
 - Prework package readiness: medium-high.
 - Status wrapper readiness: medium-high.
-- Interview wrapper readiness: low; next bounded patch.
-- SpecKit proxy readiness: low.
+- Interview wrapper readiness: medium; flag-based answer recording is implemented and tested.
+- SpecKit proxy readiness: low; next bounded patch after interview stabilization.
 
 ## Rule
 
