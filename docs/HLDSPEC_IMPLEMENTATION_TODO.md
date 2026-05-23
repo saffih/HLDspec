@@ -133,6 +133,7 @@ Therefore, missing PM/Architect/answer-pack/proxy files in `/tmp/hldspec-smoke/.
 - DONE: Orchestration contract, junior subagent task packets, judge promotion ledger, and orchestration state builder added.
 - DONE: Checkpoint question guide added as a formal read-only process step.
 - DONE: Question guide explains current checkpoint questions but does not answer, edit, convert, promote, invoke SpecKit, or implement.
+- DONE: Agent-first start prompt/context generator added for the minimal trigger `HLDspec /absolute/path/to/HLD.md`.
 
 ## Immediate current gate
 
@@ -157,35 +158,23 @@ Do not inspect PM/Architect/answer-pack/proxy files in the base smoke workspace 
 
 ## Next patch
 
-Add the agent-first entrypoint.
+Run and validate the agent-first entrypoint on the real HLD smoke path.
 
-Target user experience:
+Target command:
 
-```text
-HLDspec /absolute/path/to/HLD.md
+```bash
+cd /Users/saffi/code/HLDspec
+bash scripts/hldspec_agent_start.sh /Users/saffi/code/flow/HLD.md --workspace /tmp/hldspec-smoke
 ```
 
-Required behavior:
+Expected behavior:
 
-- create or reuse workspace
-- copy source HLD to workspace and treat source as read-only
-- run status/prework/checkpoint tools internally
-- detect current gate
-- when a human checkpoint exists, run/generate the question guide and stop
-- ask the human only real checkpoint questions
-- after conversion, run first-readonly and build bottom-up dependency-aware plan
-- build Product Manager pack, Architect pack, answer pack, and orchestration state
-- prepare only one safe SpecKit proxy dry-run phase
-- do not invoke real SpecKit unless explicitly approved by judge gates
-- do not implement
+- generate `.specify/sync/hldspec_agent_start_prompt.md`
+- preserve `/Users/saffi/code/flow/HLD.md` as read-only
+- identify current gate as conversion checkpoint when state exists
+- guide the agent to use `hldspec_question_guide.sh`
+- stop before conversion until validated human answers are recorded
 
-Suggested files:
-
-- TODO: `docs/HLDSPEC_AGENT_ORCHESTRATOR_CONTRACT.md`
-- TODO: `docs/HLDSPEC_AGENT_START_PROMPT.md`
-- TODO: `scripts/build_hldspec_agent_start_prompt.py`
-- TODO: `scripts/hldspec_agent_start.sh`
-- TODO: `tests/test_hldspec_agent_start_prompt.py`
 
 ## Later product wrappers
 
@@ -212,7 +201,7 @@ Suggested files:
 - Product/Architect answer-pack readiness: medium; generated and tested, but depends on conversion and first-readonly reaching later stages.
 - Orchestration promotion readiness: medium; gates exist, but need full real-HLD smoke after conversion passes.
 - SpecKit proxy readiness: medium; guarded dry-run exists, real execution is still deferred.
-- Agent-first UX readiness: low; engine exists, minimal trigger `HLDspec /path/to/HLD.md` is not implemented.
+- Agent-first UX readiness: medium-low; prompt/context generator exists, but full real-HLD agent workflow must still be smoke-tested.
 
 ## Rule
 
