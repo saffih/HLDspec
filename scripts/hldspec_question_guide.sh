@@ -3,12 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if command -v uv >/dev/null 2>&1; then
-  export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.hldspec-uv-cache}"
-  PYTHON_RUN=(uv run python)
-else
-  PYTHON_RUN=(python3)
-fi
+run_python() {
+  if command -v uv >/dev/null 2>&1; then
+    export UV_CACHE_DIR="${UV_CACHE_DIR:-$PWD/.hldspec-uv-cache}"
+    uv run python "$@"
+  else
+    python3 "$@"
+  fi
+}
 
 usage() {
   cat <<'EOF'
@@ -34,11 +36,15 @@ fi
 WORKSPACE="$1"
 shift
 
-QUEUE_ARGS=()
+QUEUE_PATH=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --queue)
-      QUEUE_ARGS+=(--queue "${2:-}")
+      if [ "$#" -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "ERROR: --queue requires a path" >&2
+        exit 2
+      fi
+      QUEUE_PATH="$2"
       shift 2
       ;;
     *)
@@ -49,7 +55,11 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-"${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_question_guide.py" "$WORKSPACE" "${QUEUE_ARGS[@]}"
+if [ -n "$QUEUE_PATH" ]; then
+  run_python "$ROOT/scripts/build_hldspec_question_guide.py" "$WORKSPACE" --queue "$QUEUE_PATH"
+else
+  run_python "$ROOT/scripts/build_hldspec_question_guide.py" "$WORKSPACE"
+fi
 
 STATE_SYNC="$WORKSPACE/.specify/sync"
 FIRSTRUN_SYNC="$WORKSPACE/firstrun/.specify/sync"
