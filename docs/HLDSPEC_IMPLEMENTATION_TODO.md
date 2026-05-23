@@ -158,6 +158,138 @@ question guide explains hld_conversion_decision_queue
 
 Do not inspect PM/Architect/answer-pack/proxy files in the base smoke workspace until conversion has passed.
 
+<!-- ANSWER_DOSSIER_STRATEGY_START -->
+## Answer Dossier extraction strategy - active design context
+
+Current discovery from Flow HLD strategy work:
+
+```text
+The current SpecKit prework package is too shallow for approval even after the spec build plan split decisions pass.
+It can list bottom-up IDs and counts, but it does not yet expose enough named capabilities, interface contracts,
+provider/consumer links, data ownership, integration paths, source-of-truth/update timing, dependency reasons,
+or PM acceptance context.
+```
+
+Important source-HLD clue:
+
+```text
+The Flow HLD itself says implementation guidance comes from Component Interface Definitions,
+Database Schema Specification, core.md Contract Invariants, and technical-debt/deprecation timelines.
+HLDspec must extract those into named maps, not only preserve them inside raw HLD prose.
+```
+
+Current recommended strategy:
+
+```text
+Hybrid extraction with terminology learning:
+1. generic grep hotspot pass for high-signal terms
+2. project vocabulary extraction from headings, code symbols, commands, protocol names, table names, status values, and repeated domain terms
+3. second project-specific grep using learned vocabulary to catch missed areas
+4. full heading/section classifier pass for recall
+5. Architect extraction pass
+6. Product Manager extraction pass
+7. synthesis into SpecKit Answer Dossier
+8. dossier quality gate before SpecKit approval
+```
+
+Architect pass must extract:
+
+```text
+components
+ownership/boundaries
+interfaces
+provider/consumer links
+data ownership
+source-of-truth/update timing
+integration paths
+dependency reasons
+failure/fallback behavior
+security constraints
+TBD/NEEDS_CLARIFICATION items
+```
+
+Product Manager pass must extract:
+
+```text
+stakeholders/personas
+job-to-be-done
+pain points
+user journeys/workflows
+user stories
+acceptance criteria
+success metrics
+priorities/v1 scope
+non-goals/deferred scope
+open product questions
+```
+
+Required new dossier artifacts:
+
+```text
+.specify/sync/speckit_answer_dossier.md
+.specify/sync/architecture_answer_pack.md
+.specify/sync/product_answer_pack.md
+.specify/sync/interface_contract_map.md
+.specify/sync/integration_map.md
+.specify/sync/data_ownership_map.md
+.specify/sync/dependency_reason_map.md
+.specify/sync/open_questions_tbd_map.md
+```
+
+Quality gate must fail if a planned spec lacks:
+
+```text
+named capability
+owns/provides/consumes
+provider/consumer interface map
+data ownership or explicit TBD
+source-of-truth/update timing or explicit TBD
+dependency reason
+integration path when cross-component
+failure/fallback notes when relevant
+PM value/user story/acceptance criteria or explicit non-user-facing classification
+HLD traceability
+```
+
+Known important Flow contracts to verify extraction finds:
+
+```text
+Brain-to-Flow CLI Contract
+CLI Protocol Contract
+Database API Contract
+WIP Source-of-Truth Contract
+Task Delivery Handshake Contract
+HTTP/UI API Contract
+Storage Projection Contract
+Session Spawn Contract
+Environment Isolation Contract
+Logging Contract
+Reply Handling Contract
+```
+
+Next safe patch:
+
+```text
+Implement an Answer Dossier extraction experiment/stage.
+Compare grep-only, chunk-only, and hybrid-with-terminology-learning extraction on the Flow HLD.
+Do not invoke SpecKit.
+Do not create final specs manually.
+Do not edit /Users/saffi/code/flow/HLD.md.
+```
+
+Supporting strategy doc:
+
+```text
+docs/HLDSPEC_ANSWER_DOSSIER_EXTRACTION_STRATEGY.md
+```
+
+Restart prompt:
+
+```text
+Dev
+```
+<!-- ANSWER_DOSSIER_STRATEGY_END -->
+
 ## Next patch
 
 Run and validate the full agent-first workflow from scratch through conversion decisions, spec-plan split decisions, and the SpecKit prework human-review gate.
@@ -200,7 +332,7 @@ Expected behavior:
 - Status wrapper readiness: medium-high.
 - Interview wrapper readiness: medium; flag-based answer recording is implemented and tested for existing queues.
 - Question guide readiness: medium; formal read-only process step exists, but must be smoke-tested on real conversion queues.
-- Product/Architect answer-pack readiness: medium; generated and tested, but depends on conversion and first-readonly reaching later stages.
+- Product/Architect answer-pack readiness: medium-low for SpecKit approval; generated packs exist, but the new Answer Dossier strategy shows they need named capabilities, contracts, ownership, integration maps, and PM acceptance context before approval.
 - Orchestration promotion readiness: medium; gates exist, but need full real-HLD smoke after conversion passes.
 - SpecKit proxy readiness: medium; guarded dry-run exists, real execution is still deferred.
 - Agent-first UX readiness: medium-high; minimal trigger exists and spec-plan checkpoint answers are applied to workspace plan artifacts, but the full real-HLD scratch workflow must still be smoke-tested end to end.

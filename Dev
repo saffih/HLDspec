@@ -1,0 +1,66 @@
+# HLDspec Dev Restart Prompt
+
+made by AI
+
+Use this prompt when starting a new agent/session for the HLDspec Answer Dossier strategy work.
+
+```text
+We are working on HLDspec.
+
+Repository:
+- GitHub: https://github.com/saffih/HLDspec.git
+- Local authoritative repo: /Users/saffi/code/HLDspec
+
+Source HLD:
+- /Users/saffi/code/flow/HLD.md
+- Treat the source HLD as read-only.
+
+Start by reading:
+- AGENTS.md
+- docs/HLDSPEC_IMPLEMENTATION_TODO.md
+- docs/HLDSPEC_ANSWER_DOSSIER_EXTRACTION_STRATEGY.md
+- Dev
+
+Recall and follow the local patch workflow:
+1. Treat the local repo as authoritative. GitHub is the sync target.
+2. cd /Users/saffi/code/HLDspec
+3. git status --short
+4. git pull --ff-only
+5. Run local patch scripts with explicit repo path:
+   PROJECT_REPO=/Users/saffi/code/HLDspec PATCH_COMMIT=1 bash /absolute/path/to/patch.sh
+6. Run focused tests, full test discovery when available, and git diff --check.
+7. Commit only when PATCH_COMMIT=1.
+8. Do not push unless explicitly requested.
+9. If a patch fails partially, do not rerun blindly; inspect git status and repair.
+
+Current product goal:
+Build an HLDspec Answer Dossier stage before SpecKit approval.
+
+Why:
+The Flow HLD contains rich architecture and product information, but the current prework package is too shallow. It lists counts and numeric order, but does not expose named capabilities, interface contracts, provider/consumer links, data ownership, integration paths, source-of-truth ownership, update timing, dependency reasons, and PM acceptance context well enough for later SpecKit/spec orchestration.
+
+Current strategy:
+Run a hybrid extraction experiment with terminology learning:
+- Generic grep hotspot pass for high-signal keywords.
+- Project vocabulary extraction from headings, code symbols, command names, protocol names, component names, database table names, status values, and repeated domain terms.
+- Second project-specific grep using learned vocabulary to catch missed areas.
+- Full HLD section classifier pass for recall.
+- Architect pass to extract contracts, components, boundaries, interfaces, providers/consumers, data ownership, integration, failures/fallbacks, dependency reasons, and TBDs.
+- Product Manager pass to extract personas, JTBD, workflows, user stories, acceptance criteria, success metrics, priorities, non-goals, and product questions.
+- Synthesis pass to build SpecKit Answer Dossier artifacts.
+- Quality gate fails unless every planned spec has enough named architecture/product context or explicit TBD/NEEDS_CLARIFICATION.
+
+Do not:
+- Do not invoke SpecKit yet.
+- Do not create final specs manually.
+- Do not implement Flow/VLT code.
+- Do not edit /Users/saffi/code/flow/HLD.md.
+- Do not approve stale prework packages.
+- Do not invent source-of-truth, update timing, ownership, or metadata; mark unknowns as TBD/NEEDS_CLARIFICATION.
+
+Next safe work:
+1. Implement or prototype the Answer Dossier extraction stage in HLDspec.
+2. Compare grep-only, chunk-only, and hybrid-with-terminology-learning extraction on the Flow HLD.
+3. Save results under .specify/sync/ and summarize in docs/HLDSPEC_IMPLEMENTATION_TODO.md.
+4. Keep the user interaction simple: user answers only ok / next / accept all / explicit choices at real checkpoints.
+```
