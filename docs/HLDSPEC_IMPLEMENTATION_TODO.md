@@ -42,7 +42,6 @@ Context rule:
 
 If future context is short, use this TODO to recover where we are, what is already done, what is intentionally deferred, and what the next safe patch should be. Keep this file updated after every patch.
 <!-- HLDSPEC_PROCESS_INTRO_END -->
-
 ## Current milestone
 
 Goal: make the first-run planning path safe enough to use as the product foundation before adding larger orchestration features.
