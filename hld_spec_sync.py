@@ -1221,7 +1221,7 @@ def apply_plan_quality(plan: dict[str, object], parsed_map: hld_map.HldMap) -> N
         decision = "FIX"
         recommendation = "REVIEW_PLAN"
     else:
-        decision = "FIX"
+        decision = "PASS"
         recommendation = "KEEP_PLAN"
 
     plan["plan_quality"] = {
