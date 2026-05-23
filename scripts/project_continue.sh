@@ -81,6 +81,23 @@ render_checkpoint() {
   return "$rc"
 }
 
+rebuild_post_plan_artifacts() {
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_plan.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_proxy_dossier.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_junior_task_packets.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_product_manager_pack.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_architect_pack.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_answer_pack.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_orchestration_state.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_state.py" "$FIRSTRUN" --source-hld "$SOURCE_HLD"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_package.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_target_spec_work_order.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_branch_queue.py" "$FIRSTRUN/.specify/sync/target_spec_work_order.json" "$FIRSTRUN"
+}
+
 report_spec_gate() {
   local review="$FIRSTRUN/.specify/sync/spec_build_plan_review.md"
   local plan="$FIRSTRUN/.specify/sync/spec_build_plan.json"
@@ -229,6 +246,24 @@ fi
 if [ ! -f "$FIRSTRUN/.specify/sync/spec_build_plan_review.md" ]; then
   echo "State: working HLD is converted. Running first-readonly on converted HLD."
   bash "$ROOT/scripts/first_run_readonly.sh" "$WORK/HLD.md" "$FIRSTRUN" --force
+fi
+
+# 4.5. Apply answered spec-build-plan decisions to the workspace plan.
+SPEC_PLAN_QUEUE="$FIRSTRUN/.specify/sync/spec_build_plan_decision_queue.json"
+SPEC_PLAN="$FIRSTRUN/.specify/sync/spec_build_plan.json"
+if [ -f "$SPEC_PLAN_QUEUE" ] && [ -f "$SPEC_PLAN" ]; then
+  set +e
+  queue_has_tbd "$SPEC_PLAN_QUEUE"
+  spq_rc=$?
+  set -e
+  if [ "$spq_rc" -eq 0 ]; then
+    echo "State: spec build plan decision queue has no TBD answers. Applying decisions to workspace plan."
+    "${PYTHON_RUN[@]}" "$ROOT/scripts/apply_spec_build_plan_decisions.py" "$FIRSTRUN"
+    rebuild_post_plan_artifacts
+  elif [ "$spq_rc" -ne 2 ]; then
+    echo "ERROR: failed to inspect spec build plan decision queue." >&2
+    exit "$spq_rc"
+  fi
 fi
 
 # 5. Report spec gate.
