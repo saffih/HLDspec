@@ -139,7 +139,9 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
             [],
         )
 
-    if conversion_queue.exists() and has_tbd_questions(conversion_queue):
+    working_hld_converted = hld_is_converted(working_hld)
+
+    if not working_hld_converted and conversion_queue.exists() and has_tbd_questions(conversion_queue):
         base["blocking_questions"] = [{"artifact": str(conversion_queue), "open_question_count": count_tbd(conversion_queue)}]
         return finish(
             "CONVERSION_CHECKPOINT",
@@ -155,13 +157,18 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
             [sync / "hld_conversion_decision_queue.md", conversion_queue],
         )
 
-    if not hld_is_converted(working_hld):
+    if not working_hld_converted:
         return finish(
             "CONVERSION_READY_TO_APPLY",
             "apply_working_hld_conversion",
             "hld_conversion_decisions_answered",
             ["apply conversion decisions to working HLD only", "rerun first_readonly on converted working HLD"],
             [conversion_queue],
+        )
+
+    if conversion_queue.exists() and has_tbd_questions(conversion_queue):
+        base["notes"].append(
+            "Ignored stale conversion queue because the working HLD is already in HLDspec format."
         )
 
     if not plan_review.exists():

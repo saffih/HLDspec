@@ -102,6 +102,7 @@ Therefore, missing PM/Architect/answer-pack/proxy files in `/tmp/hldspec-smoke/.
 
 ## Done
 
+- DONE: State priority bug fixed so converted HLD workspaces ignore stale derived conversion queues and advance to the real next gate.
 - DONE: HLD section classifier marks stakeholder, persona, business case, executive summary, assumptions, and milestone sections as context-only.
 - DONE: HLD section classifier marks decision log and open conflict sections as governance context.
 - DONE: Explicit HLD-SPECS metadata still overrides context-only title classification.
