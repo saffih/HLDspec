@@ -59,3 +59,20 @@ Convert only the workspace `HLD.md` using:
 - raw marking plan
 
 After conversion, then run the next read-only flow if the generated context says it is safe.
+
+## Stage rule: SpecKit-ready prework
+
+Before invoking SpecKit, an agent must produce and review:
+
+```bash
+bash scripts/hldspec_speckit_ready.sh <workspace>
+```
+
+This builds:
+
+- architecture analysis
+- compact constitution context
+- bottom-up spec list
+- readiness review
+
+It does not invoke SpecKit, create final specs, or implement.

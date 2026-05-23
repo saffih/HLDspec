@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def sync_dir(workspace: Path) -> Path:
+    direct = workspace / ".specify" / "sync"
+    nested = workspace / "firstrun" / ".specify" / "sync"
+    for sync in (direct, nested):
+        if (sync / "speckit_constitution_context.json").exists() or (sync / "hldspec_speckit_spec_list.json").exists():
+            return sync
+    direct.mkdir(parents=True, exist_ok=True)
+    return direct
+
+
+def has_required_constitution_bits(context: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    for key in [
+        "source_of_truth_hierarchy",
+        "architecture_layer_model",
+        "interface_taxonomy",
+        "split_rules",
+        "no_invention_rules",
+        "checkpoint_triage_rules",
+        "speckit_boundaries",
+        "validation_gates",
+    ]:
+        if not context.get(key):
+            missing.append(key)
+    return missing
+
+
+def build_review(workspace: Path) -> dict[str, Any]:
+    sync = sync_dir(workspace)
+    arch = load_json(sync / "hldspec_architecture_analysis.json")
+    constitution = load_json(sync / "speckit_constitution_context.json")
+    spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
+
+    missing: list[str] = []
+    if not arch:
+        missing.append("hldspec_architecture_analysis")
+    if not constitution:
+        missing.append("speckit_constitution_context")
+    if not spec_list:
+        missing.append("hldspec_speckit_spec_list")
+    missing.extend([f"constitution.{x}" for x in has_required_constitution_bits(constitution)])
+
+    blocking: list[str] = []
+    if missing:
+        blocking.append("missing readiness artifacts or required constitution sections")
+    if spec_list.get("spec_count", 0) == 0:
+        blocking.append("no planned specs generated")
+
+    status = "SPECKIT_PREWORK_READY_FOR_HUMAN_REVIEW" if not blocking else "SPECKIT_PREWORK_NOT_READY"
+
+    return {
+        "schema_version": 1,
+        "workspace": str(workspace),
+        "status": status,
+        "not_real_speckit_execution": True,
+        "implementation_allowed": False,
+        "missing": missing,
+        "blocking": blocking,
+        "architecture_status": arch.get("status", "MISSING"),
+        "constitution_status": constitution.get("status", "MISSING"),
+        "spec_list_status": spec_list.get("status", "MISSING"),
+        "spec_count": spec_list.get("spec_count", 0),
+        "next_safe_action": (
+            "Human review of constitution context and spec list; do not invoke SpecKit yet."
+            if status == "SPECKIT_PREWORK_READY_FOR_HUMAN_REVIEW"
+            else "Fix missing readiness artifacts before SpecKit prework review."
+        ),
+    }
+
+
+def render_md(data: dict[str, Any]) -> str:
+    lines = [
+        "# HLDspec SpecKit Readiness Review",
+        "",
+        "made by AI",
+        "",
+        f"Status: `{data.get('status')}`",
+        f"Workspace: `{data.get('workspace')}`",
+        f"Spec count: {data.get('spec_count')}",
+        f"Implementation allowed: `{str(data.get('implementation_allowed')).lower()}`",
+        f"Real SpecKit execution: `false`",
+        "",
+        "## Component statuses",
+        "",
+        f"- architecture analysis: `{data.get('architecture_status')}`",
+        f"- constitution context: `{data.get('constitution_status')}`",
+        f"- spec list: `{data.get('spec_list_status')}`",
+        "",
+        "## Blocking",
+        "",
+    ]
+    if data.get("blocking"):
+        for item in data["blocking"]:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- none")
+
+    lines += ["", "## Missing", ""]
+    if data.get("missing"):
+        for item in data["missing"]:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- none")
+
+    lines += ["", "## Next safe action", "", data.get("next_safe_action", ""), ""]
+    return "\n".join(lines)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Review whether HLDspec outputs are ready for human SpecKit prework review.")
+    parser.add_argument("workspace")
+    args = parser.parse_args()
+
+    workspace = Path(args.workspace).expanduser().resolve()
+    sync = sync_dir(workspace)
+    data = build_review(workspace)
+    json_path = sync / "hldspec_speckit_readiness.json"
+    md_path = sync / "hldspec_speckit_readiness.md"
+    write_json(json_path, data)
+    md_path.write_text(render_md(data), encoding="utf-8")
+
+    print("HLDspec SpecKit readiness review generated:")
+    print(f"- json: {json_path}")
+    print(f"- report: {md_path}")
+    print(f"- status: {data['status']}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

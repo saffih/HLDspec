@@ -218,3 +218,23 @@ answer pack is READY
 judge promotion marks required artifacts ACCEPTED
 proxy dry-run is DRY_RUN_READY
 ```
+
+## SpecKit-ready gap closure
+
+DONE: SpecKit-ready prework layer added.
+
+New artifacts:
+
+- `hldspec_architecture_analysis.json/md`
+- `speckit_constitution_context.json/md`
+- `hldspec_speckit_spec_list.json/md`
+- `hldspec_speckit_readiness.json/md`
+
+Rules:
+
+- Constitution is compact shared architecture context plus governance.
+- HLD remains the full architecture source of truth.
+- Specs are bottom-up capability contracts.
+- Tool/state, logic/orchestration, and API/contract layers must be split when independently evolvable.
+- No-invention/defer applies to missing metadata, source-of-truth ownership, and update timing.
+- This layer does not invoke SpecKit and does not implement.
