@@ -2106,3 +2106,17 @@ The judge/orchestrator must present:
 - constitution/dependency/first-feature case from `speckit_prework_package.md`
 - only real human checkpoint questions
 
+## Use cases and simple API
+
+The canonical product-level use cases and simple command/artifact API are defined in:
+
+```text
+docs/HLDSPEC_USE_CASES_AND_API.md
+```
+
+The judge/orchestrator should use this document when deciding:
+- what is context-only vs buildable
+- what API/interface surfaces exist
+- what the first buildable feature should be
+- which simple command/API should handle the current user scenario
+

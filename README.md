@@ -550,3 +550,13 @@ python3 scripts/convert_hld_to_hldspec.py ./Flow-System-HLD.md --default-flow-sp
 
 This writes a separate converted file and conversion index. It does not modify the source HLD unless an explicit output path points to the source and `--overwrite` is used.
 
+## HLDspec use cases and simple API
+
+See:
+
+```text
+docs/HLDSPEC_USE_CASES_AND_API.md
+```
+
+This document defines the simple judge/orchestrator scenarios, command API, artifact API, and classification rules for context-only versus buildable sections.
+
