@@ -47,3 +47,7 @@ echo "- state json: $STATE_JSON"
 echo "- state report: $STATE_MD"
 echo
 cat "$STATE_MD"
+
+echo
+echo "Checkpoint question guide:"
+bash "$ROOT/scripts/hldspec_question_guide.sh" "$WORKSPACE" || true

@@ -12,6 +12,7 @@ from typing import Any
 KNOWN_QUEUE_NAMES = (
     "hld_conversion_decision_queue.json",
     "spec_build_plan_decision_queue.json",
+    "speckit_question_escalation_queue.json",
 )
 
 
@@ -169,6 +170,8 @@ def render_queue_md(queue: dict[str, Any], path: Path) -> str:
         title = "HLD Conversion Decision Queue"
     elif path.name == "spec_build_plan_decision_queue.json":
         title = "Spec Build Plan Decision Queue"
+    elif path.name == "speckit_question_escalation_queue.json":
+        title = "SpecKit Question Escalation Queue"
 
     checkpoint = queue.get("checkpoint", {}) if isinstance(queue.get("checkpoint"), dict) else {}
     lines = [

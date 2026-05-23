@@ -80,11 +80,21 @@ echo "- workspace: $WORKSPACE"
 echo "- phase: $PHASE"
 echo
 
+set +e
 bash "$ROOT/scripts/hldspec_prework.sh" "$SOURCE_HLD" "$WORKSPACE" $FORCE
+PREWORK_RC=$?
+set -e
 
 echo
 echo "Status after prework:"
-bash "$ROOT/scripts/hldspec_status.sh" "$WORKSPACE" "$SOURCE_HLD"
+bash "$ROOT/scripts/hldspec_status.sh" "$WORKSPACE" "$SOURCE_HLD" || true
+
+if [ "$PREWORK_RC" -ne 0 ]; then
+  echo
+  echo "Prework stopped before the full smoke sequence completed."
+  echo "If this is a human checkpoint, use the question guide above, record answers, then rerun."
+  exit "$PREWORK_RC"
+fi
 
 echo
 echo "Product alignment review:"

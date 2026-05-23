@@ -97,13 +97,19 @@ Goal: make the first-run planning path safe enough to use as the product foundat
 - DONE: Orchestration state builder added.
 - DONE: Proxy dry-run now refuses unpromoted answer packs.
 - DONE: Orchestration promotion regression tests added.
+- DONE: Formal checkpoint question guide added for conversion/spec-plan/SpecKit escalation queues.
+- DONE: hldspec_question_guide wrapper added.
+- DONE: hldspec_status now generates the checkpoint question guide.
+- DONE: hldspec_smoke now stops gracefully at early checkpoints and prints the guide.
+- DONE: hldspec_interview queue discovery now includes SpecKit question escalation queues.
+- DONE: Question-guide regression tests added.
 
 ## Next patch
 
-- TODO: Run scripts/hldspec_smoke.sh on a real HLD and inspect junior task packets, orchestration state, PM/Architect packs, answer pack, and readiness artifacts.
-- TODO: Resolve blocking PMQ/ARQ questions through hldspec_interview-compatible queues.
-- TODO: Promote PM pack, Architect pack, and answer pack only after review.
-- TODO: Decide whether real one-phase SpecKit execution is approved only after answer pack is READY and ACCEPTED.
+- TODO: Run scripts/hldspec_question_guide.sh on the active smoke workspace and answer real conversion checkpoint questions.
+- TODO: Convert the smoke copy of the HLD only after conversion decisions are recorded.
+- TODO: Rerun first_run_readonly on the converted smoke HLD.
+- TODO: Then inspect junior task packets, orchestration state, PM/Architect packs, answer pack, and readiness artifacts.
 
 ## Later product wrappers
 

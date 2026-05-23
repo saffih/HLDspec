@@ -146,6 +146,7 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
             "hld_conversion_decisions",
             "raw_hld_format_report",
             [
+                "run scripts/hldspec_question_guide.sh <workspace>",
                 "judge presents hld_conversion_decision_queue.md",
                 "human answers only listed split/keep questions",
                 "judge updates hld_conversion_decision_queue.json",
@@ -181,7 +182,12 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
             "SPEC_BUILD_PLAN_CHECKPOINT",
             "spec_build_plan_decisions",
             "spec_build_plan_review",
-            ["judge presents spec_build_plan_decision_queue.md", "human answers listed plan questions", "judge reruns hldspec"],
+            [
+                "run scripts/hldspec_question_guide.sh <workspace>",
+                "judge presents spec_build_plan_decision_queue.md",
+                "human answers listed plan questions",
+                "judge reruns hldspec",
+            ],
             [fsync / "spec_build_plan_decision_queue.md", spec_queue, plan_review],
         )
 
