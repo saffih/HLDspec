@@ -89,6 +89,7 @@ else
   run_python "$ROOT/scripts/build_hldspec_speckit_spec_list.py" "$WORKSPACE"
 fi
 
+run_python "$ROOT/scripts/build_hldspec_architecture_findings_disposition.py" "$WORKSPACE"
 run_python "$ROOT/scripts/run_hldspec_speckit_readiness.py" "$WORKSPACE"
 
 # Install orchestrator instruction files (idempotent — skips existing non-stub files)

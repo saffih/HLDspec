@@ -47,9 +47,38 @@ def has_required_constitution_bits(context: dict[str, Any]) -> list[str]:
     return missing
 
 
+def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[str, Any]) -> list[str]:
+    if arch.get("status") != "ARCHITECTURE_REVIEW_REQUIRED":
+        return []
+    findings = [item for item in arch.get("findings", []) if isinstance(item, dict)]
+    if not findings:
+        return []
+    if not disposition:
+        return [f"architecture review has {len(findings)} finding(s) requiring disposition"]
+    if disposition.get("status") not in {"DISPOSITIONED", "APPROVED"}:
+        return [f"architecture disposition status is {disposition.get('status', 'MISSING')}"]
+    finding_ids = {str(item.get("finding_id")) for item in findings if item.get("finding_id")}
+    records = disposition.get("dispositions", [])
+    if not isinstance(records, list):
+        return ["architecture disposition records are missing or invalid"]
+    covered = {str(item.get("finding_id")) for item in records if isinstance(item, dict) and item.get("finding_id")}
+    missing = sorted(finding_ids - covered)
+    if missing:
+        return [f"architecture disposition missing {len(missing)} finding(s): {', '.join(missing[:5])}"]
+    unresolved = [
+        str(item.get("finding_id"))
+        for item in records
+        if isinstance(item, dict) and str(item.get("disposition", "")).upper() in {"", "TBD", "CONFLICT", "UNRESOLVED"}
+    ]
+    if unresolved:
+        return [f"architecture disposition has {len(unresolved)} unresolved finding(s): {', '.join(unresolved[:5])}"]
+    return []
+
+
 def build_review(workspace: Path) -> dict[str, Any]:
     sync = sync_dir(workspace)
     arch = load_json(sync / "hldspec_architecture_analysis.json")
+    arch_disposition = load_json(sync / "hldspec_architecture_findings_disposition.json")
     constitution = load_json(sync / "speckit_constitution_context.json")
     spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
 
@@ -67,6 +96,11 @@ def build_review(workspace: Path) -> dict[str, Any]:
         blocking.append("missing readiness artifacts or required constitution sections")
     if spec_list.get("spec_count", 0) == 0:
         blocking.append("no planned specs generated")
+    if spec_list.get("status") != "SPEC_LIST_READY_FOR_REVIEW":
+        blocking.append(f"spec list is {spec_list.get('status', 'MISSING')}")
+    for item in spec_list.get("blocking", []) if isinstance(spec_list.get("blocking"), list) else []:
+        blocking.append(f"spec list: {item}")
+    blocking.extend(architecture_disposition_blockers(arch, arch_disposition))
 
     status = "SPECKIT_PREWORK_READY_FOR_HUMAN_REVIEW" if not blocking else "SPECKIT_PREWORK_NOT_READY"
 
@@ -79,13 +113,14 @@ def build_review(workspace: Path) -> dict[str, Any]:
         "missing": missing,
         "blocking": blocking,
         "architecture_status": arch.get("status", "MISSING"),
+        "architecture_disposition_status": arch_disposition.get("status", "MISSING"),
         "constitution_status": constitution.get("status", "MISSING"),
         "spec_list_status": spec_list.get("status", "MISSING"),
         "spec_count": spec_list.get("spec_count", 0),
         "next_safe_action": (
             "Human review of constitution context and spec list; do not invoke SpecKit yet."
             if status == "SPECKIT_PREWORK_READY_FOR_HUMAN_REVIEW"
-            else "Fix missing readiness artifacts before SpecKit prework review."
+            else "Resolve architecture/spec-list blockers before SpecKit prework approval."
         ),
     }
 
@@ -94,7 +129,7 @@ def render_md(data: dict[str, Any]) -> str:
     lines = [
         "# HLDspec SpecKit Readiness Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data.get('status')}`",
         f"Workspace: `{data.get('workspace')}`",
@@ -105,6 +140,7 @@ def render_md(data: dict[str, Any]) -> str:
         "## Component statuses",
         "",
         f"- architecture analysis: `{data.get('architecture_status')}`",
+        f"- architecture disposition: `{data.get('architecture_disposition_status')}`",
         f"- constitution context: `{data.get('constitution_status')}`",
         f"- spec list: `{data.get('spec_list_status')}`",
         "",

@@ -273,6 +273,25 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                     "RunSkeptic_decision": "VERIFY",
                 }
             )
+            non_historical = as_list(existing_scan.get("non_historical_ids"))
+            if non_historical:
+                sample = ", ".join(str(item) for item in non_historical[:5])
+                findings.append(
+                    {
+                        "id": "QG-018",
+                        "severity": "ACTION",
+                        "area": "spec history classification",
+                        "finding": (
+                            f"{len(non_historical)} existing spec(s) are not historical because their Feature Branch "
+                            f"was not found in first-parent merge history: {sample}"
+                        ),
+                        "recommendation": (
+                            "Treat these specs as active/unmerged context, not completed history. "
+                            "Only specs classified MERGED_DONE may be used as historical baseline."
+                        ),
+                        "RunSkeptic_decision": "VERIFY",
+                    }
+                )
 
     if not dossier_quality:
         findings.append(
@@ -410,7 +429,7 @@ def render_md(review: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Prework Quality Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{review['status']}`",
         f"Review type: `{review['review_type']}`",
