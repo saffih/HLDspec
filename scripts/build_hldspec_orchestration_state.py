@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Any
 
 ARTIFACTS: dict[str, dict[str, str]] = {
-    "hldspec_junior_task_packets": {"role": "Judge", "path": "hldspec_junior_task_packets.json", "kind": "junior_task_packets"},
-    "speckit_product_manager_pack": {"role": "Product Lead", "path": "speckit_product_manager_pack.json", "kind": "domain_pack"},
-    "speckit_architect_pack": {"role": "Architect Lead", "path": "speckit_architect_pack.json", "kind": "domain_pack"},
-    "speckit_answer_pack": {"role": "Judge", "path": "speckit_answer_pack.json", "kind": "answer_pack"},
-    "speckit_prework_package": {"role": "Judge", "path": "speckit_prework_package.json", "kind": "approval_package"},
-    "speckit_proxy_dry_run": {"role": "SpecKit Proxy", "path": "speckit_proxy_dry_run.json", "kind": "proxy_plan"},
+    "hldspec_junior_task_packets": {"role": "Judge", "assigned_agent_name": "HLDspec Judge Orchestrator", "model_tier": "MODEL_CRITICAL", "path": "hldspec_junior_task_packets.json", "kind": "junior_task_packets"},
+    "speckit_product_manager_pack": {"role": "Product Lead", "assigned_agent_name": "Product Lead Reviewer", "model_tier": "MODEL_STRONG", "path": "speckit_product_manager_pack.json", "kind": "domain_pack"},
+    "speckit_architect_pack": {"role": "Architect Lead", "assigned_agent_name": "Architect Lead Reviewer", "model_tier": "MODEL_CRITICAL", "path": "speckit_architect_pack.json", "kind": "domain_pack"},
+    "speckit_answer_pack": {"role": "Judge", "assigned_agent_name": "HLDspec Judge Orchestrator", "model_tier": "MODEL_CRITICAL", "path": "speckit_answer_pack.json", "kind": "answer_pack"},
+    "speckit_prework_package": {"role": "Judge", "assigned_agent_name": "HLDspec Judge Orchestrator", "model_tier": "MODEL_CRITICAL", "path": "speckit_prework_package.json", "kind": "approval_package"},
+    "speckit_proxy_dry_run": {"role": "SpecKit Proxy", "assigned_agent_name": "HLDspec Judge Orchestrator", "model_tier": "MODEL_CRITICAL", "path": "speckit_proxy_dry_run.json", "kind": "proxy_plan"},
 }
 DEPENDENCIES = {"speckit_answer_pack": ["speckit_product_manager_pack", "speckit_architect_pack"], "speckit_proxy_dry_run": ["speckit_answer_pack"]}
 
@@ -108,7 +108,7 @@ def build_state(workspace: Path) -> dict[str, Any]:
             blockers.append(f"{artifact_id} has {len(questions)} blocking open question(s)")
         if exists and missing_deps and artifact_id in {"speckit_answer_pack", "speckit_proxy_dry_run"}:
             blockers.append(f"{artifact_id} depends on unaccepted artifact(s): {', '.join(missing_deps)}")
-        outputs.append({"artifact_id": artifact_id, "producer_role": meta["role"], "artifact_kind": meta["kind"], "path": str(path), "exists": exists, "artifact_status": artifact_status(data), "promotion_status": promo, "requires_judge_review": artifact_id != "hldspec_junior_task_packets", "blocking_question_count": len(questions), "dependencies": deps, "unaccepted_dependencies": missing_deps, "allowed_consumers": [] if promo != "ACCEPTED" else consumers_for(artifact_id)})
+        outputs.append({"artifact_id": artifact_id, "producer_role": meta["role"], "assigned_agent_name": meta["assigned_agent_name"], "model_tier": meta["model_tier"], "artifact_kind": meta["kind"], "path": str(path), "exists": exists, "artifact_status": artifact_status(data), "promotion_status": promo, "requires_judge_review": artifact_id != "hldspec_junior_task_packets", "blocking_question_count": len(questions), "dependencies": deps, "unaccepted_dependencies": missing_deps, "allowed_consumers": [] if promo != "ACCEPTED" else consumers_for(artifact_id)})
     answer_pack_accepted = accepted(ledger, "speckit_answer_pack")
     prework = load_json(sync / "speckit_prework_package.json")
     checkpoint = prework.get("human_checkpoint", {}) if isinstance(prework.get("human_checkpoint"), dict) else {}
@@ -141,9 +141,9 @@ def build_state(workspace: Path) -> dict[str, Any]:
 
 
 def render_md(state: dict[str, Any]) -> str:
-    lines = ["# HLDspec Orchestration State", "", "made by AI", "", f"Current stage: `{state['current_stage']}`", f"Current checkpoint: `{state['current_checkpoint']}`", f"Judge controls: `{str(state['judge_controls']).lower()}`", "", "## Specialist outputs", ""]
+    lines = ["# HLDspec Orchestration State", "", "", "", f"Current stage: `{state['current_stage']}`", f"Current checkpoint: `{state['current_checkpoint']}`", f"Judge controls: `{str(state['judge_controls']).lower()}`", "", "## Specialist outputs", ""]
     for item in state.get("specialist_outputs", []):
-        lines += [f"### {item.get('artifact_id')}", "", f"- producer role: `{item.get('producer_role')}`", f"- exists: `{str(item.get('exists')).lower()}`", f"- artifact status: `{item.get('artifact_status')}`", f"- promotion status: `{item.get('promotion_status')}`", f"- blocking questions: {item.get('blocking_question_count')}", f"- unaccepted dependencies: {', '.join(item.get('unaccepted_dependencies') or []) or 'none'}", ""]
+        lines += [f"### {item.get('artifact_id')}", "", f"- producer role: `{item.get('producer_role')}`", f"- assigned agent: `{item.get('assigned_agent_name')}`", f"- model tier: `{item.get('model_tier')}`", f"- exists: `{str(item.get('exists')).lower()}`", f"- artifact status: `{item.get('artifact_status')}`", f"- promotion status: `{item.get('promotion_status')}`", f"- blocking questions: {item.get('blocking_question_count')}", f"- unaccepted dependencies: {', '.join(item.get('unaccepted_dependencies') or []) or 'none'}", ""]
     for title, key in [("Blocking reasons", "blocking_reasons"), ("Allowed next actions", "allowed_next_actions"), ("Blocked actions", "blocked_actions")]:
         lines += ["", f"## {title}", ""]
         values = state.get(key, [])

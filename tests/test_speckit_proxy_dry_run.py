@@ -96,7 +96,11 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
         dry_run = proxy.build_dry_run(workspace, "specify")
         self.assertEqual(dry_run["status"], "DRY_RUN_READY")
         self.assertEqual(dry_run["phase"], "specify")
+        self.assertEqual(dry_run["model_routing"]["assigned_agent_name"], "SpecKit Specify Proxy")
+        self.assertEqual(dry_run["model_routing"]["model_tier"], "MODEL_STRONG")
         self.assertEqual(len(dry_run["would_run"]), 1)
+        self.assertEqual(dry_run["would_run"][0]["assigned_agent_name"], "SpecKit Specify Proxy")
+        self.assertEqual(dry_run["would_run"][0]["model_tier"], "MODEL_STRONG")
         self.assertFalse(dry_run["will_invoke_speckit"])
         self.assertFalse(dry_run["implementation_allowed"])
 

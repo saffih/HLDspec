@@ -9,6 +9,38 @@ from typing import Any
 ALLOWED_PHASES = {"constitution", "specify", "clarify", "plan", "tasks", "analyze"}
 FORBIDDEN_PHASES = {"implement", "implementation"}
 APPROVAL_DECISION = "APPROVE_PLAN"
+PHASE_ROUTING = {
+    "constitution": {
+        "assigned_agent_name": "HLDspec Judge Orchestrator",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Constitution changes govern all downstream SpecKit behavior.",
+    },
+    "specify": {
+        "assigned_agent_name": "SpecKit Specify Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Specify translates promoted evidence into a bounded feature specification.",
+    },
+    "clarify": {
+        "assigned_agent_name": "SpecKit Clarify Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Clarify resolves bounded questions but must escalate architecture or scope decisions.",
+    },
+    "plan": {
+        "assigned_agent_name": "SpecKit Plan Proxy",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Plan sets architecture, data, dependency, and implementation boundaries.",
+    },
+    "tasks": {
+        "assigned_agent_name": "SpecKit Tasks Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Tasks decomposes an approved plan without changing architecture.",
+    },
+    "analyze": {
+        "assigned_agent_name": "SpecKit Analyze Reviewer",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Analyze judges cross-artifact consistency and readiness.",
+    },
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -55,6 +87,17 @@ def normalize_phase(phase: str) -> tuple[bool, str, str]:
     if clean not in ALLOWED_PHASES:
         return False, clean, f"unknown phase: {phase}"
     return True, clean, ""
+
+
+def phase_routing(phase: str) -> dict[str, str]:
+    return PHASE_ROUTING.get(
+        phase,
+        {
+            "assigned_agent_name": "SpecKit Phase Agent",
+            "model_tier": "MODEL_CRITICAL",
+            "routing_reason": "Unknown or invalid phase requires judge review before delegation.",
+        },
+    )
 
 
 def blockers_from_quality(quality: dict[str, Any]) -> list[dict[str, Any]]:
@@ -114,6 +157,7 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
     queue = load_json(sync / "speckit_invocation_queue.json")
     answer_pack = load_json(sync / "speckit_answer_pack.json")
     phase_ok, normalized_phase, phase_error = normalize_phase(phase)
+    routing = phase_routing(normalized_phase)
     blockers = blockers_from_quality(quality)
     decision = approval_decision(package)
     state_stage = str(state.get("current_stage", ""))
@@ -154,11 +198,40 @@ def build_dry_run(workspace: Path, phase: str = "specify") -> dict[str, Any]:
     elif answer_promotion != "ACCEPTED":
         refusal_reasons.append(f"answer pack promotion status is {answer_promotion}, expected ACCEPTED")
         status = "REFUSED_ANSWER_PACK_NOT_PROMOTED"
-    return {"schema_version": 1, "status": status, "dry_run": True, "workspace": str(workspace), "sync_dir": str(sync), "phase": normalized_phase, "one_phase_only": True, "implementation_allowed": False, "will_invoke_speckit": False, "will_modify_source_hld": False, "refusal_reasons": refusal_reasons, "approval": {"required_decision": APPROVAL_DECISION, "actual_decision": decision, "prework_package": str(sync / "speckit_prework_package.json")}, "state": {"current_stage": state_stage, "state_path": str(sync / "hldspec_state.json")}, "orchestration": {"state_path": str(sync / "hldspec_orchestration_state.json"), "current_stage": orchestration.get("current_stage", "")}, "answer_pack": {"status": answer_status, "promotion_status": answer_promotion, "blocking_open_questions": len(answer_blockers), "path": str(sync / "speckit_answer_pack.json")}, "selected_feature": feature, "would_run": [] if refusal_reasons else [{"phase": normalized_phase, "mode": "DRY_RUN_ONLY", "prompt": phase_prompt(normalized_phase, dossier), "stop_condition": "stop after this single phase and write a phase completion report"}], "guardrails": ["Do not invoke implementation.", "Do not run more than one SpecKit phase.", "Do not modify source HLD.", "Use only judge-promoted answer pack evidence.", "Use Product Manager pack for product/user-story questions.", "Use Architect pack for API/data/dependency/constitution questions.", "Escalate unanswered blocking PMQ/ARQ questions.", "Report changed files and next readiness after the phase."]}
+    return {
+        "schema_version": 1,
+        "status": status,
+        "dry_run": True,
+        "workspace": str(workspace),
+        "sync_dir": str(sync),
+        "phase": normalized_phase,
+        "model_routing": routing,
+        "one_phase_only": True,
+        "implementation_allowed": False,
+        "will_invoke_speckit": False,
+        "will_modify_source_hld": False,
+        "refusal_reasons": refusal_reasons,
+        "approval": {"required_decision": APPROVAL_DECISION, "actual_decision": decision, "prework_package": str(sync / "speckit_prework_package.json")},
+        "state": {"current_stage": state_stage, "state_path": str(sync / "hldspec_state.json")},
+        "orchestration": {"state_path": str(sync / "hldspec_orchestration_state.json"), "current_stage": orchestration.get("current_stage", "")},
+        "answer_pack": {"status": answer_status, "promotion_status": answer_promotion, "blocking_open_questions": len(answer_blockers), "path": str(sync / "speckit_answer_pack.json")},
+        "selected_feature": feature,
+        "would_run": [] if refusal_reasons else [{
+            "phase": normalized_phase,
+            "assigned_agent_name": routing["assigned_agent_name"],
+            "model_tier": routing["model_tier"],
+            "routing_reason": routing["routing_reason"],
+            "mode": "DRY_RUN_ONLY",
+            "prompt": phase_prompt(normalized_phase, dossier),
+            "stop_condition": "stop after this single phase and write a phase completion report",
+        }],
+        "guardrails": ["Do not invoke implementation.", "Do not run more than one SpecKit phase.", "Do not modify source HLD.", "Use only judge-promoted answer pack evidence.", "Use Product Manager pack for product/user-story questions.", "Use Architect pack for API/data/dependency/constitution questions.", "Escalate unanswered blocking PMQ/ARQ questions.", "Report changed files and next readiness after the phase."],
+    }
 
 
 def render_md(data: dict[str, Any]) -> str:
-    lines = ["# SpecKit Proxy Dry Run", "", "made by AI", "", f"Status: `{data.get('status')}`", f"Phase: `{data.get('phase')}`", f"Dry run: `{str(data.get('dry_run')).lower()}`", f"Implementation allowed: `{str(data.get('implementation_allowed')).lower()}`", f"Will invoke SpecKit: `{str(data.get('will_invoke_speckit')).lower()}`", f"Answer pack status: `{data.get('answer_pack', {}).get('status', '')}`", f"Answer pack promotion: `{data.get('answer_pack', {}).get('promotion_status', '')}`", f"Answer pack blocking questions: `{data.get('answer_pack', {}).get('blocking_open_questions', '')}`", ""]
+    routing = data.get("model_routing", {}) if isinstance(data.get("model_routing"), dict) else {}
+    lines = ["# SpecKit Proxy Dry Run", "", "", "", f"Status: `{data.get('status')}`", f"Phase: `{data.get('phase')}`", f"Assigned agent: `{routing.get('assigned_agent_name', '')}`", f"Model tier: `{routing.get('model_tier', '')}`", f"Routing reason: {routing.get('routing_reason', '')}", f"Dry run: `{str(data.get('dry_run')).lower()}`", f"Implementation allowed: `{str(data.get('implementation_allowed')).lower()}`", f"Will invoke SpecKit: `{str(data.get('will_invoke_speckit')).lower()}`", f"Answer pack status: `{data.get('answer_pack', {}).get('status', '')}`", f"Answer pack promotion: `{data.get('answer_pack', {}).get('promotion_status', '')}`", f"Answer pack blocking questions: `{data.get('answer_pack', {}).get('blocking_open_questions', '')}`", ""]
     reasons = data.get("refusal_reasons", [])
     if isinstance(reasons, list) and reasons:
         lines += ["## Refusal reasons", ""]
@@ -170,7 +243,7 @@ def render_md(data: dict[str, Any]) -> str:
     if isinstance(would, list) and would:
         for item in would:
             if isinstance(item, dict):
-                lines += [f"### {item.get('phase')}", "", f"- mode: `{item.get('mode')}`", f"- stop condition: {item.get('stop_condition')}", "", "Prompt:", "", "```text", str(item.get("prompt", "")), "```", ""]
+                lines += [f"### {item.get('phase')}", "", f"- assigned agent: `{item.get('assigned_agent_name')}`", f"- model tier: `{item.get('model_tier')}`", f"- routing reason: {item.get('routing_reason')}", f"- mode: `{item.get('mode')}`", f"- stop condition: {item.get('stop_condition')}", "", "Prompt:", "", "```text", str(item.get("prompt", "")), "```", ""]
     else:
         lines.append("- none")
     lines += ["", "## Guardrails", ""]

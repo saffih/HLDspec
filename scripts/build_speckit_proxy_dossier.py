@@ -15,6 +15,40 @@ def as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
+PHASE_MODEL_ROUTING = {
+    "constitution": {
+        "assigned_agent_name": "HLDspec Judge Orchestrator",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Constitution changes govern all downstream SpecKit behavior.",
+    },
+    "specify": {
+        "assigned_agent_name": "SpecKit Specify Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Specify translates promoted evidence into a bounded feature specification.",
+    },
+    "clarify": {
+        "assigned_agent_name": "SpecKit Clarify Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Clarify resolves bounded questions but escalates architecture or scope decisions.",
+    },
+    "plan": {
+        "assigned_agent_name": "SpecKit Plan Proxy",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Plan sets architecture, data, dependency, and implementation boundaries.",
+    },
+    "tasks": {
+        "assigned_agent_name": "SpecKit Tasks Proxy",
+        "model_tier": "MODEL_STRONG",
+        "routing_reason": "Tasks decomposes an approved plan without changing architecture.",
+    },
+    "analyze": {
+        "assigned_agent_name": "SpecKit Analyze Reviewer",
+        "model_tier": "MODEL_CRITICAL",
+        "routing_reason": "Analyze judges cross-artifact consistency and readiness.",
+    },
+}
+
+
 def first_active_item(queue: dict[str, Any]) -> dict[str, Any]:
     items = [item for item in as_list(queue.get("items")) if isinstance(item, dict)]
     for item in items:
@@ -72,6 +106,7 @@ def build_dossier(workspace: Path) -> dict[str, Any]:
             "analyze when consistency review is needed",
             "implement only after explicit approval",
         ],
+        "speckit_phase_model_routing": PHASE_MODEL_ROUTING,
         "speckit_specify_input": active.get("speckit_specify_input") or feature.get("speckit_specify_input", ""),
         "constitution_context": {
             "target_path": constitution.get("target_constitution_path", ".specify/memory/constitution.md"),
@@ -120,7 +155,7 @@ def render_md(dossier: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Proxy Dossier",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{dossier['status']}`",
         f"Protocol: `{dossier['protocol']}`",
@@ -139,6 +174,14 @@ def render_md(dossier: dict[str, Any]) -> str:
     ]
     for idx, phase in enumerate(dossier["speckit_sequence"], start=1):
         lines.append(f"{idx}. {phase}")
+    lines += [
+        "",
+        "## Phase model routing",
+        "",
+    ]
+    for phase, routing in dossier.get("speckit_phase_model_routing", {}).items():
+        if isinstance(routing, dict):
+            lines.append(f"- `{phase}`: `{routing.get('assigned_agent_name')}` / `{routing.get('model_tier')}` - {routing.get('routing_reason')}")
     lines += [
         "",
         "## Input for /speckit.specify",

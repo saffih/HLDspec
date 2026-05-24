@@ -48,18 +48,42 @@ class HldspecOrchestrationContractTest(unittest.TestCase):
     def test_junior_task_packets_are_low_cost_and_cannot_promote(self) -> None:
         data = junior.build_packets(self.make_workspace())
         self.assertGreaterEqual(len(data["task_packets"]), 4)
+        self.assertIn("model_routing_policy", data)
+        self.assertEqual(
+            data["model_routing_policy"]["promotion_rule"],
+            "Weakest sufficient model creates; strongest necessary model promotes.",
+        )
+        packets = {item["task_id"]: item for item in data["task_packets"]}
+        self.assertEqual(packets["JPM-001"]["assigned_agent_name"], "Junior Product Extractor")
+        self.assertEqual(packets["JPM-001"]["model_tier"], "MODEL_ROUTINE")
+        self.assertEqual(packets["JPM-001"]["cost_tier"], "LOW")
+        self.assertEqual(packets["JPM-002"]["assigned_agent_name"], "Product Story Drafting Agent")
+        self.assertEqual(packets["JPM-002"]["model_tier"], "MODEL_STRONG")
+        self.assertEqual(packets["JPM-002"]["cost_tier"], "MEDIUM")
+        self.assertEqual(packets["JAR-001"]["assigned_agent_name"], "Architecture Boundary Scout")
+        self.assertEqual(packets["JAR-001"]["model_tier"], "MODEL_STRONG")
+        self.assertEqual(packets["JAR-001"]["cost_tier"], "MEDIUM")
+        self.assertEqual(packets["JAR-002"]["assigned_agent_name"], "Dependency Risk Scout")
+        self.assertEqual(packets["JAR-002"]["model_tier"], "MODEL_STRONG")
+        self.assertEqual(packets["JAR-002"]["cost_tier"], "MEDIUM")
         for item in data["task_packets"]:
-            self.assertEqual(item["cost_tier"], "LOW")
             self.assertIn("do not promote artifacts", item["forbidden_actions"])
             self.assertTrue(item["requires_senior_review"])
             self.assertTrue(item["requires_judge_promotion"])
+            self.assertIn("escalation_rule", item)
 
     def test_existing_artifacts_are_proposed_not_accepted(self) -> None:
         state = orch.build_state(self.make_workspace())
         outputs = {item["artifact_id"]: item for item in state["specialist_outputs"]}
         self.assertEqual(outputs["speckit_product_manager_pack"]["promotion_status"], "PROPOSED")
+        self.assertEqual(outputs["speckit_product_manager_pack"]["assigned_agent_name"], "Product Lead Reviewer")
+        self.assertEqual(outputs["speckit_product_manager_pack"]["model_tier"], "MODEL_STRONG")
         self.assertEqual(outputs["speckit_architect_pack"]["promotion_status"], "PROPOSED")
+        self.assertEqual(outputs["speckit_architect_pack"]["assigned_agent_name"], "Architect Lead Reviewer")
+        self.assertEqual(outputs["speckit_architect_pack"]["model_tier"], "MODEL_CRITICAL")
         self.assertEqual(outputs["speckit_answer_pack"]["promotion_status"], "PROPOSED")
+        self.assertEqual(outputs["speckit_answer_pack"]["assigned_agent_name"], "HLDspec Judge Orchestrator")
+        self.assertEqual(outputs["speckit_answer_pack"]["model_tier"], "MODEL_CRITICAL")
         self.assertIn("SpecKit proxy dry-run requires accepted answer pack and approved prework", state["blocked_actions"])
 
     def test_answer_pack_cannot_be_accepted_before_pm_and_arch(self) -> None:
