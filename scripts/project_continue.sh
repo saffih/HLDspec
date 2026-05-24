@@ -84,6 +84,8 @@ render_checkpoint() {
 rebuild_post_plan_artifacts() {
   "${PYTHON_RUN[@]}" "$ROOT/scripts/review_spec_build_plan.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_spec_plan_decision_queue.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_answer_dossier.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/enrich_spec_build_plan_with_answer_context.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_plan.py" "$FIRSTRUN/.specify/sync/spec_build_plan.json" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_proxy_dossier.py" "$FIRSTRUN"

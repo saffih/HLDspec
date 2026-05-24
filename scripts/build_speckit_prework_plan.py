@@ -127,9 +127,12 @@ def build_feature_item(spec: dict[str, Any], idx: int) -> dict[str, Any]:
         "feature_name": title,
         "short_name": slugify(slug),
         "source_hld_sections": source_hld_sections,
-        "user_stories": as_list(spec.get("user_stories")),
-        "use_cases": as_list(spec.get("use_cases")),
-        "user_journeys": as_list(spec.get("user_journeys")),
+        "user_stories": as_list(spec.get("user_stories")) or as_list(spec.get("product_context", {}).get("user_stories") if isinstance(spec.get("product_context"), dict) else []),
+        "use_cases": as_list(spec.get("use_cases")) or as_list(spec.get("product_context", {}).get("use_cases") if isinstance(spec.get("product_context"), dict) else []),
+        "user_journeys": as_list(spec.get("user_journeys")) or as_list(spec.get("product_context", {}).get("user_journeys") if isinstance(spec.get("product_context"), dict) else []),
+        "product_context": spec.get("product_context", {}) if isinstance(spec.get("product_context"), dict) else {},
+        "architecture_context": spec.get("architecture_context", {}) if isinstance(spec.get("architecture_context"), dict) else {},
+        "speckit_context": spec.get("speckit_context", {}) if isinstance(spec.get("speckit_context"), dict) else {},
         "api_interface_contract_notes": inferred["api_interface_contract_notes"],
         "processing_functionality_notes": inferred["processing_functionality_notes"],
         "shared_common_dependencies": inferred["shared_common_dependencies"],
@@ -184,10 +187,47 @@ def order_features(features: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
     return [by_id[fid] for fid in ordered], warnings
 
 
+def ordered_features_from_plan(features: list[dict[str, Any]], plan: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Use spec_build_plan.recommended_order when present, with dependency validation."""
+    recommended = [str(item) for item in as_list(plan.get("recommended_order")) if str(item)]
+    if not recommended:
+        return order_features(features)
+
+    by_id = {str(item["feature_id"]): item for item in features}
+    warnings: list[str] = []
+
+    seen: set[str] = set()
+    ordered_ids: list[str] = []
+    for feature_id in recommended:
+        if feature_id in seen:
+            warnings.append(f"recommended_order duplicate feature id {feature_id}")
+            continue
+        seen.add(feature_id)
+        if feature_id not in by_id:
+            warnings.append(f"recommended_order references missing feature {feature_id}")
+            continue
+        ordered_ids.append(feature_id)
+
+    for feature_id in sorted(by_id, key=natural_key):
+        if feature_id not in seen:
+            warnings.append(f"recommended_order omitted feature {feature_id}; appended after listed features")
+            ordered_ids.append(feature_id)
+
+    position = {feature_id: idx for idx, feature_id in enumerate(ordered_ids)}
+    for feature_id in ordered_ids:
+        feature = by_id[feature_id]
+        for dep in feature.get("depends_on_features", []):
+            dep_id = str(dep)
+            if dep_id in position and position[dep_id] > position[feature_id]:
+                warnings.append(f"recommended_order violates dependency: {feature_id} appears before dependency {dep_id}")
+
+    return [by_id[feature_id] for feature_id in ordered_ids], warnings
+
+
 def build_artifacts(plan: dict[str, Any], plan_path: Path) -> dict[str, dict[str, Any]]:
     planned_specs = [item for item in as_list(plan.get("planned_specs")) if isinstance(item, dict)]
     features = [build_feature_item(spec, idx + 1) for idx, spec in enumerate(planned_specs)]
-    ordered_features, warnings = order_features(features)
+    ordered_features, warnings = ordered_features_from_plan(features, plan)
 
     plan_quality = plan.get("plan_quality", {})
     if not isinstance(plan_quality, dict):
@@ -281,6 +321,9 @@ def build_artifacts(plan: dict[str, Any], plan_path: Path) -> dict[str, dict[str
                 "speckit_specify_input": feature["speckit_specify_input"],
                 "depends_on_features": feature["depends_on_features"],
                 "source_hld_sections": feature["source_hld_sections"],
+                "product_context": feature.get("product_context", {}),
+                "architecture_context": feature.get("architecture_context", {}),
+                "speckit_context": feature.get("speckit_context", {}),
                 "recommended_phase": feature["recommended_speckit_phase"],
                 "status": "PENDING_HUMAN_PLAN_REVIEW" if idx == 1 else "WAITING_FOR_DEPENDENCIES",
             }
@@ -364,6 +407,9 @@ def render_manifest(data: dict[str, Any]) -> str:
             f"- source HLD sections: {', '.join(feature['source_hld_sections']) or 'TBD'}",
             f"- depends on: {', '.join(feature['depends_on_features']) or 'none'}",
             f"- decomposition flags: {', '.join(feature['decomposition_flags']) or 'none'}",
+            f"- use cases: {len(feature.get('use_cases', []))}",
+            f"- user stories: {len(feature.get('user_stories', []))}",
+            f"- no direct user story: {str(bool(feature.get('product_context', {}).get('no_direct_user_story'))).lower() if isinstance(feature.get('product_context'), dict) else 'false'}",
             "",
             "SpecKit specify input:",
             "",
