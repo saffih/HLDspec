@@ -1,7 +1,5 @@
 # Constitution Rule Quality
 
-made by AI
-
 HLDspec constitution/prework rules must be enforceable, not generic.
 
 Each proposed rule must include:

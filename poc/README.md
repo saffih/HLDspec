@@ -1,7 +1,5 @@
 # HLDspec POC Playground
 
-made by AI
-
 This directory provides tiny fake HLDs for a fast learning cycle.
 
 Goal:

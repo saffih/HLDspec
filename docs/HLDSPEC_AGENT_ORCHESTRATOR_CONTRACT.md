@@ -1,7 +1,5 @@
 # HLDspec Agent Orchestrator Contract
 
-made by AI
-
 ## User trigger
 
 The intended user-facing trigger is intentionally small:

@@ -1,7 +1,5 @@
 # HLDspec Canonical Flow
 
-made by AI
-
 This document defines the current canonical HLDspec flow after the SpecKit ownership correction.
 
 ## Core principle

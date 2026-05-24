@@ -1,7 +1,5 @@
 # HLDspec ProjectMachine V2
 
-made by AI
-
 ## Purpose
 
 `ProjectMachine` is the top-level HLDspec V2 coordinator.

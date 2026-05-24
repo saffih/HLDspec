@@ -1,7 +1,5 @@
 # HLDspec Minimal Agent Bootstrap
 
-made by AI
-
 ## Purpose
 
 Make the minimal trigger reliable for cheap/small agents.

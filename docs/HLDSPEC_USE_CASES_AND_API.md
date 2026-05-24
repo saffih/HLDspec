@@ -1,7 +1,5 @@
 # HLDspec Use Cases and Simple API
 
-made by AI
-
 ## Purpose
 
 HLDspec should feel like one simple judge-led product, not a pile of scripts.

@@ -1,7 +1,5 @@
 # HLDspec Agent Command Protocol
 
-made by AI
-
 ## Purpose
 
 This document defines the full agent-led HLDspec command.

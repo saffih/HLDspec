@@ -1,7 +1,5 @@
 # RunSkeptic Framework Cache
 
-made by AI
-
 This file records the authoritative Skeptic/RunSkeptic framework HLDspec must use.
 
 ## Authoritative source

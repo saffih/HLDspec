@@ -1,7 +1,5 @@
 # HLDspec Orchestration Control RunSkeptic Review
 
-made by AI
-
 Date: 2026-05-23
 
 ## Source of truth

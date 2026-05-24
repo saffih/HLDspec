@@ -1,7 +1,5 @@
 # RunSkeptic Evidence Quality
 
-made by AI
-
 RunSkeptic findings must be evidence-complete before HLDspec uses them as blockers, fixes, or approval evidence.
 
 Each finding or cycle must include:

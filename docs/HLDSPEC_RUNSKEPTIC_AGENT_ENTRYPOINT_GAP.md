@@ -1,7 +1,5 @@
 # HLDspec Agent-First Entrypoint Gap RunSkeptic Review
 
-made by AI
-
 Date: 2026-05-23
 
 ## Goal

@@ -1,7 +1,5 @@
 # HLDspec Product Alignment RunSkeptic Review
 
-made by AI
-
 Status: `PASS_WITH_DEFERRED_ITEMS`
 Review type: `HLDSPEC_PRODUCT_ALIGNMENT_RUNSKEPTIC`
 

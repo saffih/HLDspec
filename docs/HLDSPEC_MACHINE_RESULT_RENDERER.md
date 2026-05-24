@@ -1,7 +1,5 @@
 # HLDspec MachineResult Renderer
 
-made by AI
-
 ## Purpose
 
 `MachineResult` is the internal contract.

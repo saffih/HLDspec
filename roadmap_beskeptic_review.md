@@ -1,7 +1,5 @@
 # HLDspec Roadmap RunSkeptic Self-Review
 
-made by AI
-
 ## Purpose
 
 This report audits the HLDspec roadmap and current solution before adding more implementation.

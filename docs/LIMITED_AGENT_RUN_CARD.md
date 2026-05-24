@@ -1,7 +1,5 @@
 # Limited Agent Run Card
 
-made by AI
-
 Use this when the agent has limited context/capacity.
 
 Read this short card before longer docs.

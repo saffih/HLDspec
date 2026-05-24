@@ -1,7 +1,5 @@
 # HLDspec User Stories and Acceptance Tests
 
-made by AI
-
 Date: 2026-05-23
 
 ## Purpose

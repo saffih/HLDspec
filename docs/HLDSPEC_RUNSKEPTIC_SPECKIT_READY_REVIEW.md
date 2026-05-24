@@ -1,7 +1,5 @@
 # HLDspec SpecKit-Ready RunSkeptic Review
 
-made by AI
-
 Date: 2026-05-23
 
 ## Goal

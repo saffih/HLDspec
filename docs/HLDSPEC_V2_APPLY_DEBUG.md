@@ -1,7 +1,5 @@
 # HLDspec V2 Apply Debug
 
-made by AI
-
 ## Problem
 
 The legacy apply script prints validation failures to stdout and returns `2`.

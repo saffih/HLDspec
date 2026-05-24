@@ -1,7 +1,5 @@
 # Chunked Judge/Subagent Protocol
 
-made by AI
-
 ## Purpose
 
 Keep HLDspec work simple, safe, and context-friendly without adding a heavy token-measurement system.

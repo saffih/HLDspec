@@ -1,7 +1,5 @@
 # HLDspec Agent Start Prompt
 
-made by AI
-
 The canonical user-facing prompt is:
 
 ```text

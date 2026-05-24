@@ -1,7 +1,5 @@
 # HLDspec Architecture V2
 
-made by AI
-
 HLDspec V2 is a state-machine workflow engine.
 
 ## Implemented V2 slice

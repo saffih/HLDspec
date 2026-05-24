@@ -1,7 +1,5 @@
 # HLDspec Architecture Review
 
-made by AI
-
 This review applies Uncle Bob / SOLID design pressure with RunSkeptic evidence fields before large refactors.
 
 ## Purpose

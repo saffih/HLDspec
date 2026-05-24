@@ -1,7 +1,5 @@
 # HLDspec V2 Agent and Subagent Roles
 
-made by AI
-
 ## Purpose
 
 This document defines the goal, operating instructions, output contract, stop rules, and introspection checklist for each HLDspec V2 agent/subagent.

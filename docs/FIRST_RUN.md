@@ -1,7 +1,5 @@
 # First Run: Read-Only HLDspec Cycle
 
-made by AI
-
 Use this when you want to test a real HLD through the safe read-only HLDspec cycle.
 
 ## Command

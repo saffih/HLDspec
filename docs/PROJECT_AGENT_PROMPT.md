@@ -17,8 +17,6 @@ docs/HLD_AGENT_CATCHUP.md
 
 # HLDspec Project Agent Prompt
 
-made by AI
-
 Use this when the human asks an agent to run HLDspec on a project repository.
 
 ## Role

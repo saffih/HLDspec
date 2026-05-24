@@ -1,7 +1,5 @@
 # HLDspec V2 TODO
 
-made by AI
-
 ## Goal
 
 Replace fast patchwork with a proper state-machine architecture that enables reliable progress.

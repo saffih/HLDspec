@@ -153,8 +153,6 @@ status = "hldspec_ready" if existing > 0 else "needs_conversion"
 if status == "needs_conversion":
     prompt = f"""# HLD Conversion Prompt
 
-made by AI
-
 The input HLD is not yet in HLDspec format.
 
 Detected:

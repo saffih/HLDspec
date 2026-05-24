@@ -1,7 +1,5 @@
 # HLDspec Ready Gate
 
-made by AI
-
 This gate decides whether HLDspec is ready for paid agent/SpecKit testing.
 
 ## Rule

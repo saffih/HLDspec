@@ -1,7 +1,5 @@
 # External Agent Prompt: Human-in-the-Loop HLDspec Work
 
-made by AI
-
 Use this prompt when running an agent from another project directory, for example from the simulator repo.
 
 ## Prompt

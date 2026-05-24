@@ -1,7 +1,5 @@
 # HLDspec V2 Spec Plan Debug
 
-made by AI
-
 ## Purpose
 
 When `SpecBuildPlanMachine` blocks, the user needs actionable details, not only counters.

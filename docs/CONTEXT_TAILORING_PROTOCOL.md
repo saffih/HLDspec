@@ -1,7 +1,5 @@
 # Context Tailoring Protocol
 
-made by AI
-
 This protocol defines how HLDspec chooses the right agent, prompt, context, and cost level for each task.
 
 Core rule:

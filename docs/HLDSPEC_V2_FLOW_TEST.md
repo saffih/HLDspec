@@ -1,7 +1,5 @@
 # HLDspec V2 Flow Test
 
-made by AI
-
 ## Purpose
 
 This is the no-SpecKit Flow readiness test for HLDspec V2.

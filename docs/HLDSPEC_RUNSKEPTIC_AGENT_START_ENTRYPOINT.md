@@ -1,7 +1,5 @@
 # HLDspec Agent-Start Entrypoint RunSkeptic Review
 
-made by AI
-
 ## Goal
 
 Add a simple user-facing start layer:

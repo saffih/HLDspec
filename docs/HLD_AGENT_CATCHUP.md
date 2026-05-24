@@ -1,7 +1,5 @@
 # HLDspec Default Invocation
 
-made by AI
-
 Every project-level HLDspec invocation uses the judge/orchestrator role by default.
 
 ## Minimal user prompt

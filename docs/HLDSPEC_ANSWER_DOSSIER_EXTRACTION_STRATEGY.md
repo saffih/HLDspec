@@ -1,7 +1,5 @@
 # HLDspec Answer Dossier Extraction Strategy
 
-made by AI
-
 Date: 2026-05-23
 
 ## Purpose

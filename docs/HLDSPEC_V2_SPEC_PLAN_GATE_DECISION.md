@@ -1,7 +1,5 @@
 # HLDspec V2 Spec Plan Gate Decision
 
-made by AI
-
 ## Purpose
 
 A non-green spec build plan can be accepted only with an explicit rationale.

@@ -1,7 +1,5 @@
 # HLDspec V2 Handoff Docs
 
-made by AI
-
 ## Purpose
 
 HLDspec V2 now generates consolidated handoff documents before the SpecKit approval gate.

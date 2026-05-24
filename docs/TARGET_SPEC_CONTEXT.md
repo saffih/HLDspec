@@ -1,7 +1,5 @@
 # Target Spec Context Rule
 
-made by AI
-
 ## Core rule
 
 A target spec is not created from one HLD section.

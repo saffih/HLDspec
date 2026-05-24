@@ -1,7 +1,5 @@
 # HLDspec State Machine Contract
 
-made by AI
-
 ## Decision
 
 HLDspec is a state-machine system, not a single procedural script.

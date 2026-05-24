@@ -1,7 +1,5 @@
 # Context Budget Protocol
 
-made by AI
-
 ## Purpose
 
 HLDspec processes large HLDs. Large files are safe for local scripts, but risky for agent/model context.

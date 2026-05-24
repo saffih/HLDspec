@@ -1,7 +1,5 @@
 # HLDspec Implementation TODO
 
-made by AI
-
 Date: 2026-05-23
 
 <!-- HLDSPEC_PROCESS_INTRO_START -->

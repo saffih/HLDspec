@@ -1,7 +1,5 @@
 # HLDspec RunSkeptic Stabilization Record
 
-made by AI
-
 Date: 2026-05-23
 
 ## Source of truth

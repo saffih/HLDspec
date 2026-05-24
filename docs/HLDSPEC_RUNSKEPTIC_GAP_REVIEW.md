@@ -1,7 +1,5 @@
 # HLDspec RunSkeptic Gap Review - Current State to Goal
 
-made by AI
-
 Date: 2026-05-23
 
 ## Goal
