@@ -1,10 +1,13 @@
-
 # Python cache files
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# HLDspec workspace artifacts (these live in workspaces, not in this repo)
+.hldspec-first-run/
 .hldspec-ready-gate/
 .hldspec-uv-cache/
 .hldspec-architecture-review/
 .hldspec-v2-ready-gate/
 .hldspec-v2-flow-test/
+.specify/
