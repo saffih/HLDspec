@@ -51,16 +51,7 @@ def has_first_run_artifacts(workspace: Path) -> bool:
         "speckit_prework_quality_review.json",
         "speckit_prework_package.md",
     ]
-    for name in required:
-        p = sync / name
-        if not p.exists():
-            return False
-        if name.endswith(".json"):
-            try:
-                json.loads(p.read_text(encoding="utf-8"))
-            except Exception:
-                return False
-    return True
+    return any((sync / name).exists() for name in required)
 
 
 def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]]:

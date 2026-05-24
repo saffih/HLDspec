@@ -31,7 +31,7 @@ def find_sync(workspace: Path) -> Path:
     return direct
 
 
-def approve_prework(workspace: Path, decision: str, notes: str = "") -> dict[str, Any]:
+def approve_prework(workspace: Path, decision: str, notes: str = "", actor: str = "agent") -> dict[str, Any]:
     sync = find_sync(workspace)
     package_path = sync / "speckit_prework_package.json"
     if not package_path.exists():
@@ -48,8 +48,16 @@ def approve_prework(workspace: Path, decision: str, notes: str = "") -> dict[str
 
     def load_blockers(filename: str) -> list[dict[str, Any]]:
         path = sync / filename
+        if not path.exists():
+            return [
+                {
+                    "id": f"MISSING_{filename}",
+                    "severity": "BLOCKER",
+                    "finding": f"Required review file {filename} is absent. Cannot approve without evidence.",
+                }
+            ]
         try:
-            raw = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            raw = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             raw = {}
         data = raw if isinstance(raw, dict) else {}
@@ -75,15 +83,26 @@ def approve_prework(workspace: Path, decision: str, notes: str = "") -> dict[str
     package["approval_record"] = {
         "decision": decision,
         "notes": notes,
+        "actor": actor,
         "source": "approve_hldspec_prework.py",
     }
     write_json(package_path, package)
+
+    warnings: list[str] = []
+    if actor != "human":
+        warnings.append(
+            f"actor='{actor}': gate was not exercised by a human. "
+            "This approval may not reflect real human judgment. "
+            "Re-run with --actor human after explicit human review."
+        )
 
     record = {
         "schema_version": 1,
         "status": "APPROVED" if decision == "APPROVE_PLAN" else "NOT_APPROVED",
         "decision": decision,
+        "actor": actor,
         "notes": notes,
+        "warnings": warnings,
         "prework_package": str(package_path),
     }
     write_json(sync / "speckit_prework_approval.json", record)
@@ -92,22 +111,28 @@ def approve_prework(workspace: Path, decision: str, notes: str = "") -> dict[str
 
 
 def render_md(record: dict[str, Any]) -> str:
-    return "\n".join(
-        [
-            "# SpecKit Prework Approval",
-            "",
-            "made by AI",
-            "",
-            f"Status: `{record.get('status', '')}`",
-            f"Decision: `{record.get('decision', '')}`",
-            f"Prework package: `{record.get('prework_package', '')}`",
-            "",
-            "Notes:",
-            "",
-            str(record.get("notes", "") or "none"),
-            "",
-        ]
-    )
+    lines = [
+        "# SpecKit Prework Approval",
+        "",
+        "made by AI",
+        "",
+        f"Status: `{record.get('status', '')}`",
+        f"Decision: `{record.get('decision', '')}`",
+        f"Actor: `{record.get('actor', 'unknown')}`",
+        f"Prework package: `{record.get('prework_package', '')}`",
+        "",
+        "Notes:",
+        "",
+        str(record.get("notes", "") or "none"),
+        "",
+    ]
+    warnings = record.get("warnings", [])
+    if warnings:
+        lines += ["## ⚠ Warnings", ""]
+        for w in warnings:
+            lines.append(f"- {w}")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def main() -> int:
@@ -115,10 +140,11 @@ def main() -> int:
     parser.add_argument("workspace")
     parser.add_argument("--decision", default="APPROVE_PLAN")
     parser.add_argument("--notes", default="")
+    parser.add_argument("--actor", default="agent", help="Who ran this approval: 'human' or 'agent' (default: agent). Use --actor human only when a human explicitly reviewed and approved.")
     args = parser.parse_args()
 
     try:
-        record = approve_prework(Path(args.workspace), args.decision, args.notes)
+        record = approve_prework(Path(args.workspace), args.decision, args.notes, args.actor)
     except (FileNotFoundError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
 

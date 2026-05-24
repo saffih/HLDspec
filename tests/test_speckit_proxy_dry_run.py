@@ -54,6 +54,10 @@ class SpeckitProxyDryRunTest(unittest.TestCase):
             json.dumps({"status": "APPROVAL_READY", "findings": []}),
             encoding="utf-8",
         )
+        (sync / "hld_answer_dossier_quality_review.json").write_text(
+            json.dumps({"status": "APPROVAL_READY", "findings": []}),
+            encoding="utf-8",
+        )
         (sync / "speckit_proxy_dossier.json").write_text(
             json.dumps(
                 {

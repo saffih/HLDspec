@@ -1,0 +1,403 @@
+{
+  "checkpoint": {
+    "allowed_to_convert": true,
+    "checkpoint_id": "HLD_CONVERSION_DECISIONS",
+    "human_role": "owner of unresolved architecture/process decisions",
+    "manager_role": "judge/orchestrator",
+    "open_question_count": 0,
+    "purpose": "Resolve split/keep decisions before metadata-only conversion."
+  },
+  "instructions": [
+    "The judge/orchestrator must not decide these questions silently.",
+    "The judge/orchestrator may continue read-only inspection and may accumulate questions.",
+    "Conversion must not run while any blocking question has human_decision=TBD.",
+    "When enough questions are accumulated, stop at this checkpoint and ask the human to answer the queue.",
+    "After answers are recorded, rerun validation before applying metadata-only conversion."
+  ],
+  "last_answered_questions": [
+    "Q-001",
+    "Q-002",
+    "Q-003"
+  ],
+  "plan_path": "/Users/saffi/code/HLDspec/.hldspec-first-run/.specify/sync/hld_conversion_plan.json",
+  "questions": [
+    {
+      "approved_split_plan": [
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009A",
+          "source_line_count": 31,
+          "source_line_end": 781,
+          "source_line_start": 751,
+          "title": "1. TEA Architecture (Model-View-Update)"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009B",
+          "source_line_count": 18,
+          "source_line_end": 799,
+          "source_line_start": 782,
+          "title": "2. Flow Core Database API (Critical Safety Layer)"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009C",
+          "source_line_count": 237,
+          "source_line_end": 1036,
+          "source_line_start": 800,
+          "title": "3. AI Integration Layer (Delicate Integration Point)"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009D",
+          "source_line_count": 389,
+          "source_line_end": 1425,
+          "source_line_start": 1037,
+          "title": "4. Brain Architecture (core.md - The AI Process Controller)"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009E",
+          "source_line_count": 436,
+          "source_line_end": 1861,
+          "source_line_start": 1426,
+          "title": "5. Specification Hierarchy and Integration"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009F",
+          "source_line_count": 28,
+          "source_line_end": 1889,
+          "source_line_start": 1862,
+          "title": "5. Automatic Sync Operations"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009G",
+          "source_line_count": 318,
+          "source_line_end": 2207,
+          "source_line_start": 1890,
+          "title": "6. Session Management"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009H",
+          "source_line_count": 52,
+          "source_line_end": 2259,
+          "source_line_start": 2208,
+          "title": "7. WIP Lifecycle Management"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-009I",
+          "source_line_count": 169,
+          "source_line_end": 2428,
+          "source_line_start": 2260,
+          "title": "8. HTTP API & Web UI"
+        }
+      ],
+      "blocking": true,
+      "decision_status": "ANSWERED",
+      "default_proposal": {
+        "decision": "SPLIT_AS_PROPOSED",
+        "proposed_split_plan": [
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009A",
+            "source_line_count": 31,
+            "source_line_end": 781,
+            "source_line_start": 751,
+            "title": "1. TEA Architecture (Model-View-Update)"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009B",
+            "source_line_count": 18,
+            "source_line_end": 799,
+            "source_line_start": 782,
+            "title": "2. Flow Core Database API (Critical Safety Layer)"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009C",
+            "source_line_count": 237,
+            "source_line_end": 1036,
+            "source_line_start": 800,
+            "title": "3. AI Integration Layer (Delicate Integration Point)"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009D",
+            "source_line_count": 389,
+            "source_line_end": 1425,
+            "source_line_start": 1037,
+            "title": "4. Brain Architecture (core.md - The AI Process Controller)"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009E",
+            "source_line_count": 436,
+            "source_line_end": 1861,
+            "source_line_start": 1426,
+            "title": "5. Specification Hierarchy and Integration"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009F",
+            "source_line_count": 28,
+            "source_line_end": 1889,
+            "source_line_start": 1862,
+            "title": "5. Automatic Sync Operations"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009G",
+            "source_line_count": 318,
+            "source_line_end": 2207,
+            "source_line_start": 1890,
+            "title": "6. Session Management"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009H",
+            "source_line_count": 52,
+            "source_line_end": 2259,
+            "source_line_start": 2208,
+            "title": "7. WIP Lifecycle Management"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-009I",
+            "source_line_count": 169,
+            "source_line_end": 2428,
+            "source_line_start": 2260,
+            "title": "8. HTTP API & Web UI"
+          }
+        ],
+        "reason": "Candidate is 1680 lines, above the 400-line large-section threshold, and has 9 peer internal headings that can be reviewed as split boundaries."
+      },
+      "human_decision": "SPLIT_AS_PROPOSED",
+      "human_notes": "",
+      "options": [
+        "SPLIT_AS_PROPOSED",
+        "MODIFY_SPLIT",
+        "KEEP_AS_ONE"
+      ],
+      "question": "Should HLD-009 - Component Deep-Dive be split using the proposed split plan, modified, or kept as one section?",
+      "question_id": "Q-001",
+      "recommended_action": "STOP_SPLIT_DECISION_REQUIRED",
+      "source_candidate_id": "HLD-009",
+      "source_line_count": 1680,
+      "source_line_end": 2428,
+      "source_line_start": 749,
+      "title": "Component Deep-Dive"
+    },
+    {
+      "approved_split_plan": [
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010A",
+          "source_line_count": 4,
+          "source_line_end": 2434,
+          "source_line_start": 2431,
+          "title": "Overview"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010B",
+          "source_line_count": 124,
+          "source_line_end": 2558,
+          "source_line_start": 2435,
+          "title": "1. Database API Interface"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010C",
+          "source_line_count": 78,
+          "source_line_end": 2636,
+          "source_line_start": 2559,
+          "title": "2. CLI Command Interface"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010D",
+          "source_line_count": 187,
+          "source_line_end": 2823,
+          "source_line_start": 2637,
+          "title": "3. HTTP API Interface"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010E",
+          "source_line_count": 38,
+          "source_line_end": 2861,
+          "source_line_start": 2824,
+          "title": "4. Storage API Interface"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010F",
+          "source_line_count": 58,
+          "source_line_end": 2919,
+          "source_line_start": 2862,
+          "title": "5. Config API Interface"
+        },
+        {
+          "boundary_source": "first_internal_heading_level",
+          "heading_level": 3,
+          "proposed_hld_id": "HLD-010G",
+          "source_line_count": 81,
+          "source_line_end": 3000,
+          "source_line_start": 2920,
+          "title": "6. Session Spawning Interface"
+        }
+      ],
+      "blocking": true,
+      "decision_status": "ANSWERED",
+      "default_proposal": {
+        "decision": "SPLIT_AS_PROPOSED",
+        "proposed_split_plan": [
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010A",
+            "source_line_count": 4,
+            "source_line_end": 2434,
+            "source_line_start": 2431,
+            "title": "Overview"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010B",
+            "source_line_count": 124,
+            "source_line_end": 2558,
+            "source_line_start": 2435,
+            "title": "1. Database API Interface"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010C",
+            "source_line_count": 78,
+            "source_line_end": 2636,
+            "source_line_start": 2559,
+            "title": "2. CLI Command Interface"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010D",
+            "source_line_count": 187,
+            "source_line_end": 2823,
+            "source_line_start": 2637,
+            "title": "3. HTTP API Interface"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010E",
+            "source_line_count": 38,
+            "source_line_end": 2861,
+            "source_line_start": 2824,
+            "title": "4. Storage API Interface"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010F",
+            "source_line_count": 58,
+            "source_line_end": 2919,
+            "source_line_start": 2862,
+            "title": "5. Config API Interface"
+          },
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-010G",
+            "source_line_count": 81,
+            "source_line_end": 3000,
+            "source_line_start": 2920,
+            "title": "6. Session Spawning Interface"
+          }
+        ],
+        "reason": "Candidate is 572 lines, above the 400-line large-section threshold, and has 7 peer internal headings that can be reviewed as split boundaries."
+      },
+      "human_decision": "SPLIT_AS_PROPOSED",
+      "human_notes": "",
+      "options": [
+        "SPLIT_AS_PROPOSED",
+        "MODIFY_SPLIT",
+        "KEEP_AS_ONE"
+      ],
+      "question": "Should HLD-010 - Component Interface Definitions be split using the proposed split plan, modified, or kept as one section?",
+      "question_id": "Q-002",
+      "recommended_action": "STOP_SPLIT_DECISION_REQUIRED",
+      "source_candidate_id": "HLD-010",
+      "source_line_count": 572,
+      "source_line_end": 3000,
+      "source_line_start": 2429,
+      "title": "Component Interface Definitions"
+    },
+    {
+      "approved_keep_reason": "Human chose KEEP_AS_ONE at checkpoint.",
+      "blocking": true,
+      "decision_status": "ANSWERED",
+      "default_proposal": {
+        "decision": "KEEP_AS_ONE",
+        "proposed_split_plan": [
+          {
+            "boundary_source": "first_internal_heading_level",
+            "heading_level": 3,
+            "proposed_hld_id": "HLD-019A",
+            "source_line_count": 437,
+            "source_line_end": 4274,
+            "source_line_start": 3838,
+            "title": "Milestone 1: Core.md Integration and Validation \u2705 **COMPLETED**"
+          }
+        ],
+        "reason": "Candidate is 439 lines, above the 400-line large-section threshold, but no clear peer internal split boundaries were detected. Review as one large section."
+      },
+      "human_decision": "KEEP_AS_ONE",
+      "human_notes": "",
+      "options": [
+        "KEEP_AS_ONE",
+        "SPLIT",
+        "MODIFY_SPLIT"
+      ],
+      "question": "Should HLD-019 - Milestones be kept as one large section, or should a split be defined manually?",
+      "question_id": "Q-003",
+      "recommended_action": "PROCEED_SINGLE_SECTION_REVIEW",
+      "source_candidate_id": "HLD-019",
+      "source_line_count": 439,
+      "source_line_end": 4274,
+      "source_line_start": 3836,
+      "title": "Milestones"
+    }
+  ],
+  "status": "DECISIONS_RECORDED"
+}

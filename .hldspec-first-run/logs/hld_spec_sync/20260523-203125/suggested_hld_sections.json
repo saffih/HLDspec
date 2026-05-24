@@ -1,0 +1,3073 @@
+{
+  "candidate_section_count": 36,
+  "existing_hldspec_section_count": 0,
+  "heading_count": 343,
+  "headings": [
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 1,
+      "line": 1,
+      "title": "Flow System - High-Level Design (HLD)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 23,
+      "title": "IMPORTANT: Single Source of Truth"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 62,
+      "title": "Specification Alignment Plan"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 86,
+      "title": "Executive Summary"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 90,
+      "title": "Key Architectural Decisions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 101,
+      "title": "CLI Entry Point"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 144,
+      "title": "Stakeholder Analysis"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 146,
+      "title": "Stakeholder Inventory"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 152,
+      "title": "Stakeholder Concerns"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 163,
+      "title": "Authority Levels"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 173,
+      "title": "core.md Governance (v2.8.3)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 189,
+      "title": "Approval Criteria (v2.7)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 208,
+      "title": "Success Criteria"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 222,
+      "title": "User Personas"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 224,
+      "title": "Single Persona: System Owner / Developer"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 257,
+      "title": "Business Case Foundation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 259,
+      "title": "Business Objectives"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 276,
+      "title": "Job-to-be-Done"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 294,
+      "title": "Success Metrics"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 322,
+      "title": "Strategic Alignment"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 356,
+      "title": "User Stories"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 358,
+      "title": "Epic 1: Task Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 382,
+      "title": "Epic 2: AI Task Execution"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 407,
+      "title": "Epic 3: Reply Handling"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 433,
+      "title": "Epic 4: Session Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 464,
+      "title": "Epic 5: Reporting and Documentation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 490,
+      "title": "Epic 6: Data Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 516,
+      "title": "Epic 7: Logging and Monitoring"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 542,
+      "title": "Epic 8: End-to-End Workflows"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 660,
+      "title": "System Architecture Overview"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 749,
+      "title": "Component Deep-Dive"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 751,
+      "title": "1. TEA Architecture (Model-View-Update)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 753,
+      "title": "Model (Centralized State)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 765,
+      "title": "View (Pure Functions)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 774,
+      "title": "Update (Event-Driven)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 782,
+      "title": "2. Flow Core Database API (Critical Safety Layer)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 786,
+      "title": "Safety Mechanisms"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 795,
+      "title": "Critical Rule"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 800,
+      "title": "3. AI Integration Layer (Delicate Integration Point)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 802,
+      "title": "core.md - The AI Process Loop Code"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 811,
+      "title": "core.md Contract Invariants (CRITICAL)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 874,
+      "title": "Reply Decision Criteria (Objective)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 932,
+      "title": "core.md Error Recovery Paths"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 956,
+      "title": "8-Step Process Loop (Corrected Implementation)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 971,
+      "title": "Process Loop Exit Conditions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 993,
+      "title": "Recipe System (Learnable Behavior)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1002,
+      "title": "Session Spawn and Execution"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1011,
+      "title": "Logging Architecture Rationale"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 1037,
+      "title": "4. Brain Architecture (core.md - The AI Process Controller)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1039,
+      "title": "Overview"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1050,
+      "title": "Brain Responsibilities"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1080,
+      "title": "Brain Structure and Content"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1101,
+      "title": "Brain-System Interactions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1174,
+      "title": "Brain Contracts and Invariants"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1213,
+      "title": "Brain Data Flow"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1261,
+      "title": "Brain Lifecycle and Evolution"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1308,
+      "title": "Brain Quality Assurance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1343,
+      "title": "Brain Integration Points"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1375,
+      "title": "Brain Failure Modes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1401,
+      "title": "Brain Success Metrics"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 1426,
+      "title": "5. Specification Hierarchy and Integration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1439,
+      "title": "HLD as Single Source of Truth"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1454,
+      "title": "Specification Directory Structure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1487,
+      "title": "Specification Integration with HLD"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1552,
+      "title": "Specification Maintenance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1575,
+      "title": "Cross-Reference Matrix"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1589,
+      "title": "Quality Assurance for Specifications"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1605,
+      "title": "Archive and Deprecated Specifications"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1623,
+      "title": "Current Implementation Structure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1664,
+      "title": "Architecture Decision: HLD Architecture vs flow_loop.py"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1696,
+      "title": "Session Status Values (Actually Implemented)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1702,
+      "title": "Task Status Values (Database Schema)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1713,
+      "title": "CLI Protocol (Current Implementation)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1722,
+      "title": "CLI Architecture (Nervous System Model)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1822,
+      "title": "Task Discovery"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1829,
+      "title": "Status Notification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1842,
+      "title": "Report Notification (REQUIRED)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1849,
+      "title": "Session Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1854,
+      "title": "Error Handling"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 1862,
+      "title": "5. Automatic Sync Operations"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1866,
+      "title": "Triggering"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1872,
+      "title": "One-Way Projection"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1878,
+      "title": "core.md Integration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1883,
+      "title": "Performance Targets"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 1890,
+      "title": "6. Session Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1892,
+      "title": "Implementation Status"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1898,
+      "title": "Session Lifecycle"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1906,
+      "title": "Session Limits"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1912,
+      "title": "Failover Algorithm"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1958,
+      "title": "NULL Task Reassignment Mechanism"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1985,
+      "title": "Session Affinity (Optional)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 1991,
+      "title": "Unix Socket Task Delivery System"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2200,
+      "title": "Auto-Spawn"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2208,
+      "title": "7. WIP Lifecycle Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2212,
+      "title": "Auto-Create"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2219,
+      "title": "Auto-Mark Done"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2225,
+      "title": "UI Integration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2231,
+      "title": "WIP Rules"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2237,
+      "title": "WIP Update Mechanism (Clarification)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2260,
+      "title": "8. HTTP API & Web UI"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2262,
+      "title": "HTTP API Design"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2269,
+      "title": "Key Endpoints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2277,
+      "title": "Server-Sent Events (SSE) Architecture"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2413,
+      "title": "Web UI Design"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2420,
+      "title": "UI Pages"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 2429,
+      "title": "Component Interface Definitions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2431,
+      "title": "Overview"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2435,
+      "title": "1. Database API Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2443,
+      "title": "Core Methods"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2490,
+      "title": "Safety Mechanisms"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2498,
+      "title": "Connection Pool Architecture (v2.9)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2559,
+      "title": "2. CLI Command Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2567,
+      "title": "Core Commands"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2605,
+      "title": "Command Format"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2610,
+      "title": "CLI Command Implementation Status (v2.8.4)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2637,
+      "title": "3. HTTP API Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2645,
+      "title": "Endpoints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2756,
+      "title": "Response Format"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2762,
+      "title": "Error Response Format"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2784,
+      "title": "Authentication"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2790,
+      "title": "CORS Configuration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2795,
+      "title": "Rate Limiting"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2800,
+      "title": "Request Validation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2806,
+      "title": "Pagination"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2812,
+      "title": "Caching Strategy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2818,
+      "title": "API Versioning"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2824,
+      "title": "4. Storage API Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2832,
+      "title": "Core Methods"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2853,
+      "title": "Directory Structure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2862,
+      "title": "5. Config API Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2870,
+      "title": "Core Methods"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2888,
+      "title": "Configuration Structure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 2920,
+      "title": "6. Session Spawning Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2928,
+      "title": "Session Management Approaches"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2953,
+      "title": "Command Interface"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2970,
+      "title": "When to Use Each Approach"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2985,
+      "title": "Session Context (flow spawn only)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 2995,
+      "title": "Implementation Note"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3001,
+      "title": "Entity Model Transparency"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3005,
+      "title": "Entity Relationships"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3022,
+      "title": "User Navigation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3043,
+      "title": "Implementation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3045,
+      "title": "Database Schema Specification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3047,
+      "title": "Overview"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3053,
+      "title": "Core Tables"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3055,
+      "title": "hints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3075,
+      "title": "tasks"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3112,
+      "title": "reports"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3139,
+      "title": "sessions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3156,
+      "title": "config"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3168,
+      "title": "Supporting Tables"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3170,
+      "title": "task_notes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3185,
+      "title": "report_links"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3202,
+      "title": "tasks_fts"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3216,
+      "title": "Indexes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3218,
+      "title": "Performance Indexes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3250,
+      "title": "Foreign Key Relationships"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3252,
+      "title": "Core Relationships"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3256,
+      "title": "Junction Table Relationships"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3259,
+      "title": "Constraints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3261,
+      "title": "CHECK Constraints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3267,
+      "title": "UNIQUE Constraints"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3272,
+      "title": "Timestamp Convention"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3289,
+      "title": "v1 Scope Definition"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3295,
+      "title": "v1 Architecture Migration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3321,
+      "title": "v1 Complete Task Lifecycle (Already Implemented)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3347,
+      "title": "v1 Components"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3379,
+      "title": "Critical Implementation Gaps (Architectural Migration Tasks for v1)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3419,
+      "title": "v1 Implementation Plan"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3526,
+      "title": "v1 Success Criteria"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3561,
+      "title": "Data Flow Diagrams"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3563,
+      "title": "Task Execution Flow"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3599,
+      "title": "Session Spawn Flow"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3639,
+      "title": "Reply Flow (Binary Decision Model)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3683,
+      "title": "Critical Integration Points"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3685,
+      "title": "1. AI-to-System Integration (Most Critical)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3693,
+      "title": "2. Database-to-Markdown Sync"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3701,
+      "title": "3. Session Health and Failover"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3709,
+      "title": "4. WIP Lifecycle"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3717,
+      "title": "5. Task Assignment and Session Limits"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3725,
+      "title": "Round-Robin Auto-Assignment (v2.8.7)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3764,
+      "title": "Security Considerations"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3766,
+      "title": "Database Security"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3773,
+      "title": "CLI Security"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3779,
+      "title": "Session Security"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3785,
+      "title": "API Security"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3793,
+      "title": "Performance Requirements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3795,
+      "title": "Database Performance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3801,
+      "title": "Session Performance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3807,
+      "title": "Task Execution Performance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3814,
+      "title": "Error Handling Strategy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3816,
+      "title": "Error Categorization"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3822,
+      "title": "Retry Policy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3828,
+      "title": "Escalation Policy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 3836,
+      "title": "Milestones"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 3838,
+      "title": "Milestone 1: Core.md Integration and Validation \u2705 **COMPLETED**"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3844,
+      "title": "Objective"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3847,
+      "title": "Problems Solved"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3884,
+      "title": "Deliverables"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3910,
+      "title": "Backend Scenario Testing Methodology"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 3943,
+      "title": "Validation Results"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4160,
+      "title": "Architecture Impact"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4180,
+      "title": "Technical Specifications"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4232,
+      "title": "Acceptance Criteria"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4249,
+      "title": "Metrics"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4263,
+      "title": "Sign-off"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4275,
+      "title": "Environment Staging"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4277,
+      "title": "FLOW_ENV Variable"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4283,
+      "title": "Path Construction"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4288,
+      "title": "Automatic Port and Database Selection"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4338,
+      "title": "Testing Workflow with Environment Staging"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4342,
+      "title": "When to Use Test Environment"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4358,
+      "title": "Test Environment Setup"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4386,
+      "title": "Testing Workflow"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4426,
+      "title": "Test Data Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4443,
+      "title": "Test Environment Reset"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4458,
+      "title": "Testing Best Practices"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4485,
+      "title": "Example Testing Session"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4517,
+      "title": "Environment Staging Scripts"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4530,
+      "title": "Troubleshooting"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4550,
+      "title": "Technology Stack"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4552,
+      "title": "Core Technologies"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4558,
+      "title": "Web Technologies"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4564,
+      "title": "Development Tools"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4572,
+      "title": "Open Questions and Contradictions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4574,
+      "title": "Contradictions Between Specs and Current Implementation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4617,
+      "title": "Gaps in Current Implementation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4648,
+      "title": "Architecture Decisions Needed"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4713,
+      "title": "Next Steps for HLD Refinement"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4724,
+      "title": "Technical Debt and Deprecation Timeline"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4726,
+      "title": "Overview"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4730,
+      "title": "Current Technical Debt Items"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4732,
+      "title": "1. flow_loop.py (Python Script Process Loop)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 4773,
+      "title": "2. CLI Protocol Format (Text-based \u2192 JSON)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4803,
+      "title": "Technical Debt Management Process"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4812,
+      "title": "Prevention of Future Technical Debt"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4822,
+      "title": "Human Handoff Summary"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4824,
+      "title": "Executive Summary"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4828,
+      "title": "What Was Accomplished"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4850,
+      "title": "Current HLD State"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4866,
+      "title": "Verification Results"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4883,
+      "title": "Remaining Work"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4903,
+      "title": "Human Action Required"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4917,
+      "title": "Success Metrics"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4938,
+      "title": "Contact and Support"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4952,
+      "title": "Conclusion"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 4958,
+      "title": "Lessons Learned from Skeptic-Stabilized HLD Completion"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4960,
+      "title": "Process Effectiveness"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 4974,
+      "title": "Technical Insights"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5001,
+      "title": "Process Improvements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5018,
+      "title": "Quality Assurance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5030,
+      "title": "Remaining Work"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5047,
+      "title": "Recommendations for Future Projects"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5058,
+      "title": "Success Metrics"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5083,
+      "title": "Changelog"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5085,
+      "title": "Version 2.9 (2026-05-18) - Connection Pool Exhaustion Prevention & Alignment Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5122,
+      "title": "Version 2.8.7 (2026-05-18) - Session Health Monitoring Implementation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5149,
+      "title": "Version 2.8.6 (2026-05-18) - Session Health Monitoring Clarification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5182,
+      "title": "Version 2.8.4 (2026-05-17) - Comprehensive HLD Review and Improvements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5209,
+      "title": "Version 2.8.3 (2026-05-17) - Data Directory Migration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5223,
+      "title": "Version 2.8.2 (2026-05-17) - Database Schema Simplification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5234,
+      "title": "Version 2.8.1 (2026-05-17) - SpecKit Clarification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5241,
+      "title": "Version 2.8 (2026-05-17) - Comprehensive HLD Review"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5258,
+      "title": "Version 2.7 (2026-05-16) - Assumption Validation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5271,
+      "title": "Version 2.6 (2026-05-16) - CONFLICT Resolution & Database Schema"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5296,
+      "title": "Version 2.5 (2026-05-16) - Lower Tier Requirements: SSE & No Security"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5311,
+      "title": "Version 1.18 (2026-05-16) - v1 Scope Correction: Architecture Migration"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5321,
+      "title": "Version 1.17 (2026-05-15) - HLD Improved and Aligned"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5332,
+      "title": "Version 1.16 (2026-05-15) - Architecture Decision: HLD Architecture for v1"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5341,
+      "title": "Version 1.15 (2026-05-15) - v1 Complete Task Lifecycle"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5352,
+      "title": "Version 1.14 (2026-05-15) - v1 Scope Definition"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5364,
+      "title": "Version 1.13 (2026-05-15) - CLI Architecture (Nervous System Model)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5376,
+      "title": "Version 2.4 (2026-05-16) - Architectural Decision: AI-First Philosophy Validation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5384,
+      "title": "Version 2.3 (2026-05-16) - Architectural Decision: CLI-Only for core.md"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5401,
+      "title": "Version 2.1 (2026-05-16) - BMAD Party Mode Enhancements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5408,
+      "title": "Version 1.12 (2026-05-14) - Session Architecture Correction"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5421,
+      "title": "Version 1.8 (2026-05-14) - Eighth Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5424,
+      "title": "Version 1.7 (2026-05-14) - Seventh Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5427,
+      "title": "Version 1.6 (2026-05-14) - Sixth Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5433,
+      "title": "Version 1.5 (2026-05-14) - Fourth Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5438,
+      "title": "Version 1.4 (2026-05-14) - Third Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5443,
+      "title": "Version 1.3 (2026-05-14) - Second Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5448,
+      "title": "Version 1.2 (2026-05-14) - First Skeptic Pass Fixes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5457,
+      "title": "Decision Log"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5459,
+      "title": "DEC-1: CLI-Only Requirement for core.md"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5489,
+      "title": "DEC-2: AI-First Philosophy - CLI API Flexibility"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5522,
+      "title": "Data Retention Policy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5524,
+      "title": "Purpose"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5528,
+      "title": "Retention Periods by Entity Type"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5541,
+      "title": "Data Deletion Process"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5555,
+      "title": "Compliance Considerations"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5565,
+      "title": "Storage Management"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5579,
+      "title": "Operational Runbook"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5581,
+      "title": "Purpose"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5585,
+      "title": "Deployment"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 5612,
+      "title": "Recovery Objectives (Single-Stakeholder System)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 5631,
+      "title": "Incident Response Procedures"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5651,
+      "title": "Health Monitoring"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 4,
+      "line": 5682,
+      "title": "Alert Definition and Routing (v2.8.3)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5720,
+      "title": "Incident Response"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5756,
+      "title": "Maintenance"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5771,
+      "title": "Error Handling Specification"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5773,
+      "title": "Error Categories"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5795,
+      "title": "Retry Strategy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5808,
+      "title": "Error Escalation"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5835,
+      "title": "Error Logging Requirements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5854,
+      "title": "Error Recovery"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5874,
+      "title": "Implementation Handoff"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5876,
+      "title": "Purpose"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5880,
+      "title": "Traceability Matrix"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5895,
+      "title": "Test Strategy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5920,
+      "title": "Test Data Requirements"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5934,
+      "title": "Acceptance Criteria"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5947,
+      "title": "Validation Checklist"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 5971,
+      "title": "Session Spawning Failure Modes"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5973,
+      "title": "Failure Points in Session Spawning"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 5977,
+      "title": "Failure Mode 1: flow_spawn.py Execution Failure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6003,
+      "title": "Failure Mode 2: bg-devin Invocation Failure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6029,
+      "title": "Failure Mode 3: Log File Creation Failure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6055,
+      "title": "Failure Mode 4: core.md Loading Failure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6083,
+      "title": "Failure Mode 5: Session Registration Failure"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6110,
+      "title": "Failure Mode 6: Partial Session Spawn (Success at Some Steps, Failure at Others)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6136,
+      "title": "Failure Mode 7: Session Spawn Success But Task Discovery Fails"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6162,
+      "title": "Session Spawn Rollback Strategy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 6184,
+      "title": "Assumptions"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6186,
+      "title": "ASSUMPTION: Governance Definition"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6206,
+      "title": "ASSUMPTION: Security Model"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6220,
+      "title": "ASSUMPTION: Performance Claims"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6232,
+      "title": "ASSUMPTION: Stakeholder Personas"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6244,
+      "title": "ASSUMPTION: AI-First Philosophy"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6258,
+      "title": "ASSUMPTION: CLI Reliability"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6272,
+      "title": "ASSUMPTION: One-Way Sync Sufficiency"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6284,
+      "title": "ASSUMPTION: Error Scenario Coverage"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6304,
+      "title": "ASSUMPTION: Operational Procedure Completeness"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6324,
+      "title": "ASSUMPTION: Database Recovery Capability"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6343,
+      "title": "ASSUMPTION: Session Failover Effectiveness"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6362,
+      "title": "ASSUMPTION: CLI Error Detection"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6382,
+      "title": "ASSUMPTION: Environment Isolation Reliability"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6402,
+      "title": "ASSUMPTION: Operational Targets Not Required (v2.7)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 6422,
+      "title": "Open Conflicts"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6424,
+      "title": "RESOLVED: CONFLICT #2 (v2.4)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 3,
+      "line": 6432,
+      "title": "RESOLVED: CONFLICT #1 (v2.3)"
+    },
+    {
+      "hld_id": null,
+      "is_hldspec_heading": false,
+      "level": 2,
+      "line": 6442,
+      "title": "Success Criteria for HLD"
+    }
+  ],
+  "line_count": 6455,
+  "next_steps": [
+    "Preserve the original as HLD.raw.md.",
+    "Edit a working HLD.md copy only.",
+    "Apply HLD-xxx IDs only to major sections.",
+    "Use TBD for unknown specs, resources, and owners.",
+    "Add REF HLD-xxx relationships where known.",
+    "Run ./hld_spec_sync.py --hld HLD.md --hld-map-only before syncing.",
+    "Run --use-hld-map --target-hld <id> --prompt-only before applying agent output."
+  ],
+  "source_path": "/Users/saffi/code/HLDspec/.hldspec-first-run/HLD.md",
+  "suggested_hld_sections": [
+    {
+      "approx_lines_until_next_candidate": 63,
+      "heading_level": 2,
+      "line": 23,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-001",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "governance",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "governance",
+      "suggested_id": "HLD-001",
+      "title": "IMPORTANT: Single Source of Truth"
+    },
+    {
+      "approx_lines_until_next_candidate": 15,
+      "heading_level": 2,
+      "line": 86,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-002",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "LOW",
+        "HLD-ROLE": "purpose",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "LOW",
+      "role": "purpose",
+      "suggested_id": "HLD-002",
+      "title": "Executive Summary"
+    },
+    {
+      "approx_lines_until_next_candidate": 43,
+      "heading_level": 2,
+      "line": 101,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-003",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-003",
+      "title": "CLI Entry Point"
+    },
+    {
+      "approx_lines_until_next_candidate": 78,
+      "heading_level": 2,
+      "line": 144,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-004",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-004",
+      "title": "Stakeholder Analysis"
+    },
+    {
+      "approx_lines_until_next_candidate": 35,
+      "heading_level": 2,
+      "line": 222,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-005",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-005",
+      "title": "User Personas"
+    },
+    {
+      "approx_lines_until_next_candidate": 99,
+      "heading_level": 2,
+      "line": 257,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-006",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-006",
+      "title": "Business Case Foundation"
+    },
+    {
+      "approx_lines_until_next_candidate": 304,
+      "heading_level": 2,
+      "line": 356,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-007",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-007",
+      "title": "User Stories"
+    },
+    {
+      "approx_lines_until_next_candidate": 89,
+      "heading_level": 2,
+      "line": 660,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-008",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-008",
+      "title": "System Architecture Overview"
+    },
+    {
+      "approx_lines_until_next_candidate": 1680,
+      "heading_level": 2,
+      "line": 749,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-009",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-009",
+      "title": "Component Deep-Dive"
+    },
+    {
+      "approx_lines_until_next_candidate": 572,
+      "heading_level": 2,
+      "line": 2429,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-010",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-010",
+      "title": "Component Interface Definitions"
+    },
+    {
+      "approx_lines_until_next_candidate": 44,
+      "heading_level": 2,
+      "line": 3001,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-011",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-011",
+      "title": "Entity Model Transparency"
+    },
+    {
+      "approx_lines_until_next_candidate": 244,
+      "heading_level": 2,
+      "line": 3045,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-012",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "data",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "data",
+      "suggested_id": "HLD-012",
+      "title": "Database Schema Specification"
+    },
+    {
+      "approx_lines_until_next_candidate": 272,
+      "heading_level": 2,
+      "line": 3289,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-013",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "LOW",
+        "HLD-ROLE": "purpose",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "LOW",
+      "role": "purpose",
+      "suggested_id": "HLD-013",
+      "title": "v1 Scope Definition"
+    },
+    {
+      "approx_lines_until_next_candidate": 122,
+      "heading_level": 2,
+      "line": 3561,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-014",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "processing",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "processing",
+      "suggested_id": "HLD-014",
+      "title": "Data Flow Diagrams"
+    },
+    {
+      "approx_lines_until_next_candidate": 81,
+      "heading_level": 2,
+      "line": 3683,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-015",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "api",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "api",
+      "suggested_id": "HLD-015",
+      "title": "Critical Integration Points"
+    },
+    {
+      "approx_lines_until_next_candidate": 29,
+      "heading_level": 2,
+      "line": 3764,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-016",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "architecture",
+      "suggested_id": "HLD-016",
+      "title": "Security Considerations"
+    },
+    {
+      "approx_lines_until_next_candidate": 21,
+      "heading_level": 2,
+      "line": 3793,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-017",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-017",
+      "title": "Performance Requirements"
+    },
+    {
+      "approx_lines_until_next_candidate": 22,
+      "heading_level": 2,
+      "line": 3814,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-018",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-018",
+      "title": "Error Handling Strategy"
+    },
+    {
+      "approx_lines_until_next_candidate": 439,
+      "heading_level": 2,
+      "line": 3836,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-019",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-019",
+      "title": "Milestones"
+    },
+    {
+      "approx_lines_until_next_candidate": 275,
+      "heading_level": 2,
+      "line": 4275,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-020",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-020",
+      "title": "Environment Staging"
+    },
+    {
+      "approx_lines_until_next_candidate": 22,
+      "heading_level": 2,
+      "line": 4550,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-021",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-021",
+      "title": "Technology Stack"
+    },
+    {
+      "approx_lines_until_next_candidate": 141,
+      "heading_level": 2,
+      "line": 4572,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-022",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "risk",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "risk",
+      "suggested_id": "HLD-022",
+      "title": "Open Questions and Contradictions"
+    },
+    {
+      "approx_lines_until_next_candidate": 11,
+      "heading_level": 2,
+      "line": 4713,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-023",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-023",
+      "title": "Next Steps for HLD Refinement"
+    },
+    {
+      "approx_lines_until_next_candidate": 98,
+      "heading_level": 2,
+      "line": 4724,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-024",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-024",
+      "title": "Technical Debt and Deprecation Timeline"
+    },
+    {
+      "approx_lines_until_next_candidate": 136,
+      "heading_level": 2,
+      "line": 4822,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-025",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "LOW",
+        "HLD-ROLE": "purpose",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "LOW",
+      "role": "purpose",
+      "suggested_id": "HLD-025",
+      "title": "Human Handoff Summary"
+    },
+    {
+      "approx_lines_until_next_candidate": 125,
+      "heading_level": 2,
+      "line": 4958,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-026",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-026",
+      "title": "Lessons Learned from Skeptic-Stabilized HLD Completion"
+    },
+    {
+      "approx_lines_until_next_candidate": 374,
+      "heading_level": 2,
+      "line": 5083,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-027",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-027",
+      "title": "Changelog"
+    },
+    {
+      "approx_lines_until_next_candidate": 65,
+      "heading_level": 2,
+      "line": 5457,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-028",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "governance",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "governance",
+      "suggested_id": "HLD-028",
+      "title": "Decision Log"
+    },
+    {
+      "approx_lines_until_next_candidate": 57,
+      "heading_level": 2,
+      "line": 5522,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-029",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "governance",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "governance",
+      "suggested_id": "HLD-029",
+      "title": "Data Retention Policy"
+    },
+    {
+      "approx_lines_until_next_candidate": 192,
+      "heading_level": 2,
+      "line": 5579,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-030",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-030",
+      "title": "Operational Runbook"
+    },
+    {
+      "approx_lines_until_next_candidate": 103,
+      "heading_level": 2,
+      "line": 5771,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-031",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-031",
+      "title": "Error Handling Specification"
+    },
+    {
+      "approx_lines_until_next_candidate": 97,
+      "heading_level": 2,
+      "line": 5874,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-032",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-032",
+      "title": "Implementation Handoff"
+    },
+    {
+      "approx_lines_until_next_candidate": 213,
+      "heading_level": 2,
+      "line": 5971,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-033",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "operations",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "operations",
+      "suggested_id": "HLD-033",
+      "title": "Session Spawning Failure Modes"
+    },
+    {
+      "approx_lines_until_next_candidate": 238,
+      "heading_level": 2,
+      "line": 6184,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-034",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-034",
+      "title": "Assumptions"
+    },
+    {
+      "approx_lines_until_next_candidate": 20,
+      "heading_level": 2,
+      "line": 6422,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-035",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "HIGH",
+        "HLD-ROLE": "risk",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "HIGH",
+      "role": "risk",
+      "suggested_id": "HLD-035",
+      "title": "Open Conflicts"
+    },
+    {
+      "approx_lines_until_next_candidate": 14,
+      "heading_level": 2,
+      "line": 6442,
+      "metadata_skeleton": {
+        "HLD-ID": "HLD-036",
+        "HLD-RESOURCES": "TBD",
+        "HLD-RISK": "MEDIUM",
+        "HLD-ROLE": "architecture",
+        "HLD-SPECS": "TBD",
+        "HLD-STATUS": "active",
+        "HLD-VERIFY": "section can be processed without loading the full HLD; related specs preserve HLD anchors"
+      },
+      "risk": "MEDIUM",
+      "role": "architecture",
+      "suggested_id": "HLD-036",
+      "title": "Success Criteria for HLD"
+    }
+  ],
+  "warnings": [
+    "HLD-009 candidate 'Component Deep-Dive' spans about 1680 lines; consider splitting before sync.",
+    "HLD-010 candidate 'Component Interface Definitions' spans about 572 lines; consider splitting before sync."
+  ]
+}

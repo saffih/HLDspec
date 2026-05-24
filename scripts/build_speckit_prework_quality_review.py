@@ -19,7 +19,7 @@ def feature_name(item: dict[str, Any]) -> str:
     return str(item.get("feature_name") or item.get("title") or item.get("planned_spec_id") or item.get("feature_id") or "unknown")
 
 
-def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any], dossier_quality: dict[str, Any], interface_map: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any], dossier_quality: dict[str, Any], interface_map: dict[str, Any] | None = None, spec_list: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
@@ -68,6 +68,32 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                     "RunSkeptic_decision": "FIX",
                 }
             )
+        # QG-011b: secondary signal — first feature has no implementable content
+        # (catches documentation-as-feature even when section classification is wrong)
+        if first_feature_for_map:
+            has_use_cases = bool(as_list(first_feature_for_map.get("use_cases")))
+            has_user_stories = bool(as_list(first_feature_for_map.get("user_stories")))
+            has_user_journeys = bool(as_list(first_feature_for_map.get("user_journeys")))
+            has_api_surface = bool(as_list(first_feature_for_map.get("api_surface")))
+            has_data_entities = bool(as_list(first_feature_for_map.get("data_entities")))
+            no_implementable_content = not any([has_use_cases, has_user_stories, has_user_journeys, has_api_surface, has_data_entities])
+            if no_implementable_content:
+                findings.append(
+                    {
+                        "id": "QG-011b",
+                        "severity": "BLOCKER",
+                        "area": "first feature implementability",
+                        "finding": (
+                            f"First feature '{feature_name(first_feature_for_map)}' has no use_cases, user_stories, user_journeys, "
+                            "api_surface, or data_entities — it is likely a documentation or overview section, not a buildable feature."
+                        ),
+                        "recommendation": (
+                            "Select a first feature that has at least one of: use cases, user stories, API surface, or data entities. "
+                            "Architecture overview sections should not be the first SpecKit invocation."
+                        ),
+                        "RunSkeptic_decision": "FIX",
+                    }
+                )
 
     if not features:
         findings.append(
@@ -148,7 +174,7 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 str(r.get("rationale", "")) for r in rules
             )
             has_contract_rule = any(
-                str(r.get("rule_id", "")).startswith(("CONTRACT-", "DATA-"))
+                str(r.get("rule_id", "")).startswith("CONTRACT-")
                 for r in rules
             )
             if not has_contract_rule:
@@ -209,6 +235,45 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
             }
         )
 
+    # QG-017: check for spec ID conflicts with existing project specs
+    if spec_list is not None:
+        existing_scan = spec_list.get("existing_specs_scan") or {}
+        conflicts = as_list(existing_scan.get("conflicts"))
+        if conflicts:
+            conflict_summary = "; ".join(
+                f"{c.get('planned_id')} conflicts with {', '.join(c.get('conflicts_with', []))}"
+                for c in conflicts[:5]
+            )
+            findings.append(
+                {
+                    "id": "QG-017",
+                    "severity": "BLOCKER",
+                    "area": "spec ID conflicts",
+                    "finding": (
+                        f"{len(conflicts)} planned spec ID(s) conflict with existing project specs: {conflict_summary}"
+                    ),
+                    "recommendation": (
+                        "Re-run build_hldspec_speckit_spec_list.py with --source-project so new IDs start after "
+                        "the highest existing spec number. Do not overwrite existing project specs."
+                    ),
+                    "RunSkeptic_decision": "FIX",
+                }
+            )
+        elif existing_scan.get("found") and existing_scan.get("existing_count", 0) > 0:
+            findings.append(
+                {
+                    "id": "QG-017-info",
+                    "severity": "ACTION",
+                    "area": "spec ID conflicts",
+                    "finding": (
+                        f"Source project has {existing_scan['existing_count']} existing spec(s); "
+                        f"new specs start at {existing_scan.get('highest_number', 0) + 1:03d}. No ID conflicts detected."
+                    ),
+                    "recommendation": "Verify that the new spec decomposition complements (not duplicates) the existing specs.",
+                    "RunSkeptic_decision": "VERIFY",
+                }
+            )
+
     if not dossier_quality:
         findings.append(
             {
@@ -265,8 +330,9 @@ def build_review(workspace: Path) -> dict[str, Any]:
     usecase_map = load_json(sync / "hld_usecase_api_map.json")
     dossier_quality = load_json(sync / "hld_answer_dossier_quality_review.json")
     interface_map = load_json(sync / "interface_contract_map.json")
+    spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
 
-    findings = build_findings(manifest, graph, constitution, queue, usecase_map, dossier_quality, interface_map)
+    findings = build_findings(manifest, graph, constitution, queue, usecase_map, dossier_quality, interface_map, spec_list)
     status = determine_status(findings)
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]

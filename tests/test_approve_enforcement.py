@@ -84,6 +84,28 @@ class TestApproveEnforcement(unittest.TestCase):
             record = self.mod.approve_prework(Path(tmp), "APPROVE_PLAN")
             self.assertEqual(record["status"], "APPROVED")
 
+    def test_missing_dossier_quality_review_blocks_approval(self):
+        # Absent evidence is not the same as clean evidence — gate must fail closed.
+        with tempfile.TemporaryDirectory() as tmp:
+            sync = self._sync(tmp)
+            _minimal_prework_package(sync)
+            # hld_answer_dossier_quality_review.json deliberately not written
+            write_json(sync / "speckit_prework_quality_review.json", {"findings": []})
+            with self.assertRaises(ValueError) as ctx:
+                self.mod.approve_prework(Path(tmp), "APPROVE_PLAN")
+            self.assertIn("MISSING_hld_answer_dossier_quality_review.json", str(ctx.exception))
+
+    def test_missing_prework_quality_review_blocks_approval(self):
+        # Both review files are required; absent prework review must also block.
+        with tempfile.TemporaryDirectory() as tmp:
+            sync = self._sync(tmp)
+            _minimal_prework_package(sync)
+            write_json(sync / "hld_answer_dossier_quality_review.json", {"findings": []})
+            # speckit_prework_quality_review.json deliberately not written
+            with self.assertRaises(ValueError) as ctx:
+                self.mod.approve_prework(Path(tmp), "APPROVE_PLAN")
+            self.assertIn("MISSING_speckit_prework_quality_review.json", str(ctx.exception))
+
     def test_action_only_does_not_block_approval(self):
         with tempfile.TemporaryDirectory() as tmp:
             sync = self._sync(tmp)
@@ -98,6 +120,30 @@ class TestApproveEnforcement(unittest.TestCase):
             record = self.mod.approve_prework(Path(tmp), "APPROVE_PLAN")
             self.assertEqual(record["status"], "APPROVED")
 
+    def test_agent_actor_produces_warning(self):
+        """Actor=agent approval is allowed but must carry a warning."""
+        with tempfile.TemporaryDirectory() as tmp:
+            sync = self._sync(tmp)
+            _minimal_prework_package(sync)
+            write_json(sync / "hld_answer_dossier_quality_review.json", {"findings": []})
+            write_json(sync / "speckit_prework_quality_review.json", {"findings": []})
+            record = self.mod.approve_prework(Path(tmp), "APPROVE_PLAN", actor="agent")
+            self.assertEqual(record["status"], "APPROVED")
+            self.assertEqual(record["actor"], "agent")
+            self.assertTrue(len(record["warnings"]) > 0, "agent approval must carry a warning")
+            self.assertIn("actor", record["warnings"][0])
+
+    def test_human_actor_produces_no_warning(self):
+        """Actor=human approval must produce zero warnings."""
+        with tempfile.TemporaryDirectory() as tmp:
+            sync = self._sync(tmp)
+            _minimal_prework_package(sync)
+            write_json(sync / "hld_answer_dossier_quality_review.json", {"findings": []})
+            write_json(sync / "speckit_prework_quality_review.json", {"findings": []})
+            record = self.mod.approve_prework(Path(tmp), "APPROVE_PLAN", actor="human")
+            self.assertEqual(record["actor"], "human")
+            self.assertEqual(record["warnings"], [], "human approval must have no warnings")
+
 
 class TestHasFirstRunArtifacts(unittest.TestCase):
     def setUp(self):
@@ -108,23 +154,26 @@ class TestHasFirstRunArtifacts(unittest.TestCase):
         sync.mkdir(parents=True, exist_ok=True)
         return sync
 
-    def test_missing_one_file_returns_false(self):
+    def test_partial_artifacts_are_detected(self):
+        # Three of four files: still a first-run workspace (mid-flight checkpoint).
         with tempfile.TemporaryDirectory() as tmp:
             sync = self._sync(tmp)
             write_json(sync / "spec_build_plan.json", {"ok": True})
             write_text(sync / "spec_build_plan_review.md", "review")
             write_json(sync / "speckit_prework_quality_review.json", {"status": "ok"})
-            # speckit_prework_package.md is missing
-            self.assertFalse(self.mod.has_first_run_artifacts(Path(tmp)))
+            # speckit_prework_package.md is absent — prework not yet generated
+            self.assertTrue(self.mod.has_first_run_artifacts(Path(tmp)))
 
-    def test_invalid_json_returns_false(self):
+    def test_invalid_json_does_not_block_detection(self):
+        # All four files are present; JSON validity is not part of detection.
+        # A temporarily-corrupt JSON must not misroute build_state to workspace/firstrun.
         with tempfile.TemporaryDirectory() as tmp:
             sync = self._sync(tmp)
             write_json(sync / "spec_build_plan.json", {"ok": True})
             write_text(sync / "spec_build_plan_review.md", "review")
             (sync / "speckit_prework_quality_review.json").write_text("not valid json{{{", encoding="utf-8")
             write_text(sync / "speckit_prework_package.md", "package")
-            self.assertFalse(self.mod.has_first_run_artifacts(Path(tmp)))
+            self.assertTrue(self.mod.has_first_run_artifacts(Path(tmp)))
 
     def test_all_present_and_valid_returns_true(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -135,11 +184,18 @@ class TestHasFirstRunArtifacts(unittest.TestCase):
             write_text(sync / "speckit_prework_package.md", "package")
             self.assertTrue(self.mod.has_first_run_artifacts(Path(tmp)))
 
-    def test_only_one_of_four_files_returns_false(self):
+    def test_single_artifact_is_detected(self):
+        # Even one known first-run file is enough to identify the workspace.
         with tempfile.TemporaryDirectory() as tmp:
             sync = self._sync(tmp)
             write_json(sync / "spec_build_plan.json", {"ok": True})
-            # other 3 missing
+            # other 3 not yet written
+            self.assertTrue(self.mod.has_first_run_artifacts(Path(tmp)))
+
+    def test_no_artifacts_returns_false(self):
+        # Empty sync dir: not a first-run workspace at all.
+        with tempfile.TemporaryDirectory() as tmp:
+            self._sync(tmp)  # creates dir, writes nothing
             self.assertFalse(self.mod.has_first_run_artifacts(Path(tmp)))
 
 

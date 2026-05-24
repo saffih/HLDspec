@@ -76,7 +76,34 @@ def split_candidates(section: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def build_list(workspace: Path) -> dict[str, Any]:
+def scan_existing_specs(source_project: Path) -> dict[str, Any]:
+    """Scan target project's specs/ directory for existing spec IDs and highest number."""
+    specs_dir = source_project / "specs"
+    if not specs_dir.is_dir():
+        return {"found": False, "specs_dir": str(specs_dir), "existing_ids": [], "highest_number": 0, "conflicts": []}
+
+    existing: list[dict[str, Any]] = []
+    for entry in sorted(specs_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        # Match NNN-slug format
+        m = re.match(r"^(\d+)-(.+)$", name)
+        if m:
+            existing.append({"spec_id": name, "number": int(m.group(1)), "slug": m.group(2)})
+
+    highest = max((s["number"] for s in existing), default=0)
+    return {
+        "found": True,
+        "specs_dir": str(specs_dir),
+        "existing_ids": [s["spec_id"] for s in existing],
+        "existing_count": len(existing),
+        "highest_number": highest,
+        "conflicts": [],  # filled in after numbering
+    }
+
+
+def build_list(workspace: Path, source_project: Path | None = None) -> dict[str, Any]:
     sync = sync_dir(workspace)
     analysis = load_json(sync / "hldspec_architecture_analysis.json")
     specs: list[dict[str, Any]] = []
@@ -99,12 +126,28 @@ def build_list(workspace: Path) -> dict[str, Any]:
             )
 
     specs.sort(key=lambda item: (ORDER.get(str(item.get("layer")), 9), str(item.get("title"))))
+
+    # Scan existing project specs to avoid ID conflicts
+    existing_scan: dict[str, Any] = {"found": False, "existing_ids": [], "highest_number": 0, "conflicts": []}
+    if source_project:
+        existing_scan = scan_existing_specs(source_project)
+
+    start_idx = existing_scan["highest_number"] + 1 if existing_scan.get("highest_number", 0) > 0 else 1
+    existing_ids_set = set(existing_scan.get("existing_ids", []))
+
     numbered: list[dict[str, Any]] = []
-    for idx, spec in enumerate(specs, start=1):
+    conflicts: list[dict[str, Any]] = []
+    for offset, spec in enumerate(specs):
+        idx = start_idx + offset
         layer = str(spec.get("layer", "unknown"))
+        spec_id = f"{idx:03d}-{slugify(str(spec.get('title')))}"
+        # Check for numeric collision even if slug differs
+        conflict_ids = [eid for eid in existing_ids_set if eid.startswith(f"{idx:03d}-")]
+        if conflict_ids:
+            conflicts.append({"planned_id": spec_id, "conflicts_with": conflict_ids})
         numbered.append(
             {
-                "spec_id": f"{idx:03d}-{slugify(str(spec.get('title')))}",
+                "spec_id": spec_id,
                 "title": spec.get("title"),
                 "layer": layer,
                 "source_hld_ids": spec.get("source_hld_ids", []),
@@ -114,17 +157,25 @@ def build_list(workspace: Path) -> dict[str, Any]:
             }
         )
 
+    existing_scan["conflicts"] = conflicts
+    has_conflicts = bool(conflicts)
+
+    status = "NO_SPEC_CANDIDATES" if not numbered else ("ID_CONFLICT_REQUIRES_REVIEW" if has_conflicts else "SPEC_LIST_READY_FOR_REVIEW")
+
     return {
         "schema_version": 1,
         "workspace": str(workspace),
-        "status": "SPEC_LIST_READY_FOR_REVIEW" if numbered else "NO_SPEC_CANDIDATES",
+        "source_project": str(source_project) if source_project else None,
+        "status": status,
         "ordering_rule": "bottom-up: governance, foundation/data/tool, logic/orchestration, API, UI, operations/testing",
         "spec_count": len(numbered),
+        "existing_specs_scan": existing_scan,
         "specs": numbered,
     }
 
 
 def render_md(data: dict[str, Any]) -> str:
+    scan = data.get("existing_specs_scan") or {}
     lines = [
         "# HLDspec SpecKit Spec List",
         "",
@@ -133,6 +184,28 @@ def render_md(data: dict[str, Any]) -> str:
         f"Status: `{data.get('status')}`",
         f"Spec count: {data.get('spec_count')}",
         "",
+    ]
+    if data.get("source_project"):
+        lines += [f"Source project: `{data['source_project']}`", ""]
+    if scan.get("found"):
+        lines += [
+            "## Existing specs scan",
+            "",
+            f"- scanned: `{scan.get('specs_dir')}`",
+            f"- existing count: {scan.get('existing_count', 0)}",
+            f"- highest existing number: {scan.get('highest_number', 0)}",
+            f"- new specs start at: `{scan.get('highest_number', 0) + 1:03d}-...`",
+            "",
+        ]
+        if scan.get("conflicts"):
+            lines += ["### ⚠ ID conflicts — RESOLVE before approval", ""]
+            for c in scan["conflicts"]:
+                lines.append(f"- planned `{c['planned_id']}` conflicts with existing: {', '.join(c['conflicts_with'])}")
+            lines.append("")
+    elif data.get("source_project"):
+        lines += [f"- No existing specs found at `{scan.get('specs_dir')}` — numbering starts at 001", ""]
+
+    lines += [
         "Ordering rule:",
         "",
         data.get("ordering_rule", ""),
@@ -160,11 +233,13 @@ def render_md(data: dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build dependency-aware SpecKit spec list from HLDspec architecture analysis.")
     parser.add_argument("workspace")
+    parser.add_argument("--source-project", help="Path to target project root (scans its specs/ for existing IDs to avoid conflicts)")
     args = parser.parse_args()
 
     workspace = Path(args.workspace).expanduser().resolve()
+    source_project = Path(args.source_project).expanduser().resolve() if args.source_project else None
     sync = sync_dir(workspace)
-    data = build_list(workspace)
+    data = build_list(workspace, source_project)
     json_path = sync / "hldspec_speckit_spec_list.json"
     md_path = sync / "hldspec_speckit_spec_list.md"
     write_json(json_path, data)
@@ -175,6 +250,9 @@ def main() -> int:
     print(f"- report: {md_path}")
     print(f"- status: {data['status']}")
     print(f"- spec count: {data['spec_count']}")
+    conflicts = (data.get("existing_specs_scan") or {}).get("conflicts", [])
+    if conflicts:
+        print(f"- WARNING: {len(conflicts)} ID conflict(s) with existing project specs — resolve before approval")
     return 0
 
 
