@@ -62,3 +62,8 @@ fi
 run_python "$ROOT/scripts/build_speckit_constitution_context.py" "$WORKSPACE"
 run_python "$ROOT/scripts/build_hldspec_speckit_spec_list.py" "$WORKSPACE"
 run_python "$ROOT/scripts/run_hldspec_speckit_readiness.py" "$WORKSPACE"
+
+# Install orchestrator instruction files (idempotent — skips existing non-stub files)
+echo ""
+echo "Installing orchestrator instructions..."
+bash "$ROOT/scripts/install_orchestrator_instructions.sh" --workspace "$WORKSPACE"
