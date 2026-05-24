@@ -1,7 +1,5 @@
 # SpecKit Proxy Protocol
 
-made by AI
-
 This protocol defines how HLDspec should use SpecKit through a bounded subagent.
 
 HLDspec does not replace SpecKit. HLDspec prepares the data, constitution context, architecture constraints, dependency order, and evidence. A SpecKit proxy subagent then engages with SpecKit as a prepared client.
@@ -20,6 +18,7 @@ HLDspec does not replace SpecKit. HLDspec prepares the data, constitution contex
 The proxy must follow the SpecKit sequence:
 
 ```text
+constitution if missing or update required
 1. constitution, if the constitution is missing or needs update
 2. specify
 3. clarify, when SpecKit produces clarification questions
@@ -241,4 +240,3 @@ docs/CONTEXT_TAILORING_PROTOCOL.md
 ```
 
 Use the weakest sufficient agent, the smallest sufficient context, and the strictest sufficient prompt. If a subtask can be done by a deterministic tool, script, grep, or lower-cost bounded agent, do not spend high-reasoning budget on it.
-

@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_JSON = ROOT / "docs" / "skeptic_framework_cache.json"
 CACHE_MD = ROOT / "docs" / "skeptic_framework_cache.md"
+QUESTION_BANK_MARKER = "skeptic-questions"
 
 
 def main() -> int:
@@ -31,6 +32,7 @@ def main() -> int:
     print(f"- json: {json_out}")
     print(f"- report: {md_out}")
     print(f"- source: {cache['authoritative_source']['repository']}/{cache['authoritative_source']['path']}")
+    print(f"- question bank: {QUESTION_BANK_MARKER}.md")
     print(f"- flow: {cache['phase_flow_text']}")
     return 0
 

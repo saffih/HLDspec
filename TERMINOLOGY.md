@@ -1,7 +1,5 @@
 # HLDspec Terminology
 
-made by AI
-
 Use these terms consistently in docs, prompts, reports, logs, code comments, and agent instructions.
 
 ## Source-of-truth terms
@@ -162,3 +160,33 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **Task Context Package** | The bounded package given to a delegated agent: task, level, personality, context, forbidden actions, output schema, stop condition, and escalation rule. |
 | **Nested Delegation** | A subagent delegating a narrower, lower-authority task to another subagent, then verifying the result. |
 
+## Model routing and agent assignment terms
+
+| Term | Meaning |
+|---|---|
+| **Model Routing Policy** | Judge-owned rule set that chooses the weakest sufficient model tier for creation work and the strongest necessary model tier for promotion gates. |
+| **Model Tier** | Abstract capability/cost class assigned to a task packet. HLDspec uses `MODEL_ROUTINE`, `MODEL_STRONG`, and `MODEL_CRITICAL` rather than vendor-specific model names. |
+| **MODEL_ROUTINE** | Low-cost model tier for deterministic summaries, bounded extraction, checklist shaping, and evidence lookup with no decision authority. |
+| **MODEL_STRONG** | Strong model tier for product drafting, SpecKit `specify`, `tasks`, bounded implementation, and synthesis where mistakes are recoverable at the next gate. |
+| **MODEL_CRITICAL** | Strongest model tier for judge decisions, constitution, architecture/data/API planning, RunSkeptic/analyze, implementation with high blast radius, merge/history audit, and artifact promotion. |
+| **Assigned Agent Name** | Stable role label recorded in task packets so the judge can route work consistently without relying on prose memory. |
+| **Promotion Model Rule** | Rule that cheap agents may propose artifacts, but only a `MODEL_CRITICAL` judge/reviewer may promote artifacts across gates. |
+| **SpecKit Phase Agent** | Named bounded agent assigned to exactly one SpecKit phase of one feature, with a model tier, allowed files, stop boundary, and output schema. |
+| **Human Decision Owner** | The human who owns product, architecture, source-of-truth, split/merge, dependency, constitution, and implementation-approval decisions that evidence cannot safely answer. |
+
+## Standard assigned agent names
+
+| Assigned Agent Name | Default Model Tier | Responsibility |
+|---|---|---|
+| **HLDspec Judge Orchestrator** | `MODEL_CRITICAL` | Owns state, gates, promotion, human checkpoints, model routing, and final decisions. |
+| **Product Lead Reviewer** | `MODEL_STRONG` | Synthesizes use cases, user stories, acceptance criteria, product scope, and product open questions. |
+| **Architect Lead Reviewer** | `MODEL_CRITICAL` | Synthesizes API/data/source-of-truth boundaries, dependency order, constitution impact, and architecture open questions. |
+| **Junior Product Extractor** | `MODEL_ROUTINE` | Extracts bounded product evidence; cannot decide or promote. |
+| **Junior Architect Extractor** | `MODEL_ROUTINE` | Extracts bounded architecture evidence; cannot decide or promote. |
+| **SpecKit Specify Proxy** | `MODEL_STRONG` | Runs `specify` for one approved feature and stops after specification artifacts. |
+| **SpecKit Clarify Proxy** | `MODEL_STRONG` | Answers only evidence-backed clarification questions and escalates human-owned decisions. |
+| **SpecKit Plan Proxy** | `MODEL_CRITICAL` | Runs `plan` for one approved feature because plan owns architecture, data model, contracts, and implementation approach. |
+| **SpecKit Tasks Proxy** | `MODEL_STRONG` | Runs `tasks` for one approved feature and stops before implementation. |
+| **SpecKit Analyze Reviewer** | `MODEL_CRITICAL` | Runs read-only consistency/adversarial review before implementation. |
+| **SpecKit Implementer** | `MODEL_STRONG` or `MODEL_CRITICAL` | Implements approved tasks; use `MODEL_CRITICAL` for cross-cutting, security, data, or architecture changes. |
+| **Merge History Auditor** | `MODEL_CRITICAL` | Verifies normal merge evidence and classifies specs as `MERGED_DONE` history. |

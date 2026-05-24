@@ -29,13 +29,28 @@ Then follow the generated context exactly.
 
 - Do not search the web for this workflow.
 - Do not search unrelated memory/docs before reading the generated context.
+- Canonical flow reference: `docs/CANONICAL_FLOW.md`.
 - Treat the source HLD as read-only.
 - Work only on workspace copies.
+- HLDspec must use SpecKit instead of reimplementing SpecKit.
 - Invoke SpecKit only via the proxy script after SPECKIT_PREWORK_APPROVAL_GATE is passed and prework is APPROVED.
 - Do not create final specs manually.
 - Do not implement.
 - Do not answer human checkpoint questions silently.
 - Do not promote artifacts without judge approval.
+
+SpecKit owns:
+- `.specify/memory/constitution.md` updates after approval
+- `spec.md` and `checklists/requirements.md`
+- `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, and `tasks.md`
+- implementation after explicit approval
+
+Judge-led review protocol: `docs/JUDGE_LED_REVIEW_PROTOCOL.md`.
+
+RunSkeptic source:
+- authoritative file: `saffih/skeptic/skeptic.md`
+- companion question bank: `skeptic-questions.md`
+- required flow: `GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN`
 
 ## Stage rule
 
@@ -113,15 +128,22 @@ This renders `templates/orchestrator/` templates with the correct workspace and 
 
 After `SPECKIT_PREWORK_APPROVAL_GATE` is approved, the orchestrator delegates each spec/phase to a junior agent:
 
-| Phase | Preferred junior | Output file |
-|---|---|---|
-| specify | Claude subagent or `codex exec` | `spec.md` + `checklists/requirements.md` |
-| plan | `codex exec` | `plan.md` |
-| tasks | `codex exec` | `tasks.md` |
-| analyze | `codex exec` | analysis output |
-| implement | `codex exec` or Devin | source code (only after tasks phase) |
+| Phase | Assigned agent name | Model tier | Preferred junior | Output file |
+|---|---|---|---|---|
+| specify | SpecKit Specify Proxy | `MODEL_STRONG` | Claude subagent or `codex exec` | `spec.md` + `checklists/requirements.md` |
+| clarify | SpecKit Clarify Proxy | `MODEL_STRONG` | Claude subagent or `codex exec` | clarified `spec.md` / answers log |
+| plan | SpecKit Plan Proxy | `MODEL_CRITICAL` | `codex exec` | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` |
+| tasks | SpecKit Tasks Proxy | `MODEL_STRONG` | `codex exec` | `tasks.md` |
+| analyze | SpecKit Analyze Reviewer | `MODEL_CRITICAL` | `codex exec` | analysis output |
+| implement | SpecKit Implementer | `MODEL_STRONG` or `MODEL_CRITICAL` by blast radius | `codex exec` or Devin | source code (only after tasks phase and approval) |
+| merge/history audit | Merge History Auditor | `MODEL_CRITICAL` | judge/orchestrator | `MERGED_DONE` classification |
 
-Always complete specify → plan → tasks before implement. The orchestrator reviews each phase output before starting the next.
+Always complete specify → clarify when needed → plan → tasks → analyze before implement. The orchestrator reviews each phase output before starting the next.
+
+Model routing rule:
+- Weakest sufficient model creates draft artifacts.
+- Strongest necessary model promotes artifacts across gates.
+- Human-owned architecture, source-of-truth, API, security, data ownership, dependency, split/merge, implementation, and merge/history decisions require `MODEL_CRITICAL` judge review or explicit human approval.
 
 ### Codex junior invocation
 

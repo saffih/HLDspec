@@ -1,7 +1,5 @@
 # HLDspec Orchestration Contract
 
-made by AI
-
 ## Purpose
 
 HLDspec is a judge-led orchestration product. Agents and role-specific tools may propose artifacts, but only the judge can promote an artifact into a controlling artifact for the next phase.
@@ -65,6 +63,42 @@ Before triggering any agent, choose the cheapest sufficient method:
 ```
 
 Junior tasks must use one task, one role, one artifact type, smallest relevant context, strict output schema, and no approval authority.
+
+## Model routing policy
+
+The judge owns model routing. Use abstract model tiers in artifacts and prompts; map those tiers to concrete provider models at runtime.
+
+```text
+MODEL_ROUTINE  -> bounded extraction, summaries, checklist shaping, evidence lookup
+MODEL_STRONG   -> product drafting, specify, tasks, recoverable implementation work
+MODEL_CRITICAL -> judge decisions, constitution, plan, analyze, high-blast-radius implementation, merge/history audit
+```
+
+Core rule:
+
+```text
+Weakest sufficient model creates.
+Strongest necessary model promotes.
+```
+
+Standard assigned agents:
+
+| Assigned agent | Model tier | Authority |
+|---|---|---|
+| HLDspec Judge Orchestrator | `MODEL_CRITICAL` | controls state, gates, promotion, model routing |
+| Product Lead Reviewer | `MODEL_STRONG` | product synthesis only |
+| Architect Lead Reviewer | `MODEL_CRITICAL` | architecture/data/API/dependency synthesis only |
+| Junior Product Extractor | `MODEL_ROUTINE` | evidence extraction only |
+| Junior Architect Extractor | `MODEL_ROUTINE` | evidence extraction only |
+| SpecKit Specify Proxy | `MODEL_STRONG` | one feature, specify phase only |
+| SpecKit Clarify Proxy | `MODEL_STRONG` | evidence-backed clarification only; escalates human-owned decisions |
+| SpecKit Plan Proxy | `MODEL_CRITICAL` | one feature, plan phase only |
+| SpecKit Tasks Proxy | `MODEL_STRONG` | one feature, tasks phase only |
+| SpecKit Analyze Reviewer | `MODEL_CRITICAL` | read-only consistency review |
+| SpecKit Implementer | `MODEL_STRONG` or `MODEL_CRITICAL` | approved implementation only |
+| Merge History Auditor | `MODEL_CRITICAL` | normal-merge evidence and `MERGED_DONE` classification |
+
+Human-owned decisions are never delegated to `MODEL_ROUTINE`. Architecture, source-of-truth, API, security, data ownership, dependency order, split/merge, implementation approval, and merge/history classification require `MODEL_CRITICAL` review or explicit human approval.
 
 ## Promotion lifecycle
 
