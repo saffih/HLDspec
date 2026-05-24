@@ -130,7 +130,7 @@ def build_pack(workspace: Path) -> dict[str, Any]:
 
 
 def render_questions_md(title: str, questions: list[dict[str, Any]]) -> str:
-    lines = [f"# {title}", "", "made by AI", ""]
+    lines = [f"# {title}", "", "", ""]
     if not questions:
         lines.append("No open questions.")
         return "\n".join(lines) + "\n"
@@ -152,7 +152,7 @@ def render_md(pack: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Answer Pack",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{pack.get('status')}`",
         "",

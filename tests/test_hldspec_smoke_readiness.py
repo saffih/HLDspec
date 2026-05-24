@@ -46,7 +46,7 @@ class HldspecSmokeReadinessTest(unittest.TestCase):
                 if path.suffix == ".json":
                     path.write_text(json.dumps({}), encoding="utf-8")
                 else:
-                    path.write_text("made by AI\n", encoding="utf-8")
+                    path.write_text("\n", encoding="utf-8")
 
             (sync / "hldspec_state.json").write_text(
                 json.dumps({"current_stage": "SPECKIT_PREWORK_APPROVAL_GATE", "current_checkpoint": "human_approves_speckit_prework"}),

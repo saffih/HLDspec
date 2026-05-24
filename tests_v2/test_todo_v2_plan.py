@@ -13,7 +13,6 @@ class TodoV2PlanTests(unittest.TestCase):
 
         required = [
             "HLDspec V2 TODO",
-            "made by AI",
             "ProjectMachine",
             "RawHldConversionMachine",
             "ApplyHldConversionMachine",
@@ -27,6 +26,7 @@ class TodoV2PlanTests(unittest.TestCase):
 
         for item in required:
             self.assertIn(item, text)
+        self.assertNotIn("made by AI", text)
 
     def test_todo_v2_declares_next_leaps_and_stop_conditions(self) -> None:
         text = (ROOT / "docs" / "TODO_V2.md").read_text(encoding="utf-8")

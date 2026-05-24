@@ -103,7 +103,7 @@ def render_md(queue: dict[str, Any]) -> str:
     lines = [
         "# HLD Conversion Decision Queue",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{queue['status']}`",
         f"Checkpoint: `{queue['checkpoint']['checkpoint_id']}`",

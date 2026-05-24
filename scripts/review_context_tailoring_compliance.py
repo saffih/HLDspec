@@ -139,7 +139,7 @@ def render_md(review: dict[str, object]) -> str:
     lines = [
         "# Context Tailoring Compliance Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{review['status']}`",
         "",

@@ -139,7 +139,7 @@ def render_md(work_order: dict[str, Any]) -> str:
     lines = [
         "# Target Spec Work Order",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{work_order['status']}`",
         f"Allowed to write workspace specs: `{str(work_order['allowed_to_write_workspace_specs']).lower()}`",

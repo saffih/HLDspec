@@ -151,7 +151,7 @@ def render_md(pack: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Architect Pack",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{pack.get('status')}`",
         "",

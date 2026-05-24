@@ -289,7 +289,7 @@ class SpecBuildPlanMachine:
         lines = [
             "# Spec Build Plan Quality Debug",
             "",
-            "made by AI",
+            "",
             "",
             f"Green: `{str(quality.get('green')).lower()}`",
             f"Decision: `{quality.get('decision')}`",

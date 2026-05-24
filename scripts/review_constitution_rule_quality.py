@@ -228,7 +228,7 @@ def render_md(review: dict[str, Any]) -> str:
     lines = [
         "# Constitution Rule Quality Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{review['status']}`",
         f"Source: `{review['source_path']}`",

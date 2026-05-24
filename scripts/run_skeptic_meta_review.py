@@ -489,7 +489,7 @@ def render_md(cycles: list[Cycle], summary: dict[str, object]) -> str:
     lines = [
         "# HLDspec RunSkeptic Meta Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{summary['status']}`",
         f"Total cycles: {summary['total_cycles']}",

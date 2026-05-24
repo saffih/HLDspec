@@ -84,7 +84,7 @@ def render_summary_md(summary: dict[str, Any], rendered_result: str) -> str:
     lines = [
         "# HLDspec V2 Flow Test Summary",
         "",
-        "made by AI",
+        "",
         "",
         f"Flow test status: `{summary['flow_test_status']}`",
         f"Machine: `{summary['machine']}`",

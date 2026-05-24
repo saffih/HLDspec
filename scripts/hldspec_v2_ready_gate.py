@@ -92,7 +92,7 @@ def main() -> int:
     (out / "hldspec_v2_ready_gate.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (out / "hldspec_v2_ready_gate.md").write_text(
         "# HLDspec V2 Ready Gate\n\n"
-        "made by AI\n\n"
+        "\n\n"
         f"Status: `{status}`\n\n"
         "This gate runs only V2 tests under `tests_v2/`.\n"
         "Legacy tests are preserved under `tests_legacy/` and are not active in this gate.\n",

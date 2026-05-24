@@ -164,7 +164,7 @@ def render_report(data: dict[str, object]) -> str:
     lines = [
         "# HLDspec Ready Gate Report",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data['status']}`",
         "",

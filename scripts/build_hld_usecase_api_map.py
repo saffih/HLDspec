@@ -434,7 +434,7 @@ def render_md(data: dict[str, Any]) -> str:
     lines = [
         "# HLD Use-case and API Map",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data.get('status')}`",
         f"Source HLD: `{data.get('source_hld')}`",

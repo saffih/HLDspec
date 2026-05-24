@@ -192,7 +192,7 @@ def render_prompt(context: dict[str, Any]) -> str:
     lines = [
         "# HLDspec Orchestrator Agent Context",
         "",
-        "made by AI",
+        "",
         "",
         "This file is internal context for the HLDspec Orchestrator Agent.",
         "The human-facing prompt is intentionally minimal:",

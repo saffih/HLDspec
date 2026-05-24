@@ -212,7 +212,7 @@ def render_md(classification: dict[str, object]) -> str:
     lines = [
         "# HLD Section Classification",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{classification.get('status')}`",
         "",

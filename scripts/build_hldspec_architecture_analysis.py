@@ -231,7 +231,7 @@ def render_md(data: dict[str, Any]) -> str:
     lines = [
         "# HLDspec Architecture Analysis",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data.get('status')}`",
         f"Workspace: `{data.get('workspace')}`",

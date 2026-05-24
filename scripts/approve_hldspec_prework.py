@@ -114,7 +114,7 @@ def render_md(record: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Prework Approval",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{record.get('status', '')}`",
         f"Decision: `{record.get('decision', '')}`",

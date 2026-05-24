@@ -385,7 +385,7 @@ def render_manifest(data: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Input Manifest",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data['status']}`",
         f"Source plan: `{data['source_plan']}`",
@@ -425,7 +425,7 @@ def render_queue(data: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Invocation Queue",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data['status']}`",
         f"Execution mode: `{data['execution_mode']}`",
@@ -459,7 +459,7 @@ def render_constitution(data: dict[str, Any]) -> str:
     lines = [
         "# Constitution Update Plan",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data['status']}`",
         f"Target constitution path: `{data['target_constitution_path']}`",
@@ -493,7 +493,7 @@ def render_graph(data: dict[str, Any]) -> str:
     lines = [
         "# Feature Dependency Graph",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data['status']}`",
         "",

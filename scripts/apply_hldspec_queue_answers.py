@@ -177,7 +177,7 @@ def render_queue_md(queue: dict[str, Any], path: Path) -> str:
     lines = [
         f"# {title}",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{queue.get('status', '')}`",
         f"Checkpoint: `{checkpoint.get('checkpoint_id', '')}`",

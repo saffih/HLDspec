@@ -113,7 +113,7 @@ def build_review(plan: dict[str, Any], plan_path: Path) -> str:
     lines: list[str] = [
         "# Spec Build Plan Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Plan: `{plan_path}`",
         "",

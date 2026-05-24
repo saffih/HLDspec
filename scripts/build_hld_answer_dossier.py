@@ -609,33 +609,33 @@ def render_simple_table(headers: list[str], rows: list[list[Any]]) -> list[str]:
 
 
 def render_hotspots_md(data: dict[str, Any]) -> str:
-    lines = ["# HLD Grep Hotspots", "", "made by AI", ""]
+    lines = ["# HLD Grep Hotspots", "", "", ""]
     lines += render_simple_table(["area", "line", "terms"], [[h["area"], h["line"], ", ".join(h["matched_terms"])] for h in as_list(data.get("hotspots"))[:200]])
     return "\n".join(lines) + "\n"
 
 
 def render_vocabulary_md(data: dict[str, Any]) -> str:
-    lines = ["# HLD Project Vocabulary", "", "made by AI", ""]
+    lines = ["# HLD Project Vocabulary", "", "", ""]
     lines += render_simple_table(["term", "count"], [[t["term"], t["count"]] for t in as_list(data.get("terms"))[:200]])
     return "\n".join(lines) + "\n"
 
 
 def render_chunk_map_md(data: dict[str, Any]) -> str:
-    lines = ["# HLD Chunk Signal Map", "", "made by AI", ""]
+    lines = ["# HLD Chunk Signal Map", "", "", ""]
     rows = [[row.get("hld_id"), row.get("title"), row.get("architect_signal"), row.get("pm_signal")] for row in as_list(data.get("sections"))]
     lines += render_simple_table(["section", "title", "architect", "pm"], rows)
     return "\n".join(lines) + "\n"
 
 
 def render_contract_map_md(data: dict[str, Any]) -> str:
-    lines = ["# Interface Contract Map", "", "made by AI", ""]
+    lines = ["# Interface Contract Map", "", "", ""]
     rows = [[c.get("contract_name"), c.get("provider"), c.get("consumer"), ", ".join(as_list(c.get("source_hld_sections")))] for c in as_list(data.get("contracts"))]
     lines += render_simple_table(["contract", "provider", "consumer", "sources"], rows)
     return "\n".join(lines) + "\n"
 
 
 def render_product_pack_md(data: dict[str, Any]) -> str:
-    lines = ["# Product Answer Pack", "", "made by AI", ""]
+    lines = ["# Product Answer Pack", "", "", ""]
     rows = [[item.get("capability_id"), item.get("capability_name"), item.get("user_goal"), item.get("user_story")] for item in as_list(data.get("product_items"))]
     lines += render_simple_table(["id", "capability", "goal", "story"], rows)
     return "\n".join(lines) + "\n"
@@ -646,7 +646,7 @@ def render_architecture_pack_md(data: dict[str, Any]) -> str:
     return "\n".join([
         "# Architecture Answer Pack",
         "",
-        "made by AI",
+        "",
         "",
         f"- contracts: `{summary.get('contract_count', 0)}`",
         f"- data objects: `{summary.get('data_object_count', 0)}`",
@@ -658,7 +658,7 @@ def render_architecture_pack_md(data: dict[str, Any]) -> str:
 
 
 def render_dossier_md(data: dict[str, Any]) -> str:
-    lines = ["# SpecKit Answer Dossier", "", "made by AI", "", data.get("purpose", ""), ""]
+    lines = ["# SpecKit Answer Dossier", "", "", "", data.get("purpose", ""), ""]
     summary = data.get("summary", {})
     lines += [
         "## Summary",
@@ -689,7 +689,7 @@ def render_dossier_md(data: dict[str, Any]) -> str:
 
 
 def render_quality_md(data: dict[str, Any]) -> str:
-    lines = ["# HLD Answer Dossier Quality Review", "", "made by AI", "", f"Status: `{data.get('status')}`", ""]
+    lines = ["# HLD Answer Dossier Quality Review", "", "", "", f"Status: `{data.get('status')}`", ""]
     if not as_list(data.get("findings")):
         lines.append("No findings.")
     for f in as_list(data.get("findings")):
@@ -750,10 +750,10 @@ def build(workspace: Path) -> dict[str, Any]:
     write_md_json(sync, "project_vocabulary", vocabulary, render_vocabulary_md(vocabulary))
     write_md_json(sync, "chunk_signal_map", chunk_map, render_chunk_map_md(chunk_map))
     write_md_json(sync, "interface_contract_map", interface_map, render_contract_map_md(interface_map))
-    write_md_json(sync, "data_ownership_map", data_map, "# Data Ownership Map\n\nmade by AI\n\nSee JSON for structured data ownership details.\n")
-    write_md_json(sync, "integration_map", integration_map, "# Integration Map\n\nmade by AI\n\nSee JSON for structured integration details.\n")
-    write_md_json(sync, "dependency_reason_map", dependency_map, "# Dependency Reason Map\n\nmade by AI\n\nSee JSON for structured dependency reasons.\n")
-    write_md_json(sync, "open_questions_tbd_map", open_questions, "# Open Questions and TBD Map\n\nmade by AI\n\nSee JSON for structured open questions and TBDs.\n")
+    write_md_json(sync, "data_ownership_map", data_map, "# Data Ownership Map\n\n\n\nSee JSON for structured data ownership details.\n")
+    write_md_json(sync, "integration_map", integration_map, "# Integration Map\n\n\n\nSee JSON for structured integration details.\n")
+    write_md_json(sync, "dependency_reason_map", dependency_map, "# Dependency Reason Map\n\n\n\nSee JSON for structured dependency reasons.\n")
+    write_md_json(sync, "open_questions_tbd_map", open_questions, "# Open Questions and TBD Map\n\n\n\nSee JSON for structured open questions and TBDs.\n")
     write_md_json(sync, "architecture_answer_pack", architecture_pack, render_architecture_pack_md(architecture_pack))
     write_md_json(sync, "product_answer_pack", product_pack, render_product_pack_md(product_pack))
     write_md_json(sync, "speckit_answer_dossier", dossier, render_dossier_md(dossier))

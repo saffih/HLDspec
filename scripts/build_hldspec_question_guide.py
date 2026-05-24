@@ -272,7 +272,7 @@ def render_md(guide: dict[str, Any]) -> str:
     lines = [
         "# HLDspec Checkpoint Question Guide",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{guide.get('status')}`",
         f"Current stage: `{guide.get('current_stage', '')}`",

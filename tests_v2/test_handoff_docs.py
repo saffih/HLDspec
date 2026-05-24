@@ -78,7 +78,7 @@ class HandoffDocsTests(unittest.TestCase):
         product_text = product.read_text(encoding="utf-8")
 
         self.assertIn("# Architecture Handoff", architecture_text)
-        self.assertIn("made by AI", architecture_text)
+        self.assertNotIn("made by AI", architecture_text)
         self.assertIn("Flow Core Database API", architecture_text)
         self.assertIn("Intentional API boundary.", architecture_text)
 

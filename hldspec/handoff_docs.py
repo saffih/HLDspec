@@ -90,7 +90,7 @@ def build_architecture_handoff(sync: Path) -> str:
     lines: list[str] = [
         "# Architecture Handoff",
         "",
-        "made by AI",
+        "",
         "",
         "## Purpose",
         "",
@@ -158,7 +158,7 @@ def build_product_handoff(sync: Path) -> str:
     lines: list[str] = [
         "# Product Handoff",
         "",
-        "made by AI",
+        "",
         "",
         "## Purpose",
         "",

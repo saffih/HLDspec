@@ -197,7 +197,7 @@ class ApplyHldConversionMachine:
 
         md_path.write_text(
             "# Apply HLD Conversion Command\n\n"
-            "made by AI\n\n"
+            "\n\n"
             f"Return code: `{result.returncode}`\n\n"
             "## Command\n\n"
             "```text\n"

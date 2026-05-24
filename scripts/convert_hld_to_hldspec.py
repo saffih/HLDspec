@@ -142,10 +142,6 @@ def convert_raw_hld(raw_text: str, split_sections: set[str]) -> tuple[str, list[
     first_top = sections[0][0]
     out.extend(lines[:first_top])
 
-    if "made by AI" not in "\n".join(out[:20]):
-        insert_at = 1 if out else 0
-        out[insert_at:insert_at] = ["", "<!-- made by AI -->", ""]
-
     converted = []
     counter = 1
 
@@ -226,7 +222,7 @@ def render_index(sections: list[ConvertedSection]) -> str:
     lines = [
         "# HLDspec Conversion Index",
         "",
-        "made by AI",
+        "",
         "",
         f"Converted sections: {len(sections)}",
         "",

@@ -411,7 +411,7 @@ def render_md(plan: dict[str, Any]) -> str:
     lines = [
         "# Raw HLD Marking Plan",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{plan['status']}`",
         "",
@@ -482,7 +482,7 @@ def render_md(plan: dict[str, Any]) -> str:
 def render_prompt(plan: dict[str, Any]) -> str:
     return (
         "# Raw HLD Marking Prompt\n\n"
-        "made by AI\n\n"
+        "\n\n"
         "Act as the HLDspec judge/orchestrator.\n\n"
         "Goal:\n"
         "Mark the raw HLD before conversion using bounded product and architecture perspectives.\n\n"

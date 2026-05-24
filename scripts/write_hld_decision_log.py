@@ -69,7 +69,7 @@ def render_markdown(log: dict[str, Any]) -> str:
     lines: list[str] = [
         "# HLDspec Decision Log",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{log['status']}`",
         f"Source HLD: `{log.get('source_hld') or ''}`",

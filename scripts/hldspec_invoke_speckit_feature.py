@@ -73,7 +73,7 @@ def render_prompt(
     lines = [
         "# SpecKit Proxy Agent Prompt",
         "",
-        "made by AI",
+        "",
         "",
         f"Feature: `{fid}` — {fname}",
         f"Source HLD sections: {source_sections}",

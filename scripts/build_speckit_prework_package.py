@@ -124,7 +124,7 @@ def render_md(pkg: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Prework Package",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{pkg['status']}`",
         f"Purpose: {pkg['purpose']}",

@@ -119,7 +119,7 @@ def render_md(data: dict[str, Any]) -> str:
     lines = [
         "# SpecKit Constitution Context Pack",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{data.get('status')}`",
         "",

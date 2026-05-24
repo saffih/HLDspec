@@ -307,7 +307,7 @@ def render_plan_md(plan: dict[str, Any], plan_path: Path) -> str:
     lines: list[str] = [
         "# Spec Build Plan",
         "",
-        "made by AI",
+        "",
         "",
         f"Source HLD: `{plan.get('source_hld', '')}`",
         f"Plan JSON: `{plan_path}`",

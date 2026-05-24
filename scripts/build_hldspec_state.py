@@ -249,7 +249,7 @@ def render_md(state: dict[str, Any]) -> str:
     lines = [
         "# HLDspec State",
         "",
-        "made by AI",
+        "",
         "",
         f"Current stage: `{state['current_stage']}`",
         f"Last completed stage: `{state['last_completed_stage']}`",

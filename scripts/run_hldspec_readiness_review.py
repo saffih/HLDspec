@@ -196,7 +196,7 @@ def render_md(review: dict[str, Any]) -> str:
     lines = [
         "# HLDspec Readiness Review",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{review['status']}`",
         f"Workspace: `{review['workspace']}`",

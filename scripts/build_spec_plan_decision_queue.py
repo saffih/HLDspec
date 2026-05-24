@@ -143,7 +143,7 @@ def render_md(queue: dict[str, Any]) -> str:
     lines = [
         "# Spec Build Plan Decision Queue",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{queue['status']}`",
         "Checkpoint: `SPEC_BUILD_PLAN_DECISIONS`",

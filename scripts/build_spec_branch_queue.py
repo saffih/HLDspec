@@ -89,7 +89,7 @@ def render_md(queue: dict[str, Any]) -> str:
     lines = [
         "# Spec Branch Queue",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{queue['status']}`",
         f"Execution mode: `{queue['execution_mode']}`",

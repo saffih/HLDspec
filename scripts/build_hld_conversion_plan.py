@@ -230,7 +230,7 @@ def render_md(plan: dict[str, Any]) -> str:
     lines: list[str] = [
         "# HLD Conversion Plan",
         "",
-        "made by AI",
+        "",
         "",
         f"Status: `{plan['status']}`",
         f"Candidate sections: {plan['candidate_count']}",
