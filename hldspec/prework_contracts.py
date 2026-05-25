@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -137,3 +138,27 @@ def shallow_dossier_fields(dossier: dict[str, Any]) -> list[str]:
         if not dossier.get(key):
             missing.append(key)
     return missing
+
+
+def stale_prework_artifacts(sync: Path) -> list[str]:
+    """Return blockers if prework artifacts are stale relative to spec_build_plan.json."""
+    plan = sync / "spec_build_plan.json"
+    if not plan.exists():
+        return []
+
+    plan_mtime = plan.stat().st_mtime
+    blockers: list[str] = []
+
+    prework = sync / "speckit_prework_package.md"
+    if prework.exists() and plan_mtime > prework.stat().st_mtime:
+        blockers.append(
+            "speckit_prework_package.md is stale: spec_build_plan.json was modified after prework was built"
+        )
+
+    queue = sync / "speckit_invocation_queue.json"
+    if queue.exists() and plan_mtime > queue.stat().st_mtime:
+        blockers.append(
+            "speckit_invocation_queue.json is stale: spec_build_plan.json was modified after queue was built"
+        )
+
+    return blockers
