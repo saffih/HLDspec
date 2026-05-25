@@ -4,23 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass, asdict
+import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable
 
-
-@dataclass
-class Cycle:
-    cycle_id: str
-    area: str
-    aspect: str
-    spotlight: str
-    decision: str
-    severity: str
-    finding: str
-    evidence: list[str]
-    recommendation: str
-    affected_artifacts: list[str]
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from hldspec.skeptic_schema import SkepticFinding as Cycle  # noqa: E402
 
 
 def read(path: Path) -> str:

@@ -3,24 +3,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from hldspec.skeptic_schema import (  # noqa: E402
+    FIELD_ALIASES,
+    REQUIRED_FINDING_FIELDS,
+    has_key,
+    is_empty_value,
+    normalize_text,
+    unresolved_unknowns,
+    value_for,
+)
 
 STATUS_PASS = "PASS"
 STATUS_PENDING = "PENDING_HUMAN_REVIEW"
 STATUS_REWORK = "REWORK_REQUIRED"
-
-
-FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    "observed_evidence": ("observed_evidence", "evidence", "evidence_checked"),
-    "evidence_level": ("evidence_level", "evidence_levels"),
-    "confidence": ("confidence", "confidence_level"),
-    "unknowns": ("unknowns", "open_questions"),
-    "verification": ("verification", "verify", "verification_plan"),
-    "residual_risk": ("residual_risk", "remaining_risk", "risk_after_fix"),
-}
 
 
 RUNSKEPTIC_KEYS = {
@@ -48,48 +49,6 @@ class Finding:
 
 def as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
-
-
-def has_key(item: dict[str, Any], field: str) -> bool:
-    return any(key in item for key in FIELD_ALIASES[field])
-
-
-def value_for(item: dict[str, Any], field: str) -> Any:
-    for key in FIELD_ALIASES[field]:
-        if key in item:
-            return item[key]
-    return None
-
-
-def normalize_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value.strip()
-    if isinstance(value, list):
-        return ", ".join(normalize_text(item) for item in value if normalize_text(item))
-    if isinstance(value, dict):
-        return json.dumps(value, sort_keys=True)
-    return str(value).strip()
-
-
-def is_empty_value(value: Any) -> bool:
-    if value is None:
-        return True
-    if isinstance(value, str):
-        return not value.strip()
-    if isinstance(value, dict):
-        return len(value) == 0
-    if isinstance(value, list):
-        return len(value) == 0
-    return False
-
-
-def unresolved_unknowns(value: Any) -> bool:
-    text = normalize_text(value).lower()
-    if not text:
-        return False
-    return text not in {"none", "n/a", "na", "no", "not applicable", "resolved", "[]"}
 
 
 def looks_like_runskeptic_item(item: dict[str, Any]) -> bool:
@@ -136,7 +95,7 @@ def review_item(item: dict[str, Any], index: int) -> tuple[dict[str, Any], list[
             )
             continue
 
-        if field in {"observed_evidence", "evidence_level", "confidence", "verification", "residual_risk"}:
+        if field in REQUIRED_FINDING_FIELDS:
             if is_empty_value(value):
                 findings.append(
                     Finding(
@@ -212,7 +171,7 @@ def build_review(payload: dict[str, Any], *, source_path: str) -> dict[str, Any]
         "status": status,
         "source_path": source_path,
         "items_reviewed": len(items),
-        "required_fields": list(FIELD_ALIASES.keys()),
+        "required_fields": list(REQUIRED_FINDING_FIELDS),
         "items": reviewed_items,
         "findings": [asdict(finding) for finding in findings],
     }
