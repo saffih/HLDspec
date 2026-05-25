@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from hldspec.command_runner import CommandRunner
+from hldspec.handoff_docs import write_handoff_docs
 from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
 from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
@@ -31,6 +32,8 @@ class ProjectMachine:
 
         repo = Path(context.repo_root)
         workspace = Path(context.workspace)
+        if workspace.exists() and not workspace.is_dir():
+            return error_result(machine=self.name, state="WORKSPACE_NOT_A_DIRECTORY", message=f"workspace must be a directory, got a file: {context.workspace}")
         working_hld = workspace / "HLD.md"
 
         if not working_hld.exists():
@@ -60,6 +63,9 @@ class ProjectMachine:
         prework_result = self.prework.run(context)
         if prework_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
             return self._wrap(prework_result)
+
+        sync = workspace / "firstrun" / ".specify" / "sync"
+        write_handoff_docs(sync)
 
         approval_result = self.approval.run(context)
         return self._wrap(approval_result)
