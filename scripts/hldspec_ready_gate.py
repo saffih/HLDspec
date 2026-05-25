@@ -46,17 +46,21 @@ REQUIRED_FILES = [
     "docs/CANONICAL_FLOW.md",
     "docs/CONTEXT_TAILORING_PROTOCOL.md",
     "docs/SPECKIT_PROXY_PROTOCOL.md",
-    "docs/skeptic_framework_cache.json",
 ]
 
 REQUIRED_TEST_MODULES = [
-    "tests.test_raw_hld_marking_plan",
-    "tests.test_spec_build_plan_quality_gate_fixtures",
-    "tests.test_context_tailoring_protocol",
-    "tests.test_context_tailoring_compliance_review",
-    "tests.test_speckit_prework_plan",
-    "tests.test_speckit_proxy_protocol",
+    "tests.test_skeptic_contract",
+    "tests.test_skeptic_orch",
+    "tests.test_hldspec_speckit_ready",
+    "tests_v2.test_raw_hld_conversion_machine",
+    "tests_v2.test_spec_build_plan_quality_gate",
+    "tests_v2.test_speckit_execution_machine",
+    "tests_v2.test_artifact_contracts",
+    "tests_v2.test_gates",
+    "tests_v2.test_cli_ux_contract",
 ]
+
+FULL_DISCOVERY_DIRS = ["tests", "tests_v2"]
 
 
 def tail(text: str, max_chars: int = 4000) -> str:
@@ -221,7 +225,7 @@ def render_report(data: dict[str, object]) -> str:
         "- raw-HLD marking test passes",
         "- product-readiness plan-quality fixtures pass",
         "- SpecKit prework/proxy tests pass",
-        "- full unittest discovery passes",
+        "- full unittest discovery passes for `tests/` and `tests_v2/`",
         "- optional Flow dry checkpoint passes when `--flow-hld` is provided",
         "- no paid agent, SpecKit, implementation, or final spec generation was invoked by this gate",
         "",
@@ -286,7 +290,14 @@ def main() -> int:
         checks.append(run_check(repo, f"narrow_test:{module}", [*py, "-m", "unittest", module, "-v"]))
 
     if not args.structure_only:
-        checks.append(run_check(repo, "full_unittest_discovery", [*py, "-m", "unittest", "discover", "-s", "tests", "-v"]))
+        for test_dir in FULL_DISCOVERY_DIRS:
+            checks.append(
+                run_check(
+                    repo,
+                    f"full_unittest_discovery:{test_dir}",
+                    [*py, "-m", "unittest", "discover", "-s", test_dir, "-v"],
+                )
+            )
 
     context_review = repo / "scripts" / "review_context_tailoring_compliance.py"
     if context_review.exists() and not args.structure_only:
