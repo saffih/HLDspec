@@ -67,7 +67,8 @@ class SpeckitPreworkMachine:
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
             )
 
-        stale = stale_registered_artifacts(sync)
+        workspace_root = Path(context.workspace)
+        stale = stale_registered_artifacts(sync, workspace=workspace_root)
         if stale:
             return blocked_result(
                 machine=self.name,
