@@ -86,7 +86,9 @@ class HandoffDocsTests(unittest.TestCase):
         self.assertIn("Product correctness guard", product_text)
         self.assertIn("Flow Core Database API", product_text)
 
-    def test_speckit_prework_machine_generates_handoff_docs_before_approval(self) -> None:
+    def test_speckit_prework_machine_does_not_generate_handoff_docs(self) -> None:
+        # write_handoff_docs() was moved to ProjectMachine (orchestration layer).
+        # SpeckitPreworkMachine is a gate only — it must not write handoff docs.
         sync = self.make_sync()
         workspace = sync.parents[2]
 
@@ -96,11 +98,11 @@ class HandoffDocsTests(unittest.TestCase):
 
         self.assertEqual(MachineStatus.CONTINUE, result.status)
         self.assertEqual("SPECKIT_PREWORK_READY_FOR_APPROVAL", result.state)
-        self.assertTrue((sync / "architecture_handoff.md").exists())
-        self.assertTrue((sync / "product_handoff.md").exists())
+        self.assertFalse((sync / "architecture_handoff.md").exists())
+        self.assertFalse((sync / "product_handoff.md").exists())
         roles = {artifact.role for artifact in result.artifacts_written}
-        self.assertIn("architecture_handoff", roles)
-        self.assertIn("product_handoff", roles)
+        self.assertNotIn("architecture_handoff", roles)
+        self.assertNotIn("product_handoff", roles)
 
 
 if __name__ == "__main__":

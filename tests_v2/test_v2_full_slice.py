@@ -49,7 +49,7 @@ class HldspecV2FullSliceTests(unittest.TestCase):
             "Continue to target-spec generation: `true`\n"
             "MD\n"
             "cat > \"$out/.specify/sync/spec_build_plan.json\" <<'JSON'\n"
-            "{\"plan_quality\":{\"decision\":\"FIX\",\"recommendation\":\"KEEP_PLAN\",\"conflicts\":[]},\"planned_specs\":[]}\n"
+            "{\"plan_quality\":{\"decision\":\"PASS\",\"recommendation\":\"KEEP_PLAN\",\"conflicts\":[]},\"planned_specs\":[]}\n"
             "JSON\n"
             "cat > \"$out/.specify/sync/speckit_prework_quality_review.json\" <<'JSON'\n"
             "{\"status\":\"PASS\",\"findings\":[]}\n"
