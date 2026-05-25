@@ -54,17 +54,19 @@ Use model tiers by task criticality. Concrete model mapping can be tuned at runt
 
 ```text
 MODEL_ROUTINE  -> deterministic extraction, inventories, code movement prep, scripted cleanup
+MODEL_DEFAULT  -> normal orchestration, repo inspection, focused implementation
 MODEL_STRONG   -> bounded module refactors, adapter extraction, tests for a single slice
 MODEL_CRITICAL -> architecture map, contract changes, role boundaries, promotion decisions, RunSkeptic verdicts
 ```
 
-Recommended concrete mapping:
+Concrete mappings are runner-specific. Use the same abstract tiers and gates
+whether the active runner is Codex, Claude, or Devin.
 
-```text
-MODEL_ROUTINE:  claude-haiku-4-5
-MODEL_STRONG:   claude-sonnet-4-6
-MODEL_CRITICAL: claude-opus-4-7
-```
+| Runner | `MODEL_ROUTINE` | `MODEL_DEFAULT` | `MODEL_STRONG` | `MODEL_CRITICAL` |
+|---|---|---|---|---|
+| Codex | `gpt-5.5 low` | `gpt-5.5 medium` | `gpt-5.5 high` | `gpt-5.5 xhigh` |
+| Claude | `Haiku 4.5` | `Sonnet 4.6` | `Sonnet 4.6` | `Opus 4.7` |
+| Devin | `SWE 1.6` | `SWE 1.6` under credit pressure; `codex 4.3 code` when available | `Sonnet 4.5` | `Opus 4.6` |
 
 Rule: weakest sufficient model creates; strongest necessary model promotes.
 

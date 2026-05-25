@@ -23,6 +23,23 @@ Read the full generated context before doing anything else.
 | `SPECKIT_READY` | Delegate each spec/phase to junior agents (see below) |
 | `COMPLETE` | Report all specs generated to user |
 
+## Model Routing
+
+Use abstract tiers in prompts and artifacts. For Claude, map them as:
+
+| Tier | Model | Use for |
+|---|---|---|
+| `MODEL_ROUTINE` | `Haiku 4.5` | bounded extraction, summaries, checklist shaping |
+| `MODEL_DEFAULT` | `Sonnet 4.6` | orchestration, repo inspection, focused implementation |
+| `MODEL_STRONG` | `Sonnet 4.6` | specify, tasks, bounded refactors, recoverable implementation |
+| `MODEL_CRITICAL` | `Opus 4.7` | architecture, constitution, plan, analyze, promotion gates |
+
+Weakest sufficient model creates. Strongest necessary model promotes.
+
+Human-owned architecture, source-of-truth, API, security, data ownership,
+dependency, split/merge, implementation, rollout, and merge/history decisions
+require `MODEL_CRITICAL` review or explicit human approval.
+
 ## Delegating SpecKit Phases (after SPECKIT_READY)
 
 Process specs in order from the spec build plan. For each spec, complete phases in sequence: **specify → plan → tasks → analyze**. Do not start the next phase until the previous one is reviewed.

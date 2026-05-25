@@ -145,6 +145,20 @@ Model routing rule:
 - Strongest necessary model promotes artifacts across gates.
 - Human-owned architecture, source-of-truth, API, security, data ownership, dependency, split/merge, implementation, and merge/history decisions require `MODEL_CRITICAL` judge review or explicit human approval.
 
+Concrete tier mapping is runner-specific. Preserve the same abstract tiers
+across Codex, Claude, and Devin so the workflow does not depend on one vendor:
+
+| Runner | `MODEL_ROUTINE` | `MODEL_DEFAULT` | `MODEL_STRONG` | `MODEL_CRITICAL` |
+|---|---|---|---|---|
+| Codex | `gpt-5.5 low` | `gpt-5.5 medium` | `gpt-5.5 high` | `gpt-5.5 xhigh` |
+| Claude | `Haiku 4.5` | `Sonnet 4.6` | `Sonnet 4.6` | `Opus 4.7` |
+| Devin | `SWE 1.6` | `SWE 1.6` under credit pressure; `codex 4.3 code` when available | `Sonnet 4.5` | `Opus 4.6` |
+
+Devin-specific credit rule: prefer complete run cards and few user turns.
+`SWE 1.6` may draft, edit, run tests, and perform a second mechanical review,
+but it must not approve architecture, constitution, source-of-truth, API, data
+ownership, dependency, security, rollout, split/merge, or promotion decisions.
+
 ### Codex junior invocation
 
 ```bash

@@ -70,6 +70,7 @@ The judge owns model routing. Use abstract model tiers in artifacts and prompts;
 
 ```text
 MODEL_ROUTINE  -> bounded extraction, summaries, checklist shaping, evidence lookup
+MODEL_DEFAULT  -> orchestration, routine repo execution, focused implementation
 MODEL_STRONG   -> product drafting, specify, tasks, recoverable implementation work
 MODEL_CRITICAL -> judge decisions, constitution, plan, analyze, high-blast-radius implementation, merge/history audit
 ```
@@ -80,6 +81,22 @@ Core rule:
 Weakest sufficient model creates.
 Strongest necessary model promotes.
 ```
+
+Concrete model mapping is runner-specific. If only one runner account has
+credits, that runner becomes the orchestrator and must still preserve the same
+abstract tiers, gates, stop rules, and promotion rules.
+
+| Runner | `MODEL_ROUTINE` | `MODEL_DEFAULT` | `MODEL_STRONG` | `MODEL_CRITICAL` |
+|---|---|---|---|---|
+| Codex | `gpt-5.5 low` | `gpt-5.5 medium` | `gpt-5.5 high` | `gpt-5.5 xhigh` |
+| Claude | `Haiku 4.5` | `Sonnet 4.6` | `Sonnet 4.6` | `Opus 4.7` |
+| Devin | `SWE 1.6` | `SWE 1.6` under credit pressure; `codex 4.3 code` when available | `Sonnet 4.5` | `Opus 4.6` |
+
+Devin is optimized for fewer user interaction turns. Prefer a complete run card
+with explicit files, commands, acceptance tests, and stop boundaries. `SWE 1.6`
+may draft, edit, run tests, and perform a second mechanical review, but it must
+not approve architecture, constitution, source-of-truth, API, data ownership,
+dependency, security, rollout, split/merge, or promotion decisions.
 
 Standard assigned agents:
 

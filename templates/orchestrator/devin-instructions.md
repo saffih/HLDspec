@@ -23,6 +23,26 @@ Read the full generated context before doing anything else.
 | `SPECKIT_READY` | Create bounded subtasks for each spec/phase (see below) |
 | `COMPLETE` | Report all specs generated to user |
 
+## Model Routing
+
+Use abstract tiers in prompts and artifacts. For Devin, map them as:
+
+| Tier | Model | Use for |
+|---|---|---|
+| `MODEL_ROUTINE` | `SWE 1.6` | bounded extraction, summaries, checklist shaping |
+| `MODEL_DEFAULT` | `SWE 1.6` under credit pressure; `codex 4.3 code` when available | orchestration, repo inspection, focused implementation |
+| `MODEL_STRONG` | `Sonnet 4.5` | specify, tasks, bounded refactors, recoverable implementation |
+| `MODEL_CRITICAL` | `Opus 4.6` | architecture, constitution, plan, analyze, promotion gates |
+
+Devin interaction turns are expensive. Prefer complete run cards, long bounded
+runs, and batched checkpoint reports instead of frequent user questions.
+
+`SWE 1.6` may draft, edit, run tests, and perform a second mechanical review,
+but it must not approve architecture, constitution, source-of-truth, API, data
+ownership, dependency, security, rollout, split/merge, or promotion decisions.
+
+Weakest sufficient model creates. Strongest necessary model promotes.
+
 ## Delegating SpecKit Phases (after SPECKIT_READY)
 
 For each planned spec, complete **specify → plan → tasks → analyze** in sequence.

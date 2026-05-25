@@ -125,13 +125,21 @@ Run: `python3 -m unittest discover -s tests_v2 -v`
 
 ## Model routing
 
-| Tier | Use for | Model |
-|---|---|---|
-| `ROUTINE` | Deterministic extraction, JSON transforms, file ops, test generation for known patterns | `claude-haiku-4-5` |
-| `STRONG` | Bounded module work, single-slice refactors, adapters, tests for new seams | `claude-sonnet-4-6` |
-| `CRITICAL` | Architecture decisions, contract changes, role boundaries, RunSkeptic verdicts, promotion gates | `claude-opus-4-7` |
+Use abstract model tiers in artifacts and prompts. Map them to concrete models
+at runtime so Codex, Claude, and Devin runs preserve the same workflow rules.
+
+| Tier | Use for | Codex | Claude | Devin |
+|---|---|---|---|---|
+| `MODEL_ROUTINE` | Deterministic extraction, summaries, inventories, evidence lookup | `gpt-5.5 low` | `Haiku 4.5` | `SWE 1.6` |
+| `MODEL_DEFAULT` | Orchestration, repo inspection, focused implementation | `gpt-5.5 medium` | `Sonnet 4.6` | `SWE 1.6` under credit pressure; `codex 4.3 code` when available |
+| `MODEL_STRONG` | Bounded module work, single-slice refactors, adapters, tests for new seams | `gpt-5.5 high` | `Sonnet 4.6` | `Sonnet 4.5` |
+| `MODEL_CRITICAL` | Architecture decisions, contract changes, role boundaries, RunSkeptic verdicts, promotion gates | `gpt-5.5 xhigh` | `Opus 4.7` | `Opus 4.6` |
 
 Rule: weakest sufficient model creates; strongest necessary model promotes.
+
+`SWE 1.6` may draft, edit, run tests, and perform mechanical review, but it must
+not approve architecture, constitution, source-of-truth, API, data ownership,
+dependency, security, rollout, split/merge, or promotion decisions.
 
 ---
 
