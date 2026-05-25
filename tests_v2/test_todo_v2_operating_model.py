@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class TodoV2OperatingModelTests(unittest.TestCase):
     def test_todo_includes_roles_subagents_and_context_tailoring(self) -> None:
-        text = (ROOT / "docs" / "TODO_V2.md").read_text(encoding="utf-8")
+        text = (ROOT / "docs" / "archive" / "TODO_V2.md").read_text(encoding="utf-8")
 
         required = [
             "Operating model: roles, subagents, and context",
@@ -32,7 +32,7 @@ class TodoV2OperatingModelTests(unittest.TestCase):
             self.assertIn(item, text)
 
     def test_todo_includes_safety_and_checkpoint_rules(self) -> None:
-        text = (ROOT / "docs" / "TODO_V2.md").read_text(encoding="utf-8")
+        text = (ROOT / "docs" / "archive" / "TODO_V2.md").read_text(encoding="utf-8")
 
         required = [
             "Checkpoint communication standard",
@@ -48,7 +48,7 @@ class TodoV2OperatingModelTests(unittest.TestCase):
             self.assertIn(item, text)
 
     def test_todo_includes_product_correctness_guard(self) -> None:
-        text = (ROOT / "docs" / "TODO_V2.md").read_text(encoding="utf-8")
+        text = (ROOT / "docs" / "archive" / "TODO_V2.md").read_text(encoding="utf-8")
 
         required = [
             "Product correctness guard",
