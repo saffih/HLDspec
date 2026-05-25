@@ -3,8 +3,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 
 DISPOSITION_BY_DECISION = {
@@ -17,33 +24,14 @@ DISPOSITION_BY_DECISION = {
 }
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    for sync in (direct, nested):
-        if (sync / "hldspec_architecture_analysis.json").exists() or (sync / "hldspec_speckit_spec_list.json").exists():
-            return sync
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    return select_sync_dir(workspace, ("hldspec_architecture_analysis.json", "hldspec_speckit_spec_list.json"))
 
 
 def build_disposition(workspace: Path, approved: bool = False) -> dict[str, Any]:
     sync = sync_dir(workspace)
-    arch = load_json(sync / "hldspec_architecture_analysis.json")
-    spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
+    arch = load_json_dict(sync / "hldspec_architecture_analysis.json")
+    spec_list = load_json_dict(sync / "hldspec_speckit_spec_list.json")
     decisions = {
         str(item.get("hld_id")): item
         for item in spec_list.get("boundary_decisions", [])
@@ -162,7 +150,7 @@ def main() -> int:
     data = build_disposition(workspace, approved=args.approve_human_reviewed_decisions)
     json_path = sync / "hldspec_architecture_findings_disposition.json"
     md_path = sync / "hldspec_architecture_findings_disposition.md"
-    write_json(json_path, data)
+    write_json_dict(json_path, data)
     md_path.write_text(render_md(data), encoding="utf-8")
 
     print("HLDspec architecture findings disposition generated:")

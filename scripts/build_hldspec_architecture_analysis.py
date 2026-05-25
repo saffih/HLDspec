@@ -4,8 +4,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 LAYER_ORDER = [
     "governance",
@@ -38,28 +45,8 @@ def as_text(value: Any) -> str:
     return str(value)
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    if (direct / "hldspec_state.json").exists():
-        return direct
-    if (nested / "hldspec_state.json").exists():
-        return nested
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    return select_sync_dir(workspace, ("hldspec_state.json",))
 
 
 def find_hld(workspace: Path, explicit_hld: str = "") -> Path:
@@ -294,7 +281,7 @@ def main() -> int:
     data = build_analysis(workspace, args.hld)
     json_path = sync / "hldspec_architecture_analysis.json"
     md_path = sync / "hldspec_architecture_analysis.md"
-    write_json(json_path, data)
+    write_json_dict(json_path, data)
     md_path.write_text(render_md(data), encoding="utf-8")
 
     print("HLDspec architecture analysis generated:")

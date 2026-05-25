@@ -5,8 +5,15 @@ import argparse
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 ORDER = {
     "governance": 0,
@@ -67,28 +74,8 @@ CONSTITUTION_TITLE_WORDS = {
 }
 
 
-def load_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-
-
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    if (direct / "hldspec_architecture_analysis.json").exists():
-        return direct
-    if (nested / "hldspec_architecture_analysis.json").exists():
-        return nested
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    return select_sync_dir(workspace, ("hldspec_architecture_analysis.json",))
 
 
 def slugify(text: str) -> str:
@@ -380,7 +367,7 @@ def scan_existing_specs(source_project: Path) -> dict[str, Any]:
 
 def build_list(workspace: Path, source_project: Path | None = None) -> dict[str, Any]:
     sync = sync_dir(workspace)
-    analysis = load_json(sync / "hldspec_architecture_analysis.json")
+    analysis = load_json_dict(sync / "hldspec_architecture_analysis.json")
     specs: list[dict[str, Any]] = []
     boundary_decisions: list[dict[str, Any]] = []
     existing_scan: dict[str, Any] = {"found": False, "existing_ids": [], "highest_number": 0, "conflicts": []}
@@ -587,7 +574,7 @@ def main() -> int:
     data = build_list(workspace, source_project)
     json_path = sync / "hldspec_speckit_spec_list.json"
     md_path = sync / "hldspec_speckit_spec_list.md"
-    write_json(json_path, data)
+    write_json_dict(json_path, data)
     md_path.write_text(render_md(data), encoding="utf-8")
 
     print("HLDspec SpecKit spec list generated:")
