@@ -67,7 +67,7 @@ FIELD_DEFAULTS: dict[str, str] = {
     "observed_evidence": "not checked",
     "evidence_level":    "unknown",
     "confidence":        "LOW",
-    "unknowns":          "unknown",
+    "unknowns":          "none",           # "none" resolves the unknowns gate
     "verification":      "manual review required",
     "residual_risk":     "unknown",
 }
