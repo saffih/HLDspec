@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from hldspec.gates import plan_gate_status  # noqa: E402
 
 
 def load_json(path: str | None) -> dict[str, Any]:
@@ -104,24 +107,21 @@ def plan_quality(plan: dict[str, Any], review_text: str) -> dict[str, Any]:
     pq = plan.get("plan_quality", {}) if isinstance(plan.get("plan_quality"), dict) else {}
     planned = as_list(plan.get("planned_specs"))
     conflicts = as_list(pq.get("conflicts"))
-    bad = []
-    for spec in planned:
-        if isinstance(spec, dict) and (spec.get("quality_flags") or spec.get("requires_user_review")):
-            bad.append(spec.get("planned_spec_id"))
+    bad = [
+        spec.get("planned_spec_id")
+        for spec in planned
+        if isinstance(spec, dict) and (spec.get("quality_flags") or spec.get("requires_user_review"))
+    ]
 
-    continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", review_text, re.I))
-    continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", review_text, re.I))
-    decision = pq.get("decision", "")
-    recommendation = pq.get("recommendation", "")
-    plan_green = continue_true and not continue_false and decision == "PASS" and recommendation == "KEEP_PLAN" and not conflicts and not bad
+    gate = plan_gate_status(plan, review_text)
 
     return {
-        "decision": decision,
-        "recommendation": recommendation,
+        "decision": gate.decision,
+        "recommendation": gate.recommendation,
         "planned_count": len(planned),
         "conflict_count": len(conflicts),
         "flagged": bad,
-        "plan_green": plan_green,
+        "plan_green": gate.green,
     }
 
 

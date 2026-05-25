@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
+from hldspec.gates import plan_gate_status
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -222,8 +222,6 @@ class SpecBuildPlanMachine:
     @staticmethod
     def _quality(plan: dict[str, Any], review_text: str) -> dict[str, Any]:
         pq = plan.get("plan_quality", {}) if isinstance(plan.get("plan_quality"), dict) else {}
-        decision = pq.get("decision", "")
-        recommendation = pq.get("recommendation", "")
         conflicts = pq.get("conflicts", [])
         planned = plan.get("planned_specs", []) if isinstance(plan, dict) else []
 
@@ -246,20 +244,18 @@ class SpecBuildPlanMachine:
                     }
                 )
 
-        continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", review_text, re.I))
-        continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", review_text, re.I))
-        green = continue_true and not continue_false and decision == "PASS" and recommendation == "KEEP_PLAN" and not conflicts and not flagged
+        gate = plan_gate_status(plan, review_text)
 
         return {
-            "green": green,
-            "decision": decision,
-            "recommendation": recommendation,
+            "green": gate.green,
+            "decision": gate.decision,
+            "recommendation": gate.recommendation,
             "conflict_count": len(conflicts),
             "conflicts": conflicts if isinstance(conflicts, list) else [],
             "flagged_count": len(flagged),
             "flagged_specs": flagged,
-            "continue_true": continue_true,
-            "continue_false": continue_false,
+            "continue_true": gate.continue_true,
+            "continue_false": gate.continue_false,
         }
 
     @staticmethod

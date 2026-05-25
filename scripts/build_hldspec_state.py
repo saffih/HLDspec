@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from hldspec.gates import plan_gate_status  # noqa: E402
 try:
     from hldspec.prework_contracts import stale_prework_artifacts  # noqa: E402
 except ImportError:
@@ -69,31 +70,17 @@ def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]
         pq = {}
 
     specs = plan.get("planned_specs", []) if isinstance(plan, dict) else []
-    flagged = [
-        s.get("planned_spec_id")
-        for s in specs
-        if isinstance(s, dict) and (s.get("quality_flags") or s.get("requires_user_review"))
-    ] if isinstance(specs, list) else []
     conflicts = pq.get("conflicts", [])
 
     text = review_path.read_text(encoding="utf-8", errors="replace") if review_path.exists() else ""
-    allowed = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", text, re.I))
-    blocked = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", text, re.I))
+    gate = plan_gate_status(plan, text)
 
-    green = (
-        allowed
-        and not blocked
-        and pq.get("decision") in {"PASS", "FIX", "HANDLED"}
-        and pq.get("recommendation") == "KEEP_PLAN"
-        and not conflicts
-        and not flagged
-    )
-    return green, {
-        "decision": pq.get("decision", ""),
-        "recommendation": pq.get("recommendation", ""),
+    return gate.green, {
+        "decision": gate.decision,
+        "recommendation": gate.recommendation,
         "planned_specs": len(specs) if isinstance(specs, list) else 0,
         "conflicts": len(conflicts) if isinstance(conflicts, list) else 0,
-        "flagged_specs": len(flagged),
+        "flagged_specs": gate.flagged_count,
     }
 
 
