@@ -54,11 +54,7 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
 
 
 def augmented_rule_counts(constitution: dict) -> dict[str, int]:
-    """Return counts of augmented rule types present in constitution.
-
-    Returns a dict like {"CONTRACT": 3, "DATA": 2} based on rule_id prefixes
-    of rules in constitution["required_rules"].
-    """
+    """Return counts of augmented rule types present in constitution."""
     counts: dict[str, int] = {"CONTRACT": 0, "DATA": 0}
     for rule in constitution.get("required_rules", []):
         rule_id = rule.get("rule_id", "") if isinstance(rule, dict) else ""
@@ -70,11 +66,7 @@ def augmented_rule_counts(constitution: dict) -> dict[str, int]:
 
 
 def augmentation_intact(constitution: dict, expected_counts: dict[str, int]) -> list[str]:
-    """Check that augmented rules have not been wiped.
-
-    Returns a list of blocker strings (empty = intact).
-    Checks that actual count of each prefix >= expected count.
-    """
+    """Check that augmented rules have not been wiped. Returns blocker strings."""
     actual = augmented_rule_counts(constitution)
     blockers: list[str] = []
     for prefix, expected in expected_counts.items():
@@ -85,18 +77,63 @@ def augmentation_intact(constitution: dict, expected_counts: dict[str, int]) -> 
 
 
 def constitution_augmentation_blockers(constitution: dict) -> list[str]:
-    """Block if constitution has no CONTRACT-* or DATA-* rules at all
-    when required_rules is non-empty.
-
-    Returns blocker strings. An empty constitution (no required_rules) is
-    not blocked — augmentation may not have run yet.
-    A non-empty constitution with zero CONTRACT-* and zero DATA-* rules
-    is a warning, not a hard blocker, so return an empty list unless
-    the constitution explicitly claims augmentation was run
-    (field: augmentation_applied == True) but rules are missing.
-    """
+    """Block if augmentation_applied=True but no CONTRACT-* or DATA-* rules exist."""
     if constitution.get("augmentation_applied") is True:
         counts = augmented_rule_counts(constitution)
         if counts["CONTRACT"] == 0 and counts["DATA"] == 0:
             return ["constitution has augmentation_applied=True but no CONTRACT-* or DATA-* rules found"]
     return []
+
+
+REQUIRED_PM_PACK_KEYS = [
+    "users",
+    "jobs_to_be_done",
+    "user_journeys",
+    "use_cases",
+    "user_stories",
+    "acceptance_criteria",
+]
+
+REQUIRED_ARCHITECT_PACK_KEYS = [
+    "constitution_rules",
+    "component_boundaries",
+    "interface_contracts",
+    "dependency_order",
+    "technical_risks",
+]
+
+REQUIRED_DOSSIER_FIELDS = [
+    "named_capabilities",
+    "interface_contracts",
+    "data_ownership",
+    "integration_paths",
+    "dependency_reasons",
+    "acceptance_criteria",
+]
+
+
+def missing_pm_pack_keys(pm_pack: dict[str, Any]) -> list[str]:
+    """Returns list of missing required keys in the PM pack."""
+    missing: list[str] = []
+    for key in REQUIRED_PM_PACK_KEYS:
+        if not pm_pack.get(key):
+            missing.append(key)
+    return missing
+
+
+def missing_architect_pack_keys(arch_pack: dict[str, Any]) -> list[str]:
+    """Returns list of missing required keys in the Architect pack."""
+    missing: list[str] = []
+    for key in REQUIRED_ARCHITECT_PACK_KEYS:
+        if not arch_pack.get(key):
+            missing.append(key)
+    return missing
+
+
+def shallow_dossier_fields(dossier: dict[str, Any]) -> list[str]:
+    """Returns list of missing or empty required fields in the Answer Dossier."""
+    missing: list[str] = []
+    for key in REQUIRED_DOSSIER_FIELDS:
+        if not dossier.get(key):
+            missing.append(key)
+    return missing
