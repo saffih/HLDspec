@@ -24,6 +24,7 @@ These docs are living references. Follow links in CLAUDE.md for session bootstra
 | [`CONSTITUTION_RULE_QUALITY.md`](CONSTITUTION_RULE_QUALITY.md) | Constitution rule quality gate |
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents |
 | [`HLDSPEC_V2_HANDOFF_DOCS.md`](HLDSPEC_V2_HANDOFF_DOCS.md) | Handoff doc specification |
+| [`HLDSPEC_STABILITY_ARCHITECTURE.md`](HLDSPEC_STABILITY_ARCHITECTURE.md) | Stability architecture principles: artifact contracts, ports/adapters, event log, validator plugins |
 
 ### Runtime entrypoints
 
