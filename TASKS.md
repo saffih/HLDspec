@@ -28,6 +28,9 @@ Living task list. Update this when work starts, completes, or new gaps are found
 | P1 — Parallel PM + Architect extraction | Both pack builders now run concurrently in `first_run_readonly.sh` | `scripts/first_run_readonly.sh` |
 | P1 — Testing quality gate | `specs_missing_test_plans()`: UT + UI/UX required; technical specs exempt from UI/UX | `hldspec/prework_contracts.py`, `tests_v2/test_testing_quality_gate.py` |
 | P2 — Canonical entry point | `hldspec_run.sh` now runs preflight before delegating | `scripts/hldspec_run.sh` |
+| P2 — Observability | `build_hldspec_state.py`: stale artifact warnings + concise audit header in rendered output | `scripts/build_hldspec_state.py` |
+| P2 — Legacy test cleanup | Removed 4 legacy tests with V2 replacements | `tests_legacy/` |
+| P2 — Docs archive | 8 superseded docs moved to `docs/archive/` | `docs/archive/` |
 | REFACTOR_PROGRAM.md | Updated with status, gaps, correct model routing | `docs/REFACTOR_PROGRAM.md` |
 | CLAUDE.md | Project reference for new sessions | `CLAUDE.md` |
 | TASKS.md (this file) | Living task tracker | `TASKS.md` |
@@ -46,35 +49,15 @@ All P1 items done.
 
 ---
 
-## P2 — Remaining
+## P2 — COMPLETE ✓
 
-### Observability / audit summary
+All P2 items done.
 
-**What:** After a run or restart, no concise view of: current checkpoint, what's blocking, last regeneration chain, what's safe to do next.
+### Residual (no urgency)
 
-**Fix:** Extend `build_hldspec_state.py` — one concise machine-readable + human-readable status output.
-
-**Model:** `ROUTINE`
-
----
-
-### Legacy test cleanup
-
-**What:** 43 tests in `tests_legacy/`. Some cover behavior already covered by `tests_v2/`; some cover deprecated flows.
-
-**Policy:** Only delete a legacy test when a stronger V2 test covers the same behavior in the same commit.
-
-**Model:** `ROUTINE`
-
----
-
-### Docs archive — remaining
-
-**What:** Several docs in `docs/` may be superseded or historical (e.g., `HLDSPEC_AGENT_COMMAND.md`, `HLDSPEC_ORCHESTRATION_CONTRACT.md`). Need per-doc review before archiving.
-
-**Policy:** Only archive docs that are clearly superseded. Verify no live test or script references them first.
-
-**Model:** `ROUTINE`
+- **Legacy tests**: 39 remain in `tests_legacy/`. 27 fail due to stale fixtures or API changes. Each needs a same-commit V2 replacement before removal.
+- **Docs archive**: 3 docs (`FIRST_RUN.md`, `CONTEXT_BUDGET.md`, `TARGET_SPEC_CONTEXT.md`) have active references — deferred until references are updated.
+- **Orchestration state**: `HLDSPEC_AGENT_COMMAND.md` and `HLDSPEC_ORCHESTRATION_CONTRACT.md` referenced by legacy tests — deferred.
 
 ---
 
