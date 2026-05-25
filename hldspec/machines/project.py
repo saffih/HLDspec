@@ -11,6 +11,7 @@ from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
 from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
 from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
+from hldspec.machines.speckit_execution import SpecKitExecutionMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
 from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
 
@@ -25,6 +26,7 @@ class ProjectMachine:
         self.plan = SpecBuildPlanMachine()
         self.prework = SpeckitPreworkMachine()
         self.approval = ApprovalGateMachine()
+        self.execution = SpecKitExecutionMachine()
 
     def run(self, context: MachineContext) -> MachineResult:
         if not context.repo_root or not context.workspace or not context.source_hld:
@@ -68,7 +70,11 @@ class ProjectMachine:
         write_handoff_docs(sync)
 
         approval_result = self.approval.run(context)
-        return self._wrap(approval_result)
+        if approval_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            return self._wrap(approval_result)
+
+        execution_result = self.execution.run(context)
+        return self._wrap(execution_result)
 
     def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
         workspace = Path(context.workspace or ".")
