@@ -75,6 +75,22 @@ Next small slices (no urgency order):
 
 ---
 
+## Production-readiness (2026-05-26)
+
+| Item | Status | Files |
+|---|---|---|
+| Single gate semantics | ✅ Done | hldspec/gates.py |
+| Fix plan-green bug (FIX/HANDLED accepted as green) | ✅ Done | scripts/build_hldspec_state.py |
+| Gate used in SpecBuildPlanMachine | ✅ Done | hldspec/machines/spec_build_plan.py |
+| Prework gate + artifact freshness in SpeckitPreworkMachine | ✅ Done | hldspec/machines/speckit_prework.py |
+| Gate alignment: render_hldspec_checkpoint.py | ✅ Done | scripts/render_hldspec_checkpoint.py |
+| Shell-vs-machine parity tests | ✅ Done | tests_v2/test_shell_vs_machine_parity.py |
+| Event log wired into ProjectMachine | ✅ Done | hldspec/machines/project.py |
+| HumanDecisionPort stub | ✅ Done | hldspec/ports.py |
+| Option packet skeleton | ✅ Done | hldspec/option_packet.py |
+
+---
+
 ## Architecture decisions record
 
 | Decision | Rationale |
