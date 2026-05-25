@@ -51,3 +51,57 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
     if unresolved:
         return [f"architecture disposition has {len(unresolved)} unresolved finding(s): {', '.join(unresolved[:5])}"]
     return []
+
+
+REQUIRED_PM_PACK_KEYS = [
+    "users",
+    "jobs_to_be_done",
+    "user_journeys",
+    "use_cases",
+    "user_stories",
+    "acceptance_criteria",
+]
+
+REQUIRED_ARCHITECT_PACK_KEYS = [
+    "constitution_rules",
+    "component_boundaries",
+    "interface_contracts",
+    "dependency_order",
+    "technical_risks",
+]
+
+REQUIRED_DOSSIER_FIELDS = [
+    "named_capabilities",
+    "interface_contracts",
+    "data_ownership",
+    "integration_paths",
+    "dependency_reasons",
+    "acceptance_criteria",
+]
+
+
+def missing_pm_pack_keys(pm_pack: dict[str, Any]) -> list[str]:
+    """Returns list of missing required keys in the PM pack."""
+    missing: list[str] = []
+    for key in REQUIRED_PM_PACK_KEYS:
+        if not pm_pack.get(key):
+            missing.append(key)
+    return missing
+
+
+def missing_architect_pack_keys(arch_pack: dict[str, Any]) -> list[str]:
+    """Returns list of missing required keys in the Architect pack."""
+    missing: list[str] = []
+    for key in REQUIRED_ARCHITECT_PACK_KEYS:
+        if not arch_pack.get(key):
+            missing.append(key)
+    return missing
+
+
+def shallow_dossier_fields(dossier: dict[str, Any]) -> list[str]:
+    """Returns list of missing or empty required fields in the Answer Dossier."""
+    missing: list[str] = []
+    for key in REQUIRED_DOSSIER_FIELDS:
+        if not dossier.get(key):
+            missing.append(key)
+    return missing
