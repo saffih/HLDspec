@@ -11,56 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hldspec.prework_contracts import architecture_disposition_blockers, missing_constitution_keys
 from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 
 def sync_dir(workspace: Path) -> Path:
     return select_sync_dir(workspace, ("speckit_constitution_context.json", "hldspec_speckit_spec_list.json"))
-
-
-def has_required_constitution_bits(context: dict[str, Any]) -> list[str]:
-    missing: list[str] = []
-    for key in [
-        "source_of_truth_hierarchy",
-        "architecture_layer_model",
-        "interface_taxonomy",
-        "split_rules",
-        "no_invention_rules",
-        "checkpoint_triage_rules",
-        "speckit_boundaries",
-        "validation_gates",
-    ]:
-        if not context.get(key):
-            missing.append(key)
-    return missing
-
-
-def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[str, Any]) -> list[str]:
-    if arch.get("status") != "ARCHITECTURE_REVIEW_REQUIRED":
-        return []
-    findings = [item for item in arch.get("findings", []) if isinstance(item, dict)]
-    if not findings:
-        return []
-    if not disposition:
-        return [f"architecture review has {len(findings)} finding(s) requiring disposition"]
-    if disposition.get("status") not in {"DISPOSITIONED", "APPROVED"}:
-        return [f"architecture disposition status is {disposition.get('status', 'MISSING')}"]
-    finding_ids = {str(item.get("finding_id")) for item in findings if item.get("finding_id")}
-    records = disposition.get("dispositions", [])
-    if not isinstance(records, list):
-        return ["architecture disposition records are missing or invalid"]
-    covered = {str(item.get("finding_id")) for item in records if isinstance(item, dict) and item.get("finding_id")}
-    missing = sorted(finding_ids - covered)
-    if missing:
-        return [f"architecture disposition missing {len(missing)} finding(s): {', '.join(missing[:5])}"]
-    unresolved = [
-        str(item.get("finding_id"))
-        for item in records
-        if isinstance(item, dict) and str(item.get("disposition", "")).upper() in {"", "TBD", "CONFLICT", "UNRESOLVED"}
-    ]
-    if unresolved:
-        return [f"architecture disposition has {len(unresolved)} unresolved finding(s): {', '.join(unresolved[:5])}"]
-    return []
 
 
 def build_review(workspace: Path) -> dict[str, Any]:
@@ -77,7 +33,7 @@ def build_review(workspace: Path) -> dict[str, Any]:
         missing.append("speckit_constitution_context")
     if not spec_list:
         missing.append("hldspec_speckit_spec_list")
-    missing.extend([f"constitution.{x}" for x in has_required_constitution_bits(constitution)])
+    missing.extend([f"constitution.{x}" for x in missing_constitution_keys(constitution)])
 
     blocking: list[str] = []
     if missing:
