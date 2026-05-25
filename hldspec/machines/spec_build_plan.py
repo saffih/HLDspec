@@ -248,7 +248,7 @@ class SpecBuildPlanMachine:
 
         continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", review_text, re.I))
         continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", review_text, re.I))
-        green = continue_true and not continue_false and decision == "FIX" and recommendation == "KEEP_PLAN" and not conflicts and not flagged
+        green = continue_true and not continue_false and decision == "PASS" and recommendation == "KEEP_PLAN" and not conflicts and not flagged
 
         return {
             "green": green,

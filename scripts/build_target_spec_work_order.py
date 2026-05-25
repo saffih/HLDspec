@@ -27,7 +27,7 @@ def plan_gate_allows_generation(plan: dict[str, Any]) -> bool:
     decision = str(quality.get("decision", ""))
     recommendation = str(quality.get("recommendation", ""))
     conflicts = quality.get("conflicts", [])
-    if decision != "FIX" or recommendation != "KEEP_PLAN" or conflicts:
+    if decision != "PASS" or recommendation != "KEEP_PLAN" or conflicts:
         return False
 
     for spec in plan.get("planned_specs", []):
