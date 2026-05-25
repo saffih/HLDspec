@@ -8,7 +8,7 @@ Living task list. Update this when work starts, completes, or new gaps are found
 
 | Task | What | Files |
 |---|---|---|
-| Gate fix | `plan_quality.decision` green condition was `"FIX"` (never produced for clean plan); corrected to `"PASS"` | `hldspec/machines/spec_build_plan.py`, `scripts/render_hldspec_checkpoint.py`, `scripts/build_target_spec_work_order.py` |
+| Gate fix | `plan_quality.decision` green was `"FIX"`; corrected to `"PASS"` | `hldspec/machines/spec_build_plan.py` |
 | Negative-path tests | 13 gate tests covering all green/non-green conditions | `tests_v2/test_spec_build_plan_quality_gate.py` |
 | Workspace path guard | Fail fast if file path passed where directory expected | `hldspec/machines/project.py` |
 | Handoff doc decoupling | `write_handoff_docs()` moved out of gate machine into orchestrator | `hldspec/machines/speckit_prework.py`, `hldspec/machines/project.py` |
@@ -19,6 +19,15 @@ Living task list. Update this when work starts, completes, or new gaps are found
 | Stale prework detection | `stale_prework_artifacts()` checks mtime of prework vs plan | `hldspec/prework_contracts.py`, `tests_v2/test_stale_prework_detection.py` |
 | SpecKitExecutionMachine (P0) | Post-approval execution driver: constitution → features in dependency order | `hldspec/machines/speckit_execution.py`, `hldspec/machines/project.py` |
 | SpecKitExecutionMachine tests | 20 tests: missing inputs, constitution phase, all feature phases, completion | `tests_v2/test_speckit_execution_machine.py` |
+| SKEPTIC-CONTRACT-001 | Canonical RunSkeptic schema: `SkepticFinding`, `FIELD_ALIASES`, normalization helpers | `hldspec/skeptic_schema.py` |
+| SKEPTIC-CONTRACT-002 | Producer emits all required evidence fields; `unknowns` default `"none"` | `hldspec/skeptic_schema.py` |
+| SKEPTIC-TEST-001 | 21 contract tests: schema parity, missing/empty fields, integration | `tests/test_skeptic_contract.py` |
+| SKEPTIC-ORCH-001 | Evidence-quality REWORK_REQUIRED blocks ready gate; exact artifact in message | `scripts/hldspec_ready_gate.py`, `tests/test_skeptic_orch.py` |
+| DOC-SOT-001 | Authoritative docs index; alignment script updated; pre-existing failure fixed | `docs/DOCS_INDEX.md`, `scripts/run_hldspec_alignment_review.py` |
+| PROCESS-001 | Preflight checks: merge, staged, unstaged, untracked, divergence | `scripts/preflight_check.py`, `tests/test_preflight_check.py` |
+| P1 — Parallel PM + Architect extraction | Both pack builders now run concurrently in `first_run_readonly.sh` | `scripts/first_run_readonly.sh` |
+| P1 — Testing quality gate | `specs_missing_test_plans()`: UT + UI/UX required; technical specs exempt from UI/UX | `hldspec/prework_contracts.py`, `tests_v2/test_testing_quality_gate.py` |
+| P2 — Canonical entry point | `hldspec_run.sh` now runs preflight before delegating | `scripts/hldspec_run.sh` |
 | REFACTOR_PROGRAM.md | Updated with status, gaps, correct model routing | `docs/REFACTOR_PROGRAM.md` |
 | CLAUDE.md | Project reference for new sessions | `CLAUDE.md` |
 | TASKS.md (this file) | Living task tracker | `TASKS.md` |
@@ -27,49 +36,17 @@ Living task list. Update this when work starts, completes, or new gaps are found
 
 ## P0 — COMPLETE ✓
 
-All P0 items done. HLDspec is now end-to-end complete (pipeline gates through to SpecKit execution).
+All P0 items done. HLDspec is end-to-end complete.
 
 ---
 
-## P1 — Important gaps, do soon
+## P1 — COMPLETE ✓
 
-### Parallel PM + Architect extraction as explicit machine states
-
-**What:** PM and Architect extraction currently happen sequentially inside `first_run_readonly.sh`. They are independent reads from the same source and should run in parallel.
-
-**Why:** Faster, clearer role boundaries, enables correct model routing (PM extraction = ROUTINE, Architect extraction = STRONG).
-
-**Design:** Two separate script invocations in `first_run_readonly.sh` run concurrently. Or: two new machines `PmExtractionMachine` and `ArchitectExtractionMachine` that run in parallel from `ProjectMachine`, each with a completeness gate.
-
-**Model:** `STRONG` for design, `ROUTINE` for extraction scripts.
+All P1 items done.
 
 ---
 
-### Testing quality gate (UT + UI/UX)
-
-**What:** HLDspec must enforce that every spec includes:
-- UT coverage plan (which behaviours need unit tests)
-- UI/UX test plan (which user journeys need end-to-end tests)
-
-Exception: specs marked `no_direct_user_story: true` (technical foundations) are exempt from UI/UX test requirements but not from UT.
-
-**Where to add:** As a quality flag in spec build plan enrichment + a check in prework quality review.
-
-**Model:** `STRONG`
-
----
-
-## P2 — Clean up, consolidate, improve
-
-### Canonical rebuild entry point
-
-**What:** Multiple shell entry points (`first_run_readonly.sh`, `hldspec_prework.sh`, `project_continue.sh`, `hldspec_run.sh`, etc.) with no enforced order. Easy to run one script out of sequence and produce inconsistent state.
-
-**Fix:** One canonical `hldspec_run.sh` that enforces order and prevents ad-hoc partial runs. Others become internal helpers or are deprecated.
-
-**Model:** `ROUTINE`
-
----
+## P2 — Remaining
 
 ### Observability / audit summary
 
@@ -91,13 +68,13 @@ Exception: specs marked `no_direct_user_story: true` (technical foundations) are
 
 ---
 
-### Docs archive
+### Docs archive — remaining
 
-**What:** `docs/` contains 57 files, many are point-in-time RunSkeptic reviews from earlier sessions (HLDSPEC_RUNSKEPTIC_*.md). These are not living docs — they are historical records.
+**What:** Several docs in `docs/` may be superseded or historical (e.g., `HLDSPEC_AGENT_COMMAND.md`, `HLDSPEC_ORCHESTRATION_CONTRACT.md`). Need per-doc review before archiving.
 
-**Fix:** Move all `HLDSPEC_RUNSKEPTIC_*.md` and superseded TODO files to `docs/archive/`. Keep living references in `docs/`.
+**Policy:** Only archive docs that are clearly superseded. Verify no live test or script references them first.
 
-**Status:** Partially done this session (see below). Remaining cleanup TBD.
+**Model:** `ROUTINE`
 
 ---
 
@@ -111,3 +88,6 @@ Exception: specs marked `no_direct_user_story: true` (technical foundations) are
 | PM + Architect extraction parallel | Independent reads from same source; merge at Answer Dossier |
 | Reply parser separate from renderer | Parser is pure logic; renderer is presentation; different change rates |
 | Constitution augmentation additive | `build_speckit_constitution_from_contracts.py` skips covered rule_ids; safe to re-run |
+| RunSkeptic schema in `hldspec/` | Both producer and reviewer import from single source of truth |
+| Preflight before hldspec_run | Prevents multi-agent runs on dirty/diverged state |
+| `unknowns` default `"none"` | Makes evidence quality gate return PASS for auto-generated findings |
