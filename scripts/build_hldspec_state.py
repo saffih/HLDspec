@@ -4,8 +4,16 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from hldspec.prework_contracts import stale_prework_artifacts  # noqa: E402
+except ImportError:
+    def stale_prework_artifacts(sync: Path) -> list[str]:  # type: ignore[misc]
+        return []
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -111,6 +119,7 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
         "last_completed_stage": "",
         "current_checkpoint": "",
         "blocking_questions": [],
+        "stale_artifact_warnings": [],
         "next_allowed_actions": [],
         "controlling_artifacts": [],
         "supporting_artifacts": [],
@@ -226,6 +235,8 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
             [fsync / "speckit_prework_quality_review.md", prework_quality],
         )
 
+    stale = stale_prework_artifacts(fsync)
+    base["stale_artifact_warnings"] = stale
     base["notes"] = [
         "target_spec_work_order and spec_branch_queue may exist for compatibility but do not control the flow when SpecKit is available."
     ]
@@ -246,40 +257,55 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
 
 
 def render_md(state: dict[str, Any]) -> str:
+    stage = state["current_stage"]
+    checkpoint = state["current_checkpoint"]
+    blocking = state.get("blocking_questions", [])
+    stale = state.get("stale_artifact_warnings", [])
+
+    # One-line audit summary
+    if blocking:
+        audit_line = f"⚠️  BLOCKED — {checkpoint} ({len(blocking)} open question(s))"
+    elif stale:
+        audit_line = f"⚠️  STALE ARTIFACTS — {stage}"
+    else:
+        audit_line = f"✅  {stage} — {checkpoint}"
+
     lines = [
         "# HLDspec State",
         "",
+        f"> {audit_line}",
         "",
-        "",
-        f"Current stage: `{state['current_stage']}`",
-        f"Last completed stage: `{state['last_completed_stage']}`",
-        f"Current checkpoint: `{state['current_checkpoint']}`",
-        f"Source HLD modified: `{str(state['source_hld_modified']).lower()}`",
-        f"Working HLD modified: `{str(state['working_hld_modified']).lower()}`",
-        "",
-        "## Next allowed actions",
+        f"- **Stage:** `{stage}`",
+        f"- **Checkpoint:** `{checkpoint}`",
+        f"- **Last completed:** `{state['last_completed_stage']}`",
         "",
     ]
+
+    if stale:
+        lines += ["## ⚠️ Stale artifact warnings", ""]
+        for w in stale:
+            lines.append(f"- {w}")
+        lines.append("")
+
+    if blocking:
+        lines += ["## Blocking questions", ""]
+        for q in blocking:
+            lines.append(f"- `{q.get('artifact')}`: {q.get('open_question_count')} open question(s)")
+        lines.append("")
+
+    lines += ["## Next allowed actions", ""]
     for action in state.get("next_allowed_actions", []):
         lines.append(f"- {action}")
 
     for title, key in [
         ("Controlling artifacts", "controlling_artifacts"),
         ("Supporting artifacts", "supporting_artifacts"),
-        ("Legacy/supporting artifacts", "legacy_supporting_artifacts"),
     ]:
-        lines += ["", f"## {title}", ""]
         values = state.get(key, [])
         if values:
+            lines += ["", f"## {title}", ""]
             for value in values:
                 lines.append(f"- `{value}`")
-        else:
-            lines.append("- none")
-
-    if state.get("blocking_questions"):
-        lines += ["", "## Blocking questions", ""]
-        for q in state["blocking_questions"]:
-            lines.append(f"- `{q.get('artifact')}`: {q.get('open_question_count')} open")
 
     if state.get("notes"):
         lines += ["", "## Notes", ""]
@@ -303,11 +329,19 @@ def main() -> int:
     (out / "hldspec_state.json").write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (out / "hldspec_state.md").write_text(render_md(state), encoding="utf-8")
 
-    print("HLDspec state generated:")
-    print(f"- json: {out / 'hldspec_state.json'}")
-    print(f"- report: {out / 'hldspec_state.md'}")
-    print(f"- current stage: {state['current_stage']}")
-    print(f"- checkpoint: {state['current_checkpoint']}")
+    stage = state["current_stage"]
+    checkpoint = state["current_checkpoint"]
+    stale = state.get("stale_artifact_warnings", [])
+    blocking = state.get("blocking_questions", [])
+
+    print(f"Stage:      {stage}")
+    print(f"Checkpoint: {checkpoint}")
+    if blocking:
+        print(f"BLOCKED:    {len(blocking)} open question(s)")
+    if stale:
+        for w in stale:
+            print(f"STALE:      {w}")
+    print(f"Report:     {out / 'hldspec_state.md'}")
     return 0
 
 

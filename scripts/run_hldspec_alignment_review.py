@@ -12,9 +12,8 @@ from typing import Any
 REQUIRED_DOCS = [
     "docs/HLDSPEC_USE_CASES_AND_API.md",
     "docs/HLDSPEC_USER_STORIES.md",
-    "docs/HLDSPEC_IMPLEMENTATION_TODO.md",
-    "docs/HLDSPEC_RUNSKEPTIC_HOLISTIC_REVIEW.md",
-    "docs/HLDSPEC_RUNSKEPTIC_GAP_REVIEW.md",
+    # Removed: HLDSPEC_IMPLEMENTATION_TODO.md superseded by TASKS.md
+    # Removed: HLDSPEC_RUNSKEPTIC_*.md are point-in-time records, now in docs/archive/
 ]
 
 REQUIRED_SCRIPTS = [
@@ -150,8 +149,10 @@ def check_pass_keep_plan_by_behavior(root: Path) -> tuple[bool, str]:
 
 
 def check_todo_intro(root: Path) -> bool:
-    text = read_text(root, "docs/HLDSPEC_IMPLEMENTATION_TODO.md")
-    return "HLDSPEC_PROCESS_INTRO_START" in text and "Current productization sequence" in text
+    # HLDSPEC_IMPLEMENTATION_TODO.md was superseded by TASKS.md.
+    # Check TASKS.md exists and has P0/P1 structure instead.
+    text = read_text(root, "TASKS.md")
+    return "P0" in text and "P1" in text
 
 
 def check_usecase_map_contract(root: Path) -> bool:
@@ -225,9 +226,9 @@ def run_alignment_review(root: Path) -> dict[str, Any]:
             "ALIGN-TODO",
             "ACTION",
             "context preservation",
-            "TODO does not contain the process/context preservation introduction.",
-            "Keep the TODO introduction as the compacted-session recovery anchor.",
-            "docs/HLDSPEC_IMPLEMENTATION_TODO.md",
+            "TASKS.md is missing or does not have P0/P1 task structure.",
+            "Keep TASKS.md as the living session recovery anchor (supersedes HLDSPEC_IMPLEMENTATION_TODO.md).",
+            "TASKS.md",
         )
 
     if exists(root, "scripts/build_hld_usecase_api_map.py") and not check_usecase_map_contract(root):
