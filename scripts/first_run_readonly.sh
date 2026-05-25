@@ -279,8 +279,13 @@ fi
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_proxy_dossier.py" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_junior_task_packets.py" "$WORKSPACE"
-"${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_product_manager_pack.py" "$WORKSPACE"
-"${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_architect_pack.py" "$WORKSPACE"
+# PM and Architect extraction are independent reads — run in parallel
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_product_manager_pack.py" "$WORKSPACE" &
+_PM_PID=$!
+"${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_architect_pack.py" "$WORKSPACE" &
+_ARCH_PID=$!
+wait $_PM_PID   || { echo "ERROR: PM extraction failed" >&2; exit 1; }
+wait $_ARCH_PID || { echo "ERROR: Architect extraction failed" >&2; exit 1; }
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_answer_pack.py" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_answer_dossier.py" "$WORKSPACE"
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$WORKSPACE"
