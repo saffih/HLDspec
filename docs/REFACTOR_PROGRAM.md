@@ -1,4 +1,4 @@
-# HLDspec Refactor Program (`refactor` branch)
+# HLDspec Refactor Program
 
 ## Objective
 
@@ -11,6 +11,35 @@ Reduce project clutter and improve maintainability by top-down refactoring:
 - explicit promotion and review gates
 
 No feature expansion is included in this program.
+
+## Current status
+
+Branch: `main` (refactor branch merged 2026-05-25)
+
+### Completed
+
+- **Slice 1**: Shared IO/helpers extracted (`hldspec/script_io.py`, `hldspec/prework_contracts.py`)
+- **Gate fix**: `SpecBuildPlanMachine` green condition was checking `decision=="FIX"` which is never produced by `apply_spec_build_plan_decisions.py` for a clean plan — corrected to `decision=="PASS"`. Same fix applied to `render_hldspec_checkpoint.py` and `build_target_spec_work_order.py`. (Detected via RunSkeptic cross-reference.)
+- **Baseline tests**: Negative-path gate tests added (`tests_v2/test_spec_build_plan_quality_gate.py`)
+- **Workspace guard**: Early `is_dir()` check in `ProjectMachine` — fail fast if a file path is passed where a workspace directory is expected.
+- **Gate machine decoupling**: `write_handoff_docs()` moved out of `SpeckitPreworkMachine` (gate machine) into `ProjectMachine` (orchestration). Gate machines gate only.
+
+### In progress
+
+- **F**: Deterministic reply parser (`hldspec/reply_parser.py`) — maps `next/ok/accept all` to checkpoint decisions
+- **E**: Constitution augmentation guard (`prework_contracts.py`) — detects when regeneration silently wiped CONTRACT-* / DATA-* rules
+
+### Outstanding gaps (from RunSkeptic 2026-05-25)
+
+Prioritised:
+
+| Priority | Gap | Root cause |
+|---|---|---|
+| P0 | Post-approval SpecKit execution machine missing | No machine drives constitution → spec → clarify → plan → tasks → dependency order |
+| P1 | Artifact existence checked but not completeness (PM/Architect/Dossier) | Systemic: machines read file presence only; no required-key validation at seam |
+| P1 | Stale prework detection | Existence checked; staleness (input modification since last run) not detected |
+| P2 | Canonical rebuild entry point | Multiple shell entry points; no enforced order |
+| P2 | Observability / audit summary | `build_hldspec_state.py` exists; needs concise current-checkpoint view |
 
 ## Operating principles
 
@@ -29,12 +58,12 @@ MODEL_STRONG   -> bounded module refactors, adapter extraction, tests for a sing
 MODEL_CRITICAL -> architecture map, contract changes, role boundaries, promotion decisions, RunSkeptic verdicts
 ```
 
-Recommended concrete mapping for this branch:
+Recommended concrete mapping:
 
 ```text
-MODEL_ROUTINE:  gpt-5.5 (standard)
-MODEL_STRONG:   gpt-5.5 high
-MODEL_CRITICAL: gpt-5.5 xhigh
+MODEL_ROUTINE:  claude-haiku-4-5
+MODEL_STRONG:   claude-sonnet-4-6
+MODEL_CRITICAL: claude-opus-4-7
 ```
 
 Rule: weakest sufficient model creates; strongest necessary model promotes.
