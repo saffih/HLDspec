@@ -51,3 +51,52 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
     if unresolved:
         return [f"architecture disposition has {len(unresolved)} unresolved finding(s): {', '.join(unresolved[:5])}"]
     return []
+
+
+def augmented_rule_counts(constitution: dict) -> dict[str, int]:
+    """Return counts of augmented rule types present in constitution.
+
+    Returns a dict like {"CONTRACT": 3, "DATA": 2} based on rule_id prefixes
+    of rules in constitution["required_rules"].
+    """
+    counts: dict[str, int] = {"CONTRACT": 0, "DATA": 0}
+    for rule in constitution.get("required_rules", []):
+        rule_id = rule.get("rule_id", "") if isinstance(rule, dict) else ""
+        if str(rule_id).startswith("CONTRACT-"):
+            counts["CONTRACT"] += 1
+        elif str(rule_id).startswith("DATA-"):
+            counts["DATA"] += 1
+    return counts
+
+
+def augmentation_intact(constitution: dict, expected_counts: dict[str, int]) -> list[str]:
+    """Check that augmented rules have not been wiped.
+
+    Returns a list of blocker strings (empty = intact).
+    Checks that actual count of each prefix >= expected count.
+    """
+    actual = augmented_rule_counts(constitution)
+    blockers: list[str] = []
+    for prefix, expected in expected_counts.items():
+        got = actual.get(prefix, 0)
+        if got < expected:
+            blockers.append(f"{prefix} rules decreased: expected {expected}, got {got}")
+    return blockers
+
+
+def constitution_augmentation_blockers(constitution: dict) -> list[str]:
+    """Block if constitution has no CONTRACT-* or DATA-* rules at all
+    when required_rules is non-empty.
+
+    Returns blocker strings. An empty constitution (no required_rules) is
+    not blocked — augmentation may not have run yet.
+    A non-empty constitution with zero CONTRACT-* and zero DATA-* rules
+    is a warning, not a hard blocker, so return an empty list unless
+    the constitution explicitly claims augmentation was run
+    (field: augmentation_applied == True) but rules are missing.
+    """
+    if constitution.get("augmentation_applied") is True:
+        counts = augmented_rule_counts(constitution)
+        if counts["CONTRACT"] == 0 and counts["DATA"] == 0:
+            return ["constitution has augmentation_applied=True but no CONTRACT-* or DATA-* rules found"]
+    return []
