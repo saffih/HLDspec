@@ -158,3 +158,45 @@ STOP_BOUNDARY: Stop after plan.md. Do not create tasks.md or any other file."
 Key flags:
 - `--sandbox workspace-write` — grants file write access within the workspace
 - `--skip-git-repo-check` — required when workspace is not a git repo
+
+## Standard concerns (required on every HLDspec run)
+
+These concerns are mandatory and must be visible in generated artifacts before promotion:
+
+1. Design for testability
+- Explicit seams (ports/adapters/interfaces)
+- Unit/component/integration coverage intent
+- Deterministic test controls for time/random/external I/O
+
+2. Staging and non-disruptive validation
+- Test/staging environment strategy before user-impacting rollout
+- Data isolation/masking expectations
+- Rollback and smoke/regression validation path
+
+3. UI testability
+- Stable selectors/test ids/accessibility hooks where UI exists
+- Critical user journey validation plan
+- Explicit UI testing tool path (automation, assertions, evidence)
+
+4. Contract and refactor safety
+- Interface contract ownership per boundary
+- Source-of-truth and update timing ownership
+- Backward compatibility and migration constraints when refactoring
+
+5. Skeptic concern coverage
+- RunSkeptic reports must address these concerns explicitly.
+- Missing concern evidence is an ACTION/CONFLICT finding, not a silent pass.
+
+## Non-negotiables for junior/limited agents
+
+- Do not bypass checkpoint ownership.
+- Do not approve or promote artifacts.
+- Do not invent missing source-of-truth, contract, or update-timing values.
+- Do not patch generated artifacts as a fix; fix source or generator and rebuild.
+- Do not proceed to SpecKit without approved prework gate.
+
+## Known limitations
+
+- Artifact existence does not always imply completeness unless a validator enforces required keys.
+- Local static checks cannot guarantee production runtime safety.
+- Historical docs in `docs/` may describe prior states; use canonical and current run artifacts first.
