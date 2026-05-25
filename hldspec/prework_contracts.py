@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 
@@ -51,3 +52,32 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
     if unresolved:
         return [f"architecture disposition has {len(unresolved)} unresolved finding(s): {', '.join(unresolved[:5])}"]
     return []
+
+
+def stale_prework_artifacts(sync: Path) -> list[str]:
+    """Return list of blocker strings if prework artifacts are stale relative to spec_build_plan.json.
+
+    Stale = spec_build_plan.json was modified more recently than the prework artifact.
+    Returns [] if plan does not exist, if prework does not exist, or if prework is newer.
+    Only blocks when BOTH plan and prework exist AND plan is newer.
+    """
+    plan = sync / "spec_build_plan.json"
+    if not plan.exists():
+        return []
+
+    plan_mtime = plan.stat().st_mtime
+    blockers: list[str] = []
+
+    prework = sync / "speckit_prework_package.md"
+    if prework.exists() and plan_mtime > prework.stat().st_mtime:
+        blockers.append(
+            "speckit_prework_package.md is stale: spec_build_plan.json was modified after prework was built"
+        )
+
+    queue = sync / "speckit_invocation_queue.json"
+    if queue.exists() and plan_mtime > queue.stat().st_mtime:
+        blockers.append(
+            "speckit_invocation_queue.json is stale: spec_build_plan.json was modified after queue was built"
+        )
+
+    return blockers
