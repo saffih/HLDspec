@@ -36,7 +36,7 @@ class TargetSpecWorkOrderTest(unittest.TestCase):
 
     def test_work_order_orders_dependencies_before_dependents(self) -> None:
         plan = {
-            "plan_quality": {"decision": "FIX", "recommendation": "KEEP_PLAN", "conflicts": []},
+            "plan_quality": {"decision": "PASS", "recommendation": "KEEP_PLAN", "conflicts": []},
             "planned_specs": [
                 {"planned_spec_id": "002", "slug": "child", "depends_on_specs": ["001"]},
                 {"planned_spec_id": "001", "slug": "base", "depends_on_specs": []},

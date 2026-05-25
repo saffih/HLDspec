@@ -71,7 +71,7 @@ class SpecBuildPlanDebugTests(unittest.TestCase):
             json.dumps(
                 {
                     "plan_quality": {
-                        "decision": "FIX",
+                        "decision": "PASS",
                         "recommendation": "KEEP_PLAN",
                         "conflicts": [],
                     },
