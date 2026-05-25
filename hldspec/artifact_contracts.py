@@ -92,3 +92,30 @@ def validate_contract(artifact_name: str, data: dict[str, Any]) -> list[str]:
 
 def registered_artifacts() -> list[str]:
     return list(ARTIFACT_CONTRACTS.keys())
+
+
+def stale_registered_artifacts(sync: Path) -> list[str]:
+    """Return registered artifacts that are stale relative to their declared inputs.
+
+    An artifact is stale when at least one of its input_artifacts exists in
+    the sync directory and has a newer mtime than the output artifact.
+    Artifacts not present in the sync directory are skipped (not yet generated).
+    """
+    blockers: list[str] = []
+    for artifact_name, contract in ARTIFACT_CONTRACTS.items():
+        if not contract.input_artifacts:
+            continue
+        output = sync / artifact_name
+        if not output.exists():
+            continue
+        output_mtime = output.stat().st_mtime
+        newer_inputs = [
+            inp
+            for inp in contract.input_artifacts
+            if (sync / inp).exists() and (sync / inp).stat().st_mtime > output_mtime
+        ]
+        if newer_inputs:
+            blockers.append(
+                f"{artifact_name} is stale: newer input(s): {', '.join(newer_inputs)}"
+            )
+    return blockers
