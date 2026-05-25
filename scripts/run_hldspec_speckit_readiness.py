@@ -3,31 +3,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-def load_json(path: Path) -> dict[str, Any]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    for sync in (direct, nested):
-        if (sync / "speckit_constitution_context.json").exists() or (sync / "hldspec_speckit_spec_list.json").exists():
-            return sync
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    return select_sync_dir(workspace, ("speckit_constitution_context.json", "hldspec_speckit_spec_list.json"))
 
 
 def has_required_constitution_bits(context: dict[str, Any]) -> list[str]:
@@ -77,10 +65,10 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
 
 def build_review(workspace: Path) -> dict[str, Any]:
     sync = sync_dir(workspace)
-    arch = load_json(sync / "hldspec_architecture_analysis.json")
-    arch_disposition = load_json(sync / "hldspec_architecture_findings_disposition.json")
-    constitution = load_json(sync / "speckit_constitution_context.json")
-    spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
+    arch = load_json_dict(sync / "hldspec_architecture_analysis.json")
+    arch_disposition = load_json_dict(sync / "hldspec_architecture_findings_disposition.json")
+    constitution = load_json_dict(sync / "speckit_constitution_context.json")
+    spec_list = load_json_dict(sync / "hldspec_speckit_spec_list.json")
 
     missing: list[str] = []
     if not arch:
@@ -174,7 +162,7 @@ def main() -> int:
     data = build_review(workspace)
     json_path = sync / "hldspec_speckit_readiness.json"
     md_path = sync / "hldspec_speckit_readiness.md"
-    write_json(json_path, data)
+    write_json_dict(json_path, data)
     md_path.write_text(render_md(data), encoding="utf-8")
 
     print("HLDspec SpecKit readiness review generated:")
