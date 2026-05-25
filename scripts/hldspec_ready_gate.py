@@ -299,14 +299,38 @@ def main() -> int:
         )
 
     skeptic_review = repo / "scripts" / "run_skeptic_meta_review.py"
+    skeptic_evidence = repo / "scripts" / "review_runskeptic_evidence_quality.py"
+    meta_review_dir = out_dir / "runskeptic_meta_review"
+    meta_review_json = meta_review_dir / "hldspec_skeptic_meta_review.json"
+
     if skeptic_review.exists() and not args.structure_only:
         checks.append(
             run_check(
                 repo,
                 "runskeptic_meta_review",
-                [*py, str(skeptic_review), "--repo", str(repo), "--output-dir", str(out_dir / "runskeptic_meta_review"), "--fail-on-blocker"],
+                [*py, str(skeptic_review), "--repo", str(repo), "--output-dir", str(meta_review_dir), "--fail-on-blocker"],
             )
         )
+
+    if skeptic_evidence.exists() and not args.structure_only and meta_review_json.exists():
+        evidence_out = out_dir / "runskeptic_evidence_quality"
+        check = run_check(
+            repo,
+            "runskeptic_evidence_quality",
+            [*py, str(skeptic_evidence), str(meta_review_json), "--output-dir", str(evidence_out), "--fail-on-rework"],
+        )
+        # Override summary to name the exact artifact when blocking
+        if check.status != "PASS":
+            check = CheckResult(
+                name=check.name,
+                status=check.status,
+                command=check.command,
+                returncode=check.returncode,
+                summary=f"RunSkeptic evidence quality is REWORK_REQUIRED — fix {meta_review_json}",
+                stdout_tail=check.stdout_tail,
+                stderr_tail=check.stderr_tail,
+            )
+        checks.append(check)
 
     if args.flow_hld and not args.structure_only:
         flow_hld = Path(args.flow_hld).expanduser().resolve()
