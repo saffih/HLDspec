@@ -61,6 +61,20 @@ All P2 items done.
 
 ---
 
+## Architecture anchor (2026-05-25)
+
+**Stability architecture document added.** `docs/HLDSPEC_STABILITY_ARCHITECTURE.md` anchors the five principles (state machine core, artifact contracts, ports/adapters, event log, validator plugins) to known failure modes. Runtime implementation of message bus, port interfaces, and event log is **intentionally deferred** — the document names the direction; implementation happens in small slices when a specific failure mode becomes acute.
+
+Next small slices (no urgency order):
+1. Artifact contract registry skeleton (`hldspec/artifact_contracts.py`)
+2. Artifact freshness validator (extend `stale_prework_artifacts()`)
+3. Typed prework approval artifact with schema_version
+4. tests_v2 discovery in ready gate
+5. Shell-vs-ProjectMachine parity test
+6. Replace last deprecated "target-spec generation" markers in active docs
+
+---
+
 ## Architecture decisions record
 
 | Decision | Rationale |
