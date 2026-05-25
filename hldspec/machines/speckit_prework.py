@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hldspec.artifact_contracts import stale_registered_artifacts
+from hldspec.gates import prework_gate_status
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -47,19 +49,37 @@ class SpeckitPreworkMachine:
             )
 
         review = self._load_json(review_json)
-        status = review.get("status", "MISSING")
-        findings = review.get("findings", [])
-        blockers = [item for item in findings if isinstance(item, dict) and item.get("severity") == "BLOCKER"]
+        gate = prework_gate_status(review)
 
-        if status == "REWORK_REQUIRED" or blockers:
+        if not gate.ready:
             return blocked_result(
                 machine=self.name,
                 state="SPECKIT_PREWORK_REWORK",
                 kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
-                blocking_reason=f"SpecKit prework requires rework: status={status}, blockers={len(blockers)}.",
+                blocking_reason=(
+                    f"SpecKit prework requires rework: status={gate.status}, blockers={gate.blocker_count}."
+                ),
                 controlling_artifacts=(
                     ArtifactRef(path=str(review_json), role="quality_review_json"),
                     ArtifactRef(path=str(review_md), role="quality_review_report", required=False),
+                    ArtifactRef(path=str(package), role="speckit_prework_package"),
+                ),
+                forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+            )
+
+        workspace_root = Path(context.workspace)
+        stale = stale_registered_artifacts(sync, workspace=workspace_root)
+        if stale:
+            return blocked_result(
+                machine=self.name,
+                state="SPECKIT_PREWORK_STALE",
+                kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+                blocking_reason=(
+                    "Stale prework artifacts detected — inputs changed since last build. "
+                    "Rebuild before continuing: " + "; ".join(stale)
+                ),
+                controlling_artifacts=(
+                    ArtifactRef(path=str(review_json), role="quality_review_json"),
                     ArtifactRef(path=str(package), role="speckit_prework_package"),
                 ),
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),

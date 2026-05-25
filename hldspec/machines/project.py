@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from hldspec.command_runner import CommandRunner
+from hldspec.event_log import HldspecEvent, append_event, make_event_id
 from hldspec.handoff_docs import write_handoff_docs
 from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
@@ -44,12 +45,16 @@ class ProjectMachine:
                 return error_result(machine=self.name, state="FIRST_RUN_FAILED", message=f"project_first_run.sh failed rc={first.returncode}: {first.stderr[-1000:]}")
 
         raw_result = self.raw.run(context)
+        self._log_machine_completed(context, raw_result, from_state="START")
         if raw_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            self._log_terminal(context, raw_result)
             return self._wrap(raw_result)
 
         if raw_result.status == MachineStatus.CONTINUE:
             apply_result = self.apply.run(context)
+            self._log_machine_completed(context, apply_result, from_state=raw_result.state)
             if apply_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+                self._log_terminal(context, apply_result)
                 return self._wrap(apply_result)
         else:
             apply_result = raw_result
@@ -59,22 +64,72 @@ class ProjectMachine:
             return first_readonly
 
         plan_result = self.plan.run(context)
+        self._log_machine_completed(context, plan_result, from_state=apply_result.state)
         if plan_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            self._log_terminal(context, plan_result)
             return self._wrap(plan_result)
 
         prework_result = self.prework.run(context)
+        self._log_machine_completed(context, prework_result, from_state=plan_result.state)
         if prework_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            self._log_terminal(context, prework_result)
             return self._wrap(prework_result)
 
         sync = workspace / "firstrun" / ".specify" / "sync"
         write_handoff_docs(sync)
 
         approval_result = self.approval.run(context)
+        self._log_machine_completed(context, approval_result, from_state=prework_result.state)
         if approval_result.status in {MachineStatus.STOP_CHECKPOINT, MachineStatus.BLOCKED, MachineStatus.ERROR}:
+            self._log_terminal(context, approval_result)
             return self._wrap(approval_result)
 
         execution_result = self.execution.run(context)
+        self._log_machine_completed(context, execution_result, from_state=approval_result.state)
+        self._log_terminal(context, execution_result)
         return self._wrap(execution_result)
+
+    def _event_log_path(self, context: MachineContext) -> Path | None:
+        if not context.workspace:
+            return None
+        return Path(context.workspace) / ".specify" / "sync" / "hldspec_event_log.jsonl"
+
+    def _log_machine_completed(self, context: MachineContext, result: MachineResult, from_state: str) -> None:
+        log_path = self._event_log_path(context)
+        if log_path is None:
+            return
+        event = HldspecEvent(
+            event_id=make_event_id(result.machine, from_state),
+            timestamp=__import__("time").time(),
+            machine=result.machine,
+            from_state=from_state,
+            to_state=result.state,
+            event="machine_completed",
+            outputs=[ref.path for ref in result.artifacts_written],
+            decision=result.status.value,
+        )
+        append_event(log_path, event)
+
+    def _log_terminal(self, context: MachineContext, result: MachineResult) -> None:
+        log_path = self._event_log_path(context)
+        if log_path is None:
+            return
+        if result.status in {MachineStatus.DONE, MachineStatus.CONTINUE}:
+            event_name = "pipeline_complete"
+        elif result.status == MachineStatus.ERROR:
+            event_name = "pipeline_error"
+        else:
+            event_name = "pipeline_halted"
+        event = HldspecEvent(
+            event_id=make_event_id(self.name, result.state),
+            timestamp=__import__("time").time(),
+            machine=self.name,
+            from_state=result.state,
+            to_state=result.state,
+            event=event_name,
+            decision=result.status.value,
+        )
+        append_event(log_path, event)
 
     def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
         workspace = Path(context.workspace or ".")

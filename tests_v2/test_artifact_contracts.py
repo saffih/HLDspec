@@ -1,6 +1,17 @@
+import tempfile
+import time
 import unittest
+from pathlib import Path
 
-from hldspec.artifact_contracts import ARTIFACT_CONTRACTS, validate_contract, registered_artifacts
+from hldspec.artifact_contracts import (
+    ARTIFACT_CONTRACTS,
+    SYNC_LOCAL,
+    WORKSPACE_ROOT,
+    ArtifactInput,
+    stale_registered_artifacts,
+    validate_contract,
+    registered_artifacts,
+)
 
 
 class TestValidateContract(unittest.TestCase):
@@ -51,6 +62,90 @@ class TestContractIntegrity(unittest.TestCase):
     def test_artifact_name_matches_registry_key(self):
         for key, contract in ARTIFACT_CONTRACTS.items():
             self.assertEqual(key, contract.artifact_name)
+
+
+class TestArtifactInput(unittest.TestCase):
+    def test_default_location_is_sync_local(self):
+        ai = ArtifactInput(name="foo.json")
+        self.assertEqual(SYNC_LOCAL, ai.location)
+
+    def test_workspace_root_location(self):
+        ai = ArtifactInput(name="HLD.raw.md", location=WORKSPACE_ROOT)
+        self.assertEqual(WORKSPACE_ROOT, ai.location)
+
+    def test_hld_conversion_queue_uses_workspace_root_for_hld_raw(self):
+        contract = ARTIFACT_CONTRACTS["hld_conversion_decision_queue.json"]
+        hld_raw_spec = next(
+            (s for s in contract.input_specs if s.name == "HLD.raw.md"), None
+        )
+        self.assertIsNotNone(hld_raw_spec, "HLD.raw.md must be in input_specs")
+        self.assertEqual(WORKSPACE_ROOT, hld_raw_spec.location)
+
+
+class TestStaleRegisteredArtifacts(unittest.TestCase):
+
+    def _make_dirs(self, tmpdir: Path):
+        sync = tmpdir / ".specify" / "sync"
+        sync.mkdir(parents=True)
+        workspace = tmpdir
+        return sync, workspace
+
+    def test_no_artifacts_no_staleness(self):
+        with tempfile.TemporaryDirectory() as d:
+            sync, workspace = self._make_dirs(Path(d))
+            result = stale_registered_artifacts(sync, workspace=workspace)
+            self.assertEqual([], result)
+
+    def test_sync_local_input_newer_than_output_is_stale(self):
+        with tempfile.TemporaryDirectory() as d:
+            sync, workspace = self._make_dirs(Path(d))
+            output = sync / "spec_build_plan.json"
+            output.write_text("{}", encoding="utf-8")
+            time.sleep(0.02)
+            inp = sync / "hld_usecase_api_map.json"
+            inp.write_text("{}", encoding="utf-8")
+            result = stale_registered_artifacts(sync, workspace=workspace)
+            self.assertTrue(any("spec_build_plan.json" in r for r in result))
+
+    def test_workspace_root_input_newer_than_output_is_stale(self):
+        """HLD.raw.md at workspace root should trigger staleness."""
+        with tempfile.TemporaryDirectory() as d:
+            sync, workspace = self._make_dirs(Path(d))
+            output = sync / "hld_conversion_decision_queue.json"
+            output.write_text("{}", encoding="utf-8")
+            time.sleep(0.02)
+            hld_raw = workspace / "HLD.raw.md"
+            hld_raw.write_text("# raw hld", encoding="utf-8")
+            result = stale_registered_artifacts(sync, workspace=workspace)
+            self.assertTrue(
+                any("hld_conversion_decision_queue.json" in r for r in result),
+                f"Expected staleness for hld_conversion_decision_queue.json, got: {result}",
+            )
+
+    def test_workspace_root_staleness_not_detected_without_workspace_arg(self):
+        """Without workspace arg, WORKSPACE_ROOT inputs are skipped (no false positives)."""
+        with tempfile.TemporaryDirectory() as d:
+            sync, workspace = self._make_dirs(Path(d))
+            output = sync / "hld_conversion_decision_queue.json"
+            output.write_text("{}", encoding="utf-8")
+            time.sleep(0.02)
+            (workspace / "HLD.raw.md").write_text("# raw", encoding="utf-8")
+            result = stale_registered_artifacts(sync)  # no workspace arg
+            self.assertFalse(
+                any("hld_conversion_decision_queue.json" in r for r in result),
+                "Should not flag workspace-root staleness without workspace arg",
+            )
+
+    def test_output_missing_is_not_stale(self):
+        """An artifact that hasn't been generated yet is not 'stale'."""
+        with tempfile.TemporaryDirectory() as d:
+            sync, workspace = self._make_dirs(Path(d))
+            (sync / "hld_usecase_api_map.json").write_text("{}", encoding="utf-8")
+            result = stale_registered_artifacts(sync, workspace=workspace)
+            self.assertFalse(
+                any("spec_build_plan.json" in r for r in result),
+                "Missing output should not be reported as stale",
+            )
 
 
 if __name__ == "__main__":

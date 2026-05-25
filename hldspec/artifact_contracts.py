@@ -1,6 +1,19 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+
+# Input location constants
+SYNC_LOCAL = "sync"           # .specify/sync/<name>
+WORKSPACE_ROOT = "workspace"  # <workspace>/<name>  (e.g. HLD.raw.md)
+
+
+@dataclass
+class ArtifactInput:
+    """Declares a single input artifact with its location root."""
+    name: str
+    location: str = SYNC_LOCAL   # SYNC_LOCAL | WORKSPACE_ROOT
 
 
 @dataclass
@@ -11,7 +24,8 @@ class ArtifactContract:
     consumers: list[str]     # script/machine names
     required_fields: list[str]
     optional_fields: list[str] = field(default_factory=list)
-    input_artifacts: list[str] = field(default_factory=list)
+    input_artifacts: list[str] = field(default_factory=list)   # legacy: sync-local names
+    input_specs: list[ArtifactInput] = field(default_factory=list)  # typed, multi-root
     output_artifacts: list[str] = field(default_factory=list)
     notes: str = ""
 
@@ -54,7 +68,8 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         consumers=["RawHldConversionMachine", "ApplyHldConversionMachine"],
         required_fields=["questions"],
         optional_fields=[],
-        input_artifacts=["HLD.raw.md"],
+        input_artifacts=[],  # HLD.raw.md is workspace-root; use input_specs
+        input_specs=[ArtifactInput(name="HLD.raw.md", location=WORKSPACE_ROOT)],
         output_artifacts=[],
     ),
     "speckit_execution_state.json": ArtifactContract(
@@ -92,3 +107,48 @@ def validate_contract(artifact_name: str, data: dict[str, Any]) -> list[str]:
 
 def registered_artifacts() -> list[str]:
     return list(ARTIFACT_CONTRACTS.keys())
+
+
+def stale_registered_artifacts(sync: Path, workspace: Path | None = None) -> list[str]:
+    """Return registered artifacts that are stale relative to their declared inputs.
+
+    Checks both legacy input_artifacts (sync-local) and typed input_specs
+    which may be SYNC_LOCAL or WORKSPACE_ROOT.
+
+    Args:
+        sync: path to .specify/sync directory
+        workspace: path to workspace root; required to resolve WORKSPACE_ROOT inputs
+    """
+    blockers: list[str] = []
+    for artifact_name, contract in ARTIFACT_CONTRACTS.items():
+        has_inputs = bool(contract.input_artifacts or contract.input_specs)
+        if not has_inputs:
+            continue
+        output = sync / artifact_name
+        if not output.exists():
+            continue
+        output_mtime = output.stat().st_mtime
+        newer: list[str] = []
+
+        # Legacy sync-local inputs
+        for inp in contract.input_artifacts:
+            p = sync / inp
+            if p.exists() and p.stat().st_mtime > output_mtime:
+                newer.append(inp)
+
+        # Typed inputs (may be workspace-root)
+        for inp_spec in contract.input_specs:
+            if inp_spec.location == WORKSPACE_ROOT:
+                if workspace is None:
+                    continue  # can't check without workspace path
+                p = workspace / inp_spec.name
+            else:
+                p = sync / inp_spec.name
+            if p.exists() and p.stat().st_mtime > output_mtime:
+                newer.append(inp_spec.name)
+
+        if newer:
+            blockers.append(
+                f"{artifact_name} is stale: newer input(s): {', '.join(newer)}"
+            )
+    return blockers
