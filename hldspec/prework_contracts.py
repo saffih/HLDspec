@@ -140,6 +140,35 @@ def shallow_dossier_fields(dossier: dict[str, Any]) -> list[str]:
     return missing
 
 
+def specs_missing_test_plans(planned_specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one entry per spec that is missing required test plan fields.
+
+    Rules:
+      - Every spec must have a non-empty `ut_coverage_plan` (unit tests).
+      - Specs without `no_direct_user_story: true` must also have a non-empty
+        `ui_ux_test_plan` (end-to-end / user-journey tests).
+
+    Returns a list of dicts with keys: spec_id, missing_fields.
+    """
+    result: list[dict[str, Any]] = []
+    for spec in planned_specs:
+        if not isinstance(spec, dict):
+            continue
+        spec_id = str(spec.get("planned_spec_id", "?"))
+        missing: list[str] = []
+
+        if not spec.get("ut_coverage_plan"):
+            missing.append("ut_coverage_plan")
+
+        is_technical_foundation = bool(spec.get("no_direct_user_story"))
+        if not is_technical_foundation and not spec.get("ui_ux_test_plan"):
+            missing.append("ui_ux_test_plan")
+
+        if missing:
+            result.append({"spec_id": spec_id, "missing_fields": missing})
+    return result
+
+
 def stale_prework_artifacts(sync: Path) -> list[str]:
     """Return blockers if prework artifacts are stale relative to spec_build_plan.json."""
     plan = sync / "spec_build_plan.json"
