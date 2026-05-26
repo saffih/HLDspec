@@ -37,15 +37,27 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
         )
         return target
 
-    def test_generator_creates_context_artifacts_and_all_phase_prompts(self) -> None:
-        target = self.make_target()
-        result = subprocess.run(
+    def build_prompts(self, target: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
             [sys.executable, str(ROOT / "scripts" / "build_speckit_context_prompts.py"), str(target)],
             cwd=ROOT,
             text=True,
             capture_output=True,
             check=False,
         )
+
+    def validate_target(self, target: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "validate_hldspec_target.py"), str(target)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_generator_creates_context_artifacts_and_all_phase_prompts(self) -> None:
+        target = self.make_target()
+        result = self.build_prompts(target)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
         allowed = target / ".hldspec" / "allowed_evidence.json"
@@ -74,13 +86,7 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
 
     def test_validate_only_fails_when_prompt_missing_allowed_evidence(self) -> None:
         target = self.make_target()
-        subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "build_speckit_context_prompts.py"), str(target)],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
+        self.assertEqual(0, self.build_prompts(target).returncode)
         prompt = target / "prompts" / "speckit" / "001-api-foundation" / "01-specify.md"
         text = prompt.read_text(encoding="utf-8")
         prompt.write_text(text.replace("## Allowed evidence", "## Evidence"), encoding="utf-8")
@@ -97,13 +103,7 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
 
     def test_validate_only_fails_when_prompt_missing_runskeptic_trigger(self) -> None:
         target = self.make_target()
-        subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "build_speckit_context_prompts.py"), str(target)],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
+        self.assertEqual(0, self.build_prompts(target).returncode)
         prompt = target / "prompts" / "speckit" / "001-api-foundation" / "07-verify-runskeptic.md"
         text = prompt.read_text(encoding="utf-8")
         prompt.write_text(text.replace("## RunSkeptic triggers", "## Review triggers"), encoding="utf-8")
@@ -122,15 +122,73 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
         target = self.make_target()
         source = target / "targetHLD" / "HLD.md"
         before = source.read_text(encoding="utf-8")
-        result = subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / "build_speckit_context_prompts.py"), str(target)],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        result = self.build_prompts(target)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(before, source.read_text(encoding="utf-8"))
+
+    def test_validator_passes_on_generated_context_prompts(self) -> None:
+        target = self.make_target()
+        source = target / "targetHLD" / "HLD.md"
+        before = source.read_text(encoding="utf-8")
+        self.assertEqual(0, self.build_prompts(target).returncode)
+
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+        report = json.loads((target / ".hldspec" / "validation" / "context_prompt_validation.json").read_text(encoding="utf-8"))
+        self.assertEqual("PASS", report["status"])
+        self.assertEqual([], report["findings"])
+        self.assertEqual(before, source.read_text(encoding="utf-8"))
+
+    def test_validator_fails_when_allowed_evidence_is_missing(self) -> None:
+        target = self.make_target()
+        self.assertEqual(0, self.build_prompts(target).returncode)
+        (target / ".hldspec" / "allowed_evidence.json").unlink()
+
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 2)
+
+        report = json.loads((target / ".hldspec" / "validation" / "context_prompt_validation.json").read_text(encoding="utf-8"))
+        self.assertEqual("ACTION", report["status"])
+        self.assertTrue(any(item["check"] == "allowed_evidence" for item in report["findings"]))
+
+    def test_validator_fails_when_prompt_has_broad_read_phrase(self) -> None:
+        target = self.make_target()
+        self.assertEqual(0, self.build_prompts(target).returncode)
+        prompt = target / "prompts" / "speckit" / "001-api-foundation" / "03-plan.md"
+        prompt.write_text(prompt.read_text(encoding="utf-8") + "\nPlease read the whole repo before planning.\n", encoding="utf-8")
+
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 2)
+
+        report = json.loads((target / ".hldspec" / "validation" / "context_prompt_validation.json").read_text(encoding="utf-8"))
+        self.assertTrue(any(item["check"] == "forbidden_broad_read" for item in report["findings"]))
+
+    def test_validator_fails_when_implement_prompt_lacks_human_approval_guard(self) -> None:
+        target = self.make_target()
+        self.assertEqual(0, self.build_prompts(target).returncode)
+        prompt = target / "prompts" / "speckit" / "001-api-foundation" / "06-implement.md"
+        text = prompt.read_text(encoding="utf-8")
+        text = text.replace("human approval", "maintainer review").replace("APPROVED", "accepted")
+        prompt.write_text(text, encoding="utf-8")
+
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 2)
+
+        report = json.loads((target / ".hldspec" / "validation" / "context_prompt_validation.json").read_text(encoding="utf-8"))
+        self.assertTrue(any(item["check"] == "implement_human_approval" for item in report["findings"]))
+
+    def test_validator_writes_json_and_markdown_reports(self) -> None:
+        target = self.make_target()
+        self.assertEqual(0, self.build_prompts(target).returncode)
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+        json_report = target / ".hldspec" / "validation" / "context_prompt_validation.json"
+        md_report = target / ".hldspec" / "validation" / "context_prompt_validation.md"
+        self.assertTrue(json_report.exists())
+        self.assertTrue(md_report.exists())
+        self.assertIn("Status: `PASS`", md_report.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

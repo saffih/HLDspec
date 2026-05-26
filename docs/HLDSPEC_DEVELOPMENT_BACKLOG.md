@@ -54,8 +54,8 @@ Scale:
 | TargetWorkspaceAdapter | 5 | Adapter exists with legacy/new modes; agent-first continue now selects new layout. |
 | Use-case/API definition | 5 | Full UC catalog is now documented; implementation coverage and validators remain. |
 | Stateless external IO | 4 | Direction is documented; enforcement tests are incomplete. |
-| RunSkeptic enforcement | 3 | Required in docs/prompts; not yet enforced by machines or validators. |
-| Context economy | 2 | Principles are documented; context packs and validators are not implemented. |
+| RunSkeptic enforcement | 4 | Required in docs/prompts; prompt-level validator exists, but gate-machine enforcement remains. |
+| Context economy | 4 | Context packs, bounded prompts, and prompt validators exist; product-flow integration remains. |
 | SpecKit delegation templates | 2 | Desired structure is documented; generated templates are not complete/enforced. |
 | Validators and regression gates | 3 | Some tests exist; path-contract, command-surface, use-case, and promotion tests are missing. |
 
@@ -264,6 +264,8 @@ Current implementation note:
 
 ### P0-008 Validators
 
+Status: partially implemented for generated context economy and RunSkeptic prompts.
+
 Add validators for:
 
 - backend upgrade has trigger
@@ -274,6 +276,13 @@ Add validators for:
 - prompt includes cost/context rules
 - dependency graph and invocation queue match
 - generated handoff points to canonical backlog and handoff protocol
+
+Current implementation note:
+
+- `hldspec.validators` and `scripts/validate_hldspec_target.py` validate generated context economy artifacts and SpecKit prompt guardrails.
+- Reports are written under `target/.hldspec/validation/context_prompt_validation.json` and `.md`.
+- Covered checks include `allowed_evidence.json`, `forbidden_reads.md`, context pack JSON, prompt context markers, RunSkeptic triggers, valid model tiers, forbidden broad-read phrases, and implement-phase human approval guards.
+- Remaining work: backend trigger, principle evidence, constitution purity, package testability, dependency graph/queue parity, and handoff-pointer validators.
 
 ### P0-009 README and AGENTS alignment
 
@@ -287,12 +296,20 @@ Rules:
 
 ### P0-010 RunSkeptic enforcement
 
+Status: partially implemented at generated prompt validation level.
+
 Implementation still needed:
 
 - gate machines surface RunSkeptic status
 - prompt templates include RunSkeptic trigger points
 - validators block missing evidence
 - generated handoff packet lists RunSkeptic PASS/ACTION/CONFLICT status
+
+Current implementation note:
+
+- Bounded SpecKit prompts include RunSkeptic trigger points.
+- `scripts/validate_hldspec_target.py` blocks prompts that omit RunSkeptic triggers and records ACTION findings in target validation reports.
+- Remaining work: gate machines must surface RunSkeptic status, missing evidence must be enforced beyond prompt text, and generated handoff packets must include RunSkeptic PASS/ACTION/CONFLICT state.
 
 ### P0-011 Canonical target path contract
 

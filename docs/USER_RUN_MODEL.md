@@ -194,3 +194,13 @@ scripts/build_speckit_context_prompts.py <target>
 ```
 
 This generates context economy artifacts and bounded SpecKit phase prompts under the target workspace. It is not a public command yet; future product flow should expose this through a guarded `hldspec prework` or `hldspec speckit` path after validators and promotion gates are complete.
+
+## Context prompt validation
+
+Maintainer/debug tool:
+
+```bash
+scripts/validate_hldspec_target.py <target>
+```
+
+This validates generated context economy artifacts and bounded SpecKit prompts, including RunSkeptic triggers, model tiers, broad-read phrasing, and implement-phase human approval guards. It writes reports under `target/.hldspec/validation/`. It is not a public command.
