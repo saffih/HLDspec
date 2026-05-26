@@ -188,3 +188,13 @@ Prompts must also enforce cost/context economy:
 - inspect only allowed evidence
 - use weakest sufficient model
 - stop when blocked
+
+## Backend technology recommendation usage
+
+Generated prompts must include the selected backend technology recommendation for the current phase when relevant.
+
+The prompt must say whether a tool is a default or an upgrade.
+
+If it is an upgrade, the prompt must include the trigger and RunSkeptic result.
+
+Prompts must not include unrelated toolbox entries that bloat context.

@@ -209,3 +209,11 @@ The generated constitution should include target-specific principle-level rules 
 - cost/context economy
 
 The constitution must stay succinct and must not include feature-specific instructions.
+
+## Backend technology recommendation usage
+
+The constitution update plan may include backend technology principles only when they are durable target rules.
+
+Specific feature choices, branch names, task ids, and implementation details must stay out of the constitution.
+
+Backend choices that affect one package belong in spec packages and prompts.

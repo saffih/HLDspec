@@ -138,6 +138,16 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **Legacy Target Work Order** | Earlier HLDspec artifact for manual target-spec generation. It is not the controlling checkpoint when SpecKit is available. |
 
 
+
+## Runtime document usage terms
+
+| Term | Meaning |
+|---|---|
+| **Runtime Document Usage** | Rule that reusable guidance docs must be converted into target-specific artifacts, gates, and prompts during an HLDspec run. |
+| **Backend Technology Recommendation** | Short approved backend toolbox with one default and one upgrade per category, plus explicit triggers for upgrades. |
+| **Tool Upgrade** | Selection of a stronger backend/tooling option than the default; requires trigger, tests, observability, rollback path, and RunSkeptic result. |
+| **Design Principle Selection** | Target-specific subset of reusable design guidance selected for the current HLDspec run. |
+
 ## Software design principle terms
 
 | Term | Meaning |

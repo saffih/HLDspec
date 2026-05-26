@@ -427,3 +427,21 @@ It must not include:
 - branch names
 - implementation task ids
 - per-feature implementation details
+
+## Backend technology recommendation
+
+Use `docs/BACKEND_TECHNOLOGY_RECOMMENDATION.md` as the short approved backend toolbox.
+
+HLDspec must not select every architecture pattern. It must select the smallest useful set for the target project.
+
+Every optional upgrade must document:
+
+- trigger
+- reason
+- complexity added
+- tests required
+- observability required
+- rollback or simplification path
+- RunSkeptic result
+
+If a tool is selected without a trigger, mark ACTION and block promotion.

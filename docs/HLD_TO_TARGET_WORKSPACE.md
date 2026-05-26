@@ -247,3 +247,19 @@ The target workspace must preserve the design decisions needed to support:
 - cost/context economy
 
 These principles are not copied wholesale into every artifact. HLDspec must extract only the relevant principles into target-specific constitution rules, spec packages, and prompts.
+
+## Runtime document usage
+
+HLDspec must use `docs/HLDSPEC_RUNTIME_DOCUMENT_USAGE.md` during target workspace preparation.
+
+A correct run must convert reusable guidance into target-specific artifacts, including:
+
+- selected design principles
+- backend technology recommendation
+- constitution signals
+- spec packages
+- dependency graph
+- prompts
+- RunSkeptic gates
+
+Reusable docs are guidance. Target artifacts are the controlling outputs for the specific run.
