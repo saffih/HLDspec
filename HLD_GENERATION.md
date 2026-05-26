@@ -160,3 +160,100 @@ End with:
 | Unknown ownership/source-of-truth/spec mappings are marked `TBD` or `CONFLICT` | PASS/FAIL |
 | Unresolved design conflicts are marked with `CONFLICTS_WITH REF HLD-xxx` or `CONFLICT` | PASS/FAIL |
 ```
+
+## Resource-to-HLD capability
+
+HLDspec may create or improve a target HLD from multiple resources, not only from one existing HLD.
+
+Allowed resources include:
+
+- existing HLDs
+- design docs
+- architecture notes
+- API/interface notes
+- requirements
+- code references
+- testing requirements
+- deployment constraints
+- stakeholder decisions
+- RunSkeptic findings
+
+The generated HLD must live under `target/targetHLD/`.
+
+The working HLD must be:
+
+```text
+target/targetHLD/HLD.md
+```
+
+Raw source evidence must be preserved under:
+
+```text
+target/targetHLD/raw/
+```
+
+The HLD must expose enough structure for later HLDspec stages to extract:
+
+- project constitution principles
+- architecture boundaries
+- source-of-truth rules
+- API contracts
+- data ownership
+- dependencies
+- testability requirements
+- quality gates
+- implementation order
+- SpecKit-ready work packages
+
+## Additional required HLD subsections for target workspaces
+
+When creating or improving an HLD for HLDspec target workspace generation, major sections should include these subsections when relevant:
+
+```md
+### Testability
+
+Describe how this section can be tested:
+- unit tests
+- integration tests
+- end-to-end tests
+- required test seams
+- required test data
+- mocks/fakes/stubs
+- deterministic controls
+- missing test tools or blockers
+
+### SpecKit Packaging Notes
+
+Describe how this section should be sliced or grouped:
+- likely package boundary
+- dependencies
+- producer/consumer relationships
+- whether this belongs in constitution, a feature package, or both
+- implementation order constraints
+
+### Constitution Signals
+
+List principle-level rules this section implies:
+- source-of-truth rules
+- architecture boundaries
+- API/data ownership rules
+- security/reliability rules
+- testing/quality rules
+- deployment/environment rules
+```
+
+## Target workspace self-check additions
+
+Add these checks to the HLD Format Self-Check when the HLD is intended for `target/` generation:
+
+```md
+| Check | Status |
+|---|---|
+| Source resources used to create the HLD are listed and traceable | PASS/FAIL |
+| Every section has explicit testability guidance where relevant | PASS/FAIL |
+| Every section identifies unit/integration/e2e test expectations where relevant | PASS/FAIL |
+| Missing test tooling is marked `TBD` or `BLOCKER` | PASS/FAIL |
+| Constitution-level rules are principle-level, not feature-specific | PASS/FAIL |
+| SpecKit packaging notes are present for implementation-relevant sections | PASS/FAIL |
+| Architecture/source-of-truth uncertainty is marked `TBD` or `CONFLICT` | PASS/FAIL |
+```
