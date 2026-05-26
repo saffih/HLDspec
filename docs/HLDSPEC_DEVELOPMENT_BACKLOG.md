@@ -50,18 +50,18 @@ Scale:
 |---|---:|---|
 | Development handoff discipline | 7 | Canonical docs and generator exist; open-action/conflict quality still needs tightening. |
 | Agent-first product model | 5 | Docs and facade exist; orchestration is still mostly printed guidance. |
-| Target workspace clarity | 4 | Target layout is documented, but adapter, facade prompts, and machines disagree on first-run/sync paths. |
-| TargetWorkspaceAdapter | 4 | Adapter exists with legacy/new modes; ProjectMachine still constructs legacy by default. |
-| Use-case/API definition | 4 | Existing use-case doc has important scenarios, but it is not complete, current, or aligned with the new command surface. |
+| Target workspace clarity | 5 | Canonical new-layout paths are defined and partly tested; broader journey coverage remains. |
+| TargetWorkspaceAdapter | 5 | Adapter exists with legacy/new modes; agent-first continue now selects new layout. |
+| Use-case/API definition | 5 | Full UC catalog is now documented; implementation coverage and validators remain. |
 | Stateless external IO | 4 | Direction is documented; enforcement tests are incomplete. |
 | RunSkeptic enforcement | 3 | Required in docs/prompts; not yet enforced by machines or validators. |
 | Context economy | 2 | Principles are documented; context packs and validators are not implemented. |
 | SpecKit delegation templates | 2 | Desired structure is documented; generated templates are not complete/enforced. |
 | Validators and regression gates | 3 | Some tests exist; path-contract, command-surface, use-case, and promotion tests are missing. |
 
-Overall current mark: 4/10.
+Overall current mark: 5/10.
 
-Reason: the direction is correct, but unresolved source-of-truth and path-contract conflicts prevent treating `main` as product-stable.
+Reason: the path contract is mostly stabilized, but use-case implementation, command-matrix enforcement, validators, RunSkeptic gates, context economy, and promotion gates remain open.
 
 ## P0 backlog
 
@@ -559,7 +559,15 @@ Decision:
 
 ### CONFLICT-004 Use-case API doc vs current facade
 
-Decision needed:
+Decision: keep the current public surface small; mark richer commands as future and old names as legacy/debug.
+
+Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`.
+
+Future commands: `interview`, `prework`, `speckit`, `pause`.
+
+Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.
+
+Decision record:
 
 ```text
 Should the canonical public command set be start/status/review/continue/diff/doctor only, or should run/interview/prework/speckit-proxy/speckit/pause also be product commands?

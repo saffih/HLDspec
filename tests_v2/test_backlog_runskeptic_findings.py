@@ -10,7 +10,7 @@ class BacklogRunSkepticFindingsTests(unittest.TestCase):
 
     def test_backlog_records_readiness_mark_and_new_p0_items(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md").read_text(encoding="utf-8")
-        self.assertIn("Overall current mark: 4/10", text)
+        self.assertIn("Overall current mark: 5/10", text)
         for item in range(11, 18):
             self.assertIn(f"P0-{item:03d}", text)
         self.assertIn("Canonical target path contract", text)
@@ -37,7 +37,7 @@ class BacklogRunSkepticFindingsTests(unittest.TestCase):
     def test_product_scorecard_has_current_mark(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_PRODUCT_SCORECARD.md").read_text(encoding="utf-8")
         self.assertIn("Current readiness mark - 2026-05-26", text)
-        self.assertIn("Overall current mark: 4/10", text)
+        self.assertIn("Overall current mark: 5/10", text)
         self.assertIn("Promotion rule", text)
 
 

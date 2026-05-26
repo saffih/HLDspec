@@ -6,6 +6,36 @@ This document defines the simple user workflow for HLDspec.
 
 The user should not need to understand internal scripts to start.
 
+## Canonical command surface
+
+Current public product commands:
+
+| Command | Status | Notes |
+|---|---|---|
+| `hldspec start` | current | Prepare or resume a target session. |
+| `hldspec status` | current | Show target session status. |
+| `hldspec review` | current | Show human-relevant review files. |
+| `hldspec continue` | current | Run ProjectMachine to the next safe checkpoint. |
+| `hldspec diff` | current | Compare source hash with recorded target source hash. |
+| `hldspec doctor` | current | Check repo and target session prerequisites. |
+
+Future product commands:
+
+| Command | Status | Notes |
+|---|---|---|
+| `hldspec interview` | future | Collect missing source, target, intent, and constraints. |
+| `hldspec prework` | future | Generate use-case/API map, packages, graph, queue, and context packs. |
+| `hldspec speckit` | future | Delegate one approved SpecKit phase from bounded evidence. |
+| `hldspec pause` | future | Record a user-requested pause/checkpoint. |
+
+Legacy/debug commands:
+
+| Command or path | Status | Notes |
+|---|---|---|
+| `hldspec run` | legacy/debug | Older product runner name. |
+| `hldspec speckit-proxy` | legacy/debug | Older proxy naming. |
+| direct low-level scripts | legacy/debug | Maintainer/debug tools, not normal user workflow. |
+
 ## One-command start
 
 ```bash

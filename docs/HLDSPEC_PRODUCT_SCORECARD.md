@@ -21,15 +21,15 @@ This scorecard measures whether HLDspec is becoming a simple, robust, agent-firs
 
 ## Current readiness mark - 2026-05-26
 
-Overall current mark: 4/10.
+Overall current mark: 5/10.
 
 | Area | Mark | Blocker |
 |---|---:|---|
 | Development handoff discipline | 7 | Needs stronger open-action/conflict quality. |
 | Agent-first product model | 5 | Facade exists, but `continue` does not yet orchestrate ProjectMachine. |
-| Target workspace clarity | 4 | Path contract conflicts remain. |
-| TargetWorkspaceAdapter | 4 | Exists but product flow still defaults to legacy layout. |
-| Use-case/API definition | 4 | Use cases are partly defined but stale against current command surface. |
+| Target workspace clarity | 5 | Path contract mostly stabilized; broader journey coverage remains. |
+| TargetWorkspaceAdapter | 5 | Agent-first continue selects new layout; legacy remains for debug/compatibility. |
+| Use-case/API definition | 5 | UC catalog and command matrix documented; validators and implementation coverage remain. |
 | RunSkeptic enforcement | 3 | Mostly documented, not enforced. |
 | Context economy | 2 | Context-pack machinery not implemented. |
 

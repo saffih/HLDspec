@@ -54,57 +54,301 @@ HLDspec must not manually replace SpecKit.
 
 ## Current command surface status - 2026-05-26
 
-Current implemented facade:
+This section is the canonical command decision for the current product surface.
 
-```text
-hldspec start
-hldspec status
-hldspec review
-hldspec continue
-hldspec diff
-hldspec doctor
-```
+### Current public facade
 
-Legacy/debug or not-yet-current command names in this document:
+These commands are current product behavior:
 
-```text
-hldspec run
-hldspec interview
-hldspec prework
-hldspec speckit-proxy
-hldspec speckit
-hldspec pause
-```
+| Command | Status | Purpose |
+|---|---|---|
+| `hldspec start` | current | Prepare or resume an agent-first target session. |
+| `hldspec status` | current | Show recorded target session state and next action. |
+| `hldspec review` | current | Show human-relevant review/checkpoint files. |
+| `hldspec continue` | current | Run ProjectMachine to the next safe checkpoint through the new target layout. |
+| `hldspec diff` | current | Compare current source hash against the recorded target session hash. |
+| `hldspec doctor` | current | Check required docs/tools and target session files. |
+
+### Future product commands
+
+These names are valid future product concepts, but are not current public behavior until implemented and tested:
+
+| Command | Status | Purpose |
+|---|---|---|
+| `hldspec interview` | future | Collect missing source, target, intent, constraints, and approval expectations. |
+| `hldspec prework` | future | Generate use-case/API map, packages, graph, queue, context packs, and review material. |
+| `hldspec speckit` | future | Delegate exactly one approved SpecKit phase from bounded evidence. |
+| `hldspec pause` | future | Record an explicit user pause/checkpoint without advancing machines. |
+
+### Legacy/debug commands
+
+These names and direct scripts are not the normal product workflow:
+
+| Command or path | Status | Purpose |
+|---|---|---|
+| `hldspec run` | legacy/debug | Older runner name; do not document as current product behavior. |
+| `hldspec speckit-proxy` | legacy/debug | Older proxy naming; future product command should be `hldspec speckit`. |
+| direct low-level scripts | legacy/debug | Maintainer/debug tools used by agents or maintainers, not the user workflow. |
 
 Rule: use cases are canonical; command names are an interface mapping. A command must be marked current, future, or legacy/debug before docs can advertise it as product behavior.
 
+
 ## Complete use-case catalog target
 
-| Use case | Trigger | Command/API status | Main artifacts | Stop condition | Test expectation |
-|---|---|---|---|---|---|
-| UC-001 start with no source yet | user starts HLDspec without source | current/future interview path | session context, later `target/.hldspec/interview_answers.*` | source and target identified or human decision needed | no writes before target is known |
-| UC-002 start with source only | source provided, target absent | current `start` plus target selection | source HLD, target session | target chosen or created | source is read-only |
-| UC-003 create new target from raw HLD | source and target provided, no state | current `start` | `target/targetHLD/`, `target/.hldspec/` | next checkpoint generated | target layout matches adapter |
-| UC-004 adopt existing target without HLDspec state | target exists without session | current `start` mode adopt | target inspection, session manifest | adoption checkpoint | existing target not overwritten silently |
-| UC-005 resume existing HLDspec target | existing session | current `status`/`continue` | session, state, checkpoints | next safe action | no skipped gates |
-| UC-006 update after source/resources changed | source hash changed | current `diff`, future update path | input manifest, affected artifacts | affected rebuild plan | stale artifacts detected |
-| UC-007 upgrade after guidance/templates changed | HLDspec guidance changed | future upgrade path | guidance fingerprints, prompts | upgrade review | stale prompts detected |
-| UC-008 review checkpoint and capture human decisions | checkpoint exists | current `review`, future decision API | review files, decision queue | decisions recorded | machine-readable decision artifact |
-| UC-009 continue after approval | approval exists | current `continue`, needs ProjectMachine integration | ProjectMachine context | next machine checkpoint | `continue` invokes machine |
-| UC-010 handle unresolved conflict | conflict exists | current/future conflict gate | conflict artifact | human decision required | promotion blocked |
-| UC-011 generate use-case/API map | converted HLD available | future prework path | use-case/API map | map review | context-only sections not first features |
-| UC-012 generate package/dependency/invocation queue | use-case map ready | future prework path | packages, graph, queue | queue review | graph and queue match |
-| UC-013 generate context packs and bounded prompts | package ready | future prompt generation | context packs, allowed evidence, forbidden reads | prompt review | no broad-read prompt |
-| UC-014 delegate one SpecKit phase | approved package and phase | future speckit path | bounded dossier, phase prompt | phase complete or question escalated | one phase only |
-| UC-015 answer SpecKit clarification from evidence only | SpecKit asks question | future evidence answering path | evidence log, answer record | answer or escalation | answer cites allowed evidence |
-| UC-016 escalate unknown SpecKit question to human | evidence missing | future escalation path | question queue | human decision needed | unknown not guessed |
-| UC-017 verify SpecKit output and RunSkeptic findings | phase output exists | future verify path | verification report, findings | PASS/ACTION/CONFLICT | findings block promotion when unresolved |
-| UC-018 detect stale artifacts and rebuild affected outputs | inputs changed | future stale detection | artifact hashes, rebuild plan | affected rebuild done or review needed | stale dependency test |
-| UC-019 brownfield target with existing specs | specs already exist | future brownfield/adopt path | existing specs, drift report | human review | no overwrite without approval |
-| UC-020 user-requested pause before continuing | user requests pause | future/current human checkpoint behavior | state marker, handoff note | action withheld until user resumes | no further machine action |
-| UC-021 development handoff between agents/models | repo work transfers | current dev handoff | `.hldspec-dev/handoff/`, backlog | handoff packet generated | handoff includes backlog pointers |
-| UC-022 maintainer/debug direct-script run | maintainer debugging | legacy/debug | script outputs | explicit maintainer action | documented as non-product workflow |
-| UC-023 completed history / merged-work audit | completed work exists | future audit path | merge evidence, status map | history classified | no live work inferred from stale docs |
+Every use case below is part of the product contract. Current commands may not implement every use case yet, but each use case must have a stable owner, artifacts, stop condition, and test expectation before deeper orchestration or validator work proceeds.
+
+### UC-001 start with no source yet
+
+- Trigger: user starts HLDspec without a source path.
+- Preconditions: no reliable source HLD/resource path is known.
+- Command/API: future `hldspec interview`; current agent session may ask in chat before writing durable state.
+- Artifacts read: none required.
+- Artifacts written: none before target is known; after target is known, write `target/.hldspec/interview_answers.json` and `.md`.
+- Stop condition: source and target are identified, or a human decision is required.
+- Human decision: choose source and target.
+- Tests expected: no durable files are written before target is known.
+
+### UC-002 start with source only
+
+- Trigger: source HLD/resource path is provided, target is absent.
+- Preconditions: source exists and is readable; target is not known.
+- Command/API: current `hldspec start` requires target; future interview path should help choose target.
+- Artifacts read: source HLD/resources.
+- Artifacts written: none until target is chosen.
+- Stop condition: target chosen or created.
+- Human decision: approve target workspace path.
+- Tests expected: source remains read-only; no hidden state is written outside target.
+
+### UC-003 create new target from raw HLD
+
+- Trigger: source and target are provided; target has no HLDspec session state.
+- Preconditions: source exists; target does not exist or is safe to create.
+- Command/API: current `hldspec start --source <source> --target <target>`.
+- Artifacts read: source HLD/resources.
+- Artifacts written: `target/targetHLD/raw/HLD.raw.md`, `target/targetHLD/HLD.md`, `target/.hldspec/agent_session.json`, `target/.hldspec/agent_tool_manifest.md`, `target/prompts/agent/START_HLDSPEC_AGENT.md`.
+- Stop condition: target session prepared and next safe action printed.
+- Human decision: none unless target already contains conflicting state.
+- Tests expected: target layout matches `TargetWorkspaceAdapter(layout="new")`.
+
+### UC-004 adopt existing target without HLDspec state
+
+- Trigger: target exists but lacks `target/.hldspec/agent_session.json`.
+- Preconditions: target is a directory; source is known.
+- Command/API: current `hldspec start` auto-detects adopt mode.
+- Artifacts read: existing target tree, source HLD/resources.
+- Artifacts written: target session manifest and prompts only after safety checks.
+- Stop condition: adoption checkpoint or prepared session.
+- Human decision: required if existing target contains ambiguous or conflicting SpecKit/HLDspec artifacts.
+- Tests expected: existing target files are not overwritten silently.
+
+### UC-005 resume existing HLDspec target
+
+- Trigger: target has a session manifest.
+- Preconditions: `target/.hldspec/agent_session.json` exists.
+- Command/API: current `hldspec status`, `hldspec review`, `hldspec continue`.
+- Artifacts read: target session, state, review files, checkpoint files.
+- Artifacts written: event log and newly generated artifacts only when `continue` runs.
+- Stop condition: next safe checkpoint.
+- Human decision: required when checkpoint or conflict exists.
+- Tests expected: resume does not skip gates.
+
+### UC-006 update after source/resources changed
+
+- Trigger: current source hash differs from recorded source hash.
+- Preconditions: previous target session exists.
+- Command/API: current `hldspec diff`; future update workflow.
+- Artifacts read: source, recorded manifest, artifact hashes.
+- Artifacts written: stale report and affected rebuild plan.
+- Stop condition: affected outputs rebuilt or human review required.
+- Human decision: required if source change affects constitution, feature boundaries, or package order.
+- Tests expected: stale artifacts are detected and unaffected artifacts are not rebuilt.
+
+### UC-007 upgrade after HLDspec guidance/templates changed
+
+- Trigger: HLDspec guidance, templates, or validator rules changed.
+- Preconditions: target session exists.
+- Command/API: future upgrade workflow.
+- Artifacts read: guidance fingerprints, generated prompts, generated docs.
+- Artifacts written: upgrade plan and refreshed generated guidance where approved.
+- Stop condition: upgrade review or refreshed artifacts.
+- Human decision: required if upgrade changes build order, constitution, or package boundaries.
+- Tests expected: stale prompts/guidance are detected.
+
+### UC-008 review checkpoint and capture human decisions
+
+- Trigger: checkpoint or review files exist.
+- Preconditions: target session exists.
+- Command/API: current `hldspec review`; future decision capture API.
+- Artifacts read: review files, decision queues, conflicts.
+- Artifacts written: machine-readable decision artifact after user answers.
+- Stop condition: decision recorded or still awaiting human answer.
+- Human decision: answer checkpoint questions.
+- Tests expected: decisions are recorded in a controlled artifact and are replayable.
+
+### UC-009 continue after approval
+
+- Trigger: user requests progress after required approvals.
+- Preconditions: target session exists; no unresolved blocking conflict for the next step.
+- Command/API: current `hldspec continue`.
+- Artifacts read: session, approval records, state, queues, working HLD.
+- Artifacts written: event log, mirrored sync artifacts, next generated artifacts.
+- Stop condition: next safe checkpoint or pipeline completion.
+- Human decision: required if approval is missing or conflict is found.
+- Tests expected: `continue` invokes ProjectMachine with `workspace_layout="new"`.
+
+### UC-010 handle unresolved conflict
+
+- Trigger: conflict artifact exists or a machine returns conflict/blocking status.
+- Preconditions: target session exists.
+- Command/API: current/future conflict gate through `status`, `review`, and `continue`.
+- Artifacts read: conflict artifacts, review reports, state.
+- Artifacts written: no further generated product artifacts until resolved; optional handoff note.
+- Stop condition: human decision required.
+- Human decision: select resolution or defer.
+- Tests expected: promotion and continuation are blocked when unresolved conflict exists.
+
+### UC-011 generate use-case/API map
+
+- Trigger: working HLD is converted or sufficient raw evidence exists.
+- Preconditions: HLD evidence exists in target.
+- Command/API: future `hldspec prework`.
+- Artifacts read: working HLD, interview answers, source/resource manifest.
+- Artifacts written: `target/.hldspec/hld_usecase_api_map.json` and `.md`.
+- Stop condition: map review ready.
+- Human decision: required for unclear buildable/context-only sections.
+- Tests expected: context-only sections are not selected as first buildable features.
+
+### UC-012 generate package/dependency/invocation queue
+
+- Trigger: use-case/API map is ready.
+- Preconditions: buildable/context-only classification exists.
+- Command/API: future `hldspec prework`.
+- Artifacts read: use-case/API map, working HLD, constraints, existing specs if any.
+- Artifacts written: spec packages, dependency graph, invocation queue.
+- Stop condition: queue review ready.
+- Human decision: required if graph/order conflicts exist.
+- Tests expected: dependency graph and invocation queue match.
+
+### UC-013 generate context packs and bounded prompts
+
+- Trigger: package/dependency queue is approved or ready for review.
+- Preconditions: package id and allowed evidence are known.
+- Command/API: future prompt generation inside `hldspec prework`.
+- Artifacts read: package plan, allowed evidence list, constitution rules, backend choices.
+- Artifacts written: `target/.hldspec/context_packs/`, `allowed_evidence.json`, `forbidden_reads.md`, package prompts.
+- Stop condition: prompt review ready.
+- Human decision: required if prompt needs broad evidence or uncertain scope.
+- Tests expected: prompt validator rejects broad-read prompts.
+
+### UC-014 delegate one SpecKit phase
+
+- Trigger: approved package and phase are available.
+- Preconditions: bounded dossier exists; human approval permits the phase.
+- Command/API: future `hldspec speckit`.
+- Artifacts read: bounded dossier, phase prompt, allowed evidence.
+- Artifacts written: SpecKit-owned phase outputs and HLDspec execution log.
+- Stop condition: one phase completes or asks a question.
+- Human decision: required before implementation and for unknowns.
+- Tests expected: exactly one phase is delegated.
+
+### UC-015 answer SpecKit clarification from evidence only
+
+- Trigger: SpecKit asks a clarification question.
+- Preconditions: question is tied to one package/phase.
+- Command/API: future evidence-answering path under `hldspec speckit`.
+- Artifacts read: allowed evidence, question record, package context.
+- Artifacts written: answer record with evidence references or escalation record.
+- Stop condition: answer recorded or escalated.
+- Human decision: required when evidence is missing or ambiguous.
+- Tests expected: answers cite allowed evidence and never guess unknowns.
+
+### UC-016 escalate unknown SpecKit question to human
+
+- Trigger: SpecKit question cannot be answered from allowed evidence.
+- Preconditions: allowed evidence was checked.
+- Command/API: future escalation path.
+- Artifacts read: question, evidence manifest, package context.
+- Artifacts written: human question queue and checkpoint report.
+- Stop condition: human decision required.
+- Human decision: answer, defer, or update source/target intent.
+- Tests expected: unknowns are escalated rather than guessed.
+
+### UC-017 verify SpecKit output and RunSkeptic findings
+
+- Trigger: SpecKit phase output exists.
+- Preconditions: phase completed or produced reviewable artifacts.
+- Command/API: future verify path.
+- Artifacts read: SpecKit output, package prompt, expected outputs, RunSkeptic rules.
+- Artifacts written: verification report with PASS/ACTION/CONFLICT.
+- Stop condition: verified, action required, or conflict requires human decision.
+- Human decision: required for ACTION/CONFLICT promotion blockers.
+- Tests expected: unresolved findings block promotion.
+
+### UC-018 detect stale artifacts and rebuild affected outputs
+
+- Trigger: source, guidance, package graph, or SpecKit output changed.
+- Preconditions: fingerprints exist.
+- Command/API: future stale detection.
+- Artifacts read: input manifest, artifact hashes, dependency graph.
+- Artifacts written: stale report and rebuild plan.
+- Stop condition: affected rebuild plan ready or complete.
+- Human decision: required when rebuild changes approved decisions.
+- Tests expected: stale dependency test covers source and guidance changes.
+
+### UC-019 brownfield target with existing specs
+
+- Trigger: target already contains SpecKit specs or implementation artifacts.
+- Preconditions: target exists and contains existing work.
+- Command/API: future brownfield/adopt path.
+- Artifacts read: existing specs, implementation evidence, target state.
+- Artifacts written: drift report and adoption plan.
+- Stop condition: human review.
+- Human decision: approve adoption, preserve, or isolate existing work.
+- Tests expected: no overwrite without approval.
+
+### UC-020 user-requested pause before continuing
+
+- Trigger: user requests no further progress after current point.
+- Preconditions: any active session.
+- Command/API: future `hldspec pause`; current behavior should respect explicit human checkpoint.
+- Artifacts read: current session/state.
+- Artifacts written: pause marker or handoff note.
+- Stop condition: action withheld until user resumes.
+- Human decision: resume or change direction later.
+- Tests expected: no further machine action after pause marker.
+
+### UC-021 development handoff between agents/models
+
+- Trigger: repo-development work transfers to another agent/model/session.
+- Preconditions: local repo state is known.
+- Command/API: current development handoff generator.
+- Artifacts read: git status, backlog, handoff protocol, recent tests.
+- Artifacts written: `.hldspec-dev/handoff/HANDOFF.md` and `.json`.
+- Stop condition: handoff packet generated.
+- Human decision: approve next implementation step if needed.
+- Tests expected: handoff includes canonical backlog and handoff pointers.
+
+### UC-022 maintainer/debug direct-script run
+
+- Trigger: maintainer/debugging need.
+- Preconditions: user/agent intentionally leaves product facade.
+- Command/API: legacy/debug direct scripts.
+- Artifacts read: script-specific inputs.
+- Artifacts written: script-specific outputs, preferably under target-owned or debug-owned paths.
+- Stop condition: script exits and output is reviewed.
+- Human decision: required before promoting debug output into product flow.
+- Tests expected: direct scripts are documented as non-product workflow.
+
+### UC-023 completed history / merged-work audit
+
+- Trigger: target contains completed or merged history that may already satisfy planned work.
+- Preconditions: merge evidence or completed specs exist.
+- Command/API: future audit path.
+- Artifacts read: git history, completed specs, merge records, target status.
+- Artifacts written: completed-work audit and classification.
+- Stop condition: history classified as done, stale, or needs review.
+- Human decision: required when evidence is insufficient.
+- Tests expected: no live work is inferred from stale docs alone.
 
 ## Core user scenarios
 
@@ -645,4 +889,3 @@ First feature = first independently buildable system foundation
 ```
 
 The use-case/API map should catch this before prework approval.
-

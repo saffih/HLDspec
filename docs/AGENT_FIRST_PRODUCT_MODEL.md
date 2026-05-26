@@ -52,7 +52,7 @@ User
 
 ## User-facing commands
 
-The public product surface should be small:
+The current public product surface is intentionally small:
 
 ```text
 hldspec start
@@ -63,9 +63,24 @@ hldspec diff
 hldspec doctor
 ```
 
-Future controls such as `hldspec speckit` and `hldspec stop` must stay marked
-future until implemented in the facade and covered by parser tests. Low-level
-scripts remain available as agent tools and debug tools.
+Future controls must stay explicitly marked future until implemented and tested:
+
+```text
+hldspec interview
+hldspec prework
+hldspec speckit
+hldspec pause
+```
+
+Legacy/debug names and direct scripts are not normal product workflow:
+
+```text
+hldspec run
+hldspec speckit-proxy
+direct low-level scripts
+```
+
+Low-level scripts remain available as agent tools and maintainer/debug tools.
 
 ## Start command
 
