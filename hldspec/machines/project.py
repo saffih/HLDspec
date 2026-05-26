@@ -15,6 +15,7 @@ from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
 from hldspec.machines.speckit_execution import SpecKitExecutionMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
 from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class ProjectMachine:
@@ -34,10 +35,11 @@ class ProjectMachine:
             return error_result(machine=self.name, state="MISSING_CONTEXT", message="repo_root, source_hld, and workspace are required")
 
         repo = Path(context.repo_root)
-        workspace = Path(context.workspace)
+        adapter = TargetWorkspaceAdapter.from_workspace_str(context.workspace)
+        workspace = adapter.target_root
         if workspace.exists() and not workspace.is_dir():
             return error_result(machine=self.name, state="WORKSPACE_NOT_A_DIRECTORY", message=f"workspace must be a directory, got a file: {context.workspace}")
-        working_hld = workspace / "HLD.md"
+        working_hld = adapter.working_hld
 
         if not working_hld.exists():
             first = self._run_script(repo, "project_first_run.sh", context.source_hld, str(workspace))
@@ -75,8 +77,7 @@ class ProjectMachine:
             self._log_terminal(context, prework_result)
             return self._wrap(prework_result)
 
-        sync = workspace / "firstrun" / ".specify" / "sync"
-        write_handoff_docs(sync)
+        write_handoff_docs(adapter.sync_dir)
 
         approval_result = self.approval.run(context)
         self._log_machine_completed(context, approval_result, from_state=prework_result.state)
@@ -92,7 +93,7 @@ class ProjectMachine:
     def _event_log_path(self, context: MachineContext) -> Path | None:
         if not context.workspace:
             return None
-        return Path(context.workspace) / ".specify" / "sync" / "hldspec_event_log.jsonl"
+        return TargetWorkspaceAdapter.from_workspace_str(context.workspace).events_path
 
     def _log_machine_completed(self, context: MachineContext, result: MachineResult, from_state: str) -> None:
         log_path = self._event_log_path(context)
@@ -132,18 +133,16 @@ class ProjectMachine:
         append_event(log_path, event)
 
     def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
-        workspace = Path(context.workspace or ".")
-        review = workspace / "firstrun" / ".specify" / "sync" / "spec_build_plan_review.md"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(context.workspace or ".")
+        review = adapter.sync_dir / "spec_build_plan_review.md"
         if review.exists():
             return None
 
-        working_hld = workspace / "HLD.md"
-        firstrun = workspace / "firstrun"
-        result = self._run_script(repo, "first_run_readonly.sh", str(working_hld), str(firstrun), "--force")
+        result = self._run_script(repo, "first_run_readonly.sh", str(adapter.working_hld), str(adapter.firstrun_dir), "--force")
         if result.returncode not in {0, 2}:
             return error_result(machine=self.name, state="FIRST_READONLY_FAILED", message=f"first_run_readonly.sh failed rc={result.returncode}: {result.stderr[-1000:]}")
         if os.environ.get("HLDSPEC_ROLE_REVIEWS", "").strip().lower() == "local":
-            self._ensure_local_role_review_artifacts(working_hld, firstrun / ".specify" / "sync")
+            self._ensure_local_role_review_artifacts(adapter.working_hld, adapter.sync_dir)
         return None
 
     def _run_script(self, repo: Path, name: str, *args: str):
