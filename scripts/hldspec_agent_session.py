@@ -12,6 +12,14 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.machines.project import ProjectMachine
+from hldspec.result_renderer import render_machine_result
+from hldspec.state_machine import MachineContext
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
+
 SESSION_SCHEMA_VERSION = "1.0"
 
 
@@ -39,18 +47,21 @@ def json_read(path: Path) -> dict[str, Any]:
 
 
 def ensure_target_dirs(target: Path) -> None:
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
     for rel in [
         "targetHLD/raw",
         "targetHLD/sections",
         ".hldspec",
+        ".hldspec/sync",
+        ".hldspec/context_packs",
         ".specify/memory",
-        ".specify/sync",
         "prompts/agent",
         "prompts/tools",
         "prompts/speckit",
         "specs",
     ]:
         (target / rel).mkdir(parents=True, exist_ok=True)
+    adapter.events_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def detect_mode(target: Path, source_hash: str | None, requested_mode: str) -> str:
@@ -89,6 +100,7 @@ def copy_source(source: Path, target: Path) -> None:
 
 
 def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
     prompt = target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"
     source = session["source"]["path"]
     mode = session["mode"]
@@ -128,15 +140,15 @@ This is an agent-first workflow. Scripts are tools. You own orchestration, judgm
 ## First tools to consider
 
 ```bash
-bash scripts/first_run_readonly.sh "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'firstrun'}" --force
+scripts/hldspec continue --target "{target}"
 ```
 
 Then inspect:
 
 ```text
-target/.hldspec/firstrun/.specify/sync/spec_build_plan_review.md
-target/.hldspec/firstrun/.specify/sync/speckit_prework_quality_review.md
-target/.hldspec/firstrun/.specify/sync/speckit_proxy_dossier.md
+{adapter.sync_dir / 'spec_build_plan_review.md'}
+{adapter.sync_dir / 'speckit_prework_quality_review.md'}
+{adapter.sync_dir / 'speckit_proxy_dossier.md'}
 ```
 
 ## Required outputs
@@ -168,6 +180,7 @@ Stop after the next safe checkpoint and report:
 
 
 def write_tool_manifest(target: Path) -> Path:
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
     manifest = target / ".hldspec" / "agent_tool_manifest.md"
     manifest.write_text(
         f"""# HLDspec Agent Tool Manifest
@@ -177,13 +190,23 @@ Scripts are tools for the HLDspec agent.
 ## Preferred first analysis tool
 
 ```bash
-bash scripts/first_run_readonly.sh "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'firstrun'}" --force
+scripts/hldspec continue --target "{target}"
 ```
 
 ## V2 machine tool
 
 ```bash
-python3 scripts/hldspec_v2.py "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'v2-run'}"
+python3 scripts/hldspec_v2.py "{adapter.working_hld}" "{target}"
+```
+
+## Canonical target paths
+
+```text
+working_hld: {adapter.working_hld}
+raw_hld: {adapter.raw_hld}
+hldspec_sync: {adapter.sync_dir}
+event_log: {adapter.events_path}
+speckit_workspace: {adapter.specify_dir}
 ```
 
 ## Rules
@@ -224,8 +247,11 @@ def command_start(args: argparse.Namespace) -> int:
         },
         "target": str(target),
         "paths": {
-            "working_hld": str(target / "targetHLD" / "HLD.md"),
-            "raw_hld": str(target / "targetHLD" / "raw" / "HLD.raw.md"),
+            "working_hld": str(TargetWorkspaceAdapter(target_root=target, layout="new").working_hld),
+            "raw_hld": str(TargetWorkspaceAdapter(target_root=target, layout="new").raw_hld),
+            "hldspec_sync": str(TargetWorkspaceAdapter(target_root=target, layout="new").sync_dir),
+            "events": str(TargetWorkspaceAdapter(target_root=target, layout="new").events_path),
+            "specify_dir": str(TargetWorkspaceAdapter(target_root=target, layout="new").specify_dir),
             "start_prompt": str(target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"),
             "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
         },
@@ -276,6 +302,7 @@ def command_status(args: argparse.Namespace) -> int:
 
 def command_review(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
     review_paths = [
         target / ".hldspec" / "backend_technology_recommendation.md",
         target / ".hldspec" / "design_principles_selection.md",
@@ -283,8 +310,8 @@ def command_review(args: argparse.Namespace) -> int:
         target / ".hldspec" / "spec_packages.md",
         target / ".hldspec" / "feature_dependency_graph.md",
         target / ".hldspec" / "speckit_invocation_queue.md",
-        target / ".hldspec" / "firstrun" / ".specify" / "sync" / "spec_build_plan_review.md",
-        target / ".hldspec" / "firstrun" / ".specify" / "sync" / "speckit_prework_quality_review.md",
+        adapter.sync_dir / "spec_build_plan_review.md",
+        adapter.sync_dir / "speckit_prework_quality_review.md",
     ]
     print("Review these files if present:")
     for path in review_paths:
@@ -295,14 +322,22 @@ def command_review(args: argparse.Namespace) -> int:
 
 def command_continue(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
-    print("Agent-first continue:")
-    print(f"1. Open: {target / 'prompts' / 'agent' / 'START_HLDSPEC_AGENT.md'}")
-    print("2. Let the agent choose the next safe tool.")
-    print("3. Do not bypass RunSkeptic or human checkpoints.")
-    print()
-    print("Likely first tool:")
-    print(f"bash scripts/first_run_readonly.sh \"{target / 'targetHLD' / 'HLD.md'}\" \"{target / '.hldspec' / 'firstrun'}\" --force")
-    return 0
+    session = json_read(target / ".hldspec" / "agent_session.json")
+    source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
+    if not source:
+        print(f"ERROR: no source recorded in {target / '.hldspec' / 'agent_session.json'}", file=sys.stderr)
+        return 2
+
+    result = ProjectMachine().run(
+        MachineContext(
+            repo_root=str(ROOT),
+            source_hld=str(Path(source).expanduser()),
+            workspace=str(target),
+            metadata={"workspace_layout": "new"},
+        )
+    )
+    print(render_machine_result(result), end="")
+    return int(result.exit_code())
 
 
 def command_diff(args: argparse.Namespace) -> int:
@@ -373,7 +408,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_review)
 
-    p = sub.add_parser("continue", help="Print next agent/tool step.")
+    p = sub.add_parser("continue", help="Run ProjectMachine to the next safe checkpoint.")
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_continue)
 

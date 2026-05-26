@@ -71,9 +71,11 @@ class TestNewLayout(unittest.TestCase):
         legacy = TargetWorkspaceAdapter(target_root=self.root, layout="legacy")
         self.assertEqual(self.a.hldspec_dir, legacy.hldspec_dir)
 
-    def test_firstrun_dir_same_both_layouts(self) -> None:
-        legacy = TargetWorkspaceAdapter(target_root=self.root, layout="legacy")
-        self.assertEqual(self.a.firstrun_dir, legacy.firstrun_dir)
+    def test_firstrun_dir_new_is_tool_scratch_not_canonical_sync(self) -> None:
+        self.assertEqual(self.a.firstrun_dir, self.root / ".hldspec" / "tool-runs" / "firstrun")
+
+    def test_conversion_sync_dir_new_matches_hldspec_sync(self) -> None:
+        self.assertEqual(self.a.conversion_sync_dir, self.a.sync_dir)
 
 
 class TestFactory(unittest.TestCase):

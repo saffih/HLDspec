@@ -22,7 +22,8 @@ class BacklogRunSkepticFindingsTests(unittest.TestCase):
         self.assertIn("CONFLICT-003 First-run and sync path ownership", text)
         self.assertIn("CONFLICT-004 Use-case API doc vs current facade", text)
         self.assertIn("target/.hldspec/sync", text)
-        self.assertIn("target/.specify/sync", text)
+        self.assertIn("target/.hldspec/events.jsonl", text)
+        self.assertIn("target/.specify/", text)
 
     def test_usecase_doc_has_complete_catalog_and_command_status(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")

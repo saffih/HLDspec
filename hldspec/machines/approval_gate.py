@@ -11,14 +11,18 @@ from hldspec.state_machine import (
     continue_result,
     human_checkpoint,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class ApprovalGateMachine:
     name = "ApprovalGateMachine"
 
     def run(self, context: MachineContext) -> MachineResult:
-        workspace = Path(context.workspace or ".")
-        sync = workspace / "firstrun" / ".specify" / "sync"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace or ".",
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        sync = adapter.sync_dir
 
         # If the human has already recorded approval, advance to execution.
         approval_path = sync / "speckit_prework_approval.json"

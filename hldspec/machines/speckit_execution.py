@@ -30,6 +30,7 @@ from hldspec.state_machine import (
     error_result,
     human_checkpoint,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 _STATE_FILE = "speckit_execution_state.json"
 
@@ -100,7 +101,11 @@ class SpecKitExecutionMachine:
                 message="workspace is required",
             )
 
-        sync = Path(context.workspace) / "firstrun" / ".specify" / "sync"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace,
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        sync = adapter.sync_dir
         queue_path = sync / "speckit_invocation_queue.json"
         state_path = sync / _STATE_FILE
         constitution_path = sync / "constitution_update_plan.json"

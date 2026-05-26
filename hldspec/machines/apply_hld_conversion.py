@@ -17,6 +17,7 @@ from hldspec.state_machine import (
     done_result,
     error_result,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class ApplyHldConversionMachine:
@@ -34,9 +35,12 @@ class ApplyHldConversionMachine:
             )
 
         repo_root = Path(context.repo_root)
-        workspace = Path(context.workspace)
-        sync = workspace / ".specify" / "sync"
-        working_hld = workspace / "HLD.md"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace,
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        sync = adapter.conversion_sync_dir
+        working_hld = adapter.working_hld
         queue_json = sync / "hld_conversion_decision_queue.json"
         apply_script = repo_root / "scripts" / "apply_hld_conversion_decisions.py"
 

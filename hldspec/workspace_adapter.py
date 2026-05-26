@@ -8,6 +8,7 @@ Two layouts are supported:
     hldspec_dir  = <root>/.hldspec
     specify_dir  = <root>/.specify
     sync_dir     = <root>/firstrun/.specify/sync
+    conversion_sync_dir = <root>/.specify/sync
     events_path  = <root>/.specify/sync/hldspec_event_log.jsonl
     firstrun_dir = <root>/firstrun
 
@@ -18,14 +19,14 @@ Two layouts are supported:
     specify_dir  = <root>/.specify
     sync_dir     = <root>/.hldspec/sync
     events_path  = <root>/.hldspec/events.jsonl
-    firstrun_dir = <root>/firstrun  (unchanged)
+    firstrun_dir = <root>/.hldspec/tool-runs/firstrun
 
 All machines should obtain paths from the adapter instead of assembling them
 inline, so switching layouts only requires changing the adapter construction.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -64,6 +65,8 @@ class TargetWorkspaceAdapter:
 
     @property
     def firstrun_dir(self) -> Path:
+        if self.layout == "new":
+            return self.hldspec_dir / "tool-runs" / "firstrun"
         return self.target_root / "firstrun"
 
     @property
@@ -71,6 +74,12 @@ class TargetWorkspaceAdapter:
         if self.layout == "new":
             return self.hldspec_dir / "sync"
         return self.firstrun_dir / ".specify" / "sync"
+
+    @property
+    def conversion_sync_dir(self) -> Path:
+        if self.layout == "new":
+            return self.sync_dir
+        return self.specify_dir / "sync"
 
     @property
     def events_path(self) -> Path:

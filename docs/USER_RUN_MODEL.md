@@ -44,7 +44,6 @@ hldspec start
   -> hldspec status
   -> hldspec review
   -> hldspec continue
-  -> hldspec speckit --next
 ```
 
 ## Status
@@ -89,13 +88,16 @@ Continues the next safe HLDspec step through the agent/tool plan.
 
 It must not silently skip review gates.
 
-## SpecKit
+## Future SpecKit Command
 
 ```bash
 hldspec speckit --target ./target --next
 ```
 
-Runs or prepares the next approved SpecKit delegation.
+Future command. The current product facade is `start`, `status`, `review`,
+`continue`, `diff`, and `doctor`. Today, `hldspec continue` advances the
+ProjectMachine to the next safe checkpoint and blocks before unapproved SpecKit
+work.
 
 SpecKit owns:
 

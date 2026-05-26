@@ -59,13 +59,13 @@ hldspec start
 hldspec status
 hldspec review
 hldspec continue
-hldspec speckit
 hldspec diff
 hldspec doctor
-hldspec stop
 ```
 
-Low-level scripts remain available as agent tools and debug tools.
+Future controls such as `hldspec speckit` and `hldspec stop` must stay marked
+future until implemented in the facade and covered by parser tests. Low-level
+scripts remain available as agent tools and debug tools.
 
 ## Start command
 

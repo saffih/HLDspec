@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -35,16 +36,24 @@ class ProjectMachine:
             return error_result(machine=self.name, state="MISSING_CONTEXT", message="repo_root, source_hld, and workspace are required")
 
         repo = Path(context.repo_root)
-        adapter = TargetWorkspaceAdapter.from_workspace_str(context.workspace)
+        adapter = self._adapter(context)
         workspace = adapter.target_root
         if workspace.exists() and not workspace.is_dir():
             return error_result(machine=self.name, state="WORKSPACE_NOT_A_DIRECTORY", message=f"workspace must be a directory, got a file: {context.workspace}")
         working_hld = adapter.working_hld
 
+        if adapter.layout == "new":
+            self._ensure_new_layout_hld(adapter, Path(context.source_hld))
+
         if not working_hld.exists():
             first = self._run_script(repo, "project_first_run.sh", context.source_hld, str(workspace))
             if first.returncode not in {0, 2}:
                 return error_result(machine=self.name, state="FIRST_RUN_FAILED", message=f"project_first_run.sh failed rc={first.returncode}: {first.stderr[-1000:]}")
+
+        if adapter.layout == "new" and not (adapter.conversion_sync_dir / "hld_conversion_decision_queue.json").exists():
+            first_readonly = self._ensure_first_readonly(repo, context)
+            if first_readonly is not None:
+                return first_readonly
 
         raw_result = self.raw.run(context)
         self._log_machine_completed(context, raw_result, from_state="START")
@@ -93,7 +102,7 @@ class ProjectMachine:
     def _event_log_path(self, context: MachineContext) -> Path | None:
         if not context.workspace:
             return None
-        return TargetWorkspaceAdapter.from_workspace_str(context.workspace).events_path
+        return self._adapter(context).events_path
 
     def _log_machine_completed(self, context: MachineContext, result: MachineResult, from_state: str) -> None:
         log_path = self._event_log_path(context)
@@ -133,7 +142,7 @@ class ProjectMachine:
         append_event(log_path, event)
 
     def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
-        adapter = TargetWorkspaceAdapter.from_workspace_str(context.workspace or ".")
+        adapter = self._adapter(context)
         review = adapter.sync_dir / "spec_build_plan_review.md"
         if review.exists():
             return None
@@ -141,9 +150,42 @@ class ProjectMachine:
         result = self._run_script(repo, "first_run_readonly.sh", str(adapter.working_hld), str(adapter.firstrun_dir), "--force")
         if result.returncode not in {0, 2}:
             return error_result(machine=self.name, state="FIRST_READONLY_FAILED", message=f"first_run_readonly.sh failed rc={result.returncode}: {result.stderr[-1000:]}")
+        self._mirror_tool_sync(adapter)
         if os.environ.get("HLDSPEC_ROLE_REVIEWS", "").strip().lower() == "local":
             self._ensure_local_role_review_artifacts(adapter.working_hld, adapter.sync_dir)
         return None
+
+    def _adapter(self, context: MachineContext) -> TargetWorkspaceAdapter:
+        return TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace or ".",
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+
+    @staticmethod
+    def _ensure_new_layout_hld(adapter: TargetWorkspaceAdapter, source_hld: Path) -> None:
+        adapter.raw_hld.parent.mkdir(parents=True, exist_ok=True)
+        adapter.working_hld.parent.mkdir(parents=True, exist_ok=True)
+        if source_hld.exists() and not adapter.raw_hld.exists():
+            shutil.copyfile(source_hld, adapter.raw_hld)
+        if source_hld.exists() and not adapter.working_hld.exists():
+            shutil.copyfile(source_hld, adapter.working_hld)
+
+    @staticmethod
+    def _mirror_tool_sync(adapter: TargetWorkspaceAdapter) -> None:
+        if adapter.layout != "new":
+            return
+        generated_sync = adapter.firstrun_dir / ".specify" / "sync"
+        if not generated_sync.exists():
+            return
+        adapter.sync_dir.mkdir(parents=True, exist_ok=True)
+        for item in generated_sync.iterdir():
+            dest = adapter.sync_dir / item.name
+            if item.is_dir():
+                if dest.exists() and not dest.is_dir():
+                    dest.unlink()
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, dest)
 
     def _run_script(self, repo: Path, name: str, *args: str):
         script = repo / "scripts" / name

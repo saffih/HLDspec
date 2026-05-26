@@ -89,6 +89,47 @@ class ProjectMachineV2Tests(unittest.TestCase):
         self.assertEqual(MachineStatus.ERROR, result.status)
         self.assertEqual("FIRST_RUN_FAILED", result.state)
 
+    def test_agent_first_new_layout_uses_target_hld_and_hldspec_events(self) -> None:
+        repo = Path(tempfile.mkdtemp())
+        scripts = repo / "scripts"
+        scripts.mkdir()
+        (scripts / "first_run_readonly.sh").write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\nhld=\"$1\"; out=\"$2\"\n"
+            'mkdir -p "$out/.specify/sync"\n'
+            'printf "%s\\n" "$hld" > "$out/.specify/sync/received_hld_path.txt"\n'
+            "cat > \"$out/.specify/sync/hld_conversion_decision_queue.json\" <<'JSON'\n"
+            '{"questions":[{"question_id":"Q-001","source_candidate_id":"HLD-001",'
+            '"title":"Test","question":"Keep?","options":["KEEP","SPLIT"],'
+            '"human_decision":"TBD","blocking":true}]}\n'
+            "JSON\n"
+            "exit 2\n",
+            encoding="utf-8",
+        )
+        for file in scripts.iterdir():
+            file.chmod(file.stat().st_mode | stat.S_IEXEC)
+
+        source = repo / "Source-HLD.md"
+        source.write_text("# Raw HLD\n\n## Milestones\n\nBody.\n", encoding="utf-8")
+        target = repo / "target"
+
+        result = ProjectMachine().run(
+            MachineContext(
+                repo_root=str(repo),
+                source_hld=str(source),
+                workspace=str(target),
+                metadata={"workspace_layout": "new"},
+            )
+        )
+
+        self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
+        self.assertEqual("HLD_CONVERSION_DECISIONS", result.state)
+        self.assertTrue((target / "targetHLD" / "HLD.md").exists())
+        self.assertTrue((target / ".hldspec" / "sync" / "hld_conversion_decision_queue.json").exists())
+        self.assertFalse((target / ".specify" / "sync" / "hld_conversion_decision_queue.json").exists())
+        received = target / ".hldspec" / "sync" / "received_hld_path.txt"
+        self.assertEqual(str(target / "targetHLD" / "HLD.md"), received.read_text(encoding="utf-8").strip())
+        self.assertTrue((target / ".hldspec" / "events.jsonl").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

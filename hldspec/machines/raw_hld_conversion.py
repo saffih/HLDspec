@@ -17,6 +17,7 @@ from hldspec.state_machine import (
     error_result,
     human_checkpoint,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class RawHldConversionMachine:
@@ -26,10 +27,13 @@ class RawHldConversionMachine:
         if not context.workspace:
             return error_result(machine=self.name, state="NO_WORKSPACE", message="workspace is required")
 
-        workspace = Path(context.workspace)
-        working_hld = workspace / "HLD.md"
-        queue_json = workspace / ".specify" / "sync" / "hld_conversion_decision_queue.json"
-        queue_md = workspace / ".specify" / "sync" / "hld_conversion_decision_queue.md"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace,
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        working_hld = adapter.working_hld
+        queue_json = adapter.conversion_sync_dir / "hld_conversion_decision_queue.json"
+        queue_md = adapter.conversion_sync_dir / "hld_conversion_decision_queue.md"
 
         if not working_hld.exists():
             return blocked_result(

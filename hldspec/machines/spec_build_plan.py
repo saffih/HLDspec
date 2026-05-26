@@ -14,6 +14,7 @@ from hldspec.state_machine import (
     continue_result,
     human_checkpoint,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 SPEC_PLAN_DECISION_ID = "SPEC-BUILD-PLAN-001"
@@ -38,8 +39,11 @@ class SpecBuildPlanMachine:
                 quality={},
             )
 
-        workspace = Path(context.workspace)
-        sync = workspace / "firstrun" / ".specify" / "sync"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace,
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        sync = adapter.sync_dir
         review = sync / "spec_build_plan_review.md"
         plan_path = sync / "spec_build_plan.json"
         decision_path = sync / "spec_build_plan_gate_decision.json"

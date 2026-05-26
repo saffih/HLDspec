@@ -14,6 +14,7 @@ from hldspec.state_machine import (
     blocked_result,
     continue_result,
 )
+from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class SpeckitPreworkMachine:
@@ -28,7 +29,11 @@ class SpeckitPreworkMachine:
                 blocking_reason="workspace is required",
             )
 
-        sync = Path(context.workspace) / "firstrun" / ".specify" / "sync"
+        adapter = TargetWorkspaceAdapter.from_workspace_str(
+            context.workspace,
+            layout=context.metadata.get("workspace_layout", "legacy"),
+        )
+        sync = adapter.sync_dir
         package = sync / "speckit_prework_package.md"
         review_json = sync / "speckit_prework_quality_review.json"
         review_md = sync / "speckit_prework_quality_review.md"
@@ -67,7 +72,7 @@ class SpeckitPreworkMachine:
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
             )
 
-        workspace_root = Path(context.workspace)
+        workspace_root = adapter.target_root
         stale = stale_registered_artifacts(sync, workspace=workspace_root)
         if stale:
             return blocked_result(

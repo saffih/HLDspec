@@ -42,6 +42,19 @@ target/
   .hldspec/
     state.json
     state.md
+    sync/
+      hld_conversion_decision_queue.json
+      hld_conversion_decision_queue.md
+      spec_build_plan.json
+      spec_build_plan.md
+      spec_build_plan_review.md
+      speckit_prework_quality_review.json
+      speckit_prework_quality_review.md
+      speckit_proxy_dossier.json
+      speckit_proxy_dossier.md
+    events.jsonl
+    tool-runs/
+      firstrun/
     constitution_signals.json
     constitution_update_plan.json
     constitution_update_plan.md
@@ -57,9 +70,6 @@ target/
   .specify/
     memory/
       constitution.md
-    sync/
-      speckit_proxy_dossier.json
-      speckit_proxy_dossier.md
 
   prompts/
     mediator/
@@ -103,9 +113,20 @@ It contains:
 
 HLDspec-owned control and planning artifacts.
 
+Canonical HLDspec runtime artifacts for the agent-first target layout live under
+`target/.hldspec/sync/`. Legacy tools may still generate scratch files under
+`target/.hldspec/tool-runs/`, but machine-readable promotion paths must use the
+adapter-backed `.hldspec/sync/` location.
+
+The canonical agent-first event log is `target/.hldspec/events.jsonl`.
+
 ### `target/.specify/`
 
 SpecKit-owned workspace files.
+
+HLDspec must not write new review, planning, queue, or event artifacts here.
+SpecKit-owned final artifacts and constitution memory remain under `.specify/`
+and `specs/`.
 
 ### `target/prompts/`
 

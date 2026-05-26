@@ -31,6 +31,13 @@ Rules:
 
 This is a working mark for the current `main` branch after the agent-first facade, development handoff/backlog, and TargetWorkspaceAdapter changes.
 
+Update from the path-contract patch:
+
+- canonical agent-first HLDspec-owned sync path is `target/.hldspec/sync/`
+- canonical agent-first event log path is `target/.hldspec/events.jsonl`
+- `target/.specify/` remains SpecKit-owned
+- legacy scripts may write scratch output under `target/.hldspec/tool-runs/`, then ProjectMachine mirrors promoted artifacts through `TargetWorkspaceAdapter`
+
 Scale:
 
 ```text
@@ -257,13 +264,12 @@ Implementation still needed:
 
 Define one canonical path contract before further migration.
 
-Current conflict:
+Current contract:
 
 ```text
-Target layout doc says: target/.specify/sync/
-TargetWorkspaceAdapter new layout says: target/.hldspec/sync/
-Agent facade prompt says: target/.hldspec/firstrun/.specify/sync/
-ProjectMachine legacy layout says: target/firstrun/.specify/sync/ and target/.specify/sync/events
+Canonical agent-first layout: target/.hldspec/sync/ and target/.hldspec/events.jsonl.
+Legacy/debug layout: workspace/firstrun/.specify/sync/ and workspace/.specify/sync/hldspec_event_log.jsonl.
+SpecKit-owned layout: target/.specify/ and target/specs/.
 ```
 
 Acceptance:
@@ -523,42 +529,33 @@ Required implementation:
 
 ### CONFLICT-002 Target layout migration strategy
 
-Decision still needed:
+Decision:
 
 ```text
-Migrate ProjectMachine directly to target/targetHLD,
-or introduce TargetWorkspaceAdapter and migrate gradually.
+Use TargetWorkspaceAdapter and migrate machines incrementally.
 ```
 
-Safe recommendation:
+Implementation rule:
 
 ```text
-Add TargetWorkspaceAdapter first.
-Then migrate machines incrementally.
+Agent-first ProjectMachine calls use `layout="new"`.
+Legacy/debug runs may keep `layout="legacy"` until migrated.
 ```
 
 ### CONFLICT-003 First-run and sync path ownership
 
-Decision needed:
+Resolved decision:
 
 ```text
 Should first-run review/sync artifacts live under target/.hldspec/, target/.specify/, or target/firstrun/.specify/sync/?
 ```
 
-Thesis:
+Decision:
 
-- HLDspec-owned review and planning artifacts should live under `target/.hldspec/`.
-
-Antithesis:
-
-- Existing machines and SpecKit-adjacent tools already expect `.specify/sync` style paths.
-
-Safe recommendation:
-
-- choose one adapter-backed contract.
-- allow legacy reads temporarily.
-- write new HLDspec-owned artifacts only to HLDspec-owned paths.
-- keep SpecKit-owned final artifacts under `.specify/` and `specs/`.
+- HLDspec-owned review and planning artifacts live under `target/.hldspec/sync/` for the agent-first layout.
+- Event history lives under `target/.hldspec/events.jsonl`.
+- SpecKit-owned final artifacts remain under `target/.specify/` and `target/specs/`.
+- Legacy/debug runs may still read or write old `.specify/sync` shapes through the adapter during migration.
 
 ### CONFLICT-004 Use-case API doc vs current facade
 
