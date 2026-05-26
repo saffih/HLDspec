@@ -82,6 +82,8 @@ Full archive contents: [`docs/archive/`](archive/)
 | [`HLDSPEC_PRODUCT_SCORECARD.md`](HLDSPEC_PRODUCT_SCORECARD.md) | Product scorecard for simplicity, target workspace, RunSkeptic, and agent-first execution |
 | [`HLDSPEC_OUTPUT_CONTRACT.md`](HLDSPEC_OUTPUT_CONTRACT.md) | Stable user-facing command sections, PASS/ACTION/CONFLICT wording, report paths, and exit code semantics |
 | [`HLDSPEC_QUALITY_REQUIREMENTS.md`](HLDSPEC_QUALITY_REQUIREMENTS.md) | User UX, agent UX, output quality, safety, testing, and promotion/readiness quality requirements |
+| [`HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md`](HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md) | Matrix mapping HLDspec design principles to enforcement, tests, and gaps |
+| [`HLDSPEC_SELF_DOGFOOD_CONTRACT.md`](HLDSPEC_SELF_DOGFOOD_CONTRACT.md) | Self-dogfood contract proving HLDspec can run on HLDspec itself |
 
 | [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Development handoff protocol for handing the HLDspec repo between models/agents/sessions |
 

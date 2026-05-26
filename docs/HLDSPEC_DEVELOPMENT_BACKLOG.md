@@ -543,6 +543,27 @@ Keep a scorecard updated for:
 - validators
 - development handoff quality
 
+### P1-006 Self-dogfood contract and smoke test
+
+HLDspec must prove that it can run on HLDspec itself.
+
+Required:
+
+- `docs/HLDSPEC_SELF_DOGFOOD_CONTRACT.md`
+- `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md`
+- `tests_v2/test_self_dogfood_flow.py`
+
+The smoke test must run the public facade and internal guarded tools on HLDspec repository evidence without invoking SpecKit.
+
+Acceptance:
+
+- source evidence remains unchanged
+- target session/interview artifacts are written
+- context economy artifacts are generated
+- context validation report is written
+- promotion gate report is written
+- status/review/doctor expose next-safe-action and summary output
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
