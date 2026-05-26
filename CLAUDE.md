@@ -223,5 +223,5 @@ HLDspec blocks or warns when:
 | `docs/CANONICAL_FLOW.md` | Canonical flow reference |
 | `docs/HLDSPEC_V2_AGENT_ROLES.md` | Role definitions for subagents |
 | `docs/TEST_STRATEGY_V2.md` | Test strategy |
-| `docs/TODO_V2.md` | Historical — superseded by TASKS.md |
+| `docs/archive/TODO_V2.md` | Historical — superseded by TASKS.md |
 | `docs/archive/` | Point-in-time RunSkeptic reviews and old design docs |

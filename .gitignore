@@ -5,9 +5,13 @@ __pycache__/
 
 # HLDspec workspace artifacts (these live in workspaces, not in this repo)
 .hldspec-first-run/
+.hldspec-v2-run/
 .hldspec-ready-gate/
 .hldspec-uv-cache/
 .hldspec-architecture-review/
 .hldspec-v2-ready-gate/
 .hldspec-v2-flow-test/
 .specify/
+
+# Claude Code — agent worktrees are ephemeral runtime sandboxes
+.claude/worktrees/

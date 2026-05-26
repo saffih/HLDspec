@@ -52,6 +52,10 @@ superseded design docs. They are not updated and should not be used as active re
 | `docs/archive/HLDSPEC_V2_APPLY_DEBUG.md` | Debug session notes |
 | `docs/archive/CHUNKED_AGENT_PROTOCOL.md` | Deprecated agent protocol |
 | `docs/archive/EXTERNAL_AGENT_PROMPT.md` | Deprecated agent prompt |
+| `docs/archive/ARCHITECTURE_ENHANCEMENT_OPTIONS.md` | Enhancement options planning doc — superseded by `HLDSPEC_STABILITY_ARCHITECTURE.md` |
+| `docs/archive/CONTEXT_BUDGET.md` | Context budget protocol for agent/model bounded reads |
+| `docs/archive/FIRST_RUN.md` | First-run read-only cycle walkthrough |
+| `docs/archive/TARGET_SPEC_CONTEXT.md` | Target spec context rules — HLD evidence → spec package |
 
 Full archive contents: [`docs/archive/`](archive/)
 
