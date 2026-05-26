@@ -104,3 +104,17 @@ For Devin-style agents, prompts must include:
 - explicit "do not improvise" rule
 - blocker report format
 - clear stop condition
+
+## Design principle enforcement
+
+Mediator prompts must enforce `docs/SOFTWARE_DESIGN_PRINCIPLES.md`.
+
+The mediator must ensure the target agent uses RunSkeptic at key decision points and does not skip design principles for speed.
+
+The mediator must also protect cost/context economy by:
+
+- preloading only relevant HLD knowledge
+- preventing broad rereads
+- keeping target-agent scope to one feature and one phase
+- routing mechanical work to simple tools or lower-tier agents
+- escalating architecture or source-of-truth decisions

@@ -186,3 +186,26 @@ HLDspec must not update `target/.specify/memory/constitution.md` without explici
 - Every rule has evidence, rationale, or an explicit approved default.
 - Verification is clear.
 - Conflicts are escalated, not silently resolved.
+
+## Design principle source
+
+The constitution update plan must use `docs/SOFTWARE_DESIGN_PRINCIPLES.md` as reusable source knowledge.
+
+The generated constitution should include target-specific principle-level rules for:
+
+- source of truth
+- interfaces and contracts
+- clean architecture
+- ports/adapters
+- message bus or event-driven architecture where justified
+- state machines and persistent loops where workflows require resumability
+- design for testability
+- unit, integration, and end-to-end testing
+- accessibility for user-facing UI
+- QA tooling and test harnesses
+- security, reliability, performance, and configuration
+- quality gates
+- RunSkeptic
+- cost/context economy
+
+The constitution must stay succinct and must not include feature-specific instructions.

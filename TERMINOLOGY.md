@@ -137,6 +137,18 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **SpecKit Prework Approval Gate** | Checkpoint after a green Spec Build Plan where the human reviews constitution, dependency graph, invocation queue, quality review, and proxy dossier before SpecKit is invoked. |
 | **Legacy Target Work Order** | Earlier HLDspec artifact for manual target-spec generation. It is not the controlling checkpoint when SpecKit is available. |
 
+
+## Software design principle terms
+
+| Term | Meaning |
+|---|---|
+| **Software Design Principles** | Reusable HLDspec design knowledge in `docs/SOFTWARE_DESIGN_PRINCIPLES.md`; used to generate HLDs, target constitutions, spec packages, and prompts. |
+| **Cost/Context Economy** | Principle requiring the smallest sufficient context, weakest sufficient model, narrowest sufficient prompt, and bounded evidence for delegated work. |
+| **Persistent Loop** | Durable, resumable workflow pattern using explicit state, idempotent steps, stale detection, stop conditions, and retry/escalation rules. |
+| **Message-Bus Style** | Event, queue, or bus-based architecture used only when it resolves real coupling, retry, fan-out, audit, or async workflow forces. |
+| **Design for Testability** | Principle requiring explicit seams, deterministic controls, test doubles, fixtures, and unit/integration/end-to-end test paths before implementation. |
+| **Accessibility Requirement** | User-facing quality requirement covering keyboard access, screen reader labels, contrast, focus order, semantic structure, and clear errors where relevant. |
+
 ## Target workspace terms
 
 | Term | Meaning |

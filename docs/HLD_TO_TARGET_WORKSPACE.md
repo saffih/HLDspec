@@ -227,3 +227,23 @@ Human owns:
 - The source HLD is not modified implicitly.
 - Every package has clear evidence, tests, and stop conditions.
 - The constitution remains principle-level and is not polluted by feature details.
+
+## Software design principle integration
+
+HLDspec must use `docs/SOFTWARE_DESIGN_PRINCIPLES.md` when creating `target/`.
+
+The target workspace must preserve the design decisions needed to support:
+
+- explicit interfaces and contracts
+- clean architecture
+- ports/adapters
+- message-bus or event-driven style when justified
+- state machines
+- persistent loops and resumability
+- accessibility for user-facing UI
+- unit, integration, and end-to-end testability
+- quality gates
+- RunSkeptic at key junctions
+- cost/context economy
+
+These principles are not copied wholesale into every artifact. HLDspec must extract only the relevant principles into target-specific constitution rules, spec packages, and prompts.

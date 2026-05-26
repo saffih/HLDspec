@@ -257,3 +257,24 @@ Add these checks to the HLD Format Self-Check when the HLD is intended for `targ
 | SpecKit packaging notes are present for implementation-relevant sections | PASS/FAIL |
 | Architecture/source-of-truth uncertainty is marked `TBD` or `CONFLICT` | PASS/FAIL |
 ```
+
+## Software design principles for generated HLDs
+
+When generating or improving an HLD for HLDspec, use `docs/SOFTWARE_DESIGN_PRINCIPLES.md` as reusable design knowledge.
+
+The HLD should expose signals for:
+
+- source-of-truth ownership
+- explicit interfaces and contracts
+- clean architecture boundaries
+- ports/adapters
+- message-bus or event-driven style where justified
+- state machines
+- persistent loops and resumability
+- accessibility where user-facing UI exists
+- unit, integration, and end-to-end testability
+- QA tooling and missing test harnesses
+- quality gates
+- security, reliability, performance, and configuration
+- RunSkeptic trigger points
+- cost/context economy constraints

@@ -161,3 +161,30 @@ Each phase report must include:
 - RunSkeptic findings
 - next allowed step
 - blockers
+
+## Software design principles in prompts
+
+Generated SpecKit prompts must include the relevant parts of `docs/SOFTWARE_DESIGN_PRINCIPLES.md`.
+
+Each prompt should include only the principles needed for the current phase and feature package.
+
+Prompts must explicitly require RunSkeptic before decisions involving:
+
+- architecture boundaries
+- interfaces/contracts
+- message bus or event-driven behavior
+- state machines
+- persistent loops or resumability
+- data ownership
+- testability
+- accessibility
+- security/reliability/performance
+- quality gates
+
+Prompts must also enforce cost/context economy:
+
+- do not reread the full HLD unless authorized
+- use preloaded HLD knowledge first
+- inspect only allowed evidence
+- use weakest sufficient model
+- stop when blocked

@@ -25,6 +25,7 @@ These docs are living references. Follow links in CLAUDE.md for session bootstra
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents |
 | [`HLDSPEC_V2_HANDOFF_DOCS.md`](HLDSPEC_V2_HANDOFF_DOCS.md) | Handoff doc specification |
 | [`HLDSPEC_STABILITY_ARCHITECTURE.md`](HLDSPEC_STABILITY_ARCHITECTURE.md) | Stability architecture principles: artifact contracts, ports/adapters, event log, validator plugins |
+| [`SOFTWARE_DESIGN_PRINCIPLES.md`](SOFTWARE_DESIGN_PRINCIPLES.md) | Reusable software design principles for HLD generation, constitution extraction, spec packages, prompts, RunSkeptic, and cost/context economy |
 | [`HLD_TO_TARGET_WORKSPACE.md`](HLD_TO_TARGET_WORKSPACE.md) | Target workspace model: `target/`, `targetHLD/`, HLD groups, spec packages, dependency order |
 | [`CONSTITUTION_GENERATION.md`](CONSTITUTION_GENERATION.md) | Principle-level target constitution generation rules |
 | [`SPECKIT_DELEGATION_PROMPTS.md`](SPECKIT_DELEGATION_PROMPTS.md) | Generated prompts for SpecKit phase delegation |
