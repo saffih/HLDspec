@@ -15,3 +15,6 @@ __pycache__/
 
 # Claude Code — agent worktrees are ephemeral runtime sandboxes
 .claude/worktrees/
+
+# HLDspec repo-development handoff packets
+.hldspec-dev/

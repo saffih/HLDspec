@@ -225,3 +225,26 @@ HLDspec blocks or warns when:
 | `docs/TEST_STRATEGY_V2.md` | Test strategy |
 | `docs/archive/TODO_V2.md` | Historical — superseded by TASKS.md |
 | `docs/archive/` | Point-in-time RunSkeptic reviews and old design docs |
+
+## HLDspec development handoff
+
+When handing this repo between models, agents, or sessions, generate a development handoff packet.
+
+```bash
+python3 scripts/hldspec_dev_handoff.py \
+  --focus "describe the current change" \
+  --from-agent codex \
+  --to-agent claude \
+  --model-tier MODEL_STRONG
+```
+
+Default output is external/runtime state:
+
+```text
+.hldspec-dev/handoff/HANDOFF.md
+.hldspec-dev/handoff/HANDOFF.json
+```
+
+`.hldspec-dev/` is gitignored. Durable project knowledge must be promoted into `CLAUDE.md`, `TASKS.md`, or active docs.
+
+See `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`.

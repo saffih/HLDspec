@@ -131,3 +131,9 @@ Next small slices (no urgency order):
 | RunSkeptic schema in `hldspec/` | Both producer and reviewer import from single source of truth |
 | Preflight before hldspec_run | Prevents multi-agent runs on dirty/diverged state |
 | `unknowns` default `"none"` | Makes evidence quality gate return PASS for auto-generated findings |
+
+## Development handoff protocol
+
+| Item | Status | Files |
+|---|---|---|
+| HLDspec repo-development handoff | Added protocol and generator for handing repo work between models/agents/sessions | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`, `scripts/hldspec_dev_handoff.py`, `tests_v2/test_dev_handoff.py` |
