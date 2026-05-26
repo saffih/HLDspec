@@ -94,6 +94,27 @@ class SelfDogfoodFlowTests(unittest.TestCase):
         validate = self.run_python_script("validate_hldspec_target.py", str(target))
         self.assertEqual(0, validate.returncode, validate.stderr + validate.stdout)
 
+        promoted_capabilities = target / ".hldspec" / "promoted_capabilities.json"
+        promoted_capabilities.write_text(
+            json.dumps(
+                {
+                    "capabilities": [
+                        {
+                            "name": "self-dogfood smoke flow",
+                            "runskeptic_status": "PASS",
+                            "runskeptic_evidence": [
+                                "RunSkeptic reviewed the self-dogfood smoke flow and found no blocking ACTION/CONFLICT findings."
+                            ],
+                        }
+                    ]
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
         promote = self.run_python_script("check_hldspec_promotion_gate.py", str(target))
         self.assertEqual(0, promote.returncode, promote.stderr + promote.stdout)
 

@@ -23,3 +23,9 @@ This matrix tracks whether HLDspec enforces its own design principles on the HLD
 If a principle has no enforcement and no test, it is documentation only.
 
 Documentation-only principles must be marked ACTION before promotion.
+
+## Validation
+
+`tests_v2/test_principle_enforcement_matrix.py` validates that every matrix row has non-placeholder entries for principle, current enforcement, tests proving it, and missing enforcement.
+
+Promotion evidence for capabilities is validated by `tests_v2/test_promoted_capability_runskeptic_gate.py`, which requires promoted capabilities to include RunSkeptic PASS evidence and blocks missing, ACTION, or CONFLICT RunSkeptic status.

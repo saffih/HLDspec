@@ -288,6 +288,18 @@ def _check_readiness_mark(target: Path, findings: list[PromotionGateFinding], in
             findings.append(_finding(target, "ACTION", "readiness_evidence", path, "readiness mark above 7 requires tests or reproduced evidence"))
 
 
+def _has_runskeptic_evidence(item: dict[str, Any]) -> bool:
+    for key in ("runskeptic_evidence", "runskeptic_report", "evidence", "reproduced_evidence"):
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+        if isinstance(value, list) and value:
+            return True
+        if isinstance(value, dict) and value:
+            return True
+    return False
+
+
 def _check_promoted_capability_runskeptic(target: Path, findings: list[PromotionGateFinding], inputs_read: list[str]) -> None:
     path = target / ".hldspec" / "promoted_capabilities.json"
     data = _read_optional_json(target, path, findings, inputs_read)
@@ -303,6 +315,15 @@ def _check_promoted_capability_runskeptic(target: Path, findings: list[Promotion
         status = str(item.get("runskeptic_status", "")).upper()
         if status not in {"PASS", "ACTION", "CONFLICT"}:
             findings.append(_finding(target, "ACTION", "runskeptic_status", path, f"promoted capability {name} is missing RunSkeptic status"))
+            continue
+        if status == "ACTION":
+            findings.append(_finding(target, "ACTION", "runskeptic_status", path, f"promoted capability {name} has unresolved RunSkeptic ACTION status"))
+            continue
+        if status == "CONFLICT":
+            findings.append(_finding(target, "CONFLICT", "runskeptic_status", path, f"promoted capability {name} has unresolved RunSkeptic CONFLICT status"))
+            continue
+        if not _has_runskeptic_evidence(item):
+            findings.append(_finding(target, "ACTION", "runskeptic_evidence", path, f"promoted capability {name} has RunSkeptic PASS status without evidence"))
 
 
 def evaluate_promotion_gate(target: Path) -> dict[str, Any]:

@@ -555,6 +555,12 @@ Required:
 
 The smoke test must run the public facade and internal guarded tools on HLDspec repository evidence without invoking SpecKit.
 
+Current implementation note:
+
+- `tests_v2/test_self_dogfood_flow.py` runs the smoke flow against `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`.
+- `tests_v2/test_principle_enforcement_matrix.py` prevents empty or placeholder enforcement-matrix rows.
+- `tests_v2/test_promoted_capability_runskeptic_gate.py` blocks promoted capabilities unless RunSkeptic status is PASS with evidence.
+
 Acceptance:
 
 - source evidence remains unchanged
@@ -562,6 +568,7 @@ Acceptance:
 - context economy artifacts are generated
 - context validation report is written
 - promotion gate report is written
+- promoted capabilities require RunSkeptic PASS evidence
 - status/review/doctor expose next-safe-action and summary output
 
 ## P2 backlog
