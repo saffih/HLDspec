@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from hldspec.state_machine import (
@@ -7,6 +8,7 @@ from hldspec.state_machine import (
     CheckpointKind,
     MachineContext,
     MachineResult,
+    continue_result,
     human_checkpoint,
 )
 
@@ -17,6 +19,23 @@ class ApprovalGateMachine:
     def run(self, context: MachineContext) -> MachineResult:
         workspace = Path(context.workspace or ".")
         sync = workspace / "firstrun" / ".specify" / "sync"
+
+        # If the human has already recorded approval, advance to execution.
+        approval_path = sync / "speckit_prework_approval.json"
+        if approval_path.exists():
+            try:
+                record = json.loads(approval_path.read_text(encoding="utf-8"))
+            except Exception:
+                record = {}
+            if record.get("status") == "APPROVED":
+                return continue_result(
+                    machine=self.name,
+                    state="SPECKIT_PREWORK_APPROVED",
+                    actions_run=("prework approval confirmed",),
+                    artifacts_written=(
+                        ArtifactRef(path=str(approval_path), role="speckit_prework_approval"),
+                    ),
+                )
 
         return human_checkpoint(
             machine=self.name,
