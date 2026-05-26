@@ -17,6 +17,40 @@ class AgentFirstCliContractTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
+    def run_start(self, source: Path, target: Path, comment: str = "create target") -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                "start",
+                "--source",
+                str(source),
+                "--target",
+                str(target),
+                "--comment",
+                comment,
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def run_facade(self, command: str, target: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                command,
+                "--target",
+                str(target),
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
     def test_agent_first_start_creates_target_session(self) -> None:
         source = self.tmp_path / "HLD.md"
         target = self.tmp_path / "target"
@@ -94,37 +128,10 @@ class AgentFirstCliContractTests(unittest.TestCase):
         target = self.tmp_path / "target"
         source.write_text("# HLD\n", encoding="utf-8")
 
-        subprocess.run(
-            [
-                sys.executable,
-                str(self.repo / "scripts" / "hldspec_agent_session.py"),
-                "start",
-                "--source",
-                str(source),
-                "--target",
-                str(target),
-                "--comment",
-                "create target",
-            ],
-            cwd=self.repo,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
+        result = self.run_start(source, target)
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
 
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(self.repo / "scripts" / "hldspec_agent_session.py"),
-                "doctor",
-                "--target",
-                str(target),
-            ],
-            cwd=self.repo,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        result = self.run_facade("doctor", target)
 
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn(str(target / ".hldspec" / "interview_answers.json"), result.stdout)
@@ -169,6 +176,108 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode)
         self.assertIn("Diff status: unchanged", result.stdout)
+
+    def test_status_includes_next_safe_action(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        result = self.run_facade("status", target)
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("## Next Safe Action", result.stdout)
+        self.assertIn("Open prompts/agent/START_HLDSPEC_AGENT.md", result.stdout)
+
+    def test_status_reports_validation_status_when_validation_report_exists(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        validation = target / ".hldspec" / "validation" / "context_prompt_validation.json"
+        validation.parent.mkdir(parents=True, exist_ok=True)
+        validation.write_text(json.dumps({"status": "PASS"}, indent=2) + "\n", encoding="utf-8")
+
+        result = self.run_facade("status", target)
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("Validation status: PASS", result.stdout)
+        self.assertIn(str(validation), result.stdout)
+
+    def test_status_reports_promotion_gate_status_when_promotion_report_exists(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        promotion = target / ".hldspec" / "validation" / "promotion_gate.json"
+        promotion.parent.mkdir(parents=True, exist_ok=True)
+        promotion.write_text(json.dumps({"status": "ACTION"}, indent=2) + "\n", encoding="utf-8")
+
+        result = self.run_facade("status", target)
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("Promotion gate status: ACTION", result.stdout)
+        self.assertIn("Resolve ACTION/CONFLICT blockers", result.stdout)
+
+    def test_review_separates_blocking_and_optional_files(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        blocking = target / ".hldspec" / "constitution_update_plan.md"
+        optional = target / ".hldspec" / "backend_technology_recommendation.md"
+        blocking.write_text("# Constitution\n", encoding="utf-8")
+        optional.write_text("# Backend\n", encoding="utf-8")
+
+        result = self.run_facade("review", target)
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("## Blocking Review Files", result.stdout)
+        self.assertIn(str(blocking), result.stdout)
+        self.assertIn("## Optional Context Files", result.stdout)
+        self.assertIn(str(optional), result.stdout)
+        self.assertIn("## Missing Blocking Files", result.stdout)
+        self.assertIn("## Missing Non-Blocking Files", result.stdout)
+
+    def test_doctor_reports_final_summary(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        result = self.run_facade("doctor", target)
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("## Final Summary", result.stdout)
+        self.assertIn("Summary: PASS", result.stdout)
+
+    def test_output_docs_exist_and_mention_exit_code_semantics(self) -> None:
+        output_contract = self.repo / "docs" / "HLDSPEC_OUTPUT_CONTRACT.md"
+        quality_requirements = self.repo / "docs" / "HLDSPEC_QUALITY_REQUIREMENTS.md"
+
+        self.assertTrue(output_contract.exists())
+        self.assertTrue(quality_requirements.exists())
+        self.assertIn("Exit Code Semantics", output_contract.read_text(encoding="utf-8"))
+        self.assertIn("promotion/readiness", quality_requirements.read_text(encoding="utf-8").lower())
+
+    def test_status_review_doctor_do_not_modify_source_hld(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source_text = "# HLD\n\nKeep me unchanged.\n"
+        source.write_text(source_text, encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        for command in ("status", "review", "doctor"):
+            result = self.run_facade(command, target)
+            self.assertEqual(0, result.returncode, command + result.stderr + result.stdout)
+
+        self.assertEqual(source_text, source.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

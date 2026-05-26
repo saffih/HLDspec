@@ -48,6 +48,92 @@ def json_read(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def report_status(path: Path) -> tuple[str, str]:
+    if not path.exists():
+        return "not present", str(path)
+    try:
+        data = json_read(path)
+    except Exception:
+        return "ACTION", str(path)
+    return str(data.get("status", "UNKNOWN")).upper(), str(path)
+
+
+def status_is_blocking(status: str) -> bool:
+    return status in {"ACTION", "CONFLICT"}
+
+
+def collect_open_questions(target: Path) -> list[str]:
+    questions: list[str] = []
+    interview = json_read(target / ".hldspec" / "interview_answers.json")
+    raw_open = interview.get("open_questions")
+    if isinstance(raw_open, list):
+        questions.extend(str(item) for item in raw_open if str(item).strip())
+
+    hldspec_dir = target / ".hldspec"
+    if hldspec_dir.exists():
+        for path in sorted(hldspec_dir.rglob("*.json")):
+            if "/validation/" in str(path):
+                continue
+            try:
+                data = json_read(path)
+            except Exception:
+                continue
+            checkpoint = data.get("human_checkpoint")
+            if isinstance(checkpoint, dict):
+                decision = str(checkpoint.get("human_decision", checkpoint.get("decision", "TBD"))).strip().upper()
+                if decision in {"", "TBD", "UNKNOWN", "PENDING", "UNRESOLVED"}:
+                    label = checkpoint.get("question") or path.relative_to(target)
+                    questions.append(str(label))
+            checkpoint = data.get("checkpoint")
+            if isinstance(checkpoint, dict):
+                open_count = checkpoint.get("open_question_count")
+                if isinstance(open_count, int) and open_count > 0:
+                    checkpoint_id = checkpoint.get("checkpoint_id", path.relative_to(target))
+                    questions.append(f"{checkpoint_id}: {open_count} open question(s)")
+    return sorted(dict.fromkeys(questions))
+
+
+def current_state(target: Path, session: dict[str, Any]) -> str:
+    for path in [
+        target / ".hldspec" / "sync" / "hldspec_state.json",
+        target / ".hldspec" / "hldspec_state.json",
+    ]:
+        state = json_read(path)
+        if state:
+            stage = state.get("current_stage") or state.get("stage")
+            checkpoint = state.get("current_checkpoint") or state.get("checkpoint")
+            if stage and checkpoint:
+                return f"{stage} / {checkpoint}"
+            if stage:
+                return str(stage)
+    return "agent session prepared" if session else "no session"
+
+
+def print_bullet_list(items: list[str], empty: str = "none") -> None:
+    if not items:
+        print(f"- {empty}")
+        return
+    for item in items:
+        print(f"- {item}")
+
+
+def next_safe_action(session: dict[str, Any], blockers: list[str], open_questions: list[str]) -> str:
+    if blockers:
+        return "Resolve ACTION/CONFLICT blockers, then rerun status or doctor."
+    if open_questions:
+        return "Answer open human questions, then rerun hldspec continue."
+    return str(session.get("next_action") or "Run hldspec review --target <target> or hldspec continue --target <target>.")
+
+
+def summary_status(blockers: list[str], conflicts: list[str] | None = None) -> str:
+    conflicts = conflicts or []
+    if conflicts:
+        return "CONFLICT"
+    if blockers:
+        return "ACTION"
+    return "PASS"
+
+
 def ensure_target_dirs(target: Path) -> None:
     adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
     for rel in [
@@ -404,32 +490,78 @@ def command_status(args: argparse.Namespace) -> int:
         print(f"NO_SESSION: {session_path}")
         return 2
 
+    validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
+    promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
+    open_questions = collect_open_questions(target)
+    blockers: list[str] = []
+    conflicts: list[str] = []
+    for label, status, path in [
+        ("Validation", validation_status, validation_path),
+        ("Promotion gate", promotion_status, promotion_path),
+    ]:
+        if status == "CONFLICT":
+            conflicts.append(f"{label}: {status} ({path})")
+        elif status == "ACTION":
+            blockers.append(f"{label}: {status} ({path})")
+
+    source = session.get("source", {}).get("path", "UNKNOWN") if isinstance(session.get("source"), dict) else "UNKNOWN"
+    print("## HLDspec Status")
     print(f"Target: {target}")
     print(f"Mode: {session.get('mode', 'UNKNOWN')}")
-    print(f"Agent: {session.get('agent', 'UNKNOWN')}")
-    print(f"Source: {session.get('source', {}).get('path', 'UNKNOWN')}")
-    print(f"Prompt: {target / 'prompts' / 'agent' / 'START_HLDSPEC_AGENT.md'}")
-    print(f"Next: {session.get('next_action', 'Review target/.hldspec')}")
+    print(f"Source: {source}")
+    print(f"Current state: {current_state(target, session)}")
+    print("")
+    print("## Validation")
+    print(f"Validation status: {validation_status} ({validation_path})")
+    print(f"Promotion gate status: {promotion_status} ({promotion_path})")
+    print("")
+    print("## Blockers")
+    print_bullet_list(conflicts + blockers)
+    print("")
+    print("## Open Questions")
+    print_bullet_list(open_questions)
+    print("")
+    print("## Next Safe Action")
+    print(next_safe_action(session, conflicts + blockers, open_questions))
     return 0
 
 
 def command_review(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
-    review_paths = [
-        target / ".hldspec" / "backend_technology_recommendation.md",
-        target / ".hldspec" / "design_principles_selection.md",
+    blocking_paths = [
         target / ".hldspec" / "constitution_update_plan.md",
-        target / ".hldspec" / "spec_packages.md",
         target / ".hldspec" / "feature_dependency_graph.md",
         target / ".hldspec" / "speckit_invocation_queue.md",
         adapter.sync_dir / "spec_build_plan_review.md",
         adapter.sync_dir / "speckit_prework_quality_review.md",
     ]
-    print("Review these files if present:")
-    for path in review_paths:
-        status = "EXISTS" if path.exists() else "missing"
-        print(f"- {status}: {path}")
+    optional_paths = [
+        target / ".hldspec" / "backend_technology_recommendation.md",
+        target / ".hldspec" / "design_principles_selection.md",
+        target / ".hldspec" / "spec_packages.md",
+        target / ".hldspec" / "validation" / "context_prompt_validation.md",
+        target / ".hldspec" / "validation" / "promotion_gate.md",
+    ]
+    print("## HLDspec Review")
+    print("")
+    print("## Blocking Review Files")
+    print_bullet_list([str(path) for path in blocking_paths if path.exists()])
+    print("")
+    print("## Optional Context Files")
+    print_bullet_list([str(path) for path in optional_paths if path.exists()])
+    print("")
+    print("## Missing Blocking Files")
+    print_bullet_list([str(path) for path in blocking_paths if not path.exists()])
+    print("")
+    print("## Missing Non-Blocking Files")
+    print_bullet_list([str(path) for path in optional_paths if not path.exists()])
+    print("")
+    print("## Next Safe Action")
+    if any(not path.exists() for path in blocking_paths):
+        print("Generate or resolve missing blocking review files before approval or promotion.")
+    else:
+        print("Review blocking files for PASS/ACTION/CONFLICT decisions, then continue only after human-owned checkpoints are resolved.")
     return 0
 
 
@@ -486,23 +618,75 @@ def command_doctor(args: argparse.Namespace) -> int:
         ROOT / "scripts" / "hldspec_v2.py",
     ]
     ok = True
+    action_items: list[str] = []
+    conflict_items: list[str] = []
+    print("## Repo Checks")
     for path in required:
         exists = path.exists()
         print(f"{'OK' if exists else 'MISSING'}: {path}")
         ok = ok and exists
+        if not exists:
+            action_items.append(f"Missing repo file: {path}")
 
     if target:
+        print("")
+        print("## Target Layout Checks")
         for rel in [
             "targetHLD/HLD.md",
+            "targetHLD/raw/HLD.raw.md",
+            ".hldspec",
+            ".hldspec/sync",
+            ".specify",
+            "prompts/agent",
+            "prompts/speckit",
+        ]:
+            path = target / rel
+            exists = path.exists()
+            print(f"{'OK' if exists else 'MISSING'}: {path}")
+            ok = ok and exists
+            if not exists:
+                action_items.append(f"Missing target layout path: {path}")
+
+        print("")
+        print("## Session Checks")
+        for rel in [
             ".hldspec/agent_session.json",
-            ".hldspec/interview_answers.json",
-            ".hldspec/interview_answers.md",
             "prompts/agent/START_HLDSPEC_AGENT.md",
         ]:
             path = target / rel
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")
             ok = ok and exists
+            if not exists:
+                action_items.append(f"Missing session file: {path}")
+
+        print("")
+        print("## Interview Checks")
+        for rel in [
+            ".hldspec/interview_answers.json",
+            ".hldspec/interview_answers.md",
+        ]:
+            path = target / rel
+            exists = path.exists()
+            print(f"{'OK' if exists else 'MISSING'}: {path}")
+            ok = ok and exists
+            if not exists:
+                action_items.append(f"Missing interview file: {path}")
+
+        print("")
+        print("## Validation Reports")
+        validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
+        promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
+        print(f"Validation status: {validation_status} ({validation_path})")
+        print(f"Promotion gate status: {promotion_status} ({promotion_path})")
+        for label, status, path in [
+            ("Validation", validation_status, validation_path),
+            ("Promotion gate", promotion_status, promotion_path),
+        ]:
+            if status == "CONFLICT":
+                conflict_items.append(f"{label}: {status} ({path})")
+            elif status == "ACTION":
+                action_items.append(f"{label}: {status} ({path})")
         promotion_gate = target / ".hldspec" / "validation" / "promotion_gate.json"
         if promotion_gate.exists():
             try:
@@ -512,6 +696,17 @@ def command_doctor(args: argparse.Namespace) -> int:
                 status = "INVALID"
             print(f"Promotion gate: {status} ({promotion_gate})")
 
+    print("")
+    print("## Final Summary")
+    final_status = summary_status(action_items, conflict_items)
+    print(f"Summary: {final_status}")
+    print("Blockers:")
+    print_bullet_list(conflict_items + action_items)
+    print("Next safe action:")
+    if final_status == "PASS":
+        print("Continue with hldspec status, review, or continue as appropriate.")
+    else:
+        print("Resolve listed ACTION/CONFLICT items, then rerun doctor.")
     return 0 if ok else 2
 
 
