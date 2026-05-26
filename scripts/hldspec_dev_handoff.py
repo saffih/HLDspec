@@ -155,6 +155,11 @@ def render_markdown(packet: HandoffPacket) -> str:
 
     return f"""# HLDspec Development Handoff
 
+## Canonical protocol
+
+- Source of truth: `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`
+- This packet is current-session state only; do not treat it as the protocol.
+
 ## Summary
 
 - Handoff ID: `{packet.handoff_id}`

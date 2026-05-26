@@ -1,5 +1,7 @@
 # Agent bootstrap for this repo
 
+> **Canonical HLDspec development handoff:** before editing this repo or handing work to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`. `AGENTS.md`, `CLAUDE.md`, and generated `HANDOFF.md` files are pointers; the protocol file is the source of truth.
+
 ## HLDspec trigger
 
 When a user prompt starts with:
