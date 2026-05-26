@@ -52,6 +52,60 @@ SpecKit owns:
 
 HLDspec must not manually replace SpecKit.
 
+## Current command surface status - 2026-05-26
+
+Current implemented facade:
+
+```text
+hldspec start
+hldspec status
+hldspec review
+hldspec continue
+hldspec diff
+hldspec doctor
+```
+
+Legacy/debug or not-yet-current command names in this document:
+
+```text
+hldspec run
+hldspec interview
+hldspec prework
+hldspec speckit-proxy
+hldspec speckit
+hldspec pause
+```
+
+Rule: use cases are canonical; command names are an interface mapping. A command must be marked current, future, or legacy/debug before docs can advertise it as product behavior.
+
+## Complete use-case catalog target
+
+| Use case | Trigger | Command/API status | Main artifacts | Stop condition | Test expectation |
+|---|---|---|---|---|---|
+| UC-001 start with no source yet | user starts HLDspec without source | current/future interview path | session context, later `target/.hldspec/interview_answers.*` | source and target identified or human decision needed | no writes before target is known |
+| UC-002 start with source only | source provided, target absent | current `start` plus target selection | source HLD, target session | target chosen or created | source is read-only |
+| UC-003 create new target from raw HLD | source and target provided, no state | current `start` | `target/targetHLD/`, `target/.hldspec/` | next checkpoint generated | target layout matches adapter |
+| UC-004 adopt existing target without HLDspec state | target exists without session | current `start` mode adopt | target inspection, session manifest | adoption checkpoint | existing target not overwritten silently |
+| UC-005 resume existing HLDspec target | existing session | current `status`/`continue` | session, state, checkpoints | next safe action | no skipped gates |
+| UC-006 update after source/resources changed | source hash changed | current `diff`, future update path | input manifest, affected artifacts | affected rebuild plan | stale artifacts detected |
+| UC-007 upgrade after guidance/templates changed | HLDspec guidance changed | future upgrade path | guidance fingerprints, prompts | upgrade review | stale prompts detected |
+| UC-008 review checkpoint and capture human decisions | checkpoint exists | current `review`, future decision API | review files, decision queue | decisions recorded | machine-readable decision artifact |
+| UC-009 continue after approval | approval exists | current `continue`, needs ProjectMachine integration | ProjectMachine context | next machine checkpoint | `continue` invokes machine |
+| UC-010 handle unresolved conflict | conflict exists | current/future conflict gate | conflict artifact | human decision required | promotion blocked |
+| UC-011 generate use-case/API map | converted HLD available | future prework path | use-case/API map | map review | context-only sections not first features |
+| UC-012 generate package/dependency/invocation queue | use-case map ready | future prework path | packages, graph, queue | queue review | graph and queue match |
+| UC-013 generate context packs and bounded prompts | package ready | future prompt generation | context packs, allowed evidence, forbidden reads | prompt review | no broad-read prompt |
+| UC-014 delegate one SpecKit phase | approved package and phase | future speckit path | bounded dossier, phase prompt | phase complete or question escalated | one phase only |
+| UC-015 answer SpecKit clarification from evidence only | SpecKit asks question | future evidence answering path | evidence log, answer record | answer or escalation | answer cites allowed evidence |
+| UC-016 escalate unknown SpecKit question to human | evidence missing | future escalation path | question queue | human decision needed | unknown not guessed |
+| UC-017 verify SpecKit output and RunSkeptic findings | phase output exists | future verify path | verification report, findings | PASS/ACTION/CONFLICT | findings block promotion when unresolved |
+| UC-018 detect stale artifacts and rebuild affected outputs | inputs changed | future stale detection | artifact hashes, rebuild plan | affected rebuild done or review needed | stale dependency test |
+| UC-019 brownfield target with existing specs | specs already exist | future brownfield/adopt path | existing specs, drift report | human review | no overwrite without approval |
+| UC-020 user-requested pause before continuing | user requests pause | future/current human checkpoint behavior | state marker, handoff note | action withheld until user resumes | no further machine action |
+| UC-021 development handoff between agents/models | repo work transfers | current dev handoff | `.hldspec-dev/handoff/`, backlog | handoff packet generated | handoff includes backlog pointers |
+| UC-022 maintainer/debug direct-script run | maintainer debugging | legacy/debug | script outputs | explicit maintainer action | documented as non-product workflow |
+| UC-023 completed history / merged-work audit | completed work exists | future audit path | merge evidence, status map | history classified | no live work inferred from stale docs |
+
 ## Core user scenarios
 
 ### Scenario 1 - First project run from a raw HLD

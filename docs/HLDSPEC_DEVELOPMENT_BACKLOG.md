@@ -27,6 +27,35 @@ Rules:
 7. Product usage is agent-first.
 8. Direct script use is allowed for maintainer/debug usage only.
 
+## Current readiness mark - 2026-05-26
+
+This is a working mark for the current `main` branch after the agent-first facade, development handoff/backlog, and TargetWorkspaceAdapter changes.
+
+Scale:
+
+```text
+0 = absent
+5 = partially designed and partially implemented
+10 = product-ready with enforcement and tests
+```
+
+| Area | Mark | Current assessment |
+|---|---:|---|
+| Development handoff discipline | 7 | Canonical docs and generator exist; open-action/conflict quality still needs tightening. |
+| Agent-first product model | 5 | Docs and facade exist; orchestration is still mostly printed guidance. |
+| Target workspace clarity | 4 | Target layout is documented, but adapter, facade prompts, and machines disagree on first-run/sync paths. |
+| TargetWorkspaceAdapter | 4 | Adapter exists with legacy/new modes; ProjectMachine still constructs legacy by default. |
+| Use-case/API definition | 4 | Existing use-case doc has important scenarios, but it is not complete, current, or aligned with the new command surface. |
+| Stateless external IO | 4 | Direction is documented; enforcement tests are incomplete. |
+| RunSkeptic enforcement | 3 | Required in docs/prompts; not yet enforced by machines or validators. |
+| Context economy | 2 | Principles are documented; context packs and validators are not implemented. |
+| SpecKit delegation templates | 2 | Desired structure is documented; generated templates are not complete/enforced. |
+| Validators and regression gates | 3 | Some tests exist; path-contract, command-surface, use-case, and promotion tests are missing. |
+
+Overall current mark: 4/10.
+
+Reason: the direction is correct, but unresolved source-of-truth and path-contract conflicts prevent treating `main` as product-stable.
+
 ## P0 backlog
 
 ### P0-001 Stateless external IO contract
@@ -224,6 +253,122 @@ Implementation still needed:
 - validators block missing evidence
 - generated handoff packet lists RunSkeptic PASS/ACTION/CONFLICT status
 
+### P0-011 Canonical target path contract
+
+Define one canonical path contract before further migration.
+
+Current conflict:
+
+```text
+Target layout doc says: target/.specify/sync/
+TargetWorkspaceAdapter new layout says: target/.hldspec/sync/
+Agent facade prompt says: target/.hldspec/firstrun/.specify/sync/
+ProjectMachine legacy layout says: target/firstrun/.specify/sync/ and target/.specify/sync/events
+```
+
+Acceptance:
+
+- `docs/HLD_TO_TARGET_WORKSPACE.md`, `TargetWorkspaceAdapter`, `scripts/hldspec_agent_session.py`, and `ProjectMachine` describe and use the same paths.
+- tests fail if a new path model is introduced without updating the adapter and docs.
+
+### P0-012 ProjectMachine new-layout integration
+
+Make the agent-first target workflow call ProjectMachine through the new layout.
+
+Acceptance:
+
+- a test proves `ProjectMachine` receives or uses `target/targetHLD/HLD.md` for agent-first target runs.
+- a test proves new event writes use `target/.hldspec/events.jsonl`.
+- legacy tests still pass.
+
+### P0-013 Agent prompt and tool-manifest path alignment
+
+Generated agent prompts must use the adapter path contract.
+
+Acceptance:
+
+- generated prompts derive paths from `TargetWorkspaceAdapter`.
+- generated prompts include allowed evidence and forbidden broad reads.
+- generated prompts state which paths are HLDspec-owned and which are SpecKit-owned.
+
+### P0-014 Complete use-case catalog and command/API contract
+
+All HLDspec use cases must be defined before deeper orchestration work continues.
+
+Required use-case catalog:
+
+```text
+UC-001 start with no source yet: interview for intent and source/target
+UC-002 start with source only: choose/create target
+UC-003 create new target from raw HLD
+UC-004 adopt existing target without HLDspec state
+UC-005 resume existing HLDspec target
+UC-006 update after source/resources changed
+UC-007 upgrade after HLDspec guidance/templates changed
+UC-008 review checkpoint and capture human decisions
+UC-009 continue after approval
+UC-010 handle unresolved conflict and require human decision
+UC-011 generate use-case/API map
+UC-012 generate package/dependency/invocation queue
+UC-013 generate context packs and bounded prompts
+UC-014 delegate one SpecKit phase
+UC-015 answer SpecKit clarification from evidence only
+UC-016 escalate unknown SpecKit question to human
+UC-017 verify SpecKit output and RunSkeptic findings
+UC-018 detect stale artifacts and rebuild affected outputs
+UC-019 brownfield target with existing specs
+UC-020 user-requested pause before continuing
+UC-021 development handoff between agents/models
+UC-022 maintainer/debug direct-script run
+UC-023 completed history / merged-work audit
+```
+
+Acceptance:
+
+- each use case has trigger, preconditions, command/API, artifacts read, artifacts written, stop condition, and tests expected.
+- command names match the facade or are clearly marked legacy/future.
+- no product use case requires direct user knowledge of low-level scripts.
+
+### P0-015 Product command surface parity
+
+Make docs, CLI parser, tests, and prompts agree on supported commands.
+
+Current conflict:
+
+- product docs mention `hldspec speckit` and `hldspec stop` or equivalent future controls.
+- current parser does not implement them.
+- older use-case docs mention `run`, `interview`, `prework`, and `speckit-proxy`.
+
+Acceptance:
+
+- one command matrix lists supported, future, and legacy/debug commands.
+- CLI parser tests cover every supported command.
+- docs do not advertise unsupported commands as current product behavior.
+
+### P0-016 Path-contract and command-contract regression tests
+
+Add tests that lock the product contract.
+
+Required tests:
+
+- target workspace path contract.
+- ProjectMachine new-layout entry path.
+- event log new-layout path.
+- first-run/sync path consistency.
+- prompt/tool-manifest path consistency.
+- README/AGENTS/USER_RUN_MODEL command consistency.
+- unsupported command docs are marked future or legacy.
+
+### P0-017 Promotion scorecard gate
+
+Do not promote HLDspec as product-stable without an explicit scorecard gate.
+
+Acceptance:
+
+- scorecard lists current mark, target mark, blockers, and next safe step.
+- any mark above 7 requires tests or reproduced evidence.
+- unresolved ACTION/CONFLICT items block promotion.
+
 ## P1 backlog
 
 ### P1-001 Backend toolbox cleanup
@@ -392,11 +537,53 @@ Add TargetWorkspaceAdapter first.
 Then migrate machines incrementally.
 ```
 
+### CONFLICT-003 First-run and sync path ownership
+
+Decision needed:
+
+```text
+Should first-run review/sync artifacts live under target/.hldspec/, target/.specify/, or target/firstrun/.specify/sync/?
+```
+
+Thesis:
+
+- HLDspec-owned review and planning artifacts should live under `target/.hldspec/`.
+
+Antithesis:
+
+- Existing machines and SpecKit-adjacent tools already expect `.specify/sync` style paths.
+
+Safe recommendation:
+
+- choose one adapter-backed contract.
+- allow legacy reads temporarily.
+- write new HLDspec-owned artifacts only to HLDspec-owned paths.
+- keep SpecKit-owned final artifacts under `.specify/` and `specs/`.
+
+### CONFLICT-004 Use-case API doc vs current facade
+
+Decision needed:
+
+```text
+Should the canonical public command set be start/status/review/continue/diff/doctor only, or should run/interview/prework/speckit-proxy/speckit/pause also be product commands?
+```
+
+Safe recommendation:
+
+- keep the current public surface small.
+- mark unimplemented commands as future or legacy/debug.
+- define all use cases independently of command spelling.
+- map each use case to current/future/legacy command status.
+
 ## Next safe patch sequence
 
-1. Add or update canonical handoff/backlog pointers in `AGENTS.md`.
-2. Add tests that enforce those pointers.
-3. Add TargetWorkspaceAdapter.
-4. Move event log writes to `target/.hldspec/events.jsonl`.
-5. Add interview artifacts.
-6. Add context-pack and prompt validators.
+1. Stabilize the canonical target path contract.
+2. Update TargetWorkspaceAdapter, ProjectMachine entry, agent prompt generation, and docs to match that contract.
+3. Add path-contract regression tests.
+4. Complete the use-case catalog and command/API matrix.
+5. Align README, AGENTS, USER_RUN_MODEL, and HLDSPEC_USE_CASES_AND_API.
+6. Make `continue` call ProjectMachine through the adapter instead of only printing guidance.
+7. Move event log writes to `target/.hldspec/events.jsonl` for the new layout.
+8. Add interview artifacts.
+9. Add context-pack and prompt validators.
+10. Add RunSkeptic promotion gates.
