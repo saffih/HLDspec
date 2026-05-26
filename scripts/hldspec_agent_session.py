@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from hldspec.machines.project import ProjectMachine
+from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
 from hldspec.state_machine import MachineContext
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
@@ -502,6 +503,14 @@ def command_doctor(args: argparse.Namespace) -> int:
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")
             ok = ok and exists
+        promotion_gate = target / ".hldspec" / "validation" / "promotion_gate.json"
+        if promotion_gate.exists():
+            try:
+                gate = read_promotion_json(promotion_gate)
+                status = gate.get("status", "UNKNOWN") if isinstance(gate, dict) else "UNKNOWN"
+            except Exception:
+                status = "INVALID"
+            print(f"Promotion gate: {status} ({promotion_gate})")
 
     return 0 if ok else 2
 

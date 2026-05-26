@@ -33,7 +33,7 @@ Overall current mark: 5/10.
 | RunSkeptic enforcement | 4 | Prompt-level validator checks RunSkeptic triggers; gate-machine and handoff enforcement remain. |
 | Context economy | 5 | Context-pack/prompt generator and validator exist; product-flow integration and broader semantic validators remain. |
 
-Promotion rule: do not raise the overall mark above 7 without tests or reproduced evidence for the promoted capability.
+Promotion rule: do not raise the overall mark above 7 without tests or reproduced evidence for the promoted capability. Target readiness promotion also requires `target/.hldspec/validation/promotion_gate.json` status `PASS`; ACTION or CONFLICT findings block promotion.
 
 ## Scorecard
 
@@ -59,7 +59,7 @@ Promotion rule: do not raise the overall mark above 7 without tests or reproduce
 3. Generate target-specific design principle selection.
 4. Generate target-specific backend technology recommendation.
 5. Validate package testability.
-6. Wire prompt cost/context and RunSkeptic validators into guarded product flow.
+6. Wire prompt cost/context, RunSkeptic, and promotion-gate validators into guarded product flow.
 7. Add CLI journey tests.
 8. Keep low-level scripts as tools for agents.
 

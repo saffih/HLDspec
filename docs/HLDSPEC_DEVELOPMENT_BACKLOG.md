@@ -296,7 +296,7 @@ Rules:
 
 ### P0-010 RunSkeptic enforcement
 
-Status: partially implemented at generated prompt validation level.
+Status: partially strengthened at generated prompt validation and promotion-gate levels.
 
 Implementation still needed:
 
@@ -309,7 +309,8 @@ Current implementation note:
 
 - Bounded SpecKit prompts include RunSkeptic trigger points.
 - `scripts/validate_hldspec_target.py` blocks prompts that omit RunSkeptic triggers and records ACTION findings in target validation reports.
-- Remaining work: gate machines must surface RunSkeptic status, missing evidence must be enforced beyond prompt text, and generated handoff packets must include RunSkeptic PASS/ACTION/CONFLICT state.
+- `scripts/check_hldspec_promotion_gate.py` blocks promotion when validator reports contain ACTION/CONFLICT findings or promoted capabilities omit RunSkeptic status.
+- Remaining work: gate machines must surface RunSkeptic status directly, missing evidence must be enforced beyond prompt text, and generated handoff packets must include RunSkeptic PASS/ACTION/CONFLICT state.
 
 ### P0-011 Canonical target path contract
 
@@ -418,6 +419,8 @@ Required tests:
 
 ### P0-017 Promotion scorecard gate
 
+Status: partially implemented as an internal target readiness gate.
+
 Do not promote HLDspec as product-stable without an explicit scorecard gate.
 
 Acceptance:
@@ -425,6 +428,14 @@ Acceptance:
 - scorecard lists current mark, target mark, blockers, and next safe step.
 - any mark above 7 requires tests or reproduced evidence.
 - unresolved ACTION/CONFLICT items block promotion.
+
+Current implementation note:
+
+- `hldspec.promotion.evaluate_promotion_gate` and `scripts/check_hldspec_promotion_gate.py` write `target/.hldspec/validation/promotion_gate.json` and `.md`.
+- The gate reads context validation reports, event logs, agent session, allowed evidence, context packs, prompt guards, human checkpoint artifacts, and optional readiness/promoted-capability scorecards.
+- The gate returns PASS/ACTION/CONFLICT and blocks validator ACTION/CONFLICT findings, missing context validation after prompts exist, unresolved human checkpoints, missing implementation approval guards, missing RunSkeptic status for promoted capabilities, and readiness marks above 7 without tests/evidence.
+- `hldspec doctor --target` reports existing promotion gate status.
+- Remaining work: wire the gate into a guarded product promotion path and expand scorecard fields for current mark, target mark, blockers, and next safe step.
 
 ## P1 backlog
 

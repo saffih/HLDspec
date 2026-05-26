@@ -204,3 +204,13 @@ scripts/validate_hldspec_target.py <target>
 ```
 
 This validates generated context economy artifacts and bounded SpecKit prompts, including RunSkeptic triggers, model tiers, broad-read phrasing, and implement-phase human approval guards. It writes reports under `target/.hldspec/validation/`. It is not a public command.
+
+## Promotion gate
+
+Maintainer/debug readiness check:
+
+```bash
+scripts/check_hldspec_promotion_gate.py <target>
+```
+
+This reads available target validation reports and readiness artifacts, then writes `target/.hldspec/validation/promotion_gate.json` and `.md`. Promotion requires gate status `PASS`; ACTION or CONFLICT findings block readiness promotion. It is an internal guarded check, not a public command.
