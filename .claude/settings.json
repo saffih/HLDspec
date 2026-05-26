@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m pytest tests/ -q --tb=no)",
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs -I {} basename {})"
+    ]
+  }
+}
