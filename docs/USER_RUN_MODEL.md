@@ -184,3 +184,13 @@ The agent must classify the comment and stop if the comment conflicts with targe
 - Human decisions stay explicit.
 - RunSkeptic runs at key junctions.
 - Missing evidence is ACTION or CONFLICT, not PASS.
+
+## Bounded SpecKit prompt generation
+
+Maintainer/debug tool:
+
+```bash
+scripts/build_speckit_context_prompts.py <target>
+```
+
+This generates context economy artifacts and bounded SpecKit phase prompts under the target workspace. It is not a public command yet; future product flow should expose this through a guarded `hldspec prework` or `hldspec speckit` path after validators and promotion gates are complete.

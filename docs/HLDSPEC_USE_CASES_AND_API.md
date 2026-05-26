@@ -240,6 +240,8 @@ Every use case below is part of the product contract. Current commands may not i
 - Human decision: required if prompt needs broad evidence or uncertain scope.
 - Tests expected: prompt validator rejects broad-read prompts.
 
+Implementation note: `scripts/build_speckit_context_prompts.py` provides the first deterministic generator and validator for this use case. It remains a maintainer/debug tool until wired into a public guarded flow.
+
 ### UC-014 delegate one SpecKit phase
 
 - Trigger: approved package and phase are available.

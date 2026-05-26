@@ -217,6 +217,13 @@ Every delegated task must declare:
 - stop condition
 - RunSkeptic triggers
 
+
+Current implementation note:
+
+- `scripts/build_speckit_context_prompts.py` generates `target/.hldspec/context_packs/`, `target/.hldspec/allowed_evidence.json`, `target/.hldspec/forbidden_reads.md`, and bounded SpecKit prompt files.
+- `hldspec.context_economy` validates required prompt context markers.
+- Remaining work: connect generation into the normal product flow and promotion gates.
+
 ### P0-007 SpecKit delegation templates
 
 Add generated prompt templates:
@@ -247,6 +254,13 @@ Each prompt must include:
 - stop condition
 - expected outputs
 - human checkpoint rules
+
+
+Current implementation note:
+
+- Seven bounded phase prompts are generated for each package under `target/prompts/speckit/<package-id>/`.
+- Each prompt declares target, package, exact phase, allowed evidence, forbidden reads, model tier, scope limit, stop condition, RunSkeptic triggers, expected outputs, and human checkpoint rules.
+- Remaining work: wire package discovery to the final package/invocation artifacts and add deeper semantic validators.
 
 ### P0-008 Validators
 

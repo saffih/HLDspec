@@ -31,7 +31,7 @@ Overall current mark: 5/10.
 | TargetWorkspaceAdapter | 5 | Agent-first continue selects new layout; legacy remains for debug/compatibility. |
 | Use-case/API definition | 5 | UC catalog and command matrix documented; validators and implementation coverage remain. |
 | RunSkeptic enforcement | 3 | Mostly documented, not enforced. |
-| Context economy | 2 | Context-pack machinery not implemented. |
+| Context economy | 4 | Context-pack/prompt generator exists; product-flow integration and semantic validators remain. |
 
 Promotion rule: do not raise the overall mark above 7 without tests or reproduced evidence for the promoted capability.
 
