@@ -41,7 +41,11 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
 
     def test_backlog_records_command_surface_decision(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md").read_text(encoding="utf-8")
-        self.assertIn("Overall current mark: 5/10", text)
+        self.assertIn("Overall current mark: 6/10", text)
+        self.assertIn("Context economy", text)
+        self.assertIn("Seven bounded SpecKit phase prompts are generated", text)
+        self.assertIn("Promoted capability RunSkeptic evidence", text)
+        self.assertIn("Self-dogfood", text)
         self.assertIn("Decision: keep the current public surface small", text)
         self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`.", text)
         self.assertIn("Future commands: `interview`, `prework`, `speckit`, `pause`.", text)

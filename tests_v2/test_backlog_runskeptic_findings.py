@@ -8,14 +8,32 @@ class BacklogRunSkepticFindingsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.repo = Path(__file__).resolve().parents[1]
 
-    def test_backlog_records_readiness_mark_and_new_p0_items(self) -> None:
+    def test_backlog_records_readiness_mark_and_current_p0_items(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md").read_text(encoding="utf-8")
-        self.assertIn("Overall current mark: 5/10", text)
-        for item in range(11, 18):
-            self.assertIn(f"P0-{item:03d}", text)
-        self.assertIn("Canonical target path contract", text)
-        self.assertIn("Complete use-case catalog", text)
-        self.assertIn("Promotion scorecard gate", text)
+        self.assertIn("Overall current mark: 6/10", text)
+        self.assertNotIn("Overall current mark: 5/10", text)
+
+        for phrase in (
+            "P0-001 External IO enforcement across all write paths",
+            "P0-002 Guarded product-flow integration",
+            "P0-003 End-to-end journey tests",
+            "P0-004 Stale artifact and diff handling",
+            "P0-005 Domain validators before product-stable promotion",
+            "P0-006 RunSkeptic status propagation",
+            "Mostly addressed former P0 items",
+        ):
+            self.assertIn(phrase, text)
+
+        for phrase in (
+            "Context economy",
+            "SpecKit prompts",
+            "Validators",
+            "RunSkeptic enforcement",
+            "Promotion gate",
+            "Self-dogfood",
+            "Promoted capability RunSkeptic evidence",
+        ):
+            self.assertIn(phrase, text)
 
     def test_backlog_records_path_and_command_conflicts(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md").read_text(encoding="utf-8")
@@ -37,8 +55,10 @@ class BacklogRunSkepticFindingsTests(unittest.TestCase):
     def test_product_scorecard_has_current_mark(self) -> None:
         text = (self.repo / "docs" / "HLDSPEC_PRODUCT_SCORECARD.md").read_text(encoding="utf-8")
         self.assertIn("Current readiness mark - 2026-05-26", text)
-        self.assertIn("Overall current mark: 5/10", text)
+        self.assertIn("Overall current mark: 6/10", text)
+        self.assertNotIn("Overall current mark: 5/10", text)
         self.assertIn("Promotion rule", text)
+        self.assertIn("not product-ready", text)
 
 
 if __name__ == "__main__":

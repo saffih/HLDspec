@@ -11,6 +11,8 @@ Use together with:
 - `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`
 - `.hldspec-dev/handoff/HANDOFF.md`
 - `TASKS.md`
+- `docs/HLDSPEC_PRODUCT_SCORECARD.md`
+- `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md`
 
 ## Core product direction
 
@@ -29,14 +31,7 @@ Rules:
 
 ## Current readiness mark - 2026-05-26
 
-This is a working mark for the current `main` branch after the agent-first facade, development handoff/backlog, and TargetWorkspaceAdapter changes.
-
-Update from the path-contract patch:
-
-- canonical agent-first HLDspec-owned sync path is `target/.hldspec/sync/`
-- canonical agent-first event log path is `target/.hldspec/events.jsonl`
-- `target/.specify/` remains SpecKit-owned
-- legacy scripts may write scratch output under `target/.hldspec/tool-runs/`, then ProjectMachine mirrors promoted artifacts through `TargetWorkspaceAdapter`
+This mark reflects the current `main` branch after the command-surface, path-contract, interview-artifact, context-economy, validator, promotion-gate, UX-output, self-dogfood, and promoted-capability RunSkeptic evidence patches.
 
 Scale:
 
@@ -48,185 +43,42 @@ Scale:
 
 | Area | Mark | Current assessment |
 |---|---:|---|
-| Development handoff discipline | 7 | Canonical docs and generator exist; open-action/conflict quality still needs tightening. |
-| Agent-first product model | 5 | Docs and facade exist; orchestration is still mostly printed guidance. |
-| Target workspace clarity | 5 | Canonical new-layout paths are defined and partly tested; broader journey coverage remains. |
-| TargetWorkspaceAdapter | 5 | Adapter exists with legacy/new modes; agent-first continue now selects new layout. |
-| Use-case/API definition | 5 | Full UC catalog is now documented; implementation coverage and validators remain. |
-| Stateless external IO | 4 | Direction is documented; enforcement tests are incomplete. |
-| RunSkeptic enforcement | 4 | Required in docs/prompts; prompt-level validator exists, but gate-machine enforcement remains. |
-| Context economy | 4 | Context packs, bounded prompts, and prompt validators exist; product-flow integration remains. |
-| SpecKit delegation templates | 2 | Desired structure is documented; generated templates are not complete/enforced. |
-| Validators and regression gates | 3 | Some tests exist; path-contract, command-surface, use-case, and promotion tests are missing. |
+| Development handoff discipline | 7 | Canonical handoff/backlog docs and generator exist; generated handoff still needs stronger open-action, conflict, and RunSkeptic status quality. |
+| Agent-first product model | 6 | Public facade is narrowed to `start`, `status`, `review`, `continue`, `diff`, and `doctor`; richer commands are marked future or legacy/debug; full end-to-end orchestration coverage remains open. |
+| Target workspace clarity | 7 | New-layout paths are stabilized: `target/.hldspec/sync/`, `target/.hldspec/events.jsonl`, `target/targetHLD/HLD.md`, `target/targetHLD/raw/HLD.raw.md`, and SpecKit-owned `target/.specify/`; broader migration coverage remains. |
+| TargetWorkspaceAdapter | 7 | Adapter supports legacy/new modes and `hldspec continue` uses ProjectMachine with new-layout metadata; remaining machines still need migration coverage. |
+| Use-case/API definition | 6 | Use-case catalog and command matrix exist; implementation and journey tests do not yet cover every use case. |
+| Stateless external IO | 5 | `start` and self-dogfood smoke prove target-only durable writes for key flows; enforcement across every write path remains incomplete. |
+| Context economy | 6 | Context packs, allowed evidence, forbidden reads, bounded SpecKit prompts, and context validators exist; guarded product-flow integration remains. |
+| SpecKit delegation prompts | 6 | Seven bounded SpecKit phase prompts are generated per package; package discovery/invocation wiring and deeper semantic validators remain. |
+| Validators and regression gates | 6 | Context prompt validator, promotion gate, command/path tests, self-dogfood smoke, and matrix tests exist; domain validators remain open. |
+| RunSkeptic enforcement | 6 | Prompt validators and promotion gate enforce RunSkeptic trigger/status requirements, including promoted capability RunSkeptic PASS evidence; gate-machine and handoff propagation remain open. |
+| Promotion gate | 6 | Promotion gate blocks validator ACTION/CONFLICT, missing context validation, unresolved checkpoints, readiness marks above evidence, and promoted capabilities without RunSkeptic PASS evidence; not yet wired into a complete product promotion command. |
+| UX/output quality | 6 | `status`, `review`, and `doctor` show decision-oriented output with blockers, validation status, promotion status, next safe action, and final summary; `start`, `diff`, and stage-aware checks need more coverage. |
+| Self-dogfood | 6 | HLDspec can run a smoke flow on HLDspec backlog evidence without invoking SpecKit; full self-hosted SpecKit delegation remains out of scope and unproven. |
 
-Overall current mark: 5/10.
+Overall current mark: 6/10.
 
-Reason: the path contract is mostly stabilized, but use-case implementation, command-matrix enforcement, validators, RunSkeptic gates, context economy, and promotion gates remain open.
+Reason: the foundational contracts and several enforcement gates now exist, but HLDspec is not yet product-ready. Remaining blockers are guarded product-flow integration, end-to-end journey coverage, stale-artifact/diff handling, domain validators, and RunSkeptic status propagation through handoff/gate-machine outputs.
 
-## P0 backlog
+## Current implementation notes
 
-### P0-001 Stateless external IO contract
+### Context economy
 
-Status: partially addressed for the `hldspec start` path.
+Implemented:
 
-Define and enforce:
+- `hldspec/context_economy.py`
+- `scripts/build_speckit_context_prompts.py`
+- `target/.hldspec/context_packs/`
+- `target/.hldspec/allowed_evidence.json`
+- `target/.hldspec/forbidden_reads.md`
+- bounded per-package prompts under `target/prompts/speckit/<package-id>/`
 
-```text
-HLDspec core is stateless.
-All durable run state is external.
-Target-product state lives in target/.
-HLDspec-development handoff state lives in .hldspec-dev/.
-```
+Current status: mostly addressed as artifact generation and validation. Residual work is product-flow wiring and semantic validation beyond required markers.
 
-Required:
+### SpecKit prompts
 
-- source/target discovery behavior
-- no hidden global state
-- no internal untracked memory
-- tests proving state files are created only under approved external locations
-
-Covered now:
-
-- `start` preserves source HLD content.
-- `start` writes durable target-product artifacts only under `target/`.
-- `start` does not create durable sibling files next to the source HLD.
-
-Still needed:
-
-- broader enforcement around non-start flows and generated prework/SpecKit delegation artifacts.
-
-### P0-002 User interview capability
-
-Status: first artifact flow addressed through the existing `hldspec start` command; future interactive source/target discovery remains out of scope.
-
-Add an interview flow for the user working in the HLDspec repo.
-
-Purpose:
-
-- understand user intent before writing
-- identify source HLD/resources
-- identify target directory
-- classify intent: create, update, upgrade, adopt, resume, review, debug
-- collect constraints, special requirements, and approval expectations
-
-Rules:
-
-- before source and target are known, interview answers remain session context
-- after source and target are known, answers are written as external evidence
-- answers feed HLD generation, constitution extraction, package slicing, prompts, and RunSkeptic gates
-
-Suggested artifacts after target is known:
-
-```text
-target/.hldspec/interview_answers.json
-target/.hldspec/interview_answers.md
-```
-
-Covered now:
-
-- `start --source ... --target ... --comment ...` writes both interview artifacts.
-- JSON records schema version, timestamp, source path/hash, target, mode, agent, comment, simple intent classification, approval expectations, constraints, and open questions.
-- `doctor --target` checks the interview artifacts.
-
-### P0-003 TargetWorkspaceAdapter
-
-Add an adapter so machines stop hardcoding legacy paths.
-
-Current mismatch:
-
-```text
-new model: target/targetHLD/HLD.md
-old machines: workspace/HLD.md and workspace/firstrun/
-```
-
-Required adapter fields:
-
-```text
-target_root
-working_hld
-raw_hld
-hldspec_dir
-specify_dir
-sync_dir
-events_path
-firstrun_dir
-```
-
-Safe approach:
-
-1. add adapter
-2. update ProjectMachine first
-3. migrate machines one by one
-4. preserve legacy compatibility during transition
-
-### P0-004 Event and state ownership
-
-Move HLDspec event/log ownership out of SpecKit-owned paths.
-
-Preferred new path:
-
-```text
-target/.hldspec/events.jsonl
-```
-
-SpecKit-owned paths remain under:
-
-```text
-target/.specify/
-```
-
-Compatibility may read old paths, but new HLDspec writes should use HLDspec-owned paths.
-
-### P0-005 Agent-first CLI facade integration
-
-Desired public commands:
-
-```text
-hldspec start
-hldspec status
-hldspec review
-hldspec continue
-hldspec diff
-hldspec doctor
-```
-
-Next fix:
-
-- `continue` should call ProjectMachine through TargetWorkspaceAdapter
-- it should not only print the likely next tool
-- direct scripts remain maintainer/debug tools
-
-### P0-006 Context economy enforcement
-
-Implementation still needed:
-
-```text
-target/.hldspec/context_packs/
-target/.hldspec/allowed_evidence.json
-target/.hldspec/forbidden_reads.md
-model_tier per task
-prompt context validator
-```
-
-Every delegated task must declare:
-
-- allowed evidence
-- forbidden broad reads
-- model tier
-- max scope
-- stop condition
-- RunSkeptic triggers
-
-
-Current implementation note:
-
-- `scripts/build_speckit_context_prompts.py` generates `target/.hldspec/context_packs/`, `target/.hldspec/allowed_evidence.json`, `target/.hldspec/forbidden_reads.md`, and bounded SpecKit prompt files.
-- `hldspec.context_economy` validates required prompt context markers.
-- Remaining work: connect generation into the normal product flow and promotion gates.
-
-### P0-007 SpecKit delegation templates
-
-Add generated prompt templates:
+Implemented:
 
 ```text
 target/prompts/speckit/<package-id>/
@@ -239,203 +91,256 @@ target/prompts/speckit/<package-id>/
   07-verify-runskeptic.md
 ```
 
-Each prompt must include:
+Current status: mostly addressed for bounded prompt generation. Residual work is package discovery, invocation queue integration, and validation of produced SpecKit outputs.
 
-- target directory
-- package id/name
-- exact SpecKit phase
-- allowed evidence files
-- forbidden broad reads
-- preloaded HLD knowledge
-- relevant constitution rules only
-- relevant backend technology choices only
-- RunSkeptic trigger points
-- unit/integration/e2e expectations
-- stop condition
-- expected outputs
-- human checkpoint rules
+### Validators
 
+Implemented:
 
-Current implementation note:
+- `hldspec/validators.py`
+- `scripts/validate_hldspec_target.py`
+- `target/.hldspec/validation/context_prompt_validation.json`
+- `target/.hldspec/validation/context_prompt_validation.md`
 
-- Seven bounded phase prompts are generated for each package under `target/prompts/speckit/<package-id>/`.
-- Each prompt declares target, package, exact phase, allowed evidence, forbidden reads, model tier, scope limit, stop condition, RunSkeptic triggers, expected outputs, and human checkpoint rules.
-- Remaining work: wire package discovery to the final package/invocation artifacts and add deeper semantic validators.
+Validated now:
 
-### P0-008 Validators
+- `allowed_evidence.json`
+- `forbidden_reads.md`
+- context pack JSON
+- required prompt context markers
+- RunSkeptic triggers
+- valid model tiers
+- forbidden broad-read phrases
+- implement-phase human approval guards
 
-Status: partially implemented for generated context economy and RunSkeptic prompts.
+Still open:
 
-Add validators for:
+- backend upgrade trigger validation
+- selected-principle evidence validation
+- constitution purity validation
+- package unit/integration/e2e testability validation
+- dependency graph and invocation queue parity
+- generated handoff pointer validation
+
+### RunSkeptic enforcement
+
+Implemented:
+
+- generated SpecKit prompts include RunSkeptic trigger points
+- context prompt validation blocks prompts that omit RunSkeptic triggers
+- promotion gate blocks validator ACTION/CONFLICT findings
+- promotion gate blocks promoted capabilities unless RunSkeptic status is PASS with evidence
+
+Still open:
+
+- gate-machine outputs must surface RunSkeptic PASS/ACTION/CONFLICT directly
+- generated handoff packets must include RunSkeptic status
+- missing evidence must be enforced beyond prompt text and promotion-scorecard cases
+
+### Promotion gate
+
+Implemented:
+
+- `hldspec/promotion.py`
+- `scripts/check_hldspec_promotion_gate.py`
+- `target/.hldspec/validation/promotion_gate.json`
+- `target/.hldspec/validation/promotion_gate.md`
+
+Blocks now:
+
+- validator ACTION/CONFLICT findings
+- missing context validation when prompts exist
+- unresolved human checkpoints
+- missing implementation approval guards
+- readiness marks above 7 without evidence
+- promoted capabilities without RunSkeptic PASS evidence
+
+Still open:
+
+- guarded product promotion command/path
+- richer scorecard fields and generated promotion summaries
+- product-flow wiring so promotion checks run automatically at the right junctions
+
+### UX output
+
+Implemented:
+
+- `docs/HLDSPEC_OUTPUT_CONTRACT.md`
+- `docs/HLDSPEC_QUALITY_REQUIREMENTS.md`
+- decision-oriented `status`, `review`, and `doctor` output
+
+Required output sections now include:
+
+- blockers
+- validation status
+- promotion status
+- next safe action
+- final summary
+
+Still open:
+
+- same output discipline for `start` and `diff`
+- stage-aware `doctor` checks
+- CLI journey tests for every supported command path
+
+### Self-dogfood
+
+Implemented:
+
+- `docs/HLDSPEC_SELF_DOGFOOD_CONTRACT.md`
+- `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md`
+- `tests_v2/test_self_dogfood_flow.py`
+
+The smoke flow runs against HLDspec repository evidence, writes target session/interview/context/validation/promotion artifacts, and does not invoke SpecKit.
+
+Still open:
+
+- full self-hosted SpecKit handoff
+- repeated stale-input and changed-guidance rebuild tests
+- evidence capture for red-to-green RunSkeptic cycles
+
+### Promoted capability RunSkeptic evidence
+
+Implemented:
+
+- `tests_v2/test_promoted_capability_runskeptic_gate.py`
+- promotion gate requirement that every promoted capability must include RunSkeptic PASS evidence
+- blocking behavior for missing, ACTION, or CONFLICT RunSkeptic status
+
+Still open:
+
+- generated promoted-capability scorecard creation
+- human-readable promotion diff linking each promoted capability to exact evidence
+
+## P0 backlog - still blocks product-stable claims
+
+### P0-001 External IO enforcement across all write paths
+
+Status: partially addressed; still P0.
+
+Covered now:
+
+- `start` preserves source HLD content.
+- `start` writes durable target-product artifacts under `target/`.
+- self-dogfood smoke verifies source evidence remains unchanged.
+- target state paths are explicit and tested for key flows.
+
+Still needed:
+
+- tests proving every write path writes only to approved target or `.hldspec-dev/` locations
+- enforcement for non-start flows, generated prework artifacts, SpecKit delegation prompts, and promotion reports
+- explicit failure when a product flow attempts durable writes outside the path contract
+
+### P0-002 Guarded product-flow integration
+
+Status: open P0.
+
+Problem: context economy, validators, RunSkeptic checks, and promotion gate exist as tools/gates, but the product flow still needs stronger automatic sequencing.
+
+Acceptance:
+
+- `hldspec continue` knows when to build context prompts, validate them, run promotion checks, and stop.
+- `status`, `review`, and `doctor` agree on current blockers and next safe action.
+- no product path can proceed from generated prompts to implementation while validation or promotion is ACTION/CONFLICT.
+
+### P0-003 End-to-end journey tests
+
+Status: open P0.
+
+Required journeys:
+
+- start from raw HLD source
+- resume existing target
+- review checkpoint and capture human decision
+- continue after approval
+- stop on unresolved conflict
+- generate context packs and bounded prompts
+- validate generated prompts
+- run promotion gate
+- inspect status/review/doctor output
+
+Acceptance:
+
+- tests use the public facade where possible
+- tests prove direct low-level scripts are not required for product usage
+- failures show next safe action rather than only stack traces
+
+### P0-004 Stale artifact and diff handling
+
+Status: open P0.
+
+Required artifacts:
+
+```text
+target/.hldspec/input_manifest.json
+target/.hldspec/artifact_hashes.json
+```
+
+Required detection:
+
+- source changed
+- guidance changed
+- generated prompts stale
+- SpecKit outputs changed
+- dependency graph changed
+- invocation queue stale
+
+Acceptance:
+
+- `hldspec diff` reports stale or changed artifacts clearly
+- `hldspec doctor` reports whether the target is safe to continue
+- regeneration scope is bounded to affected outputs
+
+### P0-005 Domain validators before product-stable promotion
+
+Status: open P0.
+
+Required validators:
 
 - backend upgrade has trigger
 - selected principle has evidence
 - constitution contains no feature-specific content
 - each package has unit/integration/e2e testability
-- prompt includes RunSkeptic rules
-- prompt includes cost/context rules
 - dependency graph and invocation queue match
 - generated handoff points to canonical backlog and handoff protocol
 
-Current implementation note:
-
-- `hldspec.validators` and `scripts/validate_hldspec_target.py` validate generated context economy artifacts and SpecKit prompt guardrails.
-- Reports are written under `target/.hldspec/validation/context_prompt_validation.json` and `.md`.
-- Covered checks include `allowed_evidence.json`, `forbidden_reads.md`, context pack JSON, prompt context markers, RunSkeptic triggers, valid model tiers, forbidden broad-read phrases, and implement-phase human approval guards.
-- Remaining work: backend trigger, principle evidence, constitution purity, package testability, dependency graph/queue parity, and handoff-pointer validators.
-
-### P0-009 README and AGENTS alignment
-
-Rules:
-
-- `AGENTS.md` first screen points to `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`
-- `AGENTS.md` first screen points to `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`
-- `CLAUDE.md` points to the same protocol/backlog
-- generated `HANDOFF.md` points to the protocol and backlog
-- low-level scripts are documented as tools, not product workflow
-
-### P0-010 RunSkeptic enforcement
-
-Status: partially strengthened at generated prompt validation and promotion-gate levels.
-
-Implementation still needed:
-
-- gate machines surface RunSkeptic status
-- prompt templates include RunSkeptic trigger points
-- validators block missing evidence
-- generated handoff packet lists RunSkeptic PASS/ACTION/CONFLICT status
-
-Current implementation note:
-
-- Bounded SpecKit prompts include RunSkeptic trigger points.
-- `scripts/validate_hldspec_target.py` blocks prompts that omit RunSkeptic triggers and records ACTION findings in target validation reports.
-- `scripts/check_hldspec_promotion_gate.py` blocks promotion when validator reports contain ACTION/CONFLICT findings or promoted capabilities omit RunSkeptic status.
-- Remaining work: gate machines must surface RunSkeptic status directly, missing evidence must be enforced beyond prompt text, and generated handoff packets must include RunSkeptic PASS/ACTION/CONFLICT state.
-
-### P0-011 Canonical target path contract
-
-Define one canonical path contract before further migration.
-
-Current contract:
-
-```text
-Canonical agent-first layout: target/.hldspec/sync/ and target/.hldspec/events.jsonl.
-Legacy/debug layout: workspace/firstrun/.specify/sync/ and workspace/.specify/sync/hldspec_event_log.jsonl.
-SpecKit-owned layout: target/.specify/ and target/specs/.
-```
-
 Acceptance:
 
-- `docs/HLD_TO_TARGET_WORKSPACE.md`, `TargetWorkspaceAdapter`, `scripts/hldspec_agent_session.py`, and `ProjectMachine` describe and use the same paths.
-- tests fail if a new path model is introduced without updating the adapter and docs.
+- validators write machine-readable and human-readable reports
+- ACTION/CONFLICT findings block promotion
+- tests cover failing and passing cases
 
-### P0-012 ProjectMachine new-layout integration
+### P0-006 RunSkeptic status propagation
 
-Make the agent-first target workflow call ProjectMachine through the new layout.
+Status: open P0.
 
-Acceptance:
+Covered now:
 
-- a test proves `ProjectMachine` receives or uses `target/targetHLD/HLD.md` for agent-first target runs.
-- a test proves new event writes use `target/.hldspec/events.jsonl`.
-- legacy tests still pass.
+- prompt validators check RunSkeptic triggers
+- promotion gate checks promoted capability RunSkeptic PASS evidence
 
-### P0-013 Agent prompt and tool-manifest path alignment
+Still needed:
 
-Generated agent prompts must use the adapter path contract.
+- gate machines surface RunSkeptic PASS/ACTION/CONFLICT status directly
+- generated handoff packet lists RunSkeptic status
+- review output links RunSkeptic findings to exact evidence and next safe action
 
-Acceptance:
+## Mostly addressed former P0 items
 
-- generated prompts derive paths from `TargetWorkspaceAdapter`.
-- generated prompts include allowed evidence and forbidden broad reads.
-- generated prompts state which paths are HLDspec-owned and which are SpecKit-owned.
+These remain important but no longer represent the top stale-truth gaps.
 
-### P0-014 Complete use-case catalog and command/API contract
-
-All HLDspec use cases must be defined before deeper orchestration work continues.
-
-Required use-case catalog:
-
-```text
-UC-001 start with no source yet: interview for intent and source/target
-UC-002 start with source only: choose/create target
-UC-003 create new target from raw HLD
-UC-004 adopt existing target without HLDspec state
-UC-005 resume existing HLDspec target
-UC-006 update after source/resources changed
-UC-007 upgrade after HLDspec guidance/templates changed
-UC-008 review checkpoint and capture human decisions
-UC-009 continue after approval
-UC-010 handle unresolved conflict and require human decision
-UC-011 generate use-case/API map
-UC-012 generate package/dependency/invocation queue
-UC-013 generate context packs and bounded prompts
-UC-014 delegate one SpecKit phase
-UC-015 answer SpecKit clarification from evidence only
-UC-016 escalate unknown SpecKit question to human
-UC-017 verify SpecKit output and RunSkeptic findings
-UC-018 detect stale artifacts and rebuild affected outputs
-UC-019 brownfield target with existing specs
-UC-020 user-requested pause before continuing
-UC-021 development handoff between agents/models
-UC-022 maintainer/debug direct-script run
-UC-023 completed history / merged-work audit
-```
-
-Acceptance:
-
-- each use case has trigger, preconditions, command/API, artifacts read, artifacts written, stop condition, and tests expected.
-- command names match the facade or are clearly marked legacy/future.
-- no product use case requires direct user knowledge of low-level scripts.
-
-### P0-015 Product command surface parity
-
-Make docs, CLI parser, tests, and prompts agree on supported commands.
-
-Current conflict:
-
-- product docs mention `hldspec speckit` and `hldspec stop` or equivalent future controls.
-- current parser does not implement them.
-- older use-case docs mention `run`, `interview`, `prework`, and `speckit-proxy`.
-
-Acceptance:
-
-- one command matrix lists supported, future, and legacy/debug commands.
-- CLI parser tests cover every supported command.
-- docs do not advertise unsupported commands as current product behavior.
-
-### P0-016 Path-contract and command-contract regression tests
-
-Add tests that lock the product contract.
-
-Required tests:
-
-- target workspace path contract.
-- ProjectMachine new-layout entry path.
-- event log new-layout path.
-- first-run/sync path consistency.
-- prompt/tool-manifest path consistency.
-- README/AGENTS/USER_RUN_MODEL command consistency.
-- unsupported command docs are marked future or legacy.
-
-### P0-017 Promotion scorecard gate
-
-Status: partially implemented as an internal target readiness gate.
-
-Do not promote HLDspec as product-stable without an explicit scorecard gate.
-
-Acceptance:
-
-- scorecard lists current mark, target mark, blockers, and next safe step.
-- any mark above 7 requires tests or reproduced evidence.
-- unresolved ACTION/CONFLICT items block promotion.
-
-Current implementation note:
-
-- `hldspec.promotion.evaluate_promotion_gate` and `scripts/check_hldspec_promotion_gate.py` write `target/.hldspec/validation/promotion_gate.json` and `.md`.
-- The gate reads context validation reports, event logs, agent session, allowed evidence, context packs, prompt guards, human checkpoint artifacts, and optional readiness/promoted-capability scorecards.
-- The gate returns PASS/ACTION/CONFLICT and blocks validator ACTION/CONFLICT findings, missing context validation after prompts exist, unresolved human checkpoints, missing implementation approval guards, missing RunSkeptic status for promoted capabilities, and readiness marks above 7 without tests/evidence.
-- `hldspec doctor --target` reports existing promotion gate status.
-- Remaining work: wire the gate into a guarded product promotion path and expand scorecard fields for current mark, target mark, blockers, and next safe step.
+| Former item | Current status | Residual location |
+|---|---|---|
+| User interview capability | Mostly addressed for `start --source --target --comment`; future interactive discovery remains deferred. | P1-003 |
+| TargetWorkspaceAdapter | Mostly addressed for new-layout ProjectMachine entry; migration coverage remains. | P1-004 |
+| Event and state ownership | Mostly addressed for canonical new paths; full write-path enforcement remains. | P0-001 |
+| Agent-first CLI facade integration | Mostly addressed for current public command surface and `continue`; full journey coverage remains. | P0-003 |
+| Context economy enforcement | Mostly addressed as generated artifacts plus validator; product-flow integration remains. | P0-002 |
+| SpecKit delegation prompts | Mostly addressed as seven generated bounded phase prompts; package/invocation wiring remains. | P1-005 |
+| Context and prompt validators | Mostly addressed for prompt/context guardrails; domain validators remain. | P0-005 |
+| README/AGENTS alignment | Mostly addressed for command-surface direction; final docs sweep remains. | P1-006 |
+| Promotion scorecard gate | Mostly addressed as an internal target gate; product promotion command/path remains. | P0-002 |
+| Self-dogfood smoke | Mostly addressed for smoke without SpecKit; full self-hosted delegation remains future. | P1-007 |
 
 ## P1 backlog
 
@@ -480,7 +385,51 @@ Generated `.hldspec-dev/handoff/HANDOFF.md` should include:
 - next safe step
 - do-not-do list
 
-### P1-003 HLD build terminology
+### P1-003 Interactive interview discovery
+
+The current implemented path writes interview artifacts when source and target are provided.
+
+Future work:
+
+- no-source interview for intent and source discovery
+- source-only flow for target selection
+- resume/adopt interview for existing targets
+- structured clarification capture before writing
+
+### P1-004 Complete machine migration through TargetWorkspaceAdapter
+
+Residual work:
+
+- migrate remaining machines away from hardcoded legacy paths
+- keep legacy/debug compatibility explicit
+- add tests that fail if a new path model is introduced without adapter and docs updates
+
+### P1-005 Package discovery and SpecKit invocation wiring
+
+Residual work:
+
+- connect bounded prompts to final package/dependency/invocation artifacts
+- validate package prompts against the dependency graph
+- ensure each generated prompt names allowed evidence, forbidden reads, model tier, stop condition, and expected outputs
+
+### P1-006 Documentation alignment sweep
+
+Residual work:
+
+- README leads with agent-first product usage
+- AGENTS, CLAUDE, USER_RUN_MODEL, and use-case docs agree on current/future/legacy commands
+- direct scripts are documented as agent/maintainer tools, not the product workflow
+
+### P1-007 Expanded self-dogfood
+
+Residual work:
+
+- self-run with changed HLDspec guidance
+- stale-input rebuild detection
+- generated promoted-capability scorecard
+- RunSkeptic red-to-green evidence capture
+
+### P1-008 HLD build terminology
 
 Choose one product term and use it consistently.
 
@@ -509,67 +458,6 @@ build or improve target/targetHLD/HLD.md from sources and interview answers
 ```
 
 Avoid using `build` ambiguously for both HLD preparation and product implementation.
-
-### P1-004 Diff and stale detection
-
-Track fingerprints:
-
-```text
-target/.hldspec/input_manifest.json
-target/.hldspec/artifact_hashes.json
-```
-
-Detect:
-
-- source changed
-- guidance changed
-- generated prompts stale
-- SpecKit outputs changed
-- dependency graph changed
-- invocation queue stale
-
-### P1-005 HLDspec development scorecard
-
-Keep a scorecard updated for:
-
-- user simplicity
-- agent-first workflow
-- statelessness
-- target workspace clarity
-- RunSkeptic enforcement
-- context economy
-- SpecKit handoff
-- testability
-- validators
-- development handoff quality
-
-### P1-006 Self-dogfood contract and smoke test
-
-HLDspec must prove that it can run on HLDspec itself.
-
-Required:
-
-- `docs/HLDSPEC_SELF_DOGFOOD_CONTRACT.md`
-- `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md`
-- `tests_v2/test_self_dogfood_flow.py`
-
-The smoke test must run the public facade and internal guarded tools on HLDspec repository evidence without invoking SpecKit.
-
-Current implementation note:
-
-- `tests_v2/test_self_dogfood_flow.py` runs the smoke flow against `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`.
-- `tests_v2/test_principle_enforcement_matrix.py` prevents empty or placeholder enforcement-matrix rows.
-- `tests_v2/test_promoted_capability_runskeptic_gate.py` blocks promoted capabilities unless RunSkeptic status is PASS with evidence.
-
-Acceptance:
-
-- source evidence remains unchanged
-- target session/interview artifacts are written
-- context economy artifacts are generated
-- context validation report is written
-- promotion gate report is written
-- promoted capabilities require RunSkeptic PASS evidence
-- status/review/doctor expose next-safe-action and summary output
 
 ## P2 backlog
 
@@ -657,28 +545,11 @@ Future commands: `interview`, `prework`, `speckit`, `pause`.
 
 Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.
 
-Decision record:
-
-```text
-Should the canonical public command set be start/status/review/continue/diff/doctor only, or should run/interview/prework/speckit-proxy/speckit/pause also be product commands?
-```
-
-Safe recommendation:
-
-- keep the current public surface small.
-- mark unimplemented commands as future or legacy/debug.
-- define all use cases independently of command spelling.
-- map each use case to current/future/legacy command status.
-
 ## Next safe patch sequence
 
-1. Stabilize the canonical target path contract.
-2. Update TargetWorkspaceAdapter, ProjectMachine entry, agent prompt generation, and docs to match that contract.
-3. Add path-contract regression tests.
-4. Complete the use-case catalog and command/API matrix.
-5. Align README, AGENTS, USER_RUN_MODEL, and HLDSPEC_USE_CASES_AND_API.
-6. Make `continue` call ProjectMachine through the adapter instead of only printing guidance.
-7. Move event log writes to `target/.hldspec/events.jsonl` for the new layout.
-8. Add interview artifacts.
-9. Add context-pack and prompt validators.
-10. Add RunSkeptic promotion gates.
+1. Review GitHub diff and RunSkeptic on this stale-truth update.
+2. Wire context validation and promotion checks into guarded product-flow stops.
+3. Add end-to-end journey tests through the public facade.
+4. Add stale-artifact and diff detection.
+5. Add domain validators for backend triggers, principle evidence, constitution purity, package testability, graph/queue parity, and handoff pointers.
+6. Propagate RunSkeptic PASS/ACTION/CONFLICT through gate-machine and handoff outputs.
