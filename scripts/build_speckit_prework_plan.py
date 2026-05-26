@@ -375,9 +375,9 @@ def build_artifacts(plan: dict[str, Any], plan_path: Path) -> dict[str, dict[str
 
     return {
         "speckit_input_manifest": manifest,
-        "speckit_invocation_queue": invocation_queue,
-        "constitution_update_plan": constitution_plan,
         "feature_dependency_graph": dependency_graph,
+        "constitution_update_plan": constitution_plan,
+        "speckit_invocation_queue": invocation_queue,
     }
 
 

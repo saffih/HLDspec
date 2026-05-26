@@ -1,0 +1,145 @@
+{
+  "authoritative_source": {
+    "last_verified_sha": "37bbc47ea49ac7ddbfef1bdbfb2bad3fe1ffb5bd",
+    "path": "skeptic.md",
+    "repository": "saffih/skeptic",
+    "url": "https://github.com/saffih/skeptic/blob/main/skeptic.md"
+  },
+  "companion_sources": [
+    {
+      "last_verified_sha": "9740d05a7c2fda9e51443dd03a0aebc79cb861a4",
+      "path": "skeptic-questions.md",
+      "purpose": "Target-relevant domain question bank loaded when relevant.",
+      "repository": "saffih/skeptic",
+      "url": "https://github.com/saffih/skeptic/blob/main/skeptic-questions.md"
+    }
+  ],
+  "domain_checks": [
+    "SEC",
+    "CPX",
+    "REL",
+    "DAT",
+    "ARC",
+    "CFT"
+  ],
+  "domain_question_bank": {
+    "domain_group_parallelization": {
+      "CPX+ARC": [
+        "CPX",
+        "ARC"
+      ],
+      "REL+CFT": [
+        "REL",
+        "CFT"
+      ],
+      "SEC+DAT": [
+        "SEC",
+        "DAT"
+      ]
+    },
+    "finding_classification": [
+      "ACTION",
+      "CONFLICT",
+      "EXEMPLAR"
+    ],
+    "loaded_when": "Apply relevant domains first; sample likely domains when relevance is unclear; expand when findings indicate cross-domain impact or high risk.",
+    "questions": {
+      "ARC": [
+        "Implicit dependency that would surprise a new contributor?",
+        "Circular dependency between modules?",
+        "Data flow traceable from input to output?",
+        "Interfaces/contracts explicit and correct?",
+        "Relationship exists but is not written down?",
+        "Connection missing, accidental, or misplaced?"
+      ],
+      "CFT": [
+        "Test names describe behavior, not implementation?",
+        "Error message tells you HOW to fix it?",
+        "Test mocks so much it only tests the mock?"
+      ],
+      "CPX": [
+        "Independent concerns tangled in one function?",
+        "Code that should be data (lookup table, config, enum)?",
+        "State implicit and scattered vs explicit and managed?",
+        "Simple (few independent parts), or just familiar?",
+        "How many things must you hold in your head to understand this?"
+      ],
+      "DAT": [
+        "Every external call (subprocess, network, DB) timed out?",
+        "Race condition? Locks minimal and correct?",
+        "What happens when disk is full or filesystem is read-only?",
+        "Encoding explicit (UTF-8) or assumed?",
+        "Where is this data authored?",
+        "How often is it updated relative to reality?",
+        "Who consumes it, and is consistency preserved over time?"
+      ],
+      "REL": [
+        "No monitoring - how would you know this is silently broken?",
+        "What fails at 10x scale?",
+        "What external dependency could break this without any code change?",
+        "Bus factor - who knows this, and what if they leave?",
+        "Single source of truth for each important datum?",
+        "Who owns this part or datum, and who is allowed to change it?",
+        "Is ownership/current responsibility clear enough to operate safely?"
+      ],
+      "SEC": [
+        "PII in shared or public files?",
+        "Subprocess or command from unsanitized user input?",
+        "File read/written without permission check?",
+        "Test-data vs real-data boundary enforced?",
+        "Error messages expose internal paths or stack traces?",
+        "Authentication check that can be bypassed?",
+        "Symlinks validated before following?",
+        "Secrets suppression that can be circumvented?"
+      ]
+    },
+    "source": "saffih/skeptic/skeptic-questions.md"
+  },
+  "evidence_levels": [
+    "OBSERVED",
+    "REPRODUCED",
+    "HISTORICAL",
+    "INFERRED_RISK"
+  ],
+  "formal_invocation": "RunSkeptic",
+  "hldspec_contract": [
+    "Use the authoritative Skeptic phase flow for all HLDspec RunSkeptic reviews.",
+    "Record framework source and phase flow in generated workspace artifacts.",
+    "Do not call a finding fixed unless evidence and verification path are recorded.",
+    "Treat unresolved human decisions as CONFLICT or checkpoint blockers.",
+    "Use HLDspec cycles as bounded executable projections of Skeptic, not as a replacement for skeptic.md.",
+    "Cache the companion domain question bank from skeptic-questions.md, not only skeptic.md.",
+    "Use domain questions selectively, following Skeptic relevance rules.",
+    "Record selected domain checks in generated RunSkeptic review records."
+  ],
+  "name": "RunSkeptic / Skeptic",
+  "output_states": [
+    "FIX",
+    "CONFLICT",
+    "DECOMPOSE",
+    "NO_ACTION",
+    "PROVISIONAL"
+  ],
+  "phase_flow": [
+    "GATE",
+    "FUNDAMENTAL_SCAN",
+    "MAP",
+    "CONFIDENCE",
+    "STABILIZE",
+    "EVIDENCE",
+    "DECIDE",
+    "ACT",
+    "VERIFY",
+    "LEARN"
+  ],
+  "phase_flow_text": "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
+  "schema_version": 1,
+  "thinkers": [
+    "CH",
+    "OM",
+    "FE",
+    "PO",
+    "KT",
+    "SH"
+  ]
+}
