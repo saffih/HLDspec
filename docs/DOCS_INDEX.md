@@ -82,3 +82,6 @@ Full archive contents: [`docs/archive/`](archive/)
 | [`HLDSPEC_PRODUCT_SCORECARD.md`](HLDSPEC_PRODUCT_SCORECARD.md) | Product scorecard for simplicity, target workspace, RunSkeptic, and agent-first execution |
 
 | [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Development handoff protocol for handing the HLDspec repo between models/agents/sessions |
+
+| [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Canonical development handoff protocol for handing HLDspec repo work between models/agents/sessions |
+| [`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) | Durable backlog for unfinished HLDspec repo-development work and open design decisions |

@@ -248,3 +248,19 @@ Default output is external/runtime state:
 `.hldspec-dev/` is gitignored. Durable project knowledge must be promoted into `CLAUDE.md`, `TASKS.md`, or active docs.
 
 See `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`.
+
+## HLDspec development handoff and backlog
+
+Canonical repo-development handoff protocol:
+
+```text
+docs/HLDSPEC_DEVELOPMENT_HANDOFF.md
+```
+
+Durable repo-development backlog:
+
+```text
+docs/HLDSPEC_DEVELOPMENT_BACKLOG.md
+```
+
+`CLAUDE.md`, `AGENTS.md`, and generated `.hldspec-dev/handoff/HANDOFF.md` files are pointers. The docs files are the source of truth.

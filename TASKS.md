@@ -137,3 +137,11 @@ Next small slices (no urgency order):
 | Item | Status | Files |
 |---|---|---|
 | HLDspec repo-development handoff | Added protocol and generator for handing repo work between models/agents/sessions | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`, `scripts/hldspec_dev_handoff.py`, `tests_v2/test_dev_handoff.py` |
+
+## Development handoff and backlog
+
+| Item | Status | Files |
+|---|---|---|
+| HLDspec repo-development handoff protocol | Added canonical protocol and generator | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`, `scripts/hldspec_dev_handoff.py` |
+| HLDspec repo-development backlog | Added durable backlog for unfinished design and implementation work | `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` |
+| Agent bootstrap pointer | `AGENTS.md` first screen points every agent to the handoff and backlog docs | `AGENTS.md` |

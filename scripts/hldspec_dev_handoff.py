@@ -7,12 +7,14 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 
 REQUIRED_FIRST_READ = [
+    "AGENTS.md",
     "CLAUDE.md",
     "TASKS.md",
+    "docs/HLDSPEC_DEVELOPMENT_HANDOFF.md",
+    "docs/HLDSPEC_DEVELOPMENT_BACKLOG.md",
     "docs/DOCS_INDEX.md",
     "docs/CANONICAL_FLOW.md",
     "docs/ARCHITECTURE_V2.md",
@@ -30,9 +32,11 @@ INVARIANTS = [
     "Patch scripts must be syntax checked before handoff.",
     "Dirty-tree work must be handled explicitly.",
     "HLDspec runtime state belongs outside core code.",
+    "Durable backlog belongs in docs/HLDSPEC_DEVELOPMENT_BACKLOG.md.",
 ]
 
 DO_NOT_DO = [
+    "Do not depend on hidden chat history.",
     "Do not rerun a failed patch blindly.",
     "Do not reset or delete dirty work without explicit approval.",
     "Do not treat archived docs as authoritative.",
@@ -55,6 +59,8 @@ class HandoffPacket:
     current_head: str
     git_status: list[str]
     last_commits: list[str]
+    canonical_handoff_protocol: str
+    canonical_backlog: str
     required_first_read: list[str]
     changed_files: list[str]
     relevant_files: list[str]
@@ -69,27 +75,11 @@ class HandoffPacket:
 
 
 def run_git(repo: Path, args: list[str]) -> list[str]:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repo,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    result = subprocess.run(["git", *args], cwd=repo, text=True, capture_output=True, check=False)
     if result.returncode != 0:
         message = (result.stderr or result.stdout or "").strip()
         return [f"git {' '.join(args)} failed: {message}"]
     return [line for line in result.stdout.splitlines() if line.strip()]
-
-
-def current_branch(repo: Path) -> str:
-    out = run_git(repo, ["branch", "--show-current"])
-    return out[0] if out else "UNKNOWN"
-
-
-def current_head(repo: Path) -> str:
-    out = run_git(repo, ["rev-parse", "--short", "HEAD"])
-    return out[0] if out else "UNKNOWN"
 
 
 def changed_files_from_status(status: list[str]) -> list[str]:
@@ -97,7 +87,6 @@ def changed_files_from_status(status: list[str]) -> list[str]:
     for line in status:
         if not line.strip() or line.startswith("git "):
             continue
-        # porcelain short: XY path
         files.append(line[3:].strip() if len(line) > 3 else line.strip())
     return sorted(set(files))
 
@@ -105,40 +94,35 @@ def changed_files_from_status(status: list[str]) -> list[str]:
 def build_packet(args: argparse.Namespace) -> HandoffPacket:
     repo = Path(args.repo).expanduser().resolve()
     status = run_git(repo, ["status", "--short"])
-    commits = run_git(repo, ["log", "--oneline", "-5"])
     changed = changed_files_from_status(status)
-
-    relevant = list(REQUIRED_FIRST_READ)
-    for path in changed:
-        if path and path not in relevant:
-            relevant.append(path)
-
-    tests_required = [
-        "python3 -m unittest discover -s tests_v2 -v",
-        "python3 -m pytest tests_v2 -q",
-        "git diff --check",
-    ]
-
-    handoff_id = args.handoff_id or f"hldspec-dev-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    relevant = list(dict.fromkeys([*REQUIRED_FIRST_READ, *changed]))
+    now = datetime.now(timezone.utc)
+    handoff_id = args.handoff_id or f"hldspec-dev-{now.strftime('%Y%m%dT%H%M%SZ')}"
 
     return HandoffPacket(
         handoff_id=handoff_id,
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        created_at=now.isoformat(timespec="seconds"),
         repo=str(repo),
         from_actor=args.from_agent,
         to_actor=args.to_agent,
         model_tier=args.model_tier,
         focus=args.focus,
-        current_branch=current_branch(repo),
-        current_head=current_head(repo),
+        current_branch=(run_git(repo, ["branch", "--show-current"]) or ["UNKNOWN"])[0],
+        current_head=(run_git(repo, ["rev-parse", "--short", "HEAD"]) or ["UNKNOWN"])[0],
         git_status=status,
-        last_commits=commits,
+        last_commits=run_git(repo, ["log", "--oneline", "-5"]),
+        canonical_handoff_protocol="docs/HLDSPEC_DEVELOPMENT_HANDOFF.md",
+        canonical_backlog="docs/HLDSPEC_DEVELOPMENT_BACKLOG.md",
         required_first_read=list(REQUIRED_FIRST_READ),
         changed_files=changed,
         relevant_files=relevant,
         invariants=list(INVARIANTS),
         tests_run=[item for item in args.tests_run if item],
-        tests_required=tests_required,
+        tests_required=[
+            "git diff --check",
+            "python3 -m py_compile scripts/hldspec_dev_handoff.py",
+            "python3 -m unittest discover -s tests_v2 -v",
+        ],
         runskeptic_status=args.runskeptic_status,
         open_actions=[item for item in args.open_action if item],
         open_conflicts=[item for item in args.open_conflict if item],
@@ -147,18 +131,19 @@ def build_packet(args: argparse.Namespace) -> HandoffPacket:
     )
 
 
-def render_markdown(packet: HandoffPacket) -> str:
-    def bullets(items: list[str]) -> str:
-        if not items:
-            return "- none\n"
-        return "".join(f"- {item}\n" for item in items)
+def bullets(items: list[str]) -> str:
+    return "".join(f"- {item}\n" for item in items) if items else "- none\n"
 
+
+def render_markdown(packet: HandoffPacket) -> str:
     return f"""# HLDspec Development Handoff
 
-## Canonical protocol
+## Canonical references
 
-- Source of truth: `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`
-- This packet is current-session state only; do not treat it as the protocol.
+- Handoff protocol: `{packet.canonical_handoff_protocol}`
+- Durable backlog: `{packet.canonical_backlog}`
+
+This packet is current-session state only. Do not treat it as the protocol or backlog.
 
 ## Summary
 
@@ -222,39 +207,35 @@ def render_markdown(packet: HandoffPacket) -> str:
 """
 
 
-def write_packet(packet: HandoffPacket, out_dir: Path) -> tuple[Path, Path]:
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Generate an HLDspec repo-development handoff packet.")
+    parser.add_argument("--repo", default=".", help="HLDspec repo path.")
+    parser.add_argument("--out-dir", default=".hldspec-dev/handoff", help="Output directory.")
+    parser.add_argument("--handoff-id", default="")
+    parser.add_argument("--from-agent", default="unknown")
+    parser.add_argument("--to-agent", default="next-agent")
+    parser.add_argument("--model-tier", default="MODEL_DEFAULT", choices=["MODEL_ROUTINE", "MODEL_DEFAULT", "MODEL_STRONG", "MODEL_CRITICAL", "HUMAN"])
+    parser.add_argument("--focus", required=True)
+    parser.add_argument("--tests-run", action="append", default=[])
+    parser.add_argument("--runskeptic-status", default="NOT_RUN")
+    parser.add_argument("--open-action", action="append", default=[])
+    parser.add_argument("--open-conflict", action="append", default=[])
+    parser.add_argument("--next-safe-step", default="Read required first-read docs, inspect git status, then continue only within the stated focus.")
+    args = parser.parse_args()
+
+    repo = Path(args.repo).expanduser().resolve()
+    if not (repo / ".git").exists():
+        raise SystemExit(f"ERROR: not a git repo: {repo}")
+
+    packet = build_packet(args)
+    out_dir = Path(args.out_dir).expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
+
     json_path = out_dir / "HANDOFF.json"
     md_path = out_dir / "HANDOFF.md"
     json_path.write_text(json.dumps(asdict(packet), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(render_markdown(packet), encoding="utf-8")
-    return md_path, json_path
 
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate an HLDspec repo-development handoff packet.")
-    parser.add_argument("--repo", default=".", help="HLDspec repo path. Default: current directory.")
-    parser.add_argument("--out-dir", default=".hldspec-dev/handoff", help="Output directory for HANDOFF.md/json.")
-    parser.add_argument("--handoff-id", default="", help="Optional stable handoff id.")
-    parser.add_argument("--from-agent", default="unknown", help="Current agent/model/person.")
-    parser.add_argument("--to-agent", default="next-agent", help="Next agent/model/person.")
-    parser.add_argument("--model-tier", default="MODEL_DEFAULT", choices=["MODEL_ROUTINE", "MODEL_DEFAULT", "MODEL_STRONG", "MODEL_CRITICAL", "HUMAN"])
-    parser.add_argument("--focus", required=True, help="Current work focus.")
-    parser.add_argument("--tests-run", action="append", default=[], help="Test/check command already run. Repeatable.")
-    parser.add_argument("--runskeptic-status", default="NOT_RUN", help="RunSkeptic status: NOT_RUN/PASS/ACTION/CONFLICT plus notes.")
-    parser.add_argument("--open-action", action="append", default=[], help="Open ACTION item. Repeatable.")
-    parser.add_argument("--open-conflict", action="append", default=[], help="Open CONFLICT item. Repeatable.")
-    parser.add_argument("--next-safe-step", default="Read required first-read docs, inspect git status, then continue only within the stated focus.")
-    return parser.parse_args()
-
-
-def main() -> int:
-    args = parse_args()
-    repo = Path(args.repo).expanduser().resolve()
-    if not (repo / ".git").exists():
-        raise SystemExit(f"ERROR: not a git repo: {repo}")
-    packet = build_packet(args)
-    md_path, json_path = write_packet(packet, Path(args.out_dir).expanduser())
     print(f"Wrote: {md_path}")
     print(f"Wrote: {json_path}")
     return 0
