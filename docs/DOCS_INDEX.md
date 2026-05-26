@@ -76,3 +76,7 @@ Full archive contents: [`docs/archive/`](archive/)
 - **RunSkeptic schema?** → `hldspec/skeptic_schema.py` + `RUNSKEPTIC_EVIDENCE_QUALITY.md`
 - **SpecKit handoff?** → `SPECKIT_PROXY_PROTOCOL.md`
 - **How to run tests?** → `TEST_STRATEGY_V2.md`
+
+| [`AGENT_FIRST_PRODUCT_MODEL.md`](AGENT_FIRST_PRODUCT_MODEL.md) | Agent-first product model: users start sessions; scripts are tools |
+| [`USER_RUN_MODEL.md`](USER_RUN_MODEL.md) | Simple user workflow: start, status, review, continue, speckit, diff, doctor |
+| [`HLDSPEC_PRODUCT_SCORECARD.md`](HLDSPEC_PRODUCT_SCORECARD.md) | Product scorecard for simplicity, target workspace, RunSkeptic, and agent-first execution |

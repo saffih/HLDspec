@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SESSION_SCHEMA_VERSION = "1.0"
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def json_write(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def json_read(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def ensure_target_dirs(target: Path) -> None:
+    for rel in [
+        "targetHLD/raw",
+        "targetHLD/sections",
+        ".hldspec",
+        ".specify/memory",
+        ".specify/sync",
+        "prompts/agent",
+        "prompts/tools",
+        "prompts/speckit",
+        "specs",
+    ]:
+        (target / rel).mkdir(parents=True, exist_ok=True)
+
+
+def detect_mode(target: Path, source_hash: str | None, requested_mode: str) -> str:
+    if requested_mode != "auto":
+        return requested_mode
+
+    if not target.exists():
+        return "create"
+
+    session = json_read(target / ".hldspec" / "agent_session.json")
+    if not session:
+        return "adopt"
+
+    previous_hash = (
+        session.get("source", {}).get("sha256")
+        if isinstance(session.get("source"), dict)
+        else None
+    )
+    if source_hash and previous_hash and source_hash != previous_hash:
+        return "update"
+
+    conflicts = target / ".hldspec" / "conflicts.json"
+    if conflicts.exists():
+        return "blocked"
+
+    return "resume"
+
+
+def copy_source(source: Path, target: Path) -> None:
+    raw = target / "targetHLD" / "raw" / "HLD.raw.md"
+    working = target / "targetHLD" / "HLD.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, raw)
+    if not working.exists():
+        shutil.copyfile(source, working)
+
+
+def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
+    prompt = target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"
+    source = session["source"]["path"]
+    mode = session["mode"]
+    agent = session["agent"]
+    comment = session.get("comment") or ""
+
+    prompt.write_text(
+        f"""# HLDspec Agent Session
+
+## Role
+
+You are the HLDspec orchestrating agent.
+
+This is an agent-first workflow. Scripts are tools. You own orchestration, judgment, RunSkeptic usage, conflict handling, cost/context economy, and human checkpoints.
+
+## Session
+
+- Agent: `{agent}`
+- Mode: `{mode}`
+- Source: `{source}`
+- Target: `{target}`
+- Comment: `{comment}`
+
+## Core rules
+
+1. Treat source HLD/resources as read-only evidence.
+2. Work inside `target/`.
+3. Use `target/targetHLD/` for HLD evidence and working HLD.
+4. Use HLDspec scripts as deterministic tools.
+5. Do not manually create final SpecKit specs.
+6. Run or apply RunSkeptic at key junctions.
+7. Use smallest sufficient context.
+8. Use weakest sufficient model.
+9. Stop on unresolved CONFLICT.
+10. Ask for human approval before risky transitions.
+
+## First tools to consider
+
+```bash
+bash scripts/first_run_readonly.sh "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'firstrun'}" --force
+```
+
+Then inspect:
+
+```text
+target/.hldspec/firstrun/.specify/sync/spec_build_plan_review.md
+target/.hldspec/firstrun/.specify/sync/speckit_prework_quality_review.md
+target/.hldspec/firstrun/.specify/sync/speckit_proxy_dossier.md
+```
+
+## Required outputs
+
+Generate or refresh target-specific artifacts:
+
+```text
+target/.hldspec/design_principles_selection.*
+target/.hldspec/backend_technology_recommendation.*
+target/.hldspec/constitution_update_plan.*
+target/.hldspec/spec_packages.*
+target/.hldspec/feature_dependency_graph.*
+target/.hldspec/speckit_invocation_queue.*
+target/prompts/
+```
+
+## Stop condition
+
+Stop after the next safe checkpoint and report:
+
+- files created or changed
+- RunSkeptic PASS/ACTION/CONFLICT findings
+- human decisions required
+- next allowed action
+""",
+        encoding="utf-8",
+    )
+    return prompt
+
+
+def write_tool_manifest(target: Path) -> Path:
+    manifest = target / ".hldspec" / "agent_tool_manifest.md"
+    manifest.write_text(
+        f"""# HLDspec Agent Tool Manifest
+
+Scripts are tools for the HLDspec agent.
+
+## Preferred first analysis tool
+
+```bash
+bash scripts/first_run_readonly.sh "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'firstrun'}" --force
+```
+
+## V2 machine tool
+
+```bash
+python3 scripts/hldspec_v2.py "{target / 'targetHLD' / 'HLD.md'}" "{target / '.hldspec' / 'v2-run'}"
+```
+
+## Rules
+
+- Do not use scripts as the public user workflow.
+- Use tools to produce evidence and controlled artifacts.
+- Gate promotion through RunSkeptic and human checkpoints.
+- Keep final SpecKit artifacts owned by SpecKit.
+""",
+        encoding="utf-8",
+    )
+    return manifest
+
+
+def command_start(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve()
+    target = Path(args.target).expanduser().resolve()
+
+    if not source.exists() or not source.is_file():
+        print(f"ERROR: source HLD not found: {source}", file=sys.stderr)
+        return 2
+
+    source_hash = sha256_file(source)
+    mode = detect_mode(target, source_hash, args.mode)
+
+    ensure_target_dirs(target)
+    copy_source(source, target)
+
+    manifest = {
+        "schema_version": SESSION_SCHEMA_VERSION,
+        "created_or_updated_at": utc_now(),
+        "agent": args.agent,
+        "mode": mode,
+        "comment": args.comment or "",
+        "source": {
+            "path": str(source),
+            "sha256": source_hash,
+        },
+        "target": str(target),
+        "paths": {
+            "working_hld": str(target / "targetHLD" / "HLD.md"),
+            "raw_hld": str(target / "targetHLD" / "raw" / "HLD.raw.md"),
+            "start_prompt": str(target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"),
+            "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
+        },
+        "next_action": "Open prompts/agent/START_HLDSPEC_AGENT.md in an agent session.",
+    }
+    json_write(target / ".hldspec" / "agent_session.json", manifest)
+    json_write(
+        target / "targetHLD" / "raw" / "resources_manifest.json",
+        {
+            "schema_version": SESSION_SCHEMA_VERSION,
+            "resources": [
+                {
+                    "kind": "source_hld",
+                    "path": str(source),
+                    "sha256": source_hash,
+                }
+            ],
+        },
+    )
+    prompt = write_start_prompt(target, manifest)
+    tool_manifest = write_tool_manifest(target)
+
+    print(f"HLDspec agent session prepared.")
+    print(f"Mode: {mode}")
+    print(f"Target: {target}")
+    print(f"Prompt: {prompt}")
+    print(f"Tool manifest: {tool_manifest}")
+    print("Next: start an agent session with the prompt above.")
+    return 0
+
+
+def command_status(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    session_path = target / ".hldspec" / "agent_session.json"
+    session = json_read(session_path)
+    if not session:
+        print(f"NO_SESSION: {session_path}")
+        return 2
+
+    print(f"Target: {target}")
+    print(f"Mode: {session.get('mode', 'UNKNOWN')}")
+    print(f"Agent: {session.get('agent', 'UNKNOWN')}")
+    print(f"Source: {session.get('source', {}).get('path', 'UNKNOWN')}")
+    print(f"Prompt: {target / 'prompts' / 'agent' / 'START_HLDSPEC_AGENT.md'}")
+    print(f"Next: {session.get('next_action', 'Review target/.hldspec')}")
+    return 0
+
+
+def command_review(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    review_paths = [
+        target / ".hldspec" / "backend_technology_recommendation.md",
+        target / ".hldspec" / "design_principles_selection.md",
+        target / ".hldspec" / "constitution_update_plan.md",
+        target / ".hldspec" / "spec_packages.md",
+        target / ".hldspec" / "feature_dependency_graph.md",
+        target / ".hldspec" / "speckit_invocation_queue.md",
+        target / ".hldspec" / "firstrun" / ".specify" / "sync" / "spec_build_plan_review.md",
+        target / ".hldspec" / "firstrun" / ".specify" / "sync" / "speckit_prework_quality_review.md",
+    ]
+    print("Review these files if present:")
+    for path in review_paths:
+        status = "EXISTS" if path.exists() else "missing"
+        print(f"- {status}: {path}")
+    return 0
+
+
+def command_continue(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    print("Agent-first continue:")
+    print(f"1. Open: {target / 'prompts' / 'agent' / 'START_HLDSPEC_AGENT.md'}")
+    print("2. Let the agent choose the next safe tool.")
+    print("3. Do not bypass RunSkeptic or human checkpoints.")
+    print()
+    print("Likely first tool:")
+    print(f"bash scripts/first_run_readonly.sh \"{target / 'targetHLD' / 'HLD.md'}\" \"{target / '.hldspec' / 'firstrun'}\" --force")
+    return 0
+
+
+def command_diff(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve()
+    target = Path(args.target).expanduser().resolve()
+    session = json_read(target / ".hldspec" / "agent_session.json")
+
+    if not source.exists():
+        print(f"ERROR: source not found: {source}", file=sys.stderr)
+        return 2
+
+    current_hash = sha256_file(source)
+    previous_hash = session.get("source", {}).get("sha256") if session else None
+
+    print(f"Source: {source}")
+    print(f"Current hash:  {current_hash}")
+    print(f"Recorded hash: {previous_hash or 'none'}")
+    if previous_hash == current_hash:
+        print("Diff status: unchanged")
+        return 0
+    print("Diff status: changed")
+    return 1
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve() if args.target else None
+    required = [
+        ROOT / "docs" / "AGENT_FIRST_PRODUCT_MODEL.md",
+        ROOT / "docs" / "USER_RUN_MODEL.md",
+        ROOT / "docs" / "CANONICAL_FLOW.md",
+        ROOT / "docs" / "ARCHITECTURE_V2.md",
+        ROOT / "scripts" / "first_run_readonly.sh",
+        ROOT / "scripts" / "hldspec_v2.py",
+    ]
+    ok = True
+    for path in required:
+        exists = path.exists()
+        print(f"{'OK' if exists else 'MISSING'}: {path}")
+        ok = ok and exists
+
+    if target:
+        for rel in ["targetHLD/HLD.md", ".hldspec/agent_session.json", "prompts/agent/START_HLDSPEC_AGENT.md"]:
+            path = target / rel
+            exists = path.exists()
+            print(f"{'OK' if exists else 'MISSING'}: {path}")
+            ok = ok and exists
+
+    return 0 if ok else 2
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Agent-first HLDspec session facade.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("start", help="Prepare or resume an HLDspec agent session.")
+    p.add_argument("--source", required=True, help="Source HLD path.")
+    p.add_argument("--target", required=True, help="Target product workspace path.")
+    p.add_argument("--agent", default="manual", choices=["manual", "devin", "claude", "codex"], help="Target agent.")
+    p.add_argument("--mode", default="auto", choices=["auto", "create", "update", "upgrade", "adopt", "resume"], help="Intent override.")
+    p.add_argument("--comment", default="", help="User intent/comment.")
+    p.set_defaults(func=command_start)
+
+    p = sub.add_parser("status", help="Show current HLDspec agent session status.")
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=command_status)
+
+    p = sub.add_parser("review", help="Show human review files.")
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=command_review)
+
+    p = sub.add_parser("continue", help="Print next agent/tool step.")
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=command_continue)
+
+    p = sub.add_parser("diff", help="Compare source hash to recorded session hash.")
+    p.add_argument("--source", required=True)
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=command_diff)
+
+    p = sub.add_parser("doctor", help="Check agent-first docs and target session files.")
+    p.add_argument("--target", default=None)
+    p.set_defaults(func=command_doctor)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

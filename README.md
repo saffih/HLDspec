@@ -560,3 +560,23 @@ docs/HLDSPEC_USE_CASES_AND_API.md
 
 This document defines the simple judge/orchestrator scenarios, command API, artifact API, and classification rules for context-only versus buildable sections.
 
+## Agent-first usage
+
+HLDspec is agent-first.
+
+The normal user workflow is to start an HLDspec agent session. Scripts are tools for the agent, not the primary user interface.
+
+```bash
+scripts/hldspec start --source ./HLD.md --target ./target
+scripts/hldspec status --target ./target
+scripts/hldspec review --target ./target
+scripts/hldspec continue --target ./target
+```
+
+`target/` is the future product workspace. HLDspec prepares `target/`; SpecKit builds inside `target/` after approval.
+
+See:
+
+- [docs/AGENT_FIRST_PRODUCT_MODEL.md](docs/AGENT_FIRST_PRODUCT_MODEL.md)
+- [docs/USER_RUN_MODEL.md](docs/USER_RUN_MODEL.md)
+- [docs/HLDSPEC_PRODUCT_SCORECARD.md](docs/HLDSPEC_PRODUCT_SCORECARD.md)

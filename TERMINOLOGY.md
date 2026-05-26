@@ -224,3 +224,12 @@ Use spec-specific labels only as recommendations under a Skeptic decision:
 | **SpecKit Analyze Reviewer** | `MODEL_CRITICAL` | Runs read-only consistency/adversarial review before implementation. |
 | **SpecKit Implementer** | `MODEL_STRONG` or `MODEL_CRITICAL` | Implements approved tasks; use `MODEL_CRITICAL` for cross-cutting, security, data, or architecture changes. |
 | **Merge History Auditor** | `MODEL_CRITICAL` | Verifies normal merge evidence and classifies specs as `MERGED_DONE` history. |
+
+## Agent-first product terms
+
+| Term | Meaning |
+|---|---|
+| **Agent-first** | HLDspec usage model where every real run starts with an orchestrating agent session. |
+| **HLDspec Agent Session** | Session that owns orchestration, judgment, RunSkeptic use, conflict handling, cost/context economy, and human checkpoints. |
+| **Agent Tool** | Deterministic script or machine used by the HLDspec agent to inspect, generate, validate, compare, or render artifacts. |
+| **Public Product Command** | Small user-facing command such as `hldspec start`, `status`, `review`, or `continue`; it prepares or guides an agent session. |
