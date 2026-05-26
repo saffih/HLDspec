@@ -67,6 +67,8 @@ Reason: the path contract is mostly stabilized, but use-case implementation, com
 
 ### P0-001 Stateless external IO contract
 
+Status: partially addressed for the `hldspec start` path.
+
 Define and enforce:
 
 ```text
@@ -83,7 +85,19 @@ Required:
 - no internal untracked memory
 - tests proving state files are created only under approved external locations
 
+Covered now:
+
+- `start` preserves source HLD content.
+- `start` writes durable target-product artifacts only under `target/`.
+- `start` does not create durable sibling files next to the source HLD.
+
+Still needed:
+
+- broader enforcement around non-start flows and generated prework/SpecKit delegation artifacts.
+
 ### P0-002 User interview capability
+
+Status: first artifact flow addressed through the existing `hldspec start` command; future interactive source/target discovery remains out of scope.
 
 Add an interview flow for the user working in the HLDspec repo.
 
@@ -107,6 +121,12 @@ Suggested artifacts after target is known:
 target/.hldspec/interview_answers.json
 target/.hldspec/interview_answers.md
 ```
+
+Covered now:
+
+- `start --source ... --target ... --comment ...` writes both interview artifacts.
+- JSON records schema version, timestamp, source path/hash, target, mode, agent, comment, simple intent classification, approval expectations, constraints, and open questions.
+- `doctor --target` checks the interview artifacts.
 
 ### P0-003 TargetWorkspaceAdapter
 

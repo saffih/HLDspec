@@ -21,6 +21,7 @@ from hldspec.state_machine import MachineContext
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 SESSION_SCHEMA_VERSION = "1.0"
+INTERVIEW_SCHEMA_VERSION = "1.0"
 
 
 def sha256_file(path: Path) -> str:
@@ -97,6 +98,102 @@ def copy_source(source: Path, target: Path) -> None:
     shutil.copyfile(source, raw)
     if not working.exists():
         shutil.copyfile(source, working)
+
+
+def classify_intent(comment: str, mode: str) -> str:
+    text = comment.lower()
+    for intent in ("create", "update", "upgrade", "adopt", "resume", "review", "debug"):
+        if intent in text:
+            return intent.upper()
+    if mode in {"create", "update", "upgrade", "adopt", "resume"}:
+        return mode.upper()
+    return "UNKNOWN"
+
+
+def approval_expectations(comment: str) -> str:
+    text = comment.strip()
+    if not text:
+        return "UNKNOWN"
+    lowered = text.lower()
+    if "approval" not in lowered and "approve" not in lowered:
+        return "UNKNOWN"
+    return text
+
+
+def build_interview_answers(
+    *,
+    source: Path,
+    source_hash: str,
+    target: Path,
+    mode: str,
+    agent: str,
+    comment: str,
+    timestamp: str,
+) -> dict[str, Any]:
+    open_questions: list[str] = []
+    if not source:
+        open_questions.append("source")
+    if not target:
+        open_questions.append("target")
+    if not comment.strip():
+        open_questions.append("user_comment")
+
+    return {
+        "schema_version": INTERVIEW_SCHEMA_VERSION,
+        "created_or_updated_at": timestamp,
+        "source": {
+            "path": str(source),
+            "sha256": source_hash,
+        },
+        "target": str(target),
+        "mode": mode,
+        "agent": agent,
+        "comment": comment,
+        "intent_classification": classify_intent(comment, mode),
+        "approval_expectations": approval_expectations(comment),
+        "constraints": [],
+        "open_questions": open_questions,
+    }
+
+
+def render_interview_answers_md(answers: dict[str, Any]) -> str:
+    source = answers.get("source") if isinstance(answers.get("source"), dict) else {}
+    constraints = answers.get("constraints") if isinstance(answers.get("constraints"), list) else []
+    open_questions = answers.get("open_questions") if isinstance(answers.get("open_questions"), list) else []
+    lines = [
+        "# HLDspec Interview Answers",
+        "",
+        f"- schema_version: `{answers.get('schema_version', '')}`",
+        f"- created_or_updated_at: `{answers.get('created_or_updated_at', '')}`",
+        f"- source path: `{source.get('path', '')}`",
+        f"- source sha256: `{source.get('sha256', '')}`",
+        f"- target path: `{answers.get('target', '')}`",
+        f"- detected mode: `{answers.get('mode', '')}`",
+        f"- agent: `{answers.get('agent', '')}`",
+        f"- user comment: {answers.get('comment') or 'UNKNOWN'}",
+        f"- intent classification: `{answers.get('intent_classification', 'UNKNOWN')}`",
+        f"- approval expectations: {answers.get('approval_expectations') or 'UNKNOWN'}",
+        "",
+        "## Constraints",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in constraints)
+    if not constraints:
+        lines.append("- none")
+    lines.extend(["", "## Open Questions", ""])
+    lines.extend(f"- {item}" for item in open_questions)
+    if not open_questions:
+        lines.append("- none")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_interview_answers(target: Path, answers: dict[str, Any]) -> tuple[Path, Path]:
+    json_path = target / ".hldspec" / "interview_answers.json"
+    md_path = target / ".hldspec" / "interview_answers.md"
+    json_write(json_path, answers)
+    md_path.write_text(render_interview_answers_md(answers), encoding="utf-8")
+    return json_path, md_path
 
 
 def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
@@ -235,9 +332,10 @@ def command_start(args: argparse.Namespace) -> int:
     ensure_target_dirs(target)
     copy_source(source, target)
 
+    timestamp = utc_now()
     manifest = {
         "schema_version": SESSION_SCHEMA_VERSION,
-        "created_or_updated_at": utc_now(),
+        "created_or_updated_at": timestamp,
         "agent": args.agent,
         "mode": mode,
         "comment": args.comment or "",
@@ -252,12 +350,24 @@ def command_start(args: argparse.Namespace) -> int:
             "hldspec_sync": str(TargetWorkspaceAdapter(target_root=target, layout="new").sync_dir),
             "events": str(TargetWorkspaceAdapter(target_root=target, layout="new").events_path),
             "specify_dir": str(TargetWorkspaceAdapter(target_root=target, layout="new").specify_dir),
+            "interview_answers_json": str(target / ".hldspec" / "interview_answers.json"),
+            "interview_answers_md": str(target / ".hldspec" / "interview_answers.md"),
             "start_prompt": str(target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"),
             "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
         },
         "next_action": "Open prompts/agent/START_HLDSPEC_AGENT.md in an agent session.",
     }
+    interview_answers = build_interview_answers(
+        source=source,
+        source_hash=source_hash,
+        target=target,
+        mode=mode,
+        agent=args.agent,
+        comment=args.comment or "",
+        timestamp=timestamp,
+    )
     json_write(target / ".hldspec" / "agent_session.json", manifest)
+    interview_json, interview_md = write_interview_answers(target, interview_answers)
     json_write(
         target / "targetHLD" / "raw" / "resources_manifest.json",
         {
@@ -279,6 +389,8 @@ def command_start(args: argparse.Namespace) -> int:
     print(f"Target: {target}")
     print(f"Prompt: {prompt}")
     print(f"Tool manifest: {tool_manifest}")
+    print(f"Interview answers: {interview_json}")
+    print(f"Interview report: {interview_md}")
     print("Next: start an agent session with the prompt above.")
     return 0
 
@@ -379,7 +491,13 @@ def command_doctor(args: argparse.Namespace) -> int:
         ok = ok and exists
 
     if target:
-        for rel in ["targetHLD/HLD.md", ".hldspec/agent_session.json", "prompts/agent/START_HLDSPEC_AGENT.md"]:
+        for rel in [
+            "targetHLD/HLD.md",
+            ".hldspec/agent_session.json",
+            ".hldspec/interview_answers.json",
+            ".hldspec/interview_answers.md",
+            "prompts/agent/START_HLDSPEC_AGENT.md",
+        ]:
             path = target / rel
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")

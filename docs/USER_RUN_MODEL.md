@@ -62,10 +62,16 @@ It should:
 - preserve the source HLD under `target/targetHLD/raw/`
 - create or preserve `target/targetHLD/HLD.md`
 - write an agent session record
+- write interview artifacts under `target/.hldspec/interview_answers.json` and `.md`
 - write an agent start prompt
 - write a tool manifest
 - detect create/update/adopt/resume intent
 - print the next safe action
+
+The interview artifacts record the source path and hash, target path, detected
+mode, selected agent, user comment, simple intent classification, approval
+expectations when stated, constraints, and open questions. They are durable
+target-product state and must be written only under `target/`.
 
 ## Normal flow
 

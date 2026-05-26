@@ -103,7 +103,7 @@ Every use case below is part of the product contract. Current commands may not i
 - Preconditions: no reliable source HLD/resource path is known.
 - Command/API: future `hldspec interview`; current agent session may ask in chat before writing durable state.
 - Artifacts read: none required.
-- Artifacts written: none before target is known; after target is known, write `target/.hldspec/interview_answers.json` and `.md`.
+- Artifacts written: none before target is known; after target is known, current `start` writes `target/.hldspec/interview_answers.json` and `.md`.
 - Stop condition: source and target are identified, or a human decision is required.
 - Human decision: choose source and target.
 - Tests expected: no durable files are written before target is known.
@@ -114,7 +114,7 @@ Every use case below is part of the product contract. Current commands may not i
 - Preconditions: source exists and is readable; target is not known.
 - Command/API: current `hldspec start` requires target; future interview path should help choose target.
 - Artifacts read: source HLD/resources.
-- Artifacts written: none until target is chosen.
+- Artifacts written: none until target is chosen; once target is supplied, current `start` writes `target/.hldspec/interview_answers.json` and `.md`.
 - Stop condition: target chosen or created.
 - Human decision: approve target workspace path.
 - Tests expected: source remains read-only; no hidden state is written outside target.
@@ -125,10 +125,10 @@ Every use case below is part of the product contract. Current commands may not i
 - Preconditions: source exists; target does not exist or is safe to create.
 - Command/API: current `hldspec start --source <source> --target <target>`.
 - Artifacts read: source HLD/resources.
-- Artifacts written: `target/targetHLD/raw/HLD.raw.md`, `target/targetHLD/HLD.md`, `target/.hldspec/agent_session.json`, `target/.hldspec/agent_tool_manifest.md`, `target/prompts/agent/START_HLDSPEC_AGENT.md`.
+- Artifacts written: `target/targetHLD/raw/HLD.raw.md`, `target/targetHLD/HLD.md`, `target/.hldspec/agent_session.json`, `target/.hldspec/interview_answers.json`, `target/.hldspec/interview_answers.md`, `target/.hldspec/agent_tool_manifest.md`, `target/prompts/agent/START_HLDSPEC_AGENT.md`.
 - Stop condition: target session prepared and next safe action printed.
 - Human decision: none unless target already contains conflicting state.
-- Tests expected: target layout matches `TargetWorkspaceAdapter(layout="new")`.
+- Tests expected: target layout matches `TargetWorkspaceAdapter(layout="new")`; source remains unchanged; no durable product artifacts are written outside target.
 
 ### UC-004 adopt existing target without HLDspec state
 
