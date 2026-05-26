@@ -61,6 +61,33 @@ All P2 items done.
 
 ---
 
+## Live SpecKit invocation (2026-05-26)
+
+**HLDspec can now actually drive SpecKit instead of only gating on human JSON.**
+This closes the core "it runs but produces no implementation" failure.
+
+| Item | Status | Files |
+|---|---|---|
+| `SpecKitInvoker` — headless `claude /speckit-<skill>` per phase | ✅ Done | `hldspec/speckit_invoker.py` |
+| Full SpecKit toolchain phases | ✅ Done | order: SPECIFY→CLARIFY→PLAN→CHECKLIST→TASKS→ANALYZE→IMPLEMENT |
+| Per-phase model routing (cost discipline) | ✅ Done | constitution/analyze=opus, specify/clarify/plan/implement=sonnet, checklist/tasks=haiku |
+| Injectable invoker into `SpecKitExecutionMachine` (None=gated default) | ✅ Done | `hldspec/machines/speckit_execution.py` |
+| **Anti-hollow-completion gate**: advance only if artifacts produced, not exit code | ✅ Done | `InvocationResult.verified`; git-signature change detection |
+| State-version guard: live mode discards stale/simulated state | ✅ Done | `STATE_VERSION=2` |
+| Tests (invoker, artifact gate, live mode, stale-state) | ✅ Done | `tests_v2/test_speckit_invoker.py`, `test_speckit_execution_machine.py` |
+
+### Open decisions (RunSkeptic CONFLICT — need human call)
+- **Design ownership**: an older proxy (`scripts/build_speckit_proxy_dry_run.py`) *forbids* auto-implement and enforces one-phase-only. New live mode auto-runs all phases incl. IMPLEMENT (opt-in). Reconcile: keep auto-drive as opt-in capability vs. default-gated? Current stance: opt-in (invoker must be injected; default stays gated).
+- **`/home/sio/flow` vs `~/code/flow/impl`**: a Flow substrate was hand-built reading the HLD. Decide whether it's the implementation target the pipeline writes into, or discarded.
+
+### Still TODO (from RunSkeptic + user)
+- **Default output = numbered spec list respecting existing project numbering.** Prior code has `existing_specs_scan`/`highest_number` (`tests/test_hldspec_speckit_ready.py`); wire it into the live/queue path so new specs continue an existing project's numbering.
+- **Gap analysis (desired vs. actual)** — NEW capability: when the HLD changes or a feature is added, derive specs THEN diff against the current implementation to surface the delta (what to add/change) and guide the feature work, before writing code. Needed for existing/evolving projects, not just greenfield.
+- **Verify the real mechanism**: one true headless run end-to-end on a *code* feature (not 027, which is governance/scope); confirm `claude --model haiku` alias is accepted.
+- **Prove minimal chain before relying on all 8 phases.**
+
+---
+
 ## Architecture anchor (2026-05-25)
 
 **Stability architecture document added.** `docs/HLDSPEC_STABILITY_ARCHITECTURE.md` anchors the five principles (state machine core, artifact contracts, ports/adapters, event log, validator plugins) to known failure modes. Runtime implementation of message bus, port interfaces, and event log is **intentionally deferred** — the document names the direction; implementation happens in small slices when a specific failure mode becomes acute.

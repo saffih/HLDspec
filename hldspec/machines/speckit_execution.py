@@ -34,20 +34,63 @@ from hldspec.state_machine import (
 _STATE_FILE = "speckit_execution_state.json"
 
 PHASE_CONSTITUTION = "CONSTITUTION"
+PHASE_SPECIFY = "SPECIFY"
 PHASE_CLARIFY = "CLARIFY"
 PHASE_PLAN = "PLAN"
+PHASE_CHECKLIST = "CHECKLIST"
 PHASE_TASKS = "TASKS"
+PHASE_ANALYZE = "ANALYZE"
+PHASE_IMPLEMENT = "IMPLEMENT"
 PHASE_DONE = "DONE"
 
-PHASE_ORDER = [PHASE_CLARIFY, PHASE_PLAN, PHASE_TASKS, PHASE_DONE]
+# SpecKit's full per-feature ritual, making best use of the whole toolchain:
+#   specify  -> create the spec (+ feature branch)
+#   clarify  -> de-risk ambiguity before planning
+#   plan     -> implementation plan
+#   checklist-> quality checklist over the plan
+#   tasks    -> actionable task breakdown
+#   analyze  -> cross-artifact consistency gate before code
+#   implement-> write the code
+# Replaces the earlier [CLARIFY, PLAN, TASKS] order, which was missing SPECIFY
+# (the entry step) and IMPLEMENT (the only step that produces code).
+PHASE_ORDER = [
+    PHASE_SPECIFY,
+    PHASE_CLARIFY,
+    PHASE_PLAN,
+    PHASE_CHECKLIST,
+    PHASE_TASKS,
+    PHASE_ANALYZE,
+    PHASE_IMPLEMENT,
+    PHASE_DONE,
+]
+FIRST_PHASE = PHASE_SPECIFY
 
 VALID_PHASE_DECISIONS = {"COMPLETE", "REWORK", "SKIP"}
 
+# Bumped when the state schema / phase model changes. A live run refuses to
+# trust state written under a different version (e.g. a simulated run that
+# pre-filled decisions and all_complete), so stale state can't short-circuit
+# real SpecKit invocation to a hollow "done".
+STATE_VERSION = 2
+
 
 class SpecKitExecutionMachine:
-    """Drives post-approval SpecKit execution in dependency order."""
+    """Drives post-approval SpecKit execution in dependency order.
+
+    Two modes:
+    - **gated** (``invoker=None``, default): returns a human checkpoint per
+      phase and advances only when a decision is recorded in state. Used by
+      tests and by human-in-the-loop runs.
+    - **live** (``invoker`` provided): actually invokes SpecKit per phase via
+      the injected :class:`SpecKitInvoker`, deriving phase completion from the
+      invocation result. This is what turns prework into real specs and code.
+    """
 
     name = "SpecKitExecutionMachine"
+
+    def __init__(self, invoker: Any = None, constitution_summary: str = "") -> None:
+        self.invoker = invoker
+        self.constitution_summary = constitution_summary
 
     def run(self, context: MachineContext) -> MachineResult:
         if not context.workspace:
@@ -85,6 +128,12 @@ class SpecKitExecutionMachine:
 
         state = self._load_state(state_path)
 
+        # Live mode refuses to trust state from a different schema version (e.g.
+        # a prior simulated run that pre-filled decisions / all_complete). This
+        # prevents stale state from short-circuiting real invocation.
+        if self.invoker is not None and state.get("state_version") != STATE_VERSION:
+            state = {}
+
         # --- Constitution phase ---
         if not state.get("constitution_approved"):
             return self._constitution_checkpoint(sync, constitution_path, state_path, state)
@@ -108,7 +157,7 @@ class SpecKitExecutionMachine:
                 message=f"feature at index {active_index} is not a dict",
             )
 
-        active_phase = state.get("active_phase", PHASE_CLARIFY)
+        active_phase = state.get("active_phase", FIRST_PHASE)
         feature_id = str(feature.get("feature_id", f"feature-{active_index}"))
         feature_name = str(feature.get("feature_name", feature_id))
 
@@ -117,7 +166,7 @@ class SpecKitExecutionMachine:
             new_state = {
                 **state,
                 "active_feature_index": active_index + 1,
-                "active_phase": PHASE_CLARIFY,
+                "active_phase": FIRST_PHASE,
             }
             self._write_state(state_path, new_state)
             return continue_result(
@@ -155,6 +204,32 @@ class SpecKitExecutionMachine:
                 machine=self.name,
                 state="CONSTITUTION_APPROVED",
                 actions_run=("constitution approved",),
+            )
+
+        # Live mode: actually run /speckit-constitution.
+        if self.invoker is not None:
+            result = self.invoker.invoke("CONSTITUTION", self.constitution_summary or "Establish the project constitution from the prepared rules.")
+            if result.verified:
+                self._write_state(state_path, {**state, "constitution_approved": True, "constitution_decision": "APPROVED"})
+                return continue_result(
+                    machine=self.name,
+                    state="CONSTITUTION_APPROVED",
+                    actions_run=(f"invoked {result.skill}",),
+                )
+            reason = (
+                f"/{result.skill} ran but produced no constitution artifact (hollow completion guard)."
+                if result.ok
+                else f"/{result.skill} failed (rc={result.returncode}): {result.stderr[-400:]}"
+            )
+            return blocked_result(
+                machine=self.name,
+                state="CONSTITUTION_INVOCATION_FAILED",
+                kind=CheckpointKind.SPECKIT_PREWORK_APPROVAL_GATE,
+                blocking_reason=reason,
+                controlling_artifacts=(
+                    ArtifactRef(path=str(constitution_path), role="constitution_update_plan", required=False),
+                ),
+                forbidden_actions=("Do not proceed to features until the constitution is established.",),
             )
 
         return human_checkpoint(
@@ -213,6 +288,40 @@ class SpecKitExecutionMachine:
                 machine=self.name,
                 state=f"{active_phase}_COMPLETE",
                 actions_run=(f"{feature_id} {active_phase} marked complete",),
+            )
+
+        # Live mode: actually invoke SpecKit for this phase.
+        if self.invoker is not None:
+            from hldspec.speckit_invoker import build_prompt
+
+            prompt = build_prompt(active_phase, feature, self.constitution_summary)
+            result = self.invoker.invoke(active_phase, prompt)
+            if result.verified:
+                next_phase = self._next_phase(active_phase)
+                self._write_state(
+                    state_path,
+                    {**state, f"{feature_id}_{active_phase}_decision": "COMPLETE", "active_phase": next_phase},
+                )
+                return continue_result(
+                    machine=self.name,
+                    state=f"{active_phase}_COMPLETE",
+                    actions_run=(f"invoked {result.skill} for {feature_id}",),
+                )
+            reason = (
+                f"/{result.skill} ran for {feature_id} but produced no artifact "
+                f"(hollow completion guard — exit 0 is not enough)."
+                if result.ok
+                else f"/{result.skill} failed for {feature_id} (rc={result.returncode}): {result.stderr[-400:]}"
+            )
+            return blocked_result(
+                machine=self.name,
+                state=f"{active_phase}_INVOCATION_FAILED",
+                kind=CheckpointKind.SPECKIT_PREWORK_APPROVAL_GATE,
+                blocking_reason=reason,
+                controlling_artifacts=(
+                    ArtifactRef(path=str(sync / _STATE_FILE), role="speckit_execution_state", required=False),
+                ),
+                forbidden_actions=("Do not advance past a failed SpecKit phase.",),
             )
 
         depends_on = feature.get("depends_on_features", [])
@@ -276,15 +385,18 @@ class SpecKitExecutionMachine:
 
     @staticmethod
     def _phase_instruction(phase: str, feature_id: str, feature_name: str, speckit_input: str) -> str:
-        if phase == PHASE_CLARIFY:
-            cmd = f"/speckit.clarify {speckit_input or feature_id}"
-            return f"Run SpecKit clarify: `{cmd}`"
-        if phase == PHASE_PLAN:
-            cmd = f"/speckit.plan {speckit_input or feature_id}"
-            return f"Run SpecKit plan: `{cmd}`"
-        if phase == PHASE_TASKS:
-            cmd = f"/speckit.tasks {speckit_input or feature_id}"
-            return f"Run SpecKit tasks: `{cmd}`"
+        skill = {
+            PHASE_SPECIFY: "speckit-specify",
+            PHASE_CLARIFY: "speckit-clarify",
+            PHASE_PLAN: "speckit-plan",
+            PHASE_CHECKLIST: "speckit-checklist",
+            PHASE_TASKS: "speckit-tasks",
+            PHASE_ANALYZE: "speckit-analyze",
+            PHASE_IMPLEMENT: "speckit-implement",
+        }.get(phase)
+        if skill:
+            cmd = f"/{skill} {speckit_input or feature_id}"
+            return f"Run SpecKit {phase.lower()}: `{cmd}`"
         return f"Complete {phase} for {feature_name}."
 
     @staticmethod
@@ -301,4 +413,5 @@ class SpecKitExecutionMachine:
     @staticmethod
     def _write_state(path: Path, state: dict[str, Any]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        stamped = {**state, "state_version": STATE_VERSION}
+        path.write_text(json.dumps(stamped, indent=2, sort_keys=True) + "\n", encoding="utf-8")

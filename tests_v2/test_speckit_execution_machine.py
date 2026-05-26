@@ -3,7 +3,7 @@
 Covers:
 - Missing inputs (no workspace, no queue, invalid queue)
 - Constitution phase: pending, decision-in-state → continue, already approved
-- Feature phases: CLARIFY/PLAN/TASKS pending, COMPLETE → advance phase, DONE → advance feature
+- Feature phases: SPECIFY/PLAN/TASKS/IMPLEMENT pending, COMPLETE → advance phase, DONE → advance feature
 - Completion: all features done
 - State is written correctly across transitions
 """
@@ -15,9 +15,13 @@ import unittest
 from pathlib import Path
 
 from hldspec.machines.speckit_execution import (
+    PHASE_ANALYZE,
+    PHASE_CHECKLIST,
     PHASE_CLARIFY,
     PHASE_DONE,
+    PHASE_IMPLEMENT,
     PHASE_PLAN,
+    PHASE_SPECIFY,
     PHASE_TASKS,
     SpecKitExecutionMachine,
 )
@@ -147,33 +151,33 @@ class TestFeaturePhases(unittest.TestCase):
     def _approved_state(self, **extra) -> dict:
         return {"constitution_approved": True, "active_feature_index": 0, **extra}
 
-    def test_clarify_pending_produces_checkpoint(self) -> None:
+    def test_specify_pending_produces_checkpoint(self) -> None:
         ws = Path(tempfile.mkdtemp())
         _write_queue(_sync(ws), [_feature()])
-        _write_state(_sync(ws), self._approved_state(active_phase=PHASE_CLARIFY))
+        _write_state(_sync(ws), self._approved_state(active_phase=PHASE_SPECIFY))
         result = SpecKitExecutionMachine().run(_ctx(ws))
         self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
-        self.assertEqual("CLARIFY_PENDING", result.state)
+        self.assertEqual("SPECIFY_PENDING", result.state)
         assert result.checkpoint is not None
         self.assertTrue(result.checkpoint.has_open_questions())
 
-    def test_clarify_default_phase_is_used_when_not_set(self) -> None:
-        """active_phase defaults to CLARIFY when missing from state."""
+    def test_specify_default_phase_is_used_when_not_set(self) -> None:
+        """active_phase defaults to SPECIFY when missing from state."""
         ws = Path(tempfile.mkdtemp())
         _write_queue(_sync(ws), [_feature()])
         _write_state(_sync(ws), {"constitution_approved": True, "active_feature_index": 0})
         result = SpecKitExecutionMachine().run(_ctx(ws))
-        self.assertEqual("CLARIFY_PENDING", result.state)
+        self.assertEqual("SPECIFY_PENDING", result.state)
 
-    def test_clarify_complete_advances_to_plan(self) -> None:
+    def test_specify_complete_advances_to_clarify(self) -> None:
         ws = Path(tempfile.mkdtemp())
         feat = _feature("feat-001")
         _write_queue(_sync(ws), [feat])
-        _write_state(_sync(ws), {**self._approved_state(active_phase=PHASE_CLARIFY), **{"feat-001_CLARIFY_decision": "COMPLETE"}})
+        _write_state(_sync(ws), {**self._approved_state(active_phase=PHASE_SPECIFY), **{"feat-001_SPECIFY_decision": "COMPLETE"}})
         result = SpecKitExecutionMachine().run(_ctx(ws))
         self.assertEqual(MachineStatus.CONTINUE, result.status)
-        self.assertEqual("CLARIFY_COMPLETE", result.state)
-        self.assertEqual(PHASE_PLAN, _read_state(_sync(ws)).get("active_phase"))
+        self.assertEqual("SPECIFY_COMPLETE", result.state)
+        self.assertEqual(PHASE_CLARIFY, _read_state(_sync(ws)).get("active_phase"))
 
     def test_plan_pending_produces_checkpoint(self) -> None:
         ws = Path(tempfile.mkdtemp())
@@ -183,7 +187,7 @@ class TestFeaturePhases(unittest.TestCase):
         self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
         self.assertEqual("PLAN_PENDING", result.state)
 
-    def test_plan_complete_advances_to_tasks(self) -> None:
+    def test_plan_complete_advances_to_checklist(self) -> None:
         ws = Path(tempfile.mkdtemp())
         feat = _feature("feat-001")
         _write_queue(_sync(ws), [feat])
@@ -191,7 +195,7 @@ class TestFeaturePhases(unittest.TestCase):
         result = SpecKitExecutionMachine().run(_ctx(ws))
         self.assertEqual(MachineStatus.CONTINUE, result.status)
         self.assertEqual("PLAN_COMPLETE", result.state)
-        self.assertEqual(PHASE_TASKS, _read_state(_sync(ws)).get("active_phase"))
+        self.assertEqual(PHASE_CHECKLIST, _read_state(_sync(ws)).get("active_phase"))
 
     def test_tasks_pending_produces_checkpoint(self) -> None:
         ws = Path(tempfile.mkdtemp())
@@ -201,7 +205,7 @@ class TestFeaturePhases(unittest.TestCase):
         self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
         self.assertEqual("TASKS_PENDING", result.state)
 
-    def test_tasks_complete_advances_to_done(self) -> None:
+    def test_tasks_complete_advances_to_analyze(self) -> None:
         ws = Path(tempfile.mkdtemp())
         feat = _feature("feat-001")
         _write_queue(_sync(ws), [feat])
@@ -209,6 +213,16 @@ class TestFeaturePhases(unittest.TestCase):
         result = SpecKitExecutionMachine().run(_ctx(ws))
         self.assertEqual(MachineStatus.CONTINUE, result.status)
         self.assertEqual("TASKS_COMPLETE", result.state)
+        self.assertEqual(PHASE_ANALYZE, _read_state(_sync(ws)).get("active_phase"))
+
+    def test_implement_complete_advances_to_done(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        feat = _feature("feat-001")
+        _write_queue(_sync(ws), [feat])
+        _write_state(_sync(ws), {**self._approved_state(active_phase=PHASE_IMPLEMENT), **{"feat-001_IMPLEMENT_decision": "COMPLETE"}})
+        result = SpecKitExecutionMachine().run(_ctx(ws))
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("IMPLEMENT_COMPLETE", result.state)
         self.assertEqual(PHASE_DONE, _read_state(_sync(ws)).get("active_phase"))
 
     def test_phase_done_advances_feature_index(self) -> None:
@@ -220,7 +234,7 @@ class TestFeaturePhases(unittest.TestCase):
         self.assertEqual("FEATURE_ADVANCED", result.state)
         state = _read_state(_sync(ws))
         self.assertEqual(1, state.get("active_feature_index"))
-        self.assertEqual(PHASE_CLARIFY, state.get("active_phase"))
+        self.assertEqual(PHASE_SPECIFY, state.get("active_phase"))
 
     def test_invalid_feature_entry_returns_error(self) -> None:
         ws = Path(tempfile.mkdtemp())
@@ -233,6 +247,58 @@ class TestFeaturePhases(unittest.TestCase):
         result = SpecKitExecutionMachine().run(_ctx(ws))
         self.assertEqual(MachineStatus.ERROR, result.status)
         self.assertEqual("FEATURE_INVALID", result.state)
+
+
+class _FakeInvoker:
+    """Records invocations; reports artifacts produced per the `produced` flag."""
+
+    def __init__(self, produced=True, ok=True):
+        self.produced = produced
+        self.ok = ok
+        self.calls = []
+
+    def invoke(self, phase, prompt):
+        self.calls.append((phase, prompt))
+        from hldspec.speckit_invoker import InvocationResult
+
+        return InvocationResult(
+            phase=phase, skill=f"speckit-{phase.lower()}", returncode=0 if self.ok else 1,
+            ok=self.ok, stdout="", stderr="", produced_artifacts=self.produced,
+        )
+
+
+class TestLiveMode(unittest.TestCase):
+    """Live mode actually invokes SpecKit and gates on produced artifacts."""
+
+    def test_live_constitution_invokes_and_advances_when_artifact_produced(self):
+        ws = Path(tempfile.mkdtemp())
+        _write_queue(_sync(ws), [_feature()])
+        inv = _FakeInvoker(produced=True)
+        result = SpecKitExecutionMachine(invoker=inv).run(_ctx(ws))
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("CONSTITUTION_APPROVED", result.state)
+        self.assertEqual(inv.calls[0][0], "CONSTITUTION")
+
+    def test_live_blocks_on_hollow_completion(self):
+        """exit 0 but no artifact => blocked, not advanced."""
+        ws = Path(tempfile.mkdtemp())
+        _write_queue(_sync(ws), [_feature()])
+        inv = _FakeInvoker(produced=False, ok=True)
+        result = SpecKitExecutionMachine(invoker=inv).run(_ctx(ws))
+        self.assertEqual(MachineStatus.BLOCKED, result.status)
+        self.assertIn("hollow completion", result.checkpoint.blocking_reason.lower())
+
+    def test_live_ignores_stale_simulated_state(self):
+        """A prior simulated run's all_complete must not short-circuit live mode."""
+        ws = Path(tempfile.mkdtemp())
+        _write_queue(_sync(ws), [_feature()])
+        # Stale state: no state_version, marked all complete + past end.
+        _write_state(_sync(ws), {"constitution_approved": True, "active_feature_index": 99, "all_complete": True})
+        inv = _FakeInvoker(produced=True)
+        result = SpecKitExecutionMachine(invoker=inv).run(_ctx(ws))
+        # Should NOT be ALL_FEATURES_COMPLETE — stale state discarded, restarts at constitution.
+        self.assertNotEqual("ALL_FEATURES_COMPLETE", result.state)
+        self.assertEqual("CONSTITUTION_APPROVED", result.state)
 
 
 class TestCheckpointContent(unittest.TestCase):
@@ -255,10 +321,10 @@ class TestCheckpointContent(unittest.TestCase):
         forbidden = " ".join(result.checkpoint.forbidden_actions)
         self.assertIn("app code", forbidden)
 
-    def test_clarify_checkpoint_references_feature_name(self) -> None:
+    def test_specify_checkpoint_references_feature_name(self) -> None:
         ws = Path(tempfile.mkdtemp())
         _write_queue(_sync(ws), [_feature("feat-001", "My Feature")])
-        _write_state(_sync(ws), {"constitution_approved": True, "active_feature_index": 0, "active_phase": PHASE_CLARIFY})
+        _write_state(_sync(ws), {"constitution_approved": True, "active_feature_index": 0, "active_phase": PHASE_SPECIFY})
         result = SpecKitExecutionMachine().run(_ctx(ws))
         assert result.checkpoint is not None
         self.assertIn("My Feature", result.checkpoint.blocking_reason)
