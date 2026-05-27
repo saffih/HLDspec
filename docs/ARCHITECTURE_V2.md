@@ -1,5 +1,10 @@
 # HLDspec Architecture V2
 
+> Canonical system model, terminology, ownership boundaries, and full flow:
+> [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md). This doc
+> describes the code-level engine; the canonical doc wins on any terminology or
+> flow conflict.
+
 HLDspec V2 is a state-machine workflow engine.
 
 ## Implemented V2 slice

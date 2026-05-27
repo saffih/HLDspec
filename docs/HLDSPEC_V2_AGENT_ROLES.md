@@ -1,5 +1,9 @@
 # HLDspec V2 Agent and Subagent Roles
 
+> Canonical terminology and the role-review pipeline overview:
+> [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) (§6). This doc
+> details each role's contract; the canonical doc wins on any naming conflict.
+
 ## Purpose
 
 This document defines the goal, operating instructions, output contract, stop rules, and introspection checklist for each HLDspec V2 agent/subagent.

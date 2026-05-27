@@ -1,5 +1,7 @@
 # Agent bootstrap for this repo
 
+> **Canonical system model:** for terminology, ownership boundaries, the full flow, and the SpecKit Run Card, read `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` — it is authoritative and wins on any conflict.
+
 > **HLDspec repo-development handoff:** before editing this repo or handing work to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` and `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`. `AGENTS.md`, `CLAUDE.md`, and generated `HANDOFF.md` files are pointers; the docs files are the source of truth.
 
 ## HLDspec trigger

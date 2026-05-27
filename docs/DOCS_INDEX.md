@@ -10,6 +10,7 @@ These docs are living references. Follow links in CLAUDE.md for session bootstra
 
 | Doc | Purpose |
 |---|---|
+| [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | **Authoritative** canonical terminology, ownership boundaries, full flow, and SpecKit Run Card — wins on any conflict |
 | [`../CLAUDE.md`](../CLAUDE.md) | Session bootstrap — read first every session |
 | [`../TASKS.md`](../TASKS.md) | Living task list — P0/P1/P2 pending work |
 | [`../AGENTS.md`](../AGENTS.md) | Agent bootstrap for HLDspec workflow invocation |

@@ -1,5 +1,9 @@
 # HLD to Target Workspace
 
+> Canonical terminology and full flow:
+> [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) (§5 HLD
+> slice/dice model). The canonical doc wins on any terminology conflict.
+
 ## Purpose
 
 HLDspec creates a controlled `target/` workspace for one app or domain.

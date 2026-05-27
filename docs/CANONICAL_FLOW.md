@@ -1,5 +1,9 @@
 # HLDspec Canonical Flow
 
+> Canonical system model and terminology:
+> [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md). This doc
+> details the pipeline steps; the canonical doc wins on any terminology conflict.
+
 This document defines the current canonical HLDspec flow after the SpecKit ownership correction.
 
 ## Core principle

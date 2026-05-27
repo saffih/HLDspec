@@ -216,6 +216,7 @@ HLDspec blocks or warns when:
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` (this file) | Session bootstrap — read first |
+| `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` | **Authoritative** canonical terminology, ownership, full flow, SpecKit Run Card — wins on any conflict |
 | `TASKS.md` | Living task list — P0/P1/P2 pending work |
 | `AGENTS.md` | Agent bootstrap for HLDspec workflow invocation |
 | `docs/REFACTOR_PROGRAM.md` | Refactor program — completed/in-progress/outstanding |
