@@ -102,9 +102,20 @@ def detect_init_commands(
 
 
 def validate_initialized_workspace(target: Path) -> str | None:
+    """Confirm `.specify/` is a real SpecKit workspace, not HLDspec's mirror.
+
+    A real `specify init` creates `.specify/memory/` (SpecKit-owned). HLDspec only
+    ever materialises the read-only mirror under `.specify/source/`, so the mirror
+    alone must never be mistaken for an initialized SpecKit workspace.
+    """
     specify_dir = target / ".specify"
     if not specify_dir.is_dir():
         return f"SpecKit init did not create {specify_dir}"
+    if not (specify_dir / "memory").is_dir():
+        return (
+            f"{specify_dir} has no SpecKit layout (missing .specify/memory/); "
+            "only the generated .specify/source/ mirror is present"
+        )
     return None
 
 
@@ -134,7 +145,7 @@ def plan_or_init_workspace(
             available=available,
             execute=False,
             executed=False,
-            initialized=(target_path / ".specify").is_dir(),
+            initialized=validate_initialized_workspace(target_path) is None,
         )
 
     run = run or subprocess.run
