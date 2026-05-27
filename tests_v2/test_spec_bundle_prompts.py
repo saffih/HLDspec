@@ -58,6 +58,15 @@ class SpecBundlePromptTests(unittest.TestCase):
                 self.assertIn("PASS", text)
                 self.assertIn("ACTION", text)
                 self.assertIn("CONFLICT", text)
+                self.assertIn("## How to run RunSkeptic", text)
+                self.assertIn("~/code/skeptic/skeptic.md", text)
+                self.assertIn("GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN", text)
+                self.assertIn("OBSERVED", text)
+                self.assertIn("REPRODUCED", text)
+                self.assertIn("HISTORICAL", text)
+                self.assertIn("INFERRED RISK", text)
+                self.assertIn("RunSkeptic status:", text)
+                self.assertIn("Next safe action:", text)
                 self.assertNotIn("BLOCKER", text)
 
     def test_unknown_runtime_fails(self) -> None:

@@ -38,6 +38,7 @@ REQUIRED_MD_SECTIONS = (
     "## Question Answering Policy",
     "## Required Subagents / Reviewers",
     "## RunSkeptic Checkpoints",
+    "## How to run RunSkeptic",
     "## Human Approval Boundaries",
     "## Stop Conditions",
     "## Expected Outputs",
@@ -364,6 +365,57 @@ def _numbered(items: list[str]) -> list[str]:
     return [f"{idx}. {item}" for idx, item in enumerate(items, start=1)] if items else ["1. none"]
 
 
+
+
+def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") -> list[str]:
+    return [
+        "RunSkeptic is the required quality gate for this step.",
+        "",
+        "First, read the actual current framework file:",
+        "",
+        f"`{skeptic_path}`",
+        "",
+        "Do not rely on memory or a summary if the file is available.",
+        "",
+        "Apply this flow in order:",
+        "",
+        "`GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN`",
+        "",
+        "For this Run Card, RunSkeptic is normally read-only unless this card explicitly authorizes a fix.",
+        "",
+        "Use only these result statuses:",
+        "",
+        "- `PASS`: no blocking finding is known; evidence is sufficient for this step.",
+        "- `ACTION`: a fixable issue exists, such as missing evidence, stale artifact, invalid output, incomplete contract, weak testability, or unclear prompt/report content.",
+        "- `CONFLICT`: a human-owned or architecture/product/source-of-truth decision is unresolved, or multiple valid designs exist and the evidence does not choose between them.",
+        "",
+        "Minimum checks:",
+        "",
+        "1. Gate: confirm the requested step is clear, bounded, and testable.",
+        "2. Fundamental scan: check purpose, boundaries, ownership, source of truth, main flow, interfaces, dependencies, and high-risk assumptions.",
+        "3. Map: list findings before deciding. Do not fix while mapping.",
+        "4. Confidence: identify unknowns, skipped areas, and weak evidence.",
+        "5. Stabilize: merge related findings and identify root cause.",
+        "6. Evidence: mark each finding as `OBSERVED`, `REPRODUCED`, `HISTORICAL`, or `INFERRED RISK`.",
+        "7. Decide: choose `PASS`, `ACTION`, or `CONFLICT`; do not promote if any ACTION or CONFLICT remains.",
+        "8. Verify: if a fix was explicitly authorized, report the exact tests or checks run; otherwise report what verification would be required.",
+        "",
+        "Required RunSkeptic output:",
+        "",
+        "- `RunSkeptic status: PASS | ACTION | CONFLICT`",
+        "- `Scope reviewed:`",
+        "- `Evidence used:`",
+        "- `Findings:`",
+        "- `Unknowns:`",
+        "- `Human decisions needed:`",
+        "- `Verification performed:`",
+        "- `Next safe action:`",
+        "",
+        "Stop immediately if RunSkeptic returns ACTION or CONFLICT, required evidence is missing, a human-owned decision appears, or the step would require reading outside approved evidence.",
+        "",
+        "If the framework file is unavailable, do not claim full RunSkeptic compliance. Use this embedded fallback and report: `RunSkeptic source: embedded fallback`; `Confidence: lower than full framework review`; `Missing evidence: actual skeptic.md was unavailable`.",
+    ]
+
 def render_run_card_md(payload: dict[str, Any]) -> str:
     errors = validate_run_card_payload(payload)
     if errors:
@@ -430,6 +482,10 @@ def render_run_card_md(payload: dict[str, Any]) -> str:
         *_bullet([str(item) for item in as_list(payload.get("runskeptic_checkpoints"))]),
         "",
         "Use only these statuses: `PASS`, `ACTION`, `CONFLICT`. Stop on unresolved `ACTION` or `CONFLICT`.",
+        "",
+        "## How to run RunSkeptic",
+        "",
+        *runskeptic_operating_block(),
         "",
         "## Human Approval Boundaries",
         "",

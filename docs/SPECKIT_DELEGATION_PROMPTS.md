@@ -112,7 +112,7 @@ When SpecKit asks a question, the agent must classify it as:
 
 ```text
 ANSWER_FROM_EVIDENCE
-ANSWER_FROM_REASONABLE_DEFAULT
+ANSWER_FROM_APPROVED_DEFAULT
 ESCALATE_TO_HUMAN
 ```
 
@@ -131,7 +131,49 @@ Escalate questions that affect:
 
 ## RunSkeptic instructions
 
-Prompts must instruct the agent to apply RunSkeptic for high-risk concerns.
+Prompts and Run Cards must include a self-contained **How to run RunSkeptic** operating block. It is not enough to say "run RunSkeptic"; the receiving agent must know where to read the framework, what flow to apply, what statuses are allowed, what evidence to report, and when to stop.
+
+The operating block must require the agent to read the actual current framework file first:
+
+```text
+~/code/skeptic/skeptic.md
+```
+
+The operating block must include the required flow:
+
+```text
+GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN
+```
+
+The operating block must define and require only these statuses:
+
+```text
+PASS
+ACTION
+CONFLICT
+```
+
+The operating block must require findings to classify evidence as:
+
+```text
+OBSERVED
+REPRODUCED
+HISTORICAL
+INFERRED RISK
+```
+
+The operating block must require this output shape:
+
+```text
+RunSkeptic status: PASS | ACTION | CONFLICT
+Scope reviewed:
+Evidence used:
+Findings:
+Unknowns:
+Human decisions needed:
+Verification performed:
+Next safe action:
+```
 
 Minimum concerns:
 
@@ -145,7 +187,7 @@ Minimum concerns:
 - reliability
 - quality gates
 
-If the RunSkeptic executable is unavailable, the agent must apply the framework manually from the documented source.
+If the real framework file is unavailable, the agent must not claim full RunSkeptic compliance. It may use the embedded fallback block only if it reports the missing source and lower confidence.
 
 Missing concern evidence is ACTION or CONFLICT, not PASS.
 

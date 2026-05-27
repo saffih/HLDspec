@@ -98,6 +98,15 @@ class SpecKitRunCardTests(unittest.TestCase):
         self.assertIn("PASS", text)
         self.assertIn("ACTION", text)
         self.assertIn("CONFLICT", text)
+        self.assertIn("## How to run RunSkeptic", text)
+        self.assertIn("~/code/skeptic/skeptic.md", text)
+        self.assertIn("GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN", text)
+        self.assertIn("OBSERVED", text)
+        self.assertIn("REPRODUCED", text)
+        self.assertIn("HISTORICAL", text)
+        self.assertIn("INFERRED RISK", text)
+        self.assertIn("RunSkeptic status:", text)
+        self.assertIn("Next safe action:", text)
 
     def test_write_run_cards_requires_approval_by_default(self) -> None:
         root = self.make_workspace()

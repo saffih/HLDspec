@@ -21,6 +21,7 @@ REQUIRED_PROMPT_MARKERS: tuple[str, ...] = (
     "## Subagent orchestration",
     "## SpecKit lifecycle",
     "## RunSkeptic checkpoints",
+    "## How to run RunSkeptic",
     "## Human checkpoint rules",
     "## Expected outputs",
     "## Tests required",
@@ -156,6 +157,57 @@ def _runskeptic_block(runtime: str, phase: str, spec_id_value: str, skeptic_path
         "",
     ]
 
+
+
+
+def _runskeptic_operating_block(skeptic_path: str) -> list[str]:
+    return [
+        "RunSkeptic is the required quality gate for this step.",
+        "",
+        "First, read the actual current framework file:",
+        "",
+        f"`{skeptic_path}`",
+        "",
+        "Do not rely on memory or a summary if the file is available.",
+        "",
+        "Apply this flow in order:",
+        "",
+        "`GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN`",
+        "",
+        "For this prompt, RunSkeptic is normally read-only unless the Run Card explicitly authorizes a fix.",
+        "",
+        "Use only these result statuses:",
+        "",
+        "- `PASS`: no blocking finding is known; evidence is sufficient for this step.",
+        "- `ACTION`: a fixable issue exists, such as missing evidence, stale artifact, invalid output, incomplete contract, weak testability, or unclear prompt/report content.",
+        "- `CONFLICT`: a human-owned or architecture/product/source-of-truth decision is unresolved, or multiple valid designs exist and the evidence does not choose between them.",
+        "",
+        "Minimum checks:",
+        "",
+        "1. Gate: confirm the requested step is clear, bounded, and testable.",
+        "2. Fundamental scan: check purpose, boundaries, ownership, source of truth, main flow, interfaces, dependencies, and high-risk assumptions.",
+        "3. Map: list findings before deciding. Do not fix while mapping.",
+        "4. Confidence: identify unknowns, skipped areas, and weak evidence.",
+        "5. Stabilize: merge related findings and identify root cause.",
+        "6. Evidence: mark each finding as `OBSERVED`, `REPRODUCED`, `HISTORICAL`, or `INFERRED RISK`.",
+        "7. Decide: choose `PASS`, `ACTION`, or `CONFLICT`; do not promote if any ACTION or CONFLICT remains.",
+        "8. Verify: if a fix was explicitly authorized, report the exact tests or checks run; otherwise report what verification would be required.",
+        "",
+        "Required RunSkeptic output:",
+        "",
+        "- `RunSkeptic status: PASS | ACTION | CONFLICT`",
+        "- `Scope reviewed:`",
+        "- `Evidence used:`",
+        "- `Findings:`",
+        "- `Unknowns:`",
+        "- `Human decisions needed:`",
+        "- `Verification performed:`",
+        "- `Next safe action:`",
+        "",
+        "Stop immediately if RunSkeptic returns ACTION or CONFLICT, required evidence is missing, a human-owned decision appears, or the step would require reading outside approved evidence.",
+        "",
+        "If the framework file is unavailable, do not claim full RunSkeptic compliance. Use this embedded fallback and report: `RunSkeptic source: embedded fallback`; `Confidence: lower than full framework review`; `Missing evidence: actual skeptic.md was unavailable`.",
+    ]
 
 def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path, runtime: str, skeptic_path: str = "~/code/skeptic/skeptic.md") -> str:
     if runtime not in RUNTIMES:
@@ -316,6 +368,10 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "Use only these statuses: PASS, ACTION, CONFLICT.",
         "Stop on ACTION or CONFLICT unless the human explicitly resolves it.",
         "",
+        "## How to run RunSkeptic",
+        "",
+        *_runskeptic_operating_block(skeptic_path),
+        "",
         "## Human checkpoint rules",
         "",
         *_lines([str(item) for item in as_list(bundle.get("human_checkpoint_rules"))]),
@@ -352,7 +408,24 @@ def validate_prompt_text(text: str) -> list[str]:
     for word in FORBIDDEN_STATUS_WORDS:
         if word in text:
             errors.append(f"prompt must not use {word} as a RunSkeptic status")
-    for required in ("Specify", "Clarify", "Plan", "Research/data/contracts", "Tasks", "Implementation", "Verification", "RunSkeptic"):
+    for required in (
+        "Specify",
+        "Clarify",
+        "Plan",
+        "Research/data/contracts",
+        "Tasks",
+        "Implementation",
+        "Verification",
+        "RunSkeptic",
+        "How to run RunSkeptic",
+        "GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN",
+        "OBSERVED",
+        "REPRODUCED",
+        "HISTORICAL",
+        "INFERRED RISK",
+        "RunSkeptic status:",
+        "Next safe action:",
+    ):
         if required not in text:
             errors.append(f"missing lifecycle term: {required}")
     if not all(status in text for status in ("PASS", "ACTION", "CONFLICT")):
