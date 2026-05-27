@@ -23,6 +23,7 @@ These docs are living references. Follow links in AGENTS.md for session bootstra
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec ↔ SpecKit handoff protocol |
 | [`HLDSPEC_ARTIFACT_CONTRACT_STYLE.md`](HLDSPEC_ARTIFACT_CONTRACT_STYLE.md) | Standard interface-contract shape for HLDspec handoffs, prompts, reports, gap handoffs, and slice execution artifacts |
 | [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical model for one full SpecKit plan/task graph with slice-controlled implementation |
+| [`SMOKE_SCENARIOS.md`](SMOKE_SCENARIOS.md) | Deterministic end-to-end smoke scenarios: what each script validates, usage, and output contract |
 
 | [`JUDGE_LED_REVIEW_PROTOCOL.md`](JUDGE_LED_REVIEW_PROTOCOL.md) | Judge-led human review protocol |
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract |

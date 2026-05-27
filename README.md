@@ -232,6 +232,7 @@ Use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md` when handing work to another agent or
 | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` | Durable repo-development handoff protocol |
 | `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` | Durable backlog of unfinished work |
 | `docs/TEST_STRATEGY_V2.md` | Test strategy and conventions |
+| `docs/SMOKE_SCENARIOS.md` | Deterministic end-to-end smoke scenarios: what each script validates, usage, and output contract |
 
 ## Artifact contract style
 
