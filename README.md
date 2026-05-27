@@ -232,3 +232,18 @@ Use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md` when handing work to another agent or
 | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` | Durable repo-development handoff protocol |
 | `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` | Durable backlog of unfinished work |
 | `docs/TEST_STRATEGY_V2.md` | Test strategy and conventions |
+
+## Artifact contract style
+
+HLDspec handoffs, prompts, phase reports, gap handoffs, and slice execution
+instructions are written as interface contracts. Each operational artifact should
+make the same shape explicit: inputs, authority, allowed actions, forbidden
+actions, expected outputs, validation, stop conditions, report format, next
+owner, and evidence.
+
+This keeps agent work bounded and resumable. It also prevents hidden scope
+expansion: a receiving agent can see what it may read, what it may change, what
+is forbidden, what proves success, when it must stop, and who owns the next
+decision.
+
+See [HLDspec Artifact Contract Style](docs/HLDSPEC_ARTIFACT_CONTRACT_STYLE.md).

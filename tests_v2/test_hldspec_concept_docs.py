@@ -51,12 +51,13 @@ class HldspecConceptDocsTests(unittest.TestCase):
     def test_gap_handoff_template_is_status_not_truth(self):
         text = self.read("docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md")
         for phrase in (
-            "This document is a status and continuation artifact. It is not architecture truth.",
-            "## 3. Current repo state",
-            "## 5. Known gaps",
-            "## 8. Next safe patch",
-            "## 10. Validation evidence",
-            "Do not claim tested unless exact commands ran.",
+            "A gap handoff is a status and continuation artifact.",
+            "It is not architecture",
+            "## Current state",
+            "## Known gaps",
+            "## Next safe patch",
+            "## Validation required",
+            "Do not claim tests passed unless exact commands ran.",
         ):
             self.assertIn(phrase, text)
 

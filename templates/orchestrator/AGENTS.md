@@ -151,3 +151,14 @@ Before any SpecKit phase or SpecKit proxy task, read `docs/SPECKIT_SLICE_CONTROL
 Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
 
 When handing work to another agent or session, use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md`. The gap handoff is current status and next-safe-action evidence, not architecture truth.
+
+## Artifact contract rule
+
+Operational handoffs, prompts, reports, slice instructions, and gap handoffs must
+use the artifact contract shape from `docs/HLDSPEC_ARTIFACT_CONTRACT_STYLE.md`:
+Inputs, Authority, Allowed Actions, Forbidden Actions, Expected Outputs,
+Validation Required, Stop Conditions, Report Format, Next Owner, and Evidence.
+
+Do not delegate work to another agent unless the receiving artifact says what may
+be read, what may be changed, what is forbidden, what proves success, when to
+stop, and who owns the next decision.

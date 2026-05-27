@@ -343,3 +343,31 @@ RunSkeptic returns ACTION or CONFLICT
 SpecKit plans the whole product once.
 
 HLDspec controls implementation slice by slice.
+
+## Artifact contract style for slices
+
+Every slice is also a contract. A slice is not just a label like `API` or `UI`;
+it must define the operational boundary for one implementation pass.
+
+Required Slice card shape:
+
+```text
+Slice
+Purpose
+Inputs
+Authority
+Allowed work
+Forbidden work
+Expected outputs
+Focused tests
+Regression tests
+Stop conditions
+Report format
+Next owner
+Evidence
+```
+
+A slice that cannot name its allowed work, forbidden work, focused tests,
+regression tests, and stop conditions is not ready for implementation.
+
+See [HLDspec Artifact Contract Style](HLDSPEC_ARTIFACT_CONTRACT_STYLE.md).
