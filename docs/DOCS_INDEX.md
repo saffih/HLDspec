@@ -95,3 +95,11 @@ Full archive contents: [`docs/archive/`](archive/)
 
 | [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Canonical development handoff protocol for handing HLDspec repo work between models/agents/sessions |
 | [`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) | Durable backlog for unfinished HLDspec repo-development work and open design decisions |
+
+## Current front door and slice-control docs
+
+| Doc | Purpose |
+|---|---|
+| [`../README.md`](../README.md) | Conceptual front door: what HLDspec does, why it exists, and how the workflow runs |
+| [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical model for one full SpecKit flow and many gated implementation slices |
+| [`HLDSPEC_GAP_HANDOFF_TEMPLATE.md`](HLDSPEC_GAP_HANDOFF_TEMPLATE.md) | Standard status handoff template for gaps, dirty state, next patch, and tests actually run |

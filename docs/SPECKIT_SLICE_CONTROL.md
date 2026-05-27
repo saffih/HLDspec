@@ -22,6 +22,8 @@ One full HLD
 -> many approved implementation slices
 ```
 
+SpecKit plans the whole product once. HLDspec controls implementation slice by slice.
+
 ## Ownership
 
 HLDspec owns:
@@ -44,11 +46,11 @@ HLDspec may mirror source-package files into:
 .specify/source/
 ```
 
-`.specify/source/` is generated read-only context for SpecKit. It is not the source of truth.
+but `.specify/source/` is generated read-only context for SpecKit. It is not the source of truth.
 
 ## Why slices exist
 
-SpecKit can create a complete plan and task graph for the full product. But implementation may be too large or risky to run in one pass.
+SpecKit can create a complete plan and tasks for the full product. But implementation may be too large or risky to run in one pass.
 
 Slice control lets HLDspec say:
 
@@ -58,11 +60,11 @@ The full task graph is known.
 Only this selected part may be implemented now.
 ```
 
-## Canonical slices
+## Canonical slices and tests
 
 ### FOUNDATION
 
-Workspace setup, build/test commands, project scaffold, and SpecKit initialization validation.
+Workspace, build/test commands, project scaffold, SpecKit initialization validation.
 
 No product behavior.
 
@@ -89,7 +91,7 @@ invalid config fails clearly
 
 ### DOMAIN_MODEL
 
-Entities, value objects, statuses, invariants, and domain errors.
+Entities, value objects, statuses, invariants, domain errors.
 
 Must not depend on database, API, CLI, UI, or network.
 
@@ -104,7 +106,7 @@ status transition tests
 
 ### CONTRACTS
 
-Ports, interfaces, DTOs, schemas, and API/event contracts.
+Ports, interfaces, DTOs, schemas, API/event contracts.
 
 Required tests/checks:
 
@@ -117,7 +119,7 @@ invalid payload tests
 
 ### BUSINESS_LOGIC
 
-Use cases, workflows, validation rules, and state transitions.
+Use cases, workflows, validation rules, state transitions.
 
 Required tests/checks:
 
@@ -131,7 +133,7 @@ idempotency tests where relevant
 
 ### PERSISTENCE
 
-Database schema, migrations, repositories, and transaction behavior.
+Database schema, migrations, repositories, transaction behavior.
 
 Required tests/checks:
 
@@ -145,7 +147,7 @@ constraint tests
 
 ### API
 
-HTTP/RPC routes, controllers, request/response mapping, auth, and error handling.
+HTTP/RPC routes, controllers, request/response mapping, auth/error handling.
 
 Required tests/checks:
 
@@ -154,12 +156,12 @@ route tests
 request validation tests
 response shape tests
 status code tests
-auth and error mapping tests
+auth/error mapping tests
 ```
 
 ### CLI
 
-Commands, flags, arguments, stdout/stderr, and exit codes.
+Commands, flags, arguments, stdout/stderr, exit codes.
 
 Required tests/checks:
 
@@ -173,21 +175,21 @@ CLI integration tests
 
 ### UI
 
-Screens, components, forms, UI state, accessibility, and user journeys.
+Screens, components, forms, UI state, accessibility, user journeys.
 
 Required tests/checks:
 
 ```text
 component tests
 form validation tests
-loading, empty, and error state tests
+loading/empty/error state tests
 accessibility checks
 E2E happy path tests
 ```
 
 ### INTEGRATION_HARDENING
 
-End-to-end validation, security, performance, docs, and release readiness.
+End-to-end validation, security, performance, docs, release readiness.
 
 Required tests/checks:
 
@@ -195,7 +197,7 @@ Required tests/checks:
 full unit suite
 full integration suite
 full E2E suite
-lint, type, and static checks
+lint/type/static checks
 security checks where applicable
 documentation checks
 release smoke test
@@ -205,30 +207,24 @@ release smoke test
 
 ### specify
 
-SpecKit receives the full HLD-derived input.
-
-It must not produce a partial spec for one slice.
+SpecKit receives the full HLD-derived input. It must not produce a partial spec for one implementation slice.
 
 ### plan
 
-SpecKit creates one complete product plan.
-
-The plan must identify:
+SpecKit creates one complete product plan. The plan must identify:
 
 ```text
 MVP path
 slice order
 slice dependencies
 test strategy per slice
-adapter strategy: API, CLI, UI, persistence
+adapter strategy: API / CLI / UI / persistence
 HLD anchor coverage strategy
 ```
 
 ### tasks
 
-SpecKit creates one complete task graph.
-
-Every task must include:
+SpecKit creates one complete task graph. Every task must include:
 
 ```text
 task id
@@ -250,7 +246,7 @@ Slice: BUSINESS_LOGIC
 MVP: true
 HLD anchors: HLD-004, HLD-007
 Depends on: DOMAIN_MODEL:T006, CONTRACTS:T011
-Expected files: hldspec/domain/*, tests/domain/*
+Expected files: domain/services/*, tests/domain/*
 Focused test: registration validation success/failure
 Regression: domain + contracts tests
 Forbidden: API routes, UI components, database migrations
@@ -308,7 +304,7 @@ focused tests pass
 prior-slice regression passes
 anchor coverage is updated
 no uncited product behavior was added
-phase report is written
+phase_report.json is written
 no stop condition is triggered
 ```
 
@@ -337,7 +333,7 @@ selected slice is unclear
 implementation touches forbidden files
 tests fail
 new product behavior is not cited to HLD
-dependency requires an unapproved future slice
+dependency requires unapproved future slice
 human-owned decision appears
 RunSkeptic returns ACTION or CONFLICT
 ```

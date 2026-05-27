@@ -236,3 +236,11 @@ These concerns are mandatory and must be visible in generated artifacts before p
 - Artifact existence does not always imply completeness unless a validator enforces required keys.
 - Local static checks cannot guarantee production runtime safety.
 - Historical docs in `docs/` may describe prior states; use canonical and current run artifacts first.
+
+## SpecKit slice-control rule
+
+Before any SpecKit phase or SpecKit proxy task, read `docs/SPECKIT_SLICE_CONTROL.md` and the generated source context under `.specify/source/` when present.
+
+Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
+
+When handing work to another agent or session, use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md`. The gap handoff is current status and next-safe-action evidence, not architecture truth.

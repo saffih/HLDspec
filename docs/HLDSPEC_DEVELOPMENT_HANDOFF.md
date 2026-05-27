@@ -125,3 +125,9 @@ Another model can continue safely without reading the full chat history and with
 - which docs are authoritative
 - which tests prove the work
 - what the next safe step is
+
+## Gap handoff standard
+
+When HLDspec repo work is handed between agents, models, or sessions, create or update a Gap Handoff using `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md`.
+
+A Gap Handoff records current status, dirty files, known gaps, next safe patch, tests actually run, and forbidden actions. It is not architecture truth and must point back to `README.md`, `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`, `docs/SPECKIT_PROXY_PROTOCOL.md`, and `docs/SPECKIT_SLICE_CONTROL.md`.

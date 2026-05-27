@@ -143,3 +143,11 @@ Each junior call or subtask must:
 - Do not answer checkpoint questions silently — surface them to the user
 - Do not promote artifacts without judge approval
 - One spec, one phase, one junior invocation at a time
+
+## SpecKit slice-control rule
+
+Before any SpecKit phase or SpecKit proxy task, read `docs/SPECKIT_SLICE_CONTROL.md` and the generated source context under `.specify/source/` when present.
+
+Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
+
+When handing work to another agent or session, use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md`. The gap handoff is current status and next-safe-action evidence, not architecture truth.
