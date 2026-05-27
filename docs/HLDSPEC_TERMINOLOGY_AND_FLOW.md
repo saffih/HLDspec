@@ -504,12 +504,41 @@ validation, stale anchors, unsupported claims, RunSkeptic ACTION/CONFLICT (or a
 missing RunSkeptic PASS where required), a Consultant BLOCK (or missing Consultant
 PASS where required), and a missing human approval where required.
 
+### Session-plane control plane
+
+The control plane is `session_plan.json` + bounded subagent packets + machine-readable
+`context_receipt.json`/`phase_report.json` + the gate validator. Roles:
+`main-controller` (owns gates/continuation), `hldspec-basepack`, `target-runner`,
+`consultant`. The control plane owns continuation; agents do bounded work and stop; no
+packet may self-approve (`can_self_approve` is invariantly False) and every gate is
+owned by the main controller. Tmux is optional UI rendered from the plan; nothing
+launches without `--execute`. The public `continue` refuses (exit 3) when the gate
+validator blocks; gating is opt-in on `session_plan.json` existence. Code:
+`hldspec/session_control.py`, `scripts/hldspec_session_control.py`, wired in
+`scripts/hldspec_agent_session.py`.
+
+### HLD content flow
+
+`hldspec start` generates real source-package content from the working HLD via
+`build_source_package_content`: `HLD.md`, `HLD.marked.md` (stable `<!-- ANCHOR: HLD-NNN -->`
+markers), `hld_reference_map.json` (anchor → heading/title/role/risk/status/lines/sha256),
+and `speckit_single_spec_input.md` (one input; every requirement cites a `(HLD-NNN)`
+anchor). Built on the existing `hld_map.py` parser. The single-spec input is validated
+so every claim under `## Requirements` cites a known anchor; duplicate/mismatched
+anchors fail the build (`anchor_integrity_errors`). Only the mirror step stamps the
+`GENERATED` banner — authoritative files in `.hldspec/` never carry it. Code:
+`hldspec/hld_marking.py`, `hldspec/single_spec_input.py`.
+
+> An empty/stub HLD still builds a **well-formed** package (`ok=True`, 0 anchors) so
+> `start` does not fail on a stub. Well-formed is not approval-ready — the gates
+> (`SOURCE_PACKAGE_APPROVAL_GATE` etc.) are what block promotion.
+
 ### Build status
 
 Landed and tested (`tests_v2/`): source-package shape + ownership + mirror
 (`test_source_package.py`), model routing (`test_model_routing.py`), gate validator
-(`test_gate_validator.py`). Remaining slices (HLD marking + reference map, single-spec
-input generation, constitution/guidelines content, runbook + runner/consultant
-prompts, target `AGENTS.md`, HLD diff/stale-check, session control, state-machine
-extension, legacy deprecation) are decomposed in the RunSkeptic review packet and each
-returns to GATE.
+(`test_gate_validator.py`), session-plane control plane (`test_session_control.py`),
+HLD marking + single-spec input + content flow (`test_hld_marking.py`). Remaining
+slices (constitution/guidelines content, target `AGENTS.md`, HLD diff/stale-check,
+state-machine extension, legacy deprecation) are decomposed in the RunSkeptic review
+packets and each returns to GATE.

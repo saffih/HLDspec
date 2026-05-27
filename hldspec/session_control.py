@@ -26,7 +26,6 @@ from pathlib import Path
 
 from . import gate_validator as gv
 from . import model_routing as mr
-from .hld_source_package import GENERATED_BANNER
 from .script_io import load_json_dict, write_json_dict
 from .workspace_adapter import TargetWorkspaceAdapter
 
@@ -515,20 +514,22 @@ def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") 
         written[filename] = path
 
     # Runner/consultant prompts embed the Context Receipt the gate requires.
+    # Authoritative files carry no mirror banner; the mirror step is the sole
+    # banner-adder (these live in .hldspec/, not the derived mirror).
     runner_prompt = (
-        f"{GENERATED_BANNER}\n\n# Target Runner Prompt\n\n"
+        "# Target Runner Prompt\n\n"
         "You run ONE bounded phase, then stop. Before acting, output a Context "
         "Receipt; after the phase, output a Phase Report. The main-controller owns "
         "continuation.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
     )
     consultant_prompt = (
-        f"{GENERATED_BANNER}\n\n# Consultant / RunSkeptic Prompt\n\n"
+        "# Consultant / RunSkeptic Prompt\n\n"
         "You are review-only. Check meaning and source consistency, apply RunSkeptic, "
         "and return PASS / ACTION / CONFLICT. You write nothing and never approve your "
         "own findings.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
     )
     runbook = (
-        f"{GENERATED_BANNER}\n\n# SpecKit Runbook\n\n"
+        "# SpecKit Runbook\n\n"
         f"Backend selected: `{plan['backend']}`\n\n"
         "## Control model\n\n"
         f"{plan['control_rule']}\n\n"

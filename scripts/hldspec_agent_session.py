@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from hldspec import session_control as sc
+from hldspec.hld_source_package import build_source_package_content
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
@@ -473,9 +474,22 @@ def command_start(args: argparse.Namespace) -> int:
     tool_manifest = write_tool_manifest(target)
 
     # Scaffold the session-plan control plane (dry-run): session_plan.json +
-    # bounded subagent packets + runner/consultant prompts + runbook.
+    # bounded subagent packets + runner/consultant prompts + runbook. Written
+    # first so the content build hashes the runbook/prompts and mirrors them.
     session_plan = sc.build_session_plan(target, ROOT, backend=sc.DEFAULT_BACKEND)
     session_artifacts = sc.write_session_artifacts(target, session_plan)
+
+    # Generate the source-package content from the working HLD (real content flow):
+    # HLD.md, HLD.marked.md, hld_reference_map.json, speckit_single_spec_input.md,
+    # manifest + metadata, and the derived .specify/source/ mirror.
+    working_hld = TargetWorkspaceAdapter(target_root=target, layout="new").working_hld
+    source_build = None
+    if working_hld.is_file():
+        source_build = build_source_package_content(
+            target,
+            working_hld.read_text(encoding="utf-8"),
+            hld_source_ref=str(source),
+        )
 
     print(f"HLDspec agent session prepared.")
     print(f"Mode: {mode}")
@@ -485,6 +499,10 @@ def command_start(args: argparse.Namespace) -> int:
     print(f"Interview answers: {interview_json}")
     print(f"Interview report: {interview_md}")
     print(f"Session plan: {session_artifacts[sc.SESSION_PLAN_FILE]}")
+    if source_build is not None:
+        print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
+        if source_build.unsupported_claims:
+            print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
     print("Next: start an agent session with the prompt above.")
     return 0
 

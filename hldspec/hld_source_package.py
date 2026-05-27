@@ -223,3 +223,69 @@ def source_package_paths(target_root: Path, layout: str = "new") -> tuple[Path, 
     """Convenience: (authoritative source dir, derived mirror dir)."""
     adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
     return adapter.source_package_dir, adapter.specify_source_mirror_dir
+
+
+@dataclass
+class SourcePackageBuild:
+    source_dir: Path
+    anchor_count: int
+    unsupported_claims: list[str]
+    validation: "SourcePackageValidation"
+    mirrored: list[str]
+    marking_errors: list[str] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return self.validation.ok and not self.unsupported_claims and not self.marking_errors
+
+
+def build_source_package_content(
+    target_root: Path,
+    hld_text: str,
+    *,
+    hld_source_ref: str,
+    state: str = "SOURCE_PACKAGE_IMPORTED",
+    project_name: str = "",
+    layout: str = "new",
+) -> SourcePackageBuild:
+    """Real content flow: turn an HLD into the full source-package content.
+
+    Writes HLD.md, HLD.marked.md, hld_reference_map.json,
+    speckit_single_spec_input.md, then the manifest + metadata, then regenerates
+    the .specify/source/ mirror. Returns a structured build result (does not raise
+    on content findings — unsupported claims surface for the gate, matching the
+    SourcePackageValidation pattern).
+    """
+    # Imported here to avoid an import cycle (those modules import this one).
+    from . import hld_marking, single_spec_input
+
+    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
+    source_dir = adapter.source_package_dir
+    source_dir.mkdir(parents=True, exist_ok=True)
+
+    (source_dir / AUTHORITATIVE_FILES["hld"]).write_text(hld_text, encoding="utf-8")
+    (source_dir / AUTHORITATIVE_FILES["marked_hld"]).write_text(
+        hld_marking.build_marked_hld(hld_text), encoding="utf-8"
+    )
+    ref_map = hld_marking.build_reference_map(hld_text)
+    write_json_dict(source_dir / AUTHORITATIVE_FILES["reference_map"], ref_map)
+
+    spec_input = single_spec_input.build_single_spec_input(hld_text, project_name=project_name)
+    (source_dir / AUTHORITATIVE_FILES["single_spec_input"]).write_text(spec_input, encoding="utf-8")
+
+    valid_anchors = set(ref_map["anchors"].keys())
+    unsupported = single_spec_input.find_unsupported_claims(spec_input, valid_anchors)
+    marking_errors = hld_marking.anchor_integrity_errors(hld_text)
+
+    write_source_package(source_dir, hld_source_ref=hld_source_ref, state=state)
+    validation = validate_source_package(source_dir)
+    mirrored = materialize_specify_mirror(source_dir, adapter.specify_source_mirror_dir)
+
+    return SourcePackageBuild(
+        source_dir=source_dir,
+        anchor_count=len(valid_anchors),
+        unsupported_claims=unsupported,
+        validation=validation,
+        mirrored=mirrored,
+        marking_errors=marking_errors,
+    )
