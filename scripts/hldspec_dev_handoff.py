@@ -11,7 +11,6 @@ from pathlib import Path
 
 REQUIRED_FIRST_READ = [
     "AGENTS.md",
-    "CLAUDE.md",
     "TASKS.md",
     "docs/HLDSPEC_DEVELOPMENT_HANDOFF.md",
     "docs/HLDSPEC_DEVELOPMENT_BACKLOG.md",
@@ -33,6 +32,7 @@ INVARIANTS = [
     "Dirty-tree work must be handled explicitly.",
     "HLDspec runtime state belongs outside core code.",
     "Durable backlog belongs in docs/HLDSPEC_DEVELOPMENT_BACKLOG.md.",
+    "Ad hoc agent-created docs follow docs/AGENT_ARTIFACT_HYGIENE.md.",
 ]
 
 DO_NOT_DO = [

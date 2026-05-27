@@ -6,14 +6,13 @@ Authoritative reference vs archive/history. When in doubt, use this page.
 
 ## Active / Authoritative
 
-These docs are living references. Follow links in CLAUDE.md for session bootstrap.
+These docs are living references. Follow links in AGENTS.md for session bootstrap.
 
 | Doc | Purpose |
 |---|---|
 | [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | **Authoritative** canonical terminology, ownership boundaries, full flow, and SpecKit Run Card — wins on any conflict |
-| [`../CLAUDE.md`](../CLAUDE.md) | Session bootstrap — read first every session |
 | [`../TASKS.md`](../TASKS.md) | Living task list — P0/P1/P2 pending work |
-| [`../AGENTS.md`](../AGENTS.md) | Agent bootstrap for HLDspec workflow invocation |
+| [`../AGENTS.md`](../AGENTS.md) | Universal agent bootstrap for HLDspec workflow invocation |
 | [`HLDSPEC_USE_CASES_AND_API.md`](HLDSPEC_USE_CASES_AND_API.md) | Product use-case catalog and rewrite council scenarios used to evaluate whether implementation work covers the real workflows |
 | [`ARCHITECTURE_V2.md`](ARCHITECTURE_V2.md) | V2 architecture: machines, contracts, pipeline |
 | [`CANONICAL_FLOW.md`](CANONICAL_FLOW.md) | Canonical pipeline flow reference |

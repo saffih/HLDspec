@@ -6,9 +6,10 @@
 #   install_orchestrator_instructions.sh --workspace /path/to/workspace [--orchestrators claude,codex,devin]
 #
 # Installs:
-#   claude → CLAUDE.md
-#   codex  → AGENTS.md
-#   devin  → .devin/instructions.md
+#   all runners → AGENTS.md
+#   claude      → CLAUDE.md shim that points back to AGENTS.md
+#   codex       → no extra file; Codex reads AGENTS.md directly
+#   devin       → .devin/instructions.md shim that points back to AGENTS.md
 #
 # Uses HLDspec repo location (auto-detected from script location).
 
@@ -24,7 +25,8 @@ Usage:
 
 Options:
   --workspace PATH      Target HLDspec workspace (required)
-  --orchestrators LIST  Comma-separated list: claude,codex,devin (default: all)
+  --orchestrators LIST  Comma-separated shim list: claude,codex,devin (default: all)
+                        AGENTS.md is always installed as the universal contract.
   --force               Overwrite existing files
   -h, --help            Show this help
 
@@ -119,7 +121,14 @@ install_one() {
 
 echo "Installing orchestrator instructions into: $WORKSPACE"
 echo "HLDspec repo: $REPO"
-echo "Orchestrators: $ORCHESTRATORS"
+echo "Universal contract: AGENTS.md"
+echo "Compatibility shims: $ORCHESTRATORS"
+echo ""
+
+echo "[universal] AGENTS.md"
+install_one universal \
+  "$TEMPLATES/AGENTS.md" \
+  "$WORKSPACE/AGENTS.md"
 echo ""
 
 IFS=',' read -ra ORCS <<< "$ORCHESTRATORS"
@@ -127,19 +136,16 @@ for orc in "${ORCS[@]}"; do
   orc="${orc// /}"  # trim spaces
   case "$orc" in
     claude)
-      echo "[claude] CLAUDE.md"
+      echo "[claude shim] CLAUDE.md"
       install_one claude \
         "$TEMPLATES/CLAUDE.md" \
         "$WORKSPACE/CLAUDE.md"
       ;;
     codex)
-      echo "[codex] AGENTS.md"
-      install_one codex \
-        "$TEMPLATES/AGENTS.md" \
-        "$WORKSPACE/AGENTS.md"
+      echo "[codex] uses AGENTS.md directly"
       ;;
     devin)
-      echo "[devin] .devin/instructions.md"
+      echo "[devin shim] .devin/instructions.md"
       install_one devin \
         "$TEMPLATES/devin-instructions.md" \
         "$WORKSPACE/.devin/instructions.md"
@@ -151,4 +157,4 @@ for orc in "${ORCS[@]}"; do
 done
 
 echo ""
-echo "Done. Review the installed files and commit them to your workspace."
+echo "Done. Review AGENTS.md and any installed shim files, then commit them to your workspace."

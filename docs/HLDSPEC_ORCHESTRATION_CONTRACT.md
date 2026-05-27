@@ -22,6 +22,15 @@ Owns global state, source-of-truth rules, human checkpoints, artifact promotion,
 
 The judge must not perform cheap extraction work when a deterministic script or junior bounded task is sufficient.
 
+The generated target `AGENTS.md` is the universal instruction contract for the
+active runner. Claude and Devin launch files may exist only as compatibility
+shims that point back to `AGENTS.md`; they must not duplicate or override the
+orchestration contract.
+
+Optional tmux sessions are a UI convenience for launching, attaching, and
+capturing runner panes. They are rendered from the session plan and may not carry
+approval state, checkpoint state, or source-of-truth decisions.
+
 ### Product Lead
 
 Owns product synthesis: use cases, user stories, acceptance criteria, product open questions, user-visible scope, and non-goals.

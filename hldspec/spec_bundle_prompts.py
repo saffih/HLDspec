@@ -71,7 +71,7 @@ def _runtime_guidance(runtime: str) -> list[str]:
     raise ValueError(f"unsupported runtime: {runtime}")
 
 
-# Abstract model tier -> concrete model per runtime. Mirrors the CLAUDE.md
+# Abstract model tier -> concrete model per runtime. Mirrors the AGENTS.md
 # model routing table so a prompt names the model the runtime actually uses.
 RUNTIME_MODELS: dict[str, dict[str, str]] = {
     "claude": {

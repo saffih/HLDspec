@@ -22,7 +22,7 @@ Builds pre-SpecKit readiness artifacts:
 - constitution context pack
 - dependency-aware spec list (scans source-project/specs/ for existing IDs)
 - readiness review
-- orchestrator instruction files (CLAUDE.md, AGENTS.md, .devin/)
+- universal AGENTS.md plus optional Claude/Devin launch shims
 
 Options:
   --hld PATH             Source HLD file (used for architecture analysis)
@@ -92,7 +92,7 @@ fi
 run_python "$ROOT/scripts/build_hldspec_architecture_findings_disposition.py" "$WORKSPACE"
 run_python "$ROOT/scripts/run_hldspec_speckit_readiness.py" "$WORKSPACE"
 
-# Install orchestrator instruction files (idempotent — skips existing non-stub files)
+# Install universal AGENTS.md and optional launch shims (idempotent — skips existing non-stub files)
 echo ""
 echo "Installing orchestrator instructions..."
 bash "$ROOT/scripts/install_orchestrator_instructions.sh" --workspace "$WORKSPACE"

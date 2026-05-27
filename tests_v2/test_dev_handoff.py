@@ -54,7 +54,8 @@ class DevHandoffTests(unittest.TestCase):
             self.assertEqual(payload["from_actor"], "codex")
             self.assertEqual(payload["to_actor"], "claude")
             self.assertEqual(payload["model_tier"], "MODEL_STRONG")
-            self.assertIn("CLAUDE.md", payload["required_first_read"])
+            self.assertIn("AGENTS.md", payload["required_first_read"])
+            self.assertNotIn("CLAUDE.md", payload["required_first_read"])
             self.assertIn("Source HLD is read-only. Workspace copy only.", payload["invariants"])
             self.assertIn("wire into docs index", payload["open_actions"])
 

@@ -67,6 +67,7 @@ target/.hldspec/design_principles_selection.md
 target/.hldspec/engineering/selection.json
 target/.hldspec/engineering/decisions.jsonl
 target/.hldspec/source_package/engineering_guidelines.md
+target/.hldspec/tmux/
 target/.hldspec/backend_technology_recommendation.json
 target/.hldspec/backend_technology_recommendation.md
 target/.hldspec/constitution_signals.json
@@ -76,6 +77,7 @@ target/.hldspec/spec_packages.json
 target/.hldspec/spec_packages.md
 target/.hldspec/feature_dependency_graph.json
 target/.hldspec/speckit_invocation_queue.json
+target/AGENTS.md
 target/prompts/
 ```
 

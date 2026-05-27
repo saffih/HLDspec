@@ -40,7 +40,7 @@ PHASE_SKILL = {
 }
 
 # Per-phase model routing (weakest sufficient model per operation), keyed to the
-# CLAUDE.md tiers. Pick the right agent for each operation so end-to-end driving
+# AGENTS.md tiers. Pick the right agent for each operation so end-to-end driving
 # is cost-worthy: mechanical phases run cheap, reasoning/code/governance run strong.
 #   CONSTITUTION -> CRITICAL (Opus)   governs architecture/contracts
 #   SPECIFY      -> DEFAULT  (Sonnet) spec drafting

@@ -52,7 +52,6 @@ Durable project knowledge belongs in tracked docs, especially:
 ```text
 docs/HLDSPEC_DEVELOPMENT_BACKLOG.md
 TASKS.md
-CLAUDE.md
 AGENTS.md
 docs/DOCS_INDEX.md
 ```
@@ -63,7 +62,6 @@ Every model starting HLDspec repo work must read:
 
 ```text
 AGENTS.md
-CLAUDE.md
 TASKS.md
 docs/HLDSPEC_DEVELOPMENT_HANDOFF.md
 docs/HLDSPEC_DEVELOPMENT_BACKLOG.md

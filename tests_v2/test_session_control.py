@@ -58,6 +58,25 @@ class SessionPlanTests(unittest.TestCase):
         self.assertTrue(any("/tmp/my-target" in c for c in cmds))
         self.assertTrue(any(sc.MAIN_CONTROLLER in c for c in cmds))
 
+    def test_tmux_default_session_name_is_target_and_gate_specific(self):
+        plan = sc.build_session_plan(
+            "/tmp/My Target",
+            "/repo",
+            backend="tmux",
+            current_gate="SPECKIT_READY",
+        )
+        self.assertEqual(plan["session_name"], "hldspec-my-target-speckit_ready")
+
+    def test_tmux_commands_capture_logs_and_attach(self):
+        plan = sc.build_session_plan("/tmp/my-target", "/repo", backend="tmux")
+        cmds = sc.render_tmux_commands(plan)
+        text = "\n".join(cmds)
+        self.assertIn("mkdir -p", text)
+        self.assertIn("tmux pipe-pane -o", text)
+        self.assertIn("tmux capture-pane -p -S -", text)
+        self.assertIn("tmux attach-session -t", text)
+        self.assertIn(".hldspec/tmux/", text)
+
     def test_main_controller_owns_gates(self):
         plan = sc.build_session_plan("/tmp/target", "/repo")
         for role, entry in plan["roles"].items():

@@ -2,7 +2,7 @@
 
 > **Canonical system model:** for terminology, ownership boundaries, the full flow, and the SpecKit Run Card, read `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` — it is authoritative and wins on any conflict.
 
-> **HLDspec repo-development handoff:** before editing this repo or handing work to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` and `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`. `AGENTS.md`, `CLAUDE.md`, and generated `HANDOFF.md` files are pointers; the docs files are the source of truth.
+> **HLDspec repo-development handoff:** before editing this repo or handing work to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` and `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`. `AGENTS.md`, compatibility shims, and generated `HANDOFF.md` files are pointers; the docs files are the source of truth.
 
 ## HLDspec trigger
 
@@ -104,13 +104,15 @@ It does not invoke SpecKit, create final specs, or implement.
 
 HLDspec workspaces support three interchangeable orchestrators: **Claude**, **Codex**, and **Devin**. The orchestrator is the judge — it reads pipeline state, makes approval decisions, and delegates bounded phase execution to junior agents.
 
+All runners use the generated target `AGENTS.md` as the source-of-truth instruction file. Tool-specific files may exist only as launch shims that point back to `AGENTS.md`.
+
 ### Orchestrator roles
 
 | Orchestrator | Instruction file | Judge role |
 |---|---|---|
-| Claude Code | `CLAUDE.md` | Reads state, approves checkpoints, spawns junior subagents or Codex |
+| Claude Code | `AGENTS.md` (`CLAUDE.md` shim allowed) | Reads state, approves checkpoints, spawns junior subagents or Codex |
 | Codex CLI | `AGENTS.md` | Reads state, approves checkpoints, spawns junior `codex exec` calls |
-| Devin | `.devin/instructions.md` | Reads state, approves checkpoints, creates bounded Devin subtasks |
+| Devin | `AGENTS.md` (`.devin/instructions.md` shim allowed) | Reads state, approves checkpoints, creates bounded Devin subtasks |
 
 ### Junior agent role
 
@@ -122,9 +124,14 @@ Junior agents handle exactly one phase of one feature. They are cheap and bounde
 - **Scope**: one feature directory, one SpecKit skill
 - **If blocked**: report the blocker and stop — never improvise
 
+Optional tmux sessions are a convenience surface only. HLDspec may render tmux
+commands from the session plan so windows are role-named, sessions are easy to
+attach to, and pane output is captured under `.hldspec/tmux/`; tmux state never
+becomes approval state or source truth.
+
 ### Installing orchestrator instructions
 
-After `hldspec_speckit_ready.sh` creates the workspace, install orchestrator instruction files:
+After `hldspec_speckit_ready.sh` creates the workspace, install the universal orchestrator instruction file and optional compatibility shims:
 
 ```bash
 bash scripts/install_orchestrator_instructions.sh \
@@ -133,6 +140,8 @@ bash scripts/install_orchestrator_instructions.sh \
 ```
 
 This renders `templates/orchestrator/` templates with the correct workspace and repo paths.
+`AGENTS.md` is always installed; `CLAUDE.md` and `.devin/instructions.md` are
+shim files only.
 
 ### SpecKit phase delegation
 

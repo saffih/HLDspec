@@ -20,6 +20,8 @@ is owned by the main controller.
 """
 from __future__ import annotations
 
+import re
+import shlex
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -81,6 +83,8 @@ PHASE_REPORT_REQUIRED_KEYS: tuple[str, ...] = (
     "consultant_result",
     "next_safe_action",
 )
+
+TMUX_CAPTURE_DIR = ".hldspec/tmux"
 
 
 # ---------------------------------------------------------------------------
@@ -385,6 +389,8 @@ def build_session_plan(
 ) -> dict:
     if backend not in BACKENDS:
         raise ValueError(f"unknown backend: {backend!r}; expected one of {BACKENDS}")
+    if backend == "tmux" and session_name == DEFAULT_SESSION_NAME:
+        session_name = default_tmux_session_name(target_repo_path, current_gate)
     target = str(target_repo_path)
     hldspec = str(hldspec_repo_path)
     pkt_dir = ".hldspec/source_package/subagent_packets"
@@ -477,12 +483,51 @@ def _role_command(role: str, target: str, hldspec: str, backend: str) -> str:
 def render_tmux_commands(plan: dict) -> list[str]:
     """Optional tmux rendering from the session plan. Uses the real target path.
     Returned commands are NOT executed by this function."""
-    target = plan["target_repo_path"]
+    target = Path(plan["target_repo_path"])
     session = plan["session_name"]
-    cmds = [f"tmux new-session -d -s {session} -c {target} -n {MAIN_CONTROLLER}"]
+    capture_dir = target / TMUX_CAPTURE_DIR / session
+    cmds = [f"mkdir -p {_sh(capture_dir)}"]
+    cmds.append(
+        "tmux new-session -d "
+        f"-s {_sh(session)} "
+        f"-c {_sh(target)} "
+        f"-n {_sh(MAIN_CONTROLLER)}"
+    )
     for role in (BASEPACK, RUNNER, CONSULTANT):
-        cmds.append(f"tmux new-window -t {session} -c {target} -n {role}")
+        cmds.append(
+            "tmux new-window "
+            f"-t {_sh(session)} "
+            f"-c {_sh(target)} "
+            f"-n {_sh(role)}"
+        )
+    for role in ROLES:
+        window = f"{session}:{role}"
+        log_path = capture_dir / f"{role}.log"
+        pipe_command = f"cat >> {_sh(log_path)}"
+        cmds.append(f"tmux pipe-pane -o -t {_sh(window)} {_sh(pipe_command)}")
+    cmds.append(f"tmux set-option -t {_sh(session)} remain-on-exit on")
+    for role in ROLES:
+        window = f"{session}:{role}"
+        capture_path = capture_dir / f"{role}.capture.txt"
+        cmds.append(f"tmux capture-pane -p -S - -t {_sh(window)} > {_sh(capture_path)}")
+    cmds.append(f"tmux attach-session -t {_sh(session)}")
     return cmds
+
+
+def default_tmux_session_name(target_repo_path: str | Path, current_gate: str) -> str:
+    """Stable tmux name for easy attach/capture across one HLDspec run."""
+    target_slug = _slug(Path(target_repo_path).name or "target")
+    gate_slug = _slug(current_gate or "gate")
+    return f"hldspec-{target_slug}-{gate_slug}"[:90].rstrip("-") or DEFAULT_SESSION_NAME
+
+
+def _slug(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value.strip()).strip("-").lower()
+    return slug or "item"
+
+
+def _sh(value: str | Path) -> str:
+    return shlex.quote(str(value))
 
 
 def render_role_commands(plan: dict) -> dict[str, str]:
