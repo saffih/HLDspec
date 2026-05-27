@@ -172,6 +172,21 @@ Stop conditions for clarification:
   implementation approval
 - RunSkeptic returns ACTION or CONFLICT
 
+## One-Go Execution Policy and Answer-Finding Protocol
+
+Generated bundle prompts and SpecKit Run Cards must render these sections so the receiving agent stays self-sufficient instead of stopping at the first SpecKit question:
+
+- `## One-Go Execution Policy` — do as much as safely possible in one run; clarification is not a stop by default; do not stop just because SpecKit asks a question.
+- `## Answer-Finding Protocol` — resolve clarification questions from approved evidence first, in a defined order, before escalating.
+- `## HLD Section Gap Map` — map each clarification to its evidence dimension (Feature purpose, Architecture boundary, Source of truth, Dependency order, acceptance/scope, governance/approval) and read the matching approved evidence first.
+- `## Clarification Policy` — stop only when approved evidence is missing, approved evidence is contradictory, the question requires a human-owned decision, or RunSkeptic returns ACTION or CONFLICT.
+- `## How to run RunSkeptic` — the self-contained RunSkeptic operating block (framework path, flow, statuses, evidence markers, report fields).
+- `## Reassessment Request` — the structured request the receiving agent returns to HLDspec when a real blocker stops the run, instead of guessing or silently halting.
+
+The Answer-Finding Protocol must point at active HLD sections, the HLD Section Gap Map, role reviews, the spec package map, the dependency graph, the invocation queue, constitution/prework, the Run Card, and the proxy dossier.
+
+These sections are rendered from one canonical source, `hldspec/handoff_policy_blocks.py`, so bundle prompts and Run Cards cannot drift. Each major policy section must appear exactly once in a rendered prompt or Run Card.
+
 ## Clarification Policy
 
 - Resolve clarification questions from approved evidence first.

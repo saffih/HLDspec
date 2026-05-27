@@ -7,6 +7,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hldspec.handoff_policy_blocks import (
+    answer_finding_protocol_block,
+    clarification_policy_block,
+    hld_section_gap_map_block,
+    one_go_execution_policy_block,
+    reassessment_request_block,
+    runskeptic_operating_block,
+)
+
 SCHEMA_VERSION = 1
 REQUIRED_JSON_FIELDS = (
     "schema_version",
@@ -36,11 +45,15 @@ REQUIRED_MD_SECTIONS = (
     "## Forbidden Actions",
     "## Required SpecKit Sequence",
     "## Question Answering Policy",
+    "## One-Go Execution Policy",
+    "## Answer-Finding Protocol",
+    "## HLD Section Gap Map",
     "## Clarification Policy",
         "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
     "## Required Subagents / Reviewers",
     "## RunSkeptic Checkpoints",
     "## How to run RunSkeptic",
+    "## Reassessment Request",
     "## Human Approval Boundaries",
     "## Stop Conditions",
     "## Expected Outputs",
@@ -369,70 +382,6 @@ def _numbered(items: list[str]) -> list[str]:
 
 
 
-def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") -> list[str]:
-    return [
-        "RunSkeptic is the required quality gate for this step.",
-        "",
-        "First, read the actual current framework file:",
-        "",
-        f"`{skeptic_path}`",
-        "",
-        "Do not rely on memory or a summary if the file is available.",
-        "",
-        "Apply this flow in order:",
-        "",
-        "`GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN`",
-        "",
-        "For this Run Card, RunSkeptic is normally read-only unless this card explicitly authorizes a fix.",
-        "",
-        "Use only these result statuses:",
-        "",
-        "- `PASS`: no blocking finding is known; evidence is sufficient for this step.",
-        "- `ACTION`: a fixable issue exists, such as missing evidence, stale artifact, invalid output, incomplete contract, weak testability, or unclear prompt/report content.",
-        "- `CONFLICT`: a human-owned or architecture/product/source-of-truth decision is unresolved, or multiple valid designs exist and the evidence does not choose between them.",
-        "",
-        "Minimum checks:",
-        "",
-        "1. Gate: confirm the requested step is clear, bounded, and testable.",
-        "2. Fundamental scan: check purpose, boundaries, ownership, source of truth, main flow, interfaces, dependencies, and high-risk assumptions.",
-        "3. Map: list findings before deciding. Do not fix while mapping.",
-        "4. Confidence: identify unknowns, skipped areas, and weak evidence.",
-        "5. Stabilize: merge related findings and identify root cause.",
-        "6. Evidence: mark each finding as `OBSERVED`, `REPRODUCED`, `HISTORICAL`, or `INFERRED RISK`.",
-        "7. Decide: choose `PASS`, `ACTION`, or `CONFLICT`; do not promote if any ACTION or CONFLICT remains.",
-        "8. Verify: if a fix was explicitly authorized, report the exact tests or checks run; otherwise report what verification would be required.",
-        "",
-        "Required RunSkeptic output:",
-        "",
-        "- `RunSkeptic status: PASS | ACTION | CONFLICT`",
-        "- `Scope reviewed:`",
-        "- `Evidence used:`",
-        "- `Findings:`",
-        "- `Unknowns:`",
-        "- `Human decisions needed:`",
-        "- `Verification performed:`",
-        "- `Next safe action:`",
-        "",
-        "Stop immediately if RunSkeptic returns ACTION or CONFLICT, required evidence is missing, a human-owned decision appears, or the step would require reading outside approved evidence.",
-        "",
-        "If the framework file is unavailable, do not claim full RunSkeptic compliance. Use this embedded fallback and report: `RunSkeptic source: embedded fallback`; `Confidence: lower than full framework review`; `Missing evidence: actual skeptic.md was unavailable`.",
-    ]
-
-
-def clarification_policy_block() -> list[str]:
-    return [
-        "## Clarification Policy",
-        "",
-        "Clarification questions are not blockers by default.",
-        "",
-        "- First answer from approved HLDspec evidence: active HLD sections, Working HLD, spec package map, dependency graph, invocation queue, constitution update plan or approved constitution, role reviews, Run Card, and proxy dossier.",
-        "- If approved evidence clearly answers the question, answer it and continue.",
-        "- If a pre-approved default is safe and reversible and does not affect architecture, source of truth, security/privacy, data ownership, dependency order, feature scope, constitution rules, user-visible behavior, or implementation approval, answer it and continue.",
-        "- Escalate to the human only when approved evidence is missing, contradictory, or the answer is human-owned.",
-        "- Stop on RunSkeptic ACTION or CONFLICT.",
-        "",
-    ]
-
 def render_run_card_md(payload: dict[str, Any]) -> str:
     errors = validate_run_card_payload(payload)
     if errors:
@@ -490,27 +439,13 @@ def render_run_card_md(payload: dict[str, Any]) -> str:
         "- **ANSWER_FROM_APPROVED_DEFAULT**: only safe, reversible defaults outside human-owned decision areas.",
         "- **ESCALATE_TO_HUMAN**: required for architecture, source of truth, constitution, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, or implementation approval.",
         "",
+        *one_go_execution_policy_block(),
+        *answer_finding_protocol_block(),
+        *hld_section_gap_map_block(),
         *clarification_policy_block(),
-
-        '## Clarification Policy',
-        '',
-        'Clarification is not a stop by default.',
-        "If RunSkeptic returns ACTION or CONFLICT, stop even if the clarification appears answerable.",
-        'If SpecKit asks clarification questions, resolve them from approved evidence first.',
-        'Answer and continue when the answer is directly supported by approved HLDspec evidence or by an approved safe default.',
-        'Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.',
-        'Human-owned clarification includes architecture boundary, source of truth, constitution rule, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, and implementation approval.',
-        '',
         "## Required Subagents / Reviewers",
         "",
         *_bullet([str(item) for item in as_list(payload.get("subagents"))]),
-        "",
-        "## Clarification Policy",
-        "",
-        "Clarification is not a stop by default.",
-        "Resolve clarification questions from approved evidence first.",
-        "When SpecKit asks clarification questions, resolve them from approved evidence first.",
-        "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
         "",
         "## RunSkeptic Checkpoints",
         "",
@@ -518,10 +453,8 @@ def render_run_card_md(payload: dict[str, Any]) -> str:
         "",
         "Use only these statuses: `PASS`, `ACTION`, `CONFLICT`. Stop on unresolved `ACTION` or `CONFLICT`.",
         "",
-        "## How to run RunSkeptic",
-        "",
         *runskeptic_operating_block(),
-        "",
+        *reassessment_request_block(),
         "## Human Approval Boundaries",
         "",
         "- Stop for architecture boundary, source-of-truth, constitution, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, and implementation approval decisions.",

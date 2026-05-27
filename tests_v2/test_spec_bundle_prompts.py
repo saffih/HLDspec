@@ -73,6 +73,30 @@ class SpecBundlePromptTests(unittest.TestCase):
                 self.assertIn("RunSkeptic status:", text)
                 self.assertIn("Next safe action:", text)
                 self.assertNotIn("BLOCKER", text)
+                # One-go / answer-finding / gap-map self-sufficiency contract
+                self.assertIn("## One-Go Execution Policy", text)
+                self.assertIn("## Answer-Finding Protocol", text)
+                self.assertIn("## HLD Section Gap Map", text)
+                self.assertIn("Do as much as safely possible in one run", text)
+                self.assertIn("Do not stop just because SpecKit asks a question", text)
+                self.assertIn("Resolve clarification questions from approved evidence first", text)
+                self.assertIn("active HLD sections", text)
+                self.assertIn("Feature purpose", text)
+                self.assertIn("Architecture boundary", text)
+                self.assertIn("Source of truth", text)
+                self.assertIn("Dependency order", text)
+                self.assertIn("human-owned decision", text)
+                self.assertIn("## Reassessment Request", text)
+                # Each major policy section must appear exactly once (no drift/dupes).
+                for section in (
+                    "## One-Go Execution Policy",
+                    "## Answer-Finding Protocol",
+                    "## HLD Section Gap Map",
+                    "## Clarification Policy",
+                    "## How to run RunSkeptic",
+                    "## Reassessment Request",
+                ):
+                    self.assertEqual(1, text.count(section), f"{section} must appear exactly once")
 
     def test_unknown_runtime_fails(self) -> None:
         with self.assertRaises(ValueError):
