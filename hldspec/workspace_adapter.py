@@ -88,6 +88,30 @@ class TargetWorkspaceAdapter:
         return self.specify_dir / "sync" / "hldspec_event_log.jsonl"
 
     # ------------------------------------------------------------------
+    # Source package (single-HLD SpecKit source-package architecture)
+    #
+    # HLDspec authors the approved source package under .hldspec/ (control
+    # plane). A derived, read-only mirror is materialised under .specify/source/
+    # for the SpecKit runner. The canonical invariant "HLDspec never *authors*
+    # into .specify/" holds: the mirror is generated, not authored.
+    # ------------------------------------------------------------------
+
+    @property
+    def source_package_dir(self) -> Path:
+        """HLDspec-owned, authoritative approved source package."""
+        return self.hldspec_dir / "source_package"
+
+    @property
+    def specify_source_mirror_dir(self) -> Path:
+        """Derived, read-only mirror of the source package for the runner."""
+        return self.specify_dir / "source"
+
+    @property
+    def specify_memory_dir(self) -> Path:
+        """SpecKit-owned constitution location (applied at the approval gate)."""
+        return self.specify_dir / "memory"
+
+    # ------------------------------------------------------------------
     # Convenience factory
     # ------------------------------------------------------------------
 
