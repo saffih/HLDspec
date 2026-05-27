@@ -105,6 +105,7 @@ Strongest necessary model promotes.
 9. Dirty-tree work must be handled explicitly.
 10. HLDspec runtime state belongs outside core code.
 11. Durable backlog belongs in `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`.
+12. Ad hoc agent-created docs follow `docs/AGENT_ARTIFACT_HYGIENE.md`.
 
 ## Generate a handoff packet
 

@@ -352,6 +352,143 @@ Implementation note: `scripts/build_speckit_context_prompts.py` provides the fir
 - Human decision: required when evidence is insufficient.
 - Tests expected: no live work is inferred from stale docs alone.
 
+## Rewrite council scenarios - 2026-05-27
+
+These scenarios capture the evolved product target from the single-HLD rewrite
+discussion. They are evaluation cases: future implementation work should be able
+to say which scenarios it addresses, which it defers, and which gate proves it.
+
+### RUC-001 single-HLD source package setup
+
+- User story: user provides a source HLD and a target repo/workspace.
+- Expected behavior: HLDspec creates the authoritative package under
+  `target/.hldspec/source_package/` and only materializes derived runner-facing
+  files under `.specify/source/`.
+- Success means: canonical source truth is HLDspec-owned; SpecKit-owned
+  directories are not hand-authored by HLDspec.
+- Blocks if: source package writes final SpecKit specs manually or treats
+  `.specify/source/` as the authority.
+
+### RUC-002 HLD shaping before SpecKit
+
+- User story: user wants to clarify, mark, or improve an HLD before execution.
+- Expected behavior: HLDspec marks anchors, records open questions, proposes HLD
+  patches, and stops for source-truth decisions before SpecKit phases.
+- Success means: the original source HLD remains read-only; the workspace copy
+  and source package carry approved changes.
+- Blocks if: the agent silently answers checkpoint questions or modifies source
+  truth without approval.
+
+### RUC-003 single SpecKit input by default, layered only by real boundaries
+
+- User story: one coherent HLD should become one SpecKit-ready input unless
+  meaningful boundaries justify layers.
+- Expected behavior: HLDspec defaults to one single-spec input; optional layers
+  are based on source-of-truth, architecture, dependency, deployable value, or
+  testability boundaries.
+- Success means: no size-based bundle slicing; graph/queue parity remains for
+  layered paths.
+- Blocks if: the tool reintroduces many-spec bundles as the default or deletes
+  the layered dependency model entirely.
+
+### RUC-004 bounded runner and consultant phase execution
+
+- User story: an implementation or SpecKit phase is delegated to a target agent.
+- Expected behavior: runner does one bounded phase and stops; consultant is
+  review-only; the controller owns continuation and gate decisions.
+- Success means: Context Receipt, Phase Report, validation result, RunSkeptic
+  result, Consultant result, and next safe action are machine-readable enough for
+  `continue` to block or pass.
+- Blocks if: a runner continues recursively, self-approves, or proceeds without
+  required evidence.
+
+### RUC-005 HLD-side stale artifact detection
+
+- User story: approved HLD/source-package content changes after derived artifacts
+  already exist.
+- Expected behavior: HLDspec compares anchor/hash changes against derived
+  citations and classifies SAFE, REVIEW, REGENERATE, or BLOCK.
+- Success means: cited changed/deleted anchors block or force regeneration;
+  uncited changes require review instead of silent PASS.
+- Blocks if: stale derived prompts/spec inputs continue after source anchors
+  changed.
+
+### RUC-006 ordinary target-repo "make X happen" workflow
+
+- User story: user is working inside the target repo and says, "I want X; make
+  it happen."
+- Expected behavior: the target agent may edit code, but if behavior,
+  architecture, API, data shape, UI flow, ownership, or rollout changes, it must
+  record a provisional source-truth delta before claiming done.
+- Success means: request, interpretation, target diff, source-truth impact,
+  evidence, and next decision are captured in target-owned HLDspec artifacts.
+- Blocks if: code behavior changes while the HLD/source package has no
+  corresponding provisional delta.
+
+### RUC-007 POC and experiment promotion
+
+- User story: user asks for a POC or says to try an implementation direction.
+- Expected behavior: the POC is tracked as provisional truth, not invisible
+  throwaway work and not canonical product truth.
+- Success means: controller can accept, revise, reject, split, or continue the
+  POC; only accepted deltas are promoted into the canonical source package.
+- Blocks if: prototype code becomes the only record of product behavior.
+
+### RUC-008 generated target agent instructions
+
+- User story: a future target-agent session starts from the target repo without
+  the original chat context.
+- Expected behavior: HLDspec installs or generates target instructions such as
+  `AGENTS.generated.md` that explain source-truth delta rules, selected
+  engineering guidance, gate expectations, and forbidden promotion behavior.
+- Success means: ordinary target agents know to update provisional deltas and
+  report source-truth impact.
+- Blocks if: the workflow depends on hidden chat memory.
+
+### RUC-009 Engineering Toolbox P0
+
+- User story: HLDspec should help target agents build healthy software without
+  dumping a full architecture textbook into every prompt.
+- Expected behavior: mention principles by default; expand into selected
+  guidance only when risk, ambiguity, or tool-specific enforcement requires it;
+  expand full Toolbox Cards only for risky or non-obvious choices.
+- Success means: selected card -> generated guidance -> target prompt/report
+  requirement -> gate blocks missing evidence -> gate passes with evidence.
+- Blocks if: the toolbox is only documentation or if unrelated cards bloat every
+  target prompt.
+
+### RUC-010 API, data, and concurrency safety defaults
+
+- User story: common implementation choices should have safe boring defaults.
+- Expected behavior: simple HTTP+JSON APIs use explicit DTO/contracts; schemas
+  use deliberate primary keys, foreign keys, unique constraints, indexes, JSON
+  columns, and migrations; shared mutable records default to optimistic revision
+  updates rather than broad locking.
+- Success means: risky choices have triggers, required tests, observability, and
+  rollback/simplification paths.
+- Blocks if: blind last-write-wins updates, speculative indexes, business-critical
+  JSON blobs, or API contracts without DTO/schema strategy pass unchecked.
+
+### RUC-011 source-truth promotion remains controller-owned
+
+- User story: agents can propose changes, but source truth must not be promoted
+  accidentally.
+- Expected behavior: target agents write provisional deltas only; the controller
+  or human-owned gate promotes accepted deltas into the canonical source package.
+- Success means: provisional ledger is never treated as a second canonical HLD.
+- Blocks if: target agents directly mutate approved source-package truth or
+  generated SpecKit artifacts as a shortcut.
+
+### RUC-012 brownfield and existing-work reconciliation
+
+- User story: target repo may already have code, specs, partial implementation,
+  or merge history.
+- Expected behavior: HLDspec audits existing work, classifies it as usable,
+  stale, conflicting, or requiring review, and avoids overwriting it silently.
+- Success means: adoption plan identifies what source truth already covers and
+  what code has drifted beyond recorded truth.
+- Blocks if: HLDspec assumes a clean target or infers completion from stale docs.
+
 ## Core user scenarios
 
 ### Scenario 1 - First project run from a raw HLD

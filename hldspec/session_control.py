@@ -616,6 +616,12 @@ def session_continue_preflight(
     if not report or any(k not in report for k in PHASE_REPORT_REQUIRED_KEYS):
         blockers.append("missing Phase Report")
 
+    # Stale-artifact detection (Slice 5): stale cited anchors recorded in
+    # hld_change_impact.json block continuation until regenerated/resolved.
+    from . import stale_check
+
+    impact_stale = stale_check.load_stale_anchors(source_dir)
+
     if check_dirty:
         dirty = target_dirty_files(target_root)
         if dirty:
@@ -627,7 +633,7 @@ def session_continue_preflight(
         runskeptic_status=str(report.get("runskeptic_result", gv.RUNSKEPTIC_NOT_RUN) or gv.RUNSKEPTIC_NOT_RUN),
         consultant_status=str(report.get("consultant_result", gv.CONSULTANT_NOT_RUN) or gv.CONSULTANT_NOT_RUN),
         unsupported_claims=list(report.get("unsupported_claims", []) or []),
-        stale_anchors=list(report.get("stale_anchors", []) or []),
+        stale_anchors=sorted(set(report.get("stale_anchors", []) or []) | set(impact_stale)),
         validation_ok=str(report.get("validation_result", "")).upper() == "PASS",
         human_approved=bool(plan.get("approvals", {}).get(gate, False)),
     )

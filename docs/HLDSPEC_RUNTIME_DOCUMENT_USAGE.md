@@ -25,6 +25,7 @@ HLDspec must:
 HLDspec may use these documents as reusable knowledge:
 
 - `docs/SOFTWARE_DESIGN_PRINCIPLES.md`
+- `docs/ENGINEERING_TOOLBOX.md`
 - `docs/BACKEND_TECHNOLOGY_RECOMMENDATION.md`
 - `docs/HLD_TO_TARGET_WORKSPACE.md`
 - `docs/CONSTITUTION_GENERATION.md`
@@ -44,6 +45,7 @@ During a run, HLDspec must use the guidance as follows:
 source resources
   -> target/targetHLD/
   -> select relevant design principles
+  -> select relevant Engineering Toolbox guidance
   -> select backend technology recommendation defaults/upgrades
   -> extract constitution signals
   -> build principle-level constitution update plan
@@ -62,6 +64,9 @@ A correct run should produce or update these artifacts when relevant:
 ```text
 target/.hldspec/design_principles_selection.json
 target/.hldspec/design_principles_selection.md
+target/.hldspec/engineering/selection.json
+target/.hldspec/engineering/decisions.jsonl
+target/.hldspec/source_package/engineering_guidelines.md
 target/.hldspec/backend_technology_recommendation.json
 target/.hldspec/backend_technology_recommendation.md
 target/.hldspec/constitution_signals.json

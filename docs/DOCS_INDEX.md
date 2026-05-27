@@ -14,6 +14,7 @@ These docs are living references. Follow links in CLAUDE.md for session bootstra
 | [`../CLAUDE.md`](../CLAUDE.md) | Session bootstrap — read first every session |
 | [`../TASKS.md`](../TASKS.md) | Living task list — P0/P1/P2 pending work |
 | [`../AGENTS.md`](../AGENTS.md) | Agent bootstrap for HLDspec workflow invocation |
+| [`HLDSPEC_USE_CASES_AND_API.md`](HLDSPEC_USE_CASES_AND_API.md) | Product use-case catalog and rewrite council scenarios used to evaluate whether implementation work covers the real workflows |
 | [`ARCHITECTURE_V2.md`](ARCHITECTURE_V2.md) | V2 architecture: machines, contracts, pipeline |
 | [`CANONICAL_FLOW.md`](CANONICAL_FLOW.md) | Canonical pipeline flow reference |
 | [`HLDSPEC_V2_AGENT_ROLES.md`](HLDSPEC_V2_AGENT_ROLES.md) | Subagent role definitions |
@@ -23,10 +24,12 @@ These docs are living references. Follow links in CLAUDE.md for session bootstra
 | [`JUDGE_LED_REVIEW_PROTOCOL.md`](JUDGE_LED_REVIEW_PROTOCOL.md) | Judge-led human review protocol |
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract |
 | [`CONSTITUTION_RULE_QUALITY.md`](CONSTITUTION_RULE_QUALITY.md) | Constitution rule quality gate |
+| [`AGENT_ARTIFACT_HYGIENE.md`](AGENT_ARTIFACT_HYGIENE.md) | Policy for ad hoc agent-created docs, archive records, scratch output, target artifacts, and cleanup metadata |
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents |
 | [`HLDSPEC_V2_HANDOFF_DOCS.md`](HLDSPEC_V2_HANDOFF_DOCS.md) | Handoff doc specification |
 | [`HLDSPEC_STABILITY_ARCHITECTURE.md`](HLDSPEC_STABILITY_ARCHITECTURE.md) | Stability architecture principles: artifact contracts, ports/adapters, event log, validator plugins |
 | [`BACKEND_TECHNOLOGY_RECOMMENDATION.md`](BACKEND_TECHNOLOGY_RECOMMENDATION.md) | Short approved backend toolbox with defaults, upgrades, and triggers |
+| [`ENGINEERING_TOOLBOX.md`](ENGINEERING_TOOLBOX.md) | Engineering Toolbox terminology, guidance levels, P0 cards, artifact layout, and enforcement loop |
 | [`HLDSPEC_RUNTIME_DOCUMENT_USAGE.md`](HLDSPEC_RUNTIME_DOCUMENT_USAGE.md) | Runtime rules for using guidance docs correctly during HLDspec runs |
 | [`SOFTWARE_DESIGN_PRINCIPLES.md`](SOFTWARE_DESIGN_PRINCIPLES.md) | Reusable software design principles for HLD generation, constitution extraction, spec packages, prompts, RunSkeptic, and cost/context economy |
 | [`HLD_TO_TARGET_WORKSPACE.md`](HLD_TO_TARGET_WORKSPACE.md) | Target workspace model: `target/`, `targetHLD/`, HLD groups, spec packages, dependency order |
