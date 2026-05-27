@@ -15,10 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hldspec import session_control as sc
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
-from hldspec.state_machine import MachineContext
+from hldspec.state_machine import ExitCode, MachineContext
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 SESSION_SCHEMA_VERSION = "1.0"
@@ -471,6 +472,11 @@ def command_start(args: argparse.Namespace) -> int:
     prompt = write_start_prompt(target, manifest)
     tool_manifest = write_tool_manifest(target)
 
+    # Scaffold the session-plan control plane (dry-run): session_plan.json +
+    # bounded subagent packets + runner/consultant prompts + runbook.
+    session_plan = sc.build_session_plan(target, ROOT, backend=sc.DEFAULT_BACKEND)
+    session_artifacts = sc.write_session_artifacts(target, session_plan)
+
     print(f"HLDspec agent session prepared.")
     print(f"Mode: {mode}")
     print(f"Target: {target}")
@@ -478,6 +484,7 @@ def command_start(args: argparse.Namespace) -> int:
     print(f"Tool manifest: {tool_manifest}")
     print(f"Interview answers: {interview_json}")
     print(f"Interview report: {interview_md}")
+    print(f"Session plan: {session_artifacts[sc.SESSION_PLAN_FILE]}")
     print("Next: start an agent session with the prompt above.")
     return 0
 
@@ -567,6 +574,22 @@ def command_review(args: argparse.Namespace) -> int:
 
 def command_continue(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
+
+    # Control-plane gate: when a session plan exists, the gate validator decides
+    # continuation. No plan -> legacy behaviour (run ProjectMachine unchanged).
+    preflight = sc.session_continue_preflight(target)
+    if preflight.gated and not preflight.allowed:
+        print("## Continuation BLOCKED by the control plane")
+        print(f"Gate: {preflight.gate}")
+        print("Blockers:")
+        print_bullet_list(preflight.blockers)
+        print("Next safe action:")
+        print(
+            "Provide a valid Context Receipt + Phase Report, resolve the blockers above "
+            "(RunSkeptic/Consultant/validation/dirty tree), then rerun continue."
+        )
+        return ExitCode.GATE_BLOCKED.value
+
     session = json_read(target / ".hldspec" / "agent_session.json")
     source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
     if not source:
@@ -672,6 +695,32 @@ def command_doctor(args: argparse.Namespace) -> int:
             ok = ok and exists
             if not exists:
                 action_items.append(f"Missing interview file: {path}")
+
+        print("")
+        print("## Control Plane Checks")
+        adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+        plan_path = adapter.source_package_dir / sc.SESSION_PLAN_FILE
+        if plan_path.exists():
+            print(f"OK: {plan_path}")
+            # Structural health: packets present and plan well-formed are ACTION
+            # items. Whether you can continue *right now* (a Phase Report exists,
+            # gates satisfied) is informational, not a workspace-health failure.
+            for rel in ["subagent_packets/basepack_packet.md", "subagent_packets/runner_packet.md", "subagent_packets/consultant_packet.md"]:
+                p = adapter.source_package_dir / rel
+                print(f"{'OK' if p.exists() else 'MISSING'}: {p}")
+                if not p.exists():
+                    action_items.append(f"Missing subagent packet: {p}")
+            plan_data = json_read(plan_path)
+            if not plan_data.get("current_gate"):
+                action_items.append(f"Session plan missing current_gate: {plan_path}")
+            preflight = sc.session_continue_preflight(target)
+            print(f"Continuation gate: {preflight.gate}")
+            print(f"Continuation allowed now: {str(preflight.allowed).lower()}")
+            print("Continuation blockers (informational):")
+            print_bullet_list(preflight.blockers)
+        else:
+            print(f"MISSING: {plan_path}")
+            action_items.append(f"No session plan (run start or hldspec_session_control): {plan_path}")
 
         print("")
         print("## Validation Reports")
