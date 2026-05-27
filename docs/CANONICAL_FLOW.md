@@ -4,7 +4,7 @@
 > [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md). This doc
 > details the pipeline steps; the canonical doc wins on any terminology conflict.
 
-This document defines the current canonical HLDspec flow after the SpecKit ownership correction.
+This document defines the current HLDspec control-flow slice after the SpecKit ownership correction. The full product flow, terminology, ownership boundaries, SpecKit Run Card, Execution Handoff, and Reassessment Point are defined in `HLDSPEC_TERMINOLOGY_AND_FLOW.md`.
 
 ## Core principle
 
@@ -38,7 +38,7 @@ SpecKit owns:
 - implementation phase
 ```
 
-## Canonical flow
+## Current implemented/control flow slice
 
 ```text
 1. Source HLD
@@ -68,6 +68,28 @@ SpecKit owns:
 21. SpecKit tasks
 22. Implement only after explicit approval
 ```
+
+## Full product-flow extension
+
+The complete product flow does not stop at the proxy dossier. After the
+SpecKit prework approval gate, HLDspec must produce a bounded execution
+handoff before an external build/SpecKit agent continues.
+
+```text
+SpecKit prework approval gate
+  -> SpecKit Readiness Judge
+  -> SpecKit Run Card generation
+  -> Execution Handoff to the Build Agent / SpecKit Proxy Junior
+  -> SpecKit-owned phases
+  -> report back
+  -> Reassessment Point
+  -> next safe action or next SpecKit Run Card
+```
+
+The SpecKit Run Card is the operational instruction contract. The proxy dossier
+is only the evidence bundle. If this document and
+`HLDSPEC_TERMINOLOGY_AND_FLOW.md` disagree, the terminology-and-flow document
+wins.
 
 ## Current safe checkpoint after a green plan gate
 
@@ -118,9 +140,10 @@ They are not the controlling checkpoint when SpecKit is available. Their generat
 The controlling handoff is:
 
 ```text
-speckit_invocation_queue.md/json
-speckit_proxy_dossier.md/json
-speckit_prework_quality_review.md/json
+target/prompts/speckit/<package-id>/RUN_CARD.md/json
+target/.hldspec/speckit_invocation_queue.md/json
+target/.hldspec/sync/speckit_proxy_dossier.md/json
+target/.hldspec/sync/speckit_prework_quality_review.md/json
 ```
 
 ## RunSkeptic rule

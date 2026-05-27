@@ -36,14 +36,18 @@ constitution if missing or update required
 
 The proxy must not skip from HLDspec prework directly to implementation.
 
-## Dossier-first rule
+## Run Card and dossier rule
 
-Before invoking SpecKit, HLDspec must generate:
+Before invoking SpecKit, HLDspec must generate the execution handoff and its evidence bundle:
 
 ```text
-.specify/sync/speckit_proxy_dossier.json
-.specify/sync/speckit_proxy_dossier.md
+target/prompts/speckit/<package-id>/RUN_CARD.json
+target/prompts/speckit/<package-id>/RUN_CARD.md
+target/.hldspec/sync/speckit_proxy_dossier.json
+target/.hldspec/sync/speckit_proxy_dossier.md
 ```
+
+Legacy `.specify/sync/speckit_proxy_dossier.*` paths may exist for compatibility, but they are not the canonical HLDspec control-plane location. New HLDspec control artifacts live under `target/.hldspec/`.
 
 The dossier must include:
 
@@ -63,26 +67,27 @@ question-answering policy
 escalation policy
 ```
 
-The proxy must use only the dossier and listed evidence sources unless the judge explicitly expands scope.
+The proxy must use only the SpecKit Run Card, dossier, and listed evidence sources unless the judge explicitly expands scope.
 
 ## Evidence sources
 
 The proxy may inspect:
 
 ```text
-HLD.raw.md
-HLD.md
-.specify/sync/hld_index.md
-.specify/sync/hld_sections/
-.specify/sync/spec_build_plan.json
-.specify/sync/spec_build_plan_review.md
-.specify/sync/speckit_input_manifest.json
-.specify/sync/speckit_invocation_queue.json
-.specify/sync/constitution_update_plan.json
-.specify/sync/feature_dependency_graph.json
-.specify/sync/speckit_prework_quality_review.json
-.specify/memory/constitution.md, if it exists
-existing specs/, if the judge allows existing project context
+target/targetHLD/raw/HLD.raw.md
+target/targetHLD/HLD.md
+target/targetHLD/sections/
+target/.hldspec/sync/hld_index.md
+target/.hldspec/sync/spec_build_plan.json
+target/.hldspec/sync/spec_build_plan_review.md
+target/.hldspec/sync/speckit_input_manifest.json
+target/.hldspec/speckit_invocation_queue.json
+target/.hldspec/constitution_update_plan.json
+target/.hldspec/feature_dependency_graph.json
+target/.hldspec/sync/speckit_prework_quality_review.json
+target/prompts/speckit/<package-id>/RUN_CARD.md
+target/.specify/memory/constitution.md, if it exists
+target/specs/, if the judge allows existing project context
 ```
 
 The proxy may use local bounded search tools:
@@ -104,7 +109,7 @@ When SpecKit asks a question, the proxy must classify it:
 
 ```text
 ANSWER_FROM_EVIDENCE
-ANSWER_FROM_REASONABLE_DEFAULT
+ANSWER_FROM_APPROVED_DEFAULT
 ESCALATE_TO_HUMAN
 ```
 
@@ -122,9 +127,9 @@ confidence: HIGH
 affected artifacts
 ```
 
-### ANSWER_FROM_REASONABLE_DEFAULT
+### ANSWER_FROM_APPROVED_DEFAULT
 
-Use this only when SpecKit itself allows reasonable defaults and the choice does not materially affect architecture, scope, security, data ownership, user experience, or dependency order.
+Use this only when SpecKit itself allows a default, the default is pre-approved or explicitly allowed by the Run Card, and the choice does not materially affect architecture, scope, security, data ownership, user experience, dependency order, source of truth, or implementation approval.
 
 Required log entry:
 
@@ -173,7 +178,7 @@ The proxy should answer clarification questions only when:
 
 ```text
 the answer is already in the HLD/prework dossier
-or the answer is a safe reasonable default
+or the answer is an approved safe default from the Run Card
 or the judge has a prior approved decision
 ```
 
@@ -228,7 +233,7 @@ continue when a blocking RunSkeptic finding remains
 The proxy run is valid when:
 
 ```text
-the selected feature is the active next item in the approved queue
+the selected feature is the active next item in the approved Run Card and queue
 the constitution is approved or safely updated
 SpecKit specify created exactly one feature spec
 clarifications are resolved or escalated

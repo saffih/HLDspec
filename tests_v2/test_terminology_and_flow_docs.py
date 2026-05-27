@@ -56,6 +56,23 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
             "SPECKIT_PROXY_PROTOCOL.md must reference SpecKit Run Card or Execution Handoff",
         )
 
+    def test_canonical_flow_mentions_run_card_and_reassessment(self) -> None:
+        text = _read(DOCS / "CANONICAL_FLOW.md")
+        self.assertIn("SpecKit Run Card", text)
+        self.assertIn("Execution Handoff", text)
+        self.assertIn("Reassessment Point", text)
+
+    def test_speckit_proxy_protocol_uses_canonical_control_plane_paths(self) -> None:
+        text = _read(DOCS / "SPECKIT_PROXY_PROTOCOL.md")
+        self.assertIn("target/.hldspec/sync/speckit_proxy_dossier.json", text)
+        self.assertIn("target/prompts/speckit/<package-id>/RUN_CARD.json", text)
+        self.assertIn("Legacy `.specify/sync/speckit_proxy_dossier.*` paths", text)
+
+    def test_speckit_proxy_protocol_uses_approved_default_policy(self) -> None:
+        text = _read(DOCS / "SPECKIT_PROXY_PROTOCOL.md")
+        self.assertIn("ANSWER_FROM_APPROVED_DEFAULT", text)
+        self.assertNotIn("ANSWER_FROM_REASONABLE_DEFAULT", text)
+
     def test_deprecated_phrase_not_used_as_current_wording(self) -> None:
         # The canonical doc may list "target-spec generation" under deprecated
         # terms, but must never present it as the allowed current flow.
