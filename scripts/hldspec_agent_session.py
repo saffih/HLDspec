@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
+from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
@@ -144,7 +145,6 @@ def ensure_target_dirs(target: Path) -> None:
         ".hldspec",
         ".hldspec/sync",
         ".hldspec/context_packs",
-        ".specify/memory",
         "prompts/agent",
         "prompts/tools",
         "prompts/speckit",
@@ -293,6 +293,9 @@ def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
     agent = session["agent"]
     comment = session.get("comment") or ""
 
+    speckit_plan = session.get("speckit_workspace_init", {})
+    selected_command = speckit_plan.get("selected_command")
+    selected_command_text = " ".join(selected_command) if isinstance(selected_command, list) else "BLOCKED"
     prompt.write_text(
         f"""# HLDspec Agent Session
 
@@ -332,6 +335,8 @@ scripts/hldspec continue --target "{target}"
 Then inspect:
 
 ```text
+{adapter.source_package_dir / 'source_package.json'}
+{adapter.source_package_dir / 'session_plan.json'}
 {adapter.sync_dir / 'spec_build_plan_review.md'}
 {adapter.sync_dir / 'speckit_prework_quality_review.md'}
 {adapter.sync_dir / 'speckit_proxy_dossier.md'}
@@ -342,14 +347,20 @@ Then inspect:
 Generate or refresh target-specific artifacts:
 
 ```text
-target/.hldspec/design_principles_selection.*
-target/.hldspec/backend_technology_recommendation.*
-target/.hldspec/constitution_update_plan.*
-target/.hldspec/spec_packages.*
-target/.hldspec/feature_dependency_graph.*
-target/.hldspec/speckit_invocation_queue.*
+target/.hldspec/source_package/source_package.json
+target/.hldspec/source_package/session_plan.json
+target/.hldspec/source_package/source_manifest.json
+target/.specify/                 (from real SpecKit init only; not hand-authored)
+target/.specify/source/          (generated mirror only)
 target/prompts/
 ```
+
+## SpecKit workspace/init boundary
+
+- Planned init command: `{selected_command_text}`
+- Default mode is dry-run planning only.
+- Execute init only with explicit `--execute`.
+- If SpecKit init is blocked, stop and report the blocker. Do not hand-create `.specify/`, `spec.md`, `plan.md`, `tasks.md`, or other final SpecKit artifacts.
 
 ## Stop condition
 
@@ -420,6 +431,7 @@ def command_start(args: argparse.Namespace) -> int:
 
     ensure_target_dirs(target)
     copy_source(source, target)
+    speckit_init = sw.plan_or_init_workspace(target, execute=bool(args.execute))
 
     timestamp = utc_now()
     manifest = {
@@ -444,6 +456,7 @@ def command_start(args: argparse.Namespace) -> int:
             "start_prompt": str(target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"),
             "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
         },
+        "speckit_workspace_init": speckit_init.metadata(),
         "next_action": "Open prompts/agent/START_HLDSPEC_AGENT.md in an agent session.",
     }
     interview_answers = build_interview_answers(
@@ -477,6 +490,7 @@ def command_start(args: argparse.Namespace) -> int:
     # bounded subagent packets + runner/consultant prompts + runbook. Written
     # first so the content build hashes the runbook/prompts and mirrors them.
     session_plan = sc.build_session_plan(target, ROOT, backend=sc.DEFAULT_BACKEND)
+    session_plan["speckit_workspace_init"] = speckit_init.metadata()
     session_artifacts = sc.write_session_artifacts(target, session_plan)
 
     # Generate the source-package content from the working HLD (real content flow):
@@ -489,6 +503,7 @@ def command_start(args: argparse.Namespace) -> int:
             target,
             working_hld.read_text(encoding="utf-8"),
             hld_source_ref=str(source),
+            materialize_mirror=speckit_init.initialized,
         )
 
     print(f"HLDspec agent session prepared.")
@@ -499,6 +514,15 @@ def command_start(args: argparse.Namespace) -> int:
     print(f"Interview answers: {interview_json}")
     print(f"Interview report: {interview_md}")
     print(f"Session plan: {session_artifacts[sc.SESSION_PLAN_FILE]}")
+    if speckit_init.selected is not None:
+        print(f"SpecKit init command: {' '.join(speckit_init.selected.argv)}")
+    if speckit_init.blocker:
+        print(f"SpecKit init blocker: {speckit_init.blocker}")
+    elif speckit_init.execute:
+        if speckit_init.ok:
+            print(f"SpecKit workspace initialized: {target / '.specify'}")
+        else:
+            print(f"SpecKit init validation: {speckit_init.validation_error or speckit_init.stderr or 'FAILED'}")
     if source_build is not None:
         print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
         if source_build.unsupported_claims:
@@ -677,7 +701,6 @@ def command_doctor(args: argparse.Namespace) -> int:
             "targetHLD/raw/HLD.raw.md",
             ".hldspec",
             ".hldspec/sync",
-            ".specify",
             "prompts/agent",
             "prompts/speckit",
         ]:
@@ -687,6 +710,20 @@ def command_doctor(args: argparse.Namespace) -> int:
             ok = ok and exists
             if not exists:
                 action_items.append(f"Missing target layout path: {path}")
+
+        print("")
+        print("## SpecKit Workspace Checks")
+        speckit_dir = target / ".specify"
+        session = json_read(target / ".hldspec" / "agent_session.json")
+        init_meta = session.get("speckit_workspace_init", {}) if isinstance(session, dict) else {}
+        print(f"{'OK' if speckit_dir.exists() else 'PLANNED'}: {speckit_dir}")
+        if isinstance(init_meta, dict):
+            selected = init_meta.get("selected_command")
+            if isinstance(selected, list) and selected:
+                print(f"Planned init command: {' '.join(str(part) for part in selected)}")
+            blocker = init_meta.get("blocker")
+            if blocker:
+                action_items.append(f"SpecKit init blocker: {blocker}")
 
         print("")
         print("## Session Checks")
@@ -787,6 +824,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--agent", default="manual", choices=["manual", "devin", "claude", "codex"], help="Target agent.")
     p.add_argument("--mode", default="auto", choices=["auto", "create", "update", "upgrade", "adopt", "resume"], help="Intent override.")
     p.add_argument("--comment", default="", help="User intent/comment.")
+    p.add_argument("--execute", action="store_true", help="Run the detected SpecKit init command instead of dry-run planning only.")
     p.set_defaults(func=command_start)
 
     p = sub.add_parser("status", help="Show current HLDspec agent session status.")

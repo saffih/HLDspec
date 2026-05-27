@@ -247,14 +247,15 @@ def build_source_package_content(
     state: str = "SOURCE_PACKAGE_IMPORTED",
     project_name: str = "",
     layout: str = "new",
+    materialize_mirror: bool = True,
 ) -> SourcePackageBuild:
     """Real content flow: turn an HLD into the full source-package content.
 
     Writes HLD.md, HLD.marked.md, hld_reference_map.json,
-    speckit_single_spec_input.md, then the manifest + metadata, then regenerates
-    the .specify/source/ mirror. Returns a structured build result (does not raise
-    on content findings — unsupported claims surface for the gate, matching the
-    SourcePackageValidation pattern).
+    speckit_single_spec_input.md, then the manifest + metadata, then optionally
+    regenerates the .specify/source/ mirror. Returns a structured build result
+    (does not raise on content findings — unsupported claims surface for the
+    gate, matching the SourcePackageValidation pattern).
     """
     # Imported here to avoid an import cycle (those modules import this one).
     from . import hld_marking, single_spec_input
@@ -279,7 +280,9 @@ def build_source_package_content(
 
     write_source_package(source_dir, hld_source_ref=hld_source_ref, state=state)
     validation = validate_source_package(source_dir)
-    mirrored = materialize_specify_mirror(source_dir, adapter.specify_source_mirror_dir)
+    mirrored: list[str] = []
+    if materialize_mirror:
+        mirrored = materialize_specify_mirror(source_dir, adapter.specify_source_mirror_dir)
 
     return SourcePackageBuild(
         source_dir=source_dir,

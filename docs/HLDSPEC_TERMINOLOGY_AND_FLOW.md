@@ -136,10 +136,12 @@ Scripts        = deterministic tools
   package is a bounded unit SpecKit can turn into one useful feature/spec — not a
   heading.
 - **Spec Build Plan** — the plan of planned specs/packages and their quality state.
-- **Feature Dependency Graph** — `target/.hldspec/feature_dependency_graph.{json,md}`:
-  the source of truth for package/build ordering.
-- **SpecKit Invocation Queue** — `target/.hldspec/speckit_invocation_queue.{json,md}`:
-  ordered queue derived from the dependency graph. Graph → queue; never hand-built.
+- **Feature Dependency Graph** — legacy multi-package ordering artifact
+  (`target/.hldspec/feature_dependency_graph.{json,md}`) used only when an
+  explicitly approved multi-package flow requires it. Not a default start output.
+- **SpecKit Invocation Queue** — legacy ordered queue
+  (`target/.hldspec/speckit_invocation_queue.{json,md}`) derived from the legacy
+  graph. Not a default start output.
 - **SpecKit Prework Package** — the evidence/prework bundle for review/approval.
 - **SpecKit Proxy Dossier** — the evidence bundle (facts/approved context/sections/
   constraints) the proxy may use.
@@ -169,9 +171,9 @@ Scripts        = deterministic tools
  9. Scout Agent                scans chunks; flags which specialist reviewers needed
 10. Role review pipeline       Architecture, Product, Governance, optional specialists
 11. Role review summary        combines findings, blockers, conflicts, next safe action
-12. Spec package planning      bite-size SpecKit-ready packages
-13. Feature dependency graph   dependency source of truth
-14. SpecKit invocation queue   derived from the dependency graph
+12. SpecKit workspace init     detect and plan a real `specify/spec-kit/uvx` init
+13. Spec package planning      bite-size SpecKit-ready package(s) when needed
+14. Legacy graph/queue         only for explicitly approved multi-package flows
 15. SpecKit prework package    evidence/prework bundle
 16. RunSkeptic gate            PASS / ACTION / CONFLICT
 17. Human approval gate        stops for human-owned approvals
@@ -254,7 +256,16 @@ required test tools, RunSkeptic trigger conditions, evidence sources, open quest
 stop condition
 ```
 
-Ordering source of truth:
+Default start/output rule:
+
+```text
+HLDspec must plan a real SpecKit workspace init first.
+.specify/ is created only by a detected SpecKit init command.
+HLDspec-authored control artifacts remain under target/.hldspec/source_package/.
+target/.specify/source/ is a generated mirror only.
+```
+
+Legacy ordering source of truth for explicitly approved multi-package flows:
 
 ```text
 Feature Dependency Graph  (target/.hldspec/feature_dependency_graph.*)
