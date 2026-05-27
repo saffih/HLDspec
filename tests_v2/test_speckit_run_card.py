@@ -98,6 +98,11 @@ class SpecKitRunCardTests(unittest.TestCase):
         self.assertIn("PASS", text)
         self.assertIn("ACTION", text)
         self.assertIn("CONFLICT", text)
+        self.assertIn("## Clarification Policy", text)
+        self.assertIn("Resolve clarification questions from approved evidence first", text)
+        self.assertIn("approved evidence is missing", text)
+        self.assertIn("approved evidence is contradictory", text)
+        self.assertIn("human-owned", text)
         self.assertIn("## How to run RunSkeptic", text)
         self.assertIn("~/code/skeptic/skeptic.md", text)
         self.assertIn("GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN", text)
@@ -147,6 +152,26 @@ class SpecKitRunCardTests(unittest.TestCase):
         self.assertIn("## Requires", text)
         self.assertIn("## Ensures", text)
         self.assertIn("## Reassessment Triggers", text)
+
+    def test_run_card_explains_clarification_policy(self) -> None:
+        payload = build_run_card_payload(
+            {
+                "bundle_id": "G01",
+                "bundle_name": "API Bundle 01",
+                "bundle_slug": "g01-api-bundle-01",
+                "dependency_position": 1,
+                "allowed_evidence": [".hldspec/sync/speckit_invocation_queue.json"],
+            },
+            workspace=Path("/tmp/target"),
+            sync=Path("/tmp/target/.hldspec/sync"),
+            approved=True,
+        )
+        text = render_run_card_md(payload)
+        self.assertIn("## Clarification Policy", text)
+        self.assertIn("Clarification questions are not blockers by default.", text)
+        self.assertIn("approved HLDspec evidence", text)
+        self.assertIn("missing, contradictory, or the answer is human-owned", text)
+        self.assertIn("Stop on RunSkeptic ACTION or CONFLICT", text)
 
 
 if __name__ == "__main__":

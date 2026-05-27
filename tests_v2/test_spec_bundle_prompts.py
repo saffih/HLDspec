@@ -55,6 +55,11 @@ class SpecBundlePromptTests(unittest.TestCase):
                 self.assertIn("Implementation", text)
                 self.assertIn("Verification", text)
                 self.assertIn("RunSkeptic", text)
+                self.assertIn("## Clarification Policy", text)
+                self.assertIn("resolve them from approved evidence first", text)
+                self.assertIn("approved evidence is missing", text)
+                self.assertIn("approved evidence is contradictory", text)
+                self.assertIn("human-owned", text)
                 self.assertIn("PASS", text)
                 self.assertIn("ACTION", text)
                 self.assertIn("CONFLICT", text)
@@ -72,6 +77,20 @@ class SpecBundlePromptTests(unittest.TestCase):
     def test_unknown_runtime_fails(self) -> None:
         with self.assertRaises(ValueError):
             render_bundle_prompt(self.make_bundle(), workspace=Path("/tmp/work"), sync=Path("/tmp/work/.specify/sync"), runtime="unknown")
+
+    def test_prompt_explains_clarification_policy(self) -> None:
+        text = render_bundle_prompt(
+            self.make_bundle(),
+            workspace=Path("/tmp/work"),
+            sync=Path("/tmp/work/.hldspec/sync"),
+            runtime="claude",
+        )
+        self.assertEqual([], validate_prompt_text(text))
+        self.assertIn("## Clarification Policy", text)
+        self.assertIn("Clarification questions are not blockers by default.", text)
+        self.assertIn("approved HLDspec evidence", text)
+        self.assertIn("missing, contradictory, or the answer is human-owned", text)
+        self.assertIn("Stop on RunSkeptic ACTION or CONFLICT", text)
 
 
 if __name__ == "__main__":

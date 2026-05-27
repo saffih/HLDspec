@@ -20,6 +20,8 @@ REQUIRED_PROMPT_MARKERS: tuple[str, ...] = (
     "## Runtime and model recommendation",
     "## Subagent orchestration",
     "## SpecKit lifecycle",
+    "## Clarification Policy",
+        "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
     "## RunSkeptic checkpoints",
     "## How to run RunSkeptic",
     "## Human checkpoint rules",
@@ -117,6 +119,21 @@ def _user_checkpoint(prompt_text: str, options: str) -> list[str]:
         "",
     ]
 
+
+
+def clarification_policy_block() -> list[str]:
+    return [
+        "## Clarification Policy",
+        "",
+        "Clarification questions are not blockers by default.",
+        "",
+        "- First answer from approved HLDspec evidence: active HLD sections, Working HLD, spec package map, dependency graph, invocation queue, constitution update plan or approved constitution, role reviews, Run Card, and proxy dossier.",
+        "- If approved evidence clearly answers the question, answer it and continue.",
+        "- If a pre-approved default is safe and reversible and does not affect architecture, source of truth, security/privacy, data ownership, dependency order, feature scope, constitution rules, user-visible behavior, or implementation approval, answer it and continue.",
+        "- Escalate to the human only when approved evidence is missing, contradictory, or the answer is human-owned.",
+        "- Stop on RunSkeptic ACTION or CONFLICT.",
+        "",
+    ]
 
 # Phase-specific RunSkeptic scan content (what to actually inspect).
 RUNSKEPTIC_SCAN: dict[str, tuple[str, ...]] = {
@@ -286,6 +303,16 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "- Control returns to the orchestrator after every phase and before every human checkpoint.",
         "- Do not let subagents continue into the next phase without explicit orchestrator handoff.",
         "",
+
+        '## Clarification Policy',
+        '',
+        'Clarification is not a stop by default.',
+        "If RunSkeptic returns ACTION or CONFLICT, stop even if the clarification appears answerable.",
+        'If SpecKit asks clarification questions, resolve them from approved evidence first.',
+        "Answer and continue when the answer is directly supported by this bundle's approved HLDspec evidence or by an approved safe default.",
+        'Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.',
+        'Human-owned clarification includes architecture boundary, source of truth, constitution rule, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, and implementation approval.',
+        '',
         "## Where to find answers",
         "",
         "When SpecKit asks a question, resolve it in this order before escalating:",
@@ -296,6 +323,7 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "- prior clarify answers: run `lookup_speckit_clarify_answer.py` against the dossier",
         "- if no evidence exists: escalate to the user; do not invent an answer.",
         "",
+        *clarification_policy_block(),
         "## Constitution preflight",
         "",
         f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')}",
@@ -361,6 +389,13 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         ]
 
     lines += [
+        "## Clarification Policy",
+        "",
+        "Clarification is not a stop by default.",
+        "Resolve clarification questions from approved evidence first.",
+        "When SpecKit asks clarification questions, resolve them from approved evidence first.",
+        "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
+        "",
         "## RunSkeptic checkpoints",
         "",
         *_lines([str(item) for item in as_list(bundle.get("runskeptic_checkpoints"))]),
@@ -430,6 +465,14 @@ def validate_prompt_text(text: str) -> list[str]:
             errors.append(f"missing lifecycle term: {required}")
     if not all(status in text for status in ("PASS", "ACTION", "CONFLICT")):
         errors.append("prompt must include PASS/ACTION/CONFLICT statuses")
+    for required in (
+        "## Clarification Policy",
+        "Clarification questions are not blockers by default.",
+        "approved HLDspec evidence",
+        "missing, contradictory, or the answer is human-owned",
+    ):
+        if required not in text:
+            errors.append(f"missing clarification policy content: {required}")
     return errors
 
 

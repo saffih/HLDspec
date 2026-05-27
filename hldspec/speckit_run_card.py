@@ -36,6 +36,8 @@ REQUIRED_MD_SECTIONS = (
     "## Forbidden Actions",
     "## Required SpecKit Sequence",
     "## Question Answering Policy",
+    "## Clarification Policy",
+        "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
     "## Required Subagents / Reviewers",
     "## RunSkeptic Checkpoints",
     "## How to run RunSkeptic",
@@ -416,6 +418,21 @@ def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") 
         "If the framework file is unavailable, do not claim full RunSkeptic compliance. Use this embedded fallback and report: `RunSkeptic source: embedded fallback`; `Confidence: lower than full framework review`; `Missing evidence: actual skeptic.md was unavailable`.",
     ]
 
+
+def clarification_policy_block() -> list[str]:
+    return [
+        "## Clarification Policy",
+        "",
+        "Clarification questions are not blockers by default.",
+        "",
+        "- First answer from approved HLDspec evidence: active HLD sections, Working HLD, spec package map, dependency graph, invocation queue, constitution update plan or approved constitution, role reviews, Run Card, and proxy dossier.",
+        "- If approved evidence clearly answers the question, answer it and continue.",
+        "- If a pre-approved default is safe and reversible and does not affect architecture, source of truth, security/privacy, data ownership, dependency order, feature scope, constitution rules, user-visible behavior, or implementation approval, answer it and continue.",
+        "- Escalate to the human only when approved evidence is missing, contradictory, or the answer is human-owned.",
+        "- Stop on RunSkeptic ACTION or CONFLICT.",
+        "",
+    ]
+
 def render_run_card_md(payload: dict[str, Any]) -> str:
     errors = validate_run_card_payload(payload)
     if errors:
@@ -473,9 +490,27 @@ def render_run_card_md(payload: dict[str, Any]) -> str:
         "- **ANSWER_FROM_APPROVED_DEFAULT**: only safe, reversible defaults outside human-owned decision areas.",
         "- **ESCALATE_TO_HUMAN**: required for architecture, source of truth, constitution, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, or implementation approval.",
         "",
+        *clarification_policy_block(),
+
+        '## Clarification Policy',
+        '',
+        'Clarification is not a stop by default.',
+        "If RunSkeptic returns ACTION or CONFLICT, stop even if the clarification appears answerable.",
+        'If SpecKit asks clarification questions, resolve them from approved evidence first.',
+        'Answer and continue when the answer is directly supported by approved HLDspec evidence or by an approved safe default.',
+        'Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.',
+        'Human-owned clarification includes architecture boundary, source of truth, constitution rule, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, and implementation approval.',
+        '',
         "## Required Subagents / Reviewers",
         "",
         *_bullet([str(item) for item in as_list(payload.get("subagents"))]),
+        "",
+        "## Clarification Policy",
+        "",
+        "Clarification is not a stop by default.",
+        "Resolve clarification questions from approved evidence first.",
+        "When SpecKit asks clarification questions, resolve them from approved evidence first.",
+        "Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.",
         "",
         "## RunSkeptic Checkpoints",
         "",

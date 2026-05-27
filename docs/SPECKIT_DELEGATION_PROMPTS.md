@@ -106,15 +106,47 @@ Allowed evidence should be bounded to:
 - proxy dossier
 - relevant existing SpecKit artifacts
 
-## Question-answering policy
+## Question-answering and clarification policy
 
-When SpecKit asks a question, the agent must classify it as:
+When SpecKit asks a question, the receiving agent must not stop by default.
+It must first try to answer from the approved HLDspec evidence already included in
+or referenced by the prompt / Run Card.
+
+Every question is classified as:
 
 ```text
 ANSWER_FROM_EVIDENCE
 ANSWER_FROM_APPROVED_DEFAULT
 ESCALATE_TO_HUMAN
 ```
+
+### ANSWER_FROM_EVIDENCE
+
+Use when the answer is directly supported by approved evidence such as:
+
+- active HLD sections
+- working HLD
+- spec package map
+- dependency graph
+- invocation queue
+- constitution update plan or approved constitution
+- role reviews
+- proxy dossier
+- Run Card
+
+If the evidence clearly answers the question, answer it and continue.
+Record the evidence path or section used.
+
+### ANSWER_FROM_APPROVED_DEFAULT
+
+Use only for safe, reversible defaults that do not affect architecture, source of
+truth, security/privacy, data ownership, dependency order, feature split/merge,
+user-visible scope, constitution rules, or implementation approval.
+
+### ESCALATE_TO_HUMAN
+
+Stop and escalate only when the question exposes a real gap, contradiction, or
+human-owned decision.
 
 Escalate questions that affect:
 
@@ -128,6 +160,38 @@ Escalate questions that affect:
 - dependency order
 - feature split or merge
 - implementation approval
+
+Stop conditions for clarification:
+
+- the approved HLD/prework evidence does not answer it
+- approved evidence is contradictory
+- the answer would change architecture boundaries
+- the answer would choose or change a source of truth
+- the answer affects API contract, data ownership, security/privacy, dependency
+  order, feature split/merge, user-visible scope, constitution rules, or
+  implementation approval
+- RunSkeptic returns ACTION or CONFLICT
+
+## Clarification Policy
+
+- Resolve clarification questions from approved evidence first.
+- When SpecKit asks clarification questions, resolve them from approved evidence first.
+
+Clarification is not a stop by default.
+
+If SpecKit asks clarification questions, resolve them from approved evidence first.
+
+Stop only when approved evidence is missing, approved evidence is contradictory, or the question requires a human-owned decision.
+
+If RunSkeptic returns ACTION or CONFLICT, stop even if the clarification appears answerable.
+
+The receiving agent must first try to answer from approved HLDspec evidence: the active HLD sections, Working HLD, spec package map, dependency graph, invocation queue, constitution update plan or approved constitution, role reviews, Run Card, proxy dossier, and relevant existing SpecKit artifacts.
+
+The agent should answer and continue when the answer is directly supported by approved evidence or by an approved safe default.
+
+The agent must stop and escalate only when approved evidence is missing, approved evidence is contradictory, the answer would decide a human-owned issue, or RunSkeptic returns ACTION or CONFLICT.
+
+Human-owned clarification includes architecture boundary, source of truth, constitution rule, API contract, security/privacy, data ownership, user-visible scope, dependency order, feature split/merge, and implementation approval.
 
 ## RunSkeptic instructions
 
