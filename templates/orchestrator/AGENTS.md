@@ -55,6 +55,12 @@ ownership, dependency, security, rollout, split/merge, or promotion decisions.
 
 Process specs in order. Complete **specify → clarify when needed → plan → tasks
 → analyze** before moving to implementation or the next controlling gate.
+Before any SpecKit phase, the junior must read `.specify/source/HLD.md`,
+`.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`,
+and any slice-control files mirrored under `.specify/source/`. Complete one full
+specify -> plan -> tasks -> analyze sequence before implementation. During
+implementation, execute only the selected approved slice/task IDs and stop.
+
 
 Optional tmux is a convenience surface only. If used, launch it from the
 generated runbook/session plan so sessions are named `hldspec-<target>-<gate>`,

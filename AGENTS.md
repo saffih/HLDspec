@@ -45,6 +45,8 @@ HLDspec HLD: /Users/saffi/code/flow/flow-hld.md create /Users/saffi/code/flowHld
 - HLDspec must use SpecKit instead of reimplementing SpecKit.
 - Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, `.specify/source/implementation_slices.json`, and `.specify/source/slice_test_policy.md`; use one full specify/plan/tasks/analyze cycle, then implement only the explicitly selected slice unless full implementation is approved.
 - Invoke SpecKit only via the proxy script after SPECKIT_PREWORK_APPROVAL_GATE is passed and prework is APPROVED.
+- Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, and any slice-control files mirrored under `.specify/source/`. Run one complete specify -> plan -> tasks -> analyze sequence, then implement only selected approved slice/task IDs.
+
 - Do not create final specs manually.
 - Do not implement.
 - Do not answer human checkpoint questions silently.

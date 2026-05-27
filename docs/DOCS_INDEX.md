@@ -21,6 +21,8 @@ These docs are living references. Follow links in AGENTS.md for session bootstra
 | [`REFACTOR_PROGRAM.md`](REFACTOR_PROGRAM.md) | Refactor program: completed / in-progress / outstanding |
 | [`TEST_STRATEGY_V2.md`](TEST_STRATEGY_V2.md) | Test strategy and conventions |
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec ↔ SpecKit handoff protocol |
+| [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical model for one full SpecKit plan/task graph with slice-controlled implementation |
+
 | [`JUDGE_LED_REVIEW_PROTOCOL.md`](JUDGE_LED_REVIEW_PROTOCOL.md) | Judge-led human review protocol |
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract |
 | [`CONSTITUTION_RULE_QUALITY.md`](CONSTITUTION_RULE_QUALITY.md) | Constitution rule quality gate |

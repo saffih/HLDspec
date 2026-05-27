@@ -36,6 +36,42 @@ constitution if missing or update required
 
 The proxy must not skip from HLDspec prework directly to implementation.
 
+## Slice-controlled implementation
+
+The proxy must run complete-product SpecKit phases before implementation:
+
+```text
+one /speckit.specify
+one /speckit.plan
+one /speckit.tasks
+one /speckit.analyze
+```
+
+After analyze, implementation is controlled by HLDspec slice selection. The proxy
+must not invoke raw all-task implementation by default.
+
+Each implementation invocation must include:
+
+```text
+selected slice
+allowed task IDs
+allowed files
+forbidden files
+HLD anchors in scope
+deferred anchors
+focused tests
+prior-slice regression tests
+phase report path
+anchor coverage update
+stop condition
+```
+
+The proxy must stop if the selected slice is unclear, a task lacks HLD anchors,
+required evidence is missing, tests fail, files outside the approved scope change,
+or a human-owned decision appears.
+
+See `docs/SPECKIT_SLICE_CONTROL.md`.
+
 ## Run Card and dossier rule
 
 Before invoking SpecKit, HLDspec must generate the execution handoff and its evidence bundle:

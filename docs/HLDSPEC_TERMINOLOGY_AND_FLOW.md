@@ -358,6 +358,46 @@ Required SpecKit sequence inside the Run Card:
 6. /speckit.analyze if required.
 7. Implement only after explicit implementation approval.
 ```
+### Slice-controlled SpecKit implementation
+
+HLDspec does not split the HLD into partial specs to make implementation smaller.
+The HLD remains the complete product source of truth.
+
+The default SpecKit execution model is:
+
+```text
+one full HLD source package
+-> one /speckit.specify
+-> one /speckit.plan
+-> one /speckit.tasks
+-> one /speckit.analyze
+-> many approved implementation slices
+```
+
+Implementation slices are execution scopes, not separate product-truth documents.
+
+Canonical slices:
+
+```text
+FOUNDATION
+WALKING_SKELETON
+DOMAIN_MODEL
+CONTRACTS
+BUSINESS_LOGIC
+PERSISTENCE
+API
+CLI
+UI
+INTEGRATION_HARDENING
+```
+
+Each implementation slice must name selected task IDs, allowed files, forbidden files,
+HLD anchors in scope, deferred anchors, focused tests, prior-slice regression tests,
+a report contract, and a stop condition.
+
+No raw all-task implementation is allowed unless explicitly approved by the current
+gate and human owner when required.
+
 
 Question-answering policy — every SpecKit question is classified as:
 

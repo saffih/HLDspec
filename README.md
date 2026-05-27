@@ -1,582 +1,163 @@
-# HLD Spec Kit tools
+# HLDspec
 
-Tools for turning one large HLD into native Spec Kit artifacts and continuing downstream toward implementation closure.
+HLDspec is an agent-first control layer for turning one full HLD into a controlled SpecKit workflow.
 
-## Install
+HLDspec does not replace SpecKit. HLDspec preserves product truth, prepares evidence, validates source references, gates decisions, and hands SpecKit bounded work. SpecKit owns the final specs, plans, tasks, and implementation artifacts.
 
-```bash
-chmod +x hld_spec_sync.py
-chmod +x hld_spec_downstream.py
-```
-
-## Operating rules, terminology, and target constitution
-
-HLDspec operating rules live in [AGENTS.md](AGENTS.md).
-
-Canonical names are defined in [TERMINOLOGY.md](TERMINOLOGY.md).
-
-Important distinction:
-
-- HLDspec repo operating rules are not `.specify/memory/constitution.md`.
-- `.specify/memory/constitution.md` is the target Spec Kit Constitution inside the workspace being processed.
-- `hld_spec_sync.py` should create, update, leave unchanged, or report conflict for the target Spec Kit Constitution during sync.
-
-Key rules:
-
-- HLDspec uses the real Skeptic Framework from `https://github.com/saffih/skeptic/blob/main/skeptic.md`.
-- A RunSkeptic review is HLDspec's operational use of the real Skeptic flow on selected Key Aspects.
-- HLD Sections are design source units, not specs.
-- Specs are capability units.
-- Specs must be planned bottom-up with a Spec Build Plan before multi-spec work.
-- Coverage Gates and Integration Gates are required before downstream work.
-- API contracts, performance, memory, dependencies, data/state ownership, and reliability are first-class Key Aspects when relevant.
-
-
-## First read-only run
-
-To test a real HLD through the current safe cycle:
-
-```bash
-bash scripts/first_run_readonly.sh /path/to/HLD.md
-```
-
-This runs HLD format report, HLD map, Spec Build Plan, Plan Quality Gate, and Spec Build Plan Review. It does not call an agent, create specs, or create the target Spec Kit Constitution.
-
-See [docs/FIRST_RUN.md](docs/FIRST_RUN.md).
-
-
-## Target-spec context rule
-
-A target spec is designed from the Spec Build Plan plus explicitly related full HLD Sections.
-
-Do not assume one HLD Section becomes one spec. Do not generate a spec from summaries or Section Cards alone. Section Cards, if introduced later, are routing/context-control aids only.
-
-See [docs/TARGET_SPEC_CONTEXT.md](docs/TARGET_SPEC_CONTEXT.md).
-
-
-## HLD input format
-
-For large HLDs, prefer one canonical `HLD.md` with stable, grepable section metadata instead of many manually maintained HLD source files.
-
-Recommended section format:
-
-```md
-## HLD-003 - Sync Engine
-
-HLD-ID: HLD-003
-HLD-ROLE: processing
-HLD-STATUS: active
-HLD-RISK: HIGH
-HLD-SPECS: 001,002
-HLD-RESOURCES: hld_spec_sync.py,.specify/memory/constitution.md,specs/*/spec.md
-HLD-VERIFY: related specs preserve HLD anchors; feature graph includes dependencies
-```
-
-Use inline references for section relationships:
-
-```md
-This section DEPENDS REF HLD-002 because source-of-truth rules define what may be generated.
-This section REF HLD-006 for rollback behavior.
-```
-
-This is a short excerpt; a complete HLD defines referenced sections or marks unknown references as `TBD` nearby.
-
-See:
-
-- [HLD_FORMAT.md](HLD_FORMAT.md) for the HLD section format and grep/reference rules.
-- [HLD_GENERATION.md](HLD_GENERATION.md) for a reusable prompt to create HLDs in this format.
-- [HLD_DOCS_JUDGE_WORKFLOW.md](HLD_DOCS_JUDGE_WORKFLOW.md) for an optional Skeptic-derived Judge workflow for documentation-project HLDs.
-
-## Agent usage
-
-For agent-facing repository instructions, see [AGENTS.md](AGENTS.md).
-
-Agents should use the wrapper scripts instead of manually editing generated Spec Kit artifacts.
-## Safe default for limited agents and large/raw HLDs
-
-For limited agents, simulator-style work, or any large/raw HLD, the default entrypoint is:
+## Current model
 
 ```text
-docs/LIMITED_AGENT_RUN_CARD.md
-docs/SIMULATOR_AGENT_PROMPT.md
-scripts/first_run_readonly.sh
+One full HLD
+-> one HLDspec source package
+-> one SpecKit workspace
+-> one complete specify -> plan -> tasks -> analyze sequence
+-> many approved implementation slices
 ```
 
-Do **not** start with full sync, `--target-hld`, downstream planning, or implementation commands.
+The HLD is not split into partial source-truth documents. The full HLD remains the product source of truth. Slicing controls implementation scope, not product truth.
 
-Safe order:
+## Ownership boundaries
+
+HLDspec owns:
 
 ```text
-first_run_readonly.sh
--> if raw, convert HLD.md in chunks
--> rerun first_run_readonly.sh
--> review spec_build_plan_review.md
--> stop on DECOMPOSE / CONFLICT / SPLIT_PLANNED_SPEC / RESOLVE_CONFLICT
--> only then consider bounded downstream analysis
+.hldspec/
+.hldspec/source_package/
 ```
 
-The full sync and downstream commands below are advanced/controlled workflows. Use them only after the first-run review is accepted or when explicitly requested by the human.
-
-
-## Sync script
-
-`hld_spec_sync.py` syncs one large HLD into a Spec Kit-native constitution, feature specs, sync index, graph, and reports.
-
-The sync script only accepts `WRITE FILE` targets for `.specify/memory/constitution.md`, `.specify/sync/**`, and `specs/<NNN-feature-slug>/spec.md`. Agent output that tries to write implementation files or protected paths fails the run.
-
-## Default Devin run
-
-```bash
-./hld_spec_sync.py --hld ./hld.md
-```
-
-The default agent is Devin, and its default model is `swe-1.6`.
-
-## Greenfield
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --mode greenfield
-```
-
-Greenfield compares the HLD desired state against an empty current state.
-
-## Brownfield
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --mode brownfield
-```
-
-Brownfield compares the HLD desired state against existing constitution, native Spec Kit specs, and `.specify/sync/` metadata.
-
-## Auto mode
-
-```bash
-./hld_spec_sync.py --hld ./hld.md
-```
-
-Auto mode uses brownfield if `specs/*/spec.md` exists, otherwise greenfield.
-
-## Layout contract
-
-Generated feature specs are native Spec Kit specs and live in the standard Spec Kit feature directory:
+SpecKit owns:
 
 ```text
-specs/<NNN-feature-slug>/spec.md
+.specify/
+specs/
+implementation artifacts
 ```
 
-HLD sync metadata is kept out of `specs/` so the `specs/` directory remains compatible with Spec Kit workflows:
+HLDspec may mirror selected source-package files into:
 
 ```text
-.specify/sync/
+.specify/source/
 ```
 
-## Agent choices
+`.specify/source/` is generated read-only context for SpecKit. It is not the source of truth.
 
-```bash
-./hld_spec_sync.py --hld ./hld.md --agent devin
-./hld_spec_sync.py --hld ./hld.md --agent claude
-./hld_spec_sync.py --hld ./hld.md --agent codex
-```
+## Source package
 
-Default models by agent:
+The source package is the HLDspec-owned handoff bundle. It contains the full HLD, stable HLD anchors, the HLD reference map, the single SpecKit input, and execution-control policy.
+
+Key source-package artifacts include:
 
 ```text
-devin  -> swe-1.6
-claude -> opus-4.6
-codex  -> gpt-5.5
-custom -> no default model
+.hldspec/source_package/HLD.md
+.hldspec/source_package/HLD.marked.md
+.hldspec/source_package/hld_reference_map.json
+.hldspec/source_package/speckit_single_spec_input.md
 ```
 
-Use `--model` to override the selected agent default:
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --agent codex --model gpt-5.5
-```
-
-## Custom agent
-
-```bash
-./hld_spec_sync.py \
-  --hld ./hld.md \
-  --agent custom \
-  --agent-command 'my-agent --prompt-file {prompt_file} --model {model}'
-```
-
-## Runner choice
-
-Devin runs through a PTY-backed `pexpect` runner by default because some agent CLIs expect a terminal.
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --agent devin --runner pexpect
-./hld_spec_sync.py --hld ./hld.md --agent devin --runner subprocess
-```
-
-## Analyze only
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --analyze-only
-```
-
-## Report only
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --report-only
-```
-
-## Prompt only
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --prompt-only
-```
-
-## HLD format report
-
-For an existing large or raw HLD that is not yet in HLDspec format, generate a read-only conversion report:
-
-```bash
-./hld_spec_sync.py --hld HLD.md --hld-format-report
-```
-
-This does not call an agent, modify `HLD.md`, or write specs. It writes:
+Generated mirrors may appear under:
 
 ```text
-logs/hld_spec_sync/<timestamp>/hld_format_report.md
-logs/hld_spec_sync/<timestamp>/suggested_hld_sections.json
+.specify/source/
 ```
 
-Use this before `--hld-map-only` when the HLD does not yet contain stable `## HLD-xxx - Title` sections.
+## SpecKit sequence
 
-
-## HLD map mode
-
-Generate and validate an HLD section map without calling an agent:
-
-```bash
-./hld_spec_sync.py --hld HLD.md --hld-map-only
-```
-
-Map-aware sync can target one HLD section and build a bounded prompt from that section plus required references instead of loading the full HLD:
-
-```bash
-./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --prompt-only
-./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003
-./hld_spec_sync.py --hld HLD.md --use-hld-map --target-hld HLD-003 --resume
-```
-
-Generated map artifacts:
+HLDspec instructs the SpecKit proxy to run the full SpecKit sequence before implementation:
 
 ```text
-.specify/sync/hld_ref_map.json
-.specify/sync/hld_index.md
-.specify/sync/hld_sections/<section-id>.md
+1. /speckit.specify
+2. /speckit.clarify, if needed
+3. /speckit.plan
+4. /speckit.tasks
+5. /speckit.analyze
+6. /speckit.implement only after explicit approval
 ```
 
-Map-aware runs also write:
+The specify, plan, tasks, and analyze phases are complete-product phases. They are not run separately for infrastructure, business logic, API, CLI, or UI.
+
+## Slice-controlled implementation
+
+Implementation is controlled slice by slice after the complete SpecKit task graph exists.
+
+Canonical slices:
 
 ```text
-logs/hld_spec_sync/<timestamp>/context_selection.json
-.specify/sync/staged/<run-id>/proposed_writes.md
-.specify/sync/staged/<run-id>/write_manifest.json
-.specify/sync/chunks/run_state.json
+FOUNDATION
+WALKING_SKELETON
+DOMAIN_MODEL
+CONTRACTS
+BUSINESS_LOGIC
+PERSISTENCE
+API
+CLI
+UI
+INTEGRATION_HARDENING
 ```
 
-The staged writes are created after WRITE FILE target validation and before final apply.
-Use `--restart-map-run` to clear map-aware run state before rerunning a target.
-
-### Resume support
-
-`--resume` and `--restart-map-run` currently apply to `hld_spec_sync.py` map-aware target runs only.
-
-Downstream map-aware runs do not yet support resume. Re-run downstream phases explicitly with `--target-hld` and/or `--target`.
-
-Future downstream resume should include the phase, target HLD section, target specs, implementation roots, and input hashes in the run-state key.
-
-## Skeptic mode
-
-Use `--skeptic` to bake the Skeptic framework into the sync run. The agent must apply the flow from [`skeptic.md`](https://github.com/saffih/skeptic/blob/main/skeptic.md), close safe HLD/spec/constitution gaps, and write:
+Each implementation pass must name:
 
 ```text
-.specify/sync/skeptic_report.md
-.specify/sync/skeptic_conflicts.json
+selected slice
+allowed task IDs
+allowed files
+forbidden files
+HLD anchors in scope
+deferred anchors
+focused tests
+prior-slice regression tests
+stop condition
+report format
 ```
 
-If unresolved conflicts remain, the script exits with code `2` after applying only allowed safe fixes. The JSON conflict file is the human-in-the-loop handoff.
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --skeptic --agent codex
-```
-
-## Agent timeout
-
-```bash
-./hld_spec_sync.py --hld ./hld.md --agent-timeout-seconds 900
-```
-
-## Sync outputs
-
-```text
-.specify/memory/constitution.md
-specs/<NNN-feature-slug>/spec.md
-.specify/sync/spec_index.json
-.specify/sync/feature_graph.json
-.specify/sync/sync_report.md
-.specify/sync/analyze_report.md
-.specify/sync/missing_report.json
-.specify/sync/duplicate_report.json
-.specify/sync/drift_report.json
-.specify/sync/constitution_change_report.md
-logs/hld_spec_sync/<timestamp>/
-```
-
-## Downstream script
-
-Do not run downstream planning, tasks, or implementation from raw-HLD assumptions.
-
-For large/raw HLDs and limited-agent runs, downstream work must wait until:
-
-```text
-HLD is converted
-first-run Spec Build Plan Review is accepted
-relevant plan/spec boundary is clear
-downstream analysis is bounded by accepted scope
-```
-
-`downstream_analysis.md` is a bounded downstream artifact, not a first-run artifact.
-
-`hld_spec_downstream.py` continues after sync. It reads the HLD, constitution, native Spec Kit specs, and `.specify/sync/` reports, then drives downstream closure work:
-
-- gap analysis
-- gap closure plan
-- Spec Kit planning artifacts
-- task generation
-- implementation closure report
-- optional implementation file writes
-
-Default downstream mode is planning-safe. It refuses implementation file writes unless `--allow-implementation` is set.
-When implementation writes are allowed, at least one `--implementation-root` is required and protected paths such as `.git/`, `.agents/`, `.codex/`, `logs/`, and `.speckit*` remain forbidden.
-Downstream writes are also phase-scoped: `analyze` writes downstream reports, `plan` writes planning artifacts, `tasks` writes `tasks.md`, and `implement` writes the closure report plus explicitly allowed implementation roots.
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --agent codex
-```
-
-### Downstream context guard
-
-By default, `hld_spec_downstream.py` refuses to build an unbounded downstream prompt when `--use-hld-map` is not used and `--max-hld-chars` is `0`.
-
-Use one of these explicit choices:
-
-```bash
-# Preferred bounded HLD-map context
-./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase analyze --prompt-only
-
-# Explicit character bound
-./hld_spec_downstream.py --hld HLD.md --max-hld-chars 30000 --phase analyze --prompt-only
-
-# Explicit full-HLD override, only with human approval
-./hld_spec_downstream.py --hld HLD.md --allow-full-hld-context --phase analyze --prompt-only
-```
-
-Run only analysis:
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --phase analyze --agent codex
-```
-
-Target one or more specs:
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --target 006 --target 009 --agent codex
-```
-
-Allow implementation writes when you are ready to close code gaps:
-
-```bash
-./hld_spec_downstream.py \
-  --hld ./hld.md \
-  --phase implement \
-  --allow-implementation \
-  --implementation-root src \
-  --agent codex
-```
-
-Set an agent timeout:
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --agent-timeout-seconds 900 --agent codex
-```
-
-Run downstream with Skeptic gap closure:
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --phase all --skeptic --agent codex
-```
-
-With implementation fixes:
-
-```bash
-./hld_spec_downstream.py \
-  --hld ./hld.md \
-  --phase implement \
-  --skeptic \
-  --allow-implementation \
-  --implementation-root src \
-  --agent codex
-```
-
-Downstream Skeptic mode writes:
-
-```text
-.specify/sync/downstream/skeptic_report.md
-.specify/sync/downstream/skeptic_conflicts.json
-```
-
-If unresolved conflicts remain, downstream also exits with code `2` and leaves the conflict JSON as the human decision queue.
-
-Prompt only:
-
-```bash
-./hld_spec_downstream.py --hld ./hld.md --prompt-only --agent codex
-```
-
-Map-aware downstream processing can target one HLD section and include only that section, required refs, normal refs within depth, mapped specs, and relevant downstream artifacts:
-
-```bash
-./hld_spec_downstream.py --hld HLD.md --hld-map-only
-./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase plan --prompt-only
-./hld_spec_downstream.py --hld HLD.md --use-hld-map --target-hld HLD-007 --phase plan
-```
-
-`--target-hld` and `--target` may be combined only when `--target` matches the section's `HLD-SPECS` mapping.
-
-Map-aware downstream writes are staged and validated in a temporary workspace before they are applied to the real workspace.
-
-### Resume support
-
-`--resume` and `--restart-map-run` currently apply to `hld_spec_sync.py` map-aware target runs only.
-
-Downstream map-aware runs should be rerun explicitly with `--target-hld`, `--target`, and `--phase`.
-
-Future downstream resume must include phase, target HLD section, target specs, implementation roots, and input hashes.
-
-## Downstream outputs
-
-```text
-.specify/sync/downstream/downstream_analysis.md
-.specify/sync/downstream/gap_closure_plan.md
-.specify/sync/downstream/implementation_closure_report.md
-specs/<NNN-feature-slug>/plan.md
-specs/<NNN-feature-slug>/research.md
-specs/<NNN-feature-slug>/data-model.md
-specs/<NNN-feature-slug>/quickstart.md
-specs/<NNN-feature-slug>/contracts/
-specs/<NNN-feature-slug>/tasks.md
-logs/hld_spec_downstream/<timestamp>/
-```
-
-## Tests
-
-```bash
-PYTHONPYCACHEPREFIX=/private/tmp/codex_pycache python3 -m unittest discover -s tests -v
-```
-
-## Chunked judge/subagent protocol
-
-For large HLDs and limited agents, use the simple chunked judge/subagent model:
-
-```text
-proper chunks
-+ bounded subagent briefs
-+ judge/orchestrator review
-+ human-in-loop stop points
-```
-
-Start with:
-
-```text
-docs/LIMITED_AGENT_RUN_CARD.md
-docs/CHUNKED_AGENT_PROTOCOL.md
-```
-
-
-## Limited agent run card
-
-For agents with limited context/capacity, start with:
-
-```text
-docs/LIMITED_AGENT_RUN_CARD.md
-```
-
-For the simulator project, use:
-
-```text
-docs/SIMULATOR_AGENT_PROMPT.md
-```
-
-
-
-## Context budget
-
-Large HLDs should be processed with bounded context.
-
-Local scripts may read whole files. Agents should use bounded extraction (`grep`, `rg`, `sed -n`, `awk`, etc.), batch conversion, and human-in-loop reporting instead of loading or rewriting a whole HLD in one hidden pass.
-
-See [docs/CONTEXT_BUDGET.md](docs/CONTEXT_BUDGET.md).
-
-
-## External agent prompt
-
-When using an agent from another project directory, use:
-
-```text
-docs/EXTERNAL_AGENT_PROMPT.md
-```
-
-The protocol is human-in-the-loop: the agent explains what it sees, what it plans to do, the command or edit it will use, what happened, and where the human must decide.
-
-## RunSkeptic meta-review
-
-Run a broad HLDspec self-review after workflow changes:
-
-```bash
-python3 scripts/run_skeptic_meta_review.py --repo . --output-dir .hldspec-meta-review
-```
-
-## Convert a raw HLD to HLDspec format
-
-```bash
-python3 scripts/convert_hld_to_hldspec.py ./Flow-System-HLD.md --default-flow-splits
-```
-
-This writes a separate converted file and conversion index. It does not modify the source HLD unless an explicit output path points to the source and `--overwrite` is used.
-
-## HLDspec use cases and simple API
+No raw all-task implementation is allowed unless explicitly approved.
 
 See:
 
 ```text
-docs/HLDSPEC_USE_CASES_AND_API.md
+docs/SPECKIT_SLICE_CONTROL.md
 ```
 
-This document defines the simple judge/orchestrator scenarios, command API, artifact API, and classification rules for context-only versus buildable sections.
+## Testing and gates
 
-## Agent-first usage
+A slice is complete only when:
 
-HLDspec is agent-first.
-
-The normal user workflow is to start an HLDspec agent session. Scripts are tools for the agent, not the primary user interface.
-
-```bash
-scripts/hldspec start --source ./HLD.md --target ./target
-scripts/hldspec status --target ./target
-scripts/hldspec review --target ./target
-scripts/hldspec continue --target ./target
+```text
+focused tests pass
+prior-slice regression passes
+anchor coverage is updated
+no uncited product behavior was added
+phase report is written
+no stop condition is triggered
 ```
 
-`target/` is the future product workspace. HLDspec prepares `target/`; SpecKit builds inside `target/` after approval.
+HLDspec gates continuation using source-package validation, stale-anchor checks, unsupported-claim checks, RunSkeptic status, consultant review, and human approval when required.
 
-See:
+## User-facing workflow
 
-- [docs/AGENT_FIRST_PRODUCT_MODEL.md](docs/AGENT_FIRST_PRODUCT_MODEL.md)
-- [docs/USER_RUN_MODEL.md](docs/USER_RUN_MODEL.md)
-- [docs/HLDSPEC_PRODUCT_SCORECARD.md](docs/HLDSPEC_PRODUCT_SCORECARD.md)
+The public facade is intentionally small:
+
+```text
+start
+status
+review
+continue
+diff
+doctor
+```
+
+Agents should use the facade and generated run cards rather than calling low-level scripts directly.
+
+## Documentation map
+
+```text
+AGENTS.md                              agent bootstrap and hard rules
+docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md   canonical architecture and terminology
+docs/SPECKIT_PROXY_PROTOCOL.md         HLDspec-to-SpecKit handoff protocol
+docs/SPECKIT_SLICE_CONTROL.md          technical slice-control model
+docs/TEST_STRATEGY_V2.md               test strategy
+docs/DOCS_INDEX.md                     documentation index
+```
+
+## Legacy files
+
+Some older root-level scripts and docs may still exist for compatibility or history. The current model is defined by the documents above.
