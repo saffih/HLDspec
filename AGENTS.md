@@ -4,28 +4,34 @@
 
 ## HLDspec trigger
 
-When a user prompt starts with:
+When a user prompt starts with `HLDspec`, use the minimal agent UX contract:
 
 ```text
-HLDspec /path/to/HLD.md
+docs/HLDSPEC_MINIMAL_AGENT_UX.md
 ```
 
-or:
+Accepted short forms include:
 
 ```text
-HLDspec /path/to/HLD.md --workspace /path/to/workspace
+HLDspec HLD: /path/to/HLD.md create /path/to/target
+HLDspec create /path/to/target from /path/to/HLD.md
+HLDspec HLD: /path/to/HLD.md target: /path/to/target runtime: claude
 ```
 
-do not guess the process from memory.
+Agent behavior:
 
-Do this first:
+1. Extract source HLD, target workspace, mode, runtime, and comment.
+2. Default runtime to `claude` when omitted.
+3. Supported runtime values are `claude`, `codex`, and `devin`.
+4. Use the public HLDspec facade: `start`, `status`, `review`, `doctor`, and later `continue` only when safe.
+5. Do not expose low-level scripts to the user unless debugging a failure.
+6. Return only target, mode, runtime, blockers, and next safe action.
 
-```bash
-cd /Users/saffi/code/HLDspec
-bash scripts/hldspec_agent_start.sh <source-HLD.md> [--workspace <workspace>] --print-context
+Example minimal request:
+
+```text
+HLDspec HLD: /Users/saffi/code/flow/flow-hld.md create /Users/saffi/code/flowHld runtime claude
 ```
-
-Then follow the generated context exactly.
 
 ## Hard rules
 
