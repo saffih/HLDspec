@@ -119,6 +119,29 @@ class SpecBundlePlannerTests(unittest.TestCase):
         findings = validate_bundle_queue(bundle_queue, queue)
         self.assertTrue(any(f.check == "forward_dependency" for f in findings))
 
+    def test_why_grouped_surfaces_tolerated_seam_reasons(self) -> None:
+        # Two same-layer specs with different themes are kept together; the
+        # tolerated theme-change seam reason should be surfaced in why_grouped.
+        bundles = plan_bundles_from_items(
+            [
+                item("F1", "API command interface", layer="core", contracts=["api"]),
+                item("F2", "Security reliability guard", layer="core", contracts=["api"]),
+            ]
+        )
+        self.assertEqual(1, len(bundles))
+        self.assertIn("Minor boundaries kept together", bundles[0]["why_grouped"])
+        self.assertIn("internal_boundaries", bundles[0])
+
+    def test_single_spec_reason_explains_strong_boundary(self) -> None:
+        bundles = plan_bundles_from_items(
+            [
+                item("F1", "API foundation", layer="api", contracts=["api"]),
+                item("F2", "Operational runbook", layer="ops", contracts=["ops"]),
+            ]
+        )
+        self.assertEqual(2, len(bundles))
+        self.assertIn("Single-spec bundle", bundles[0]["why_grouped"])
+
     def test_validator_requires_core_fields(self) -> None:
         queue = {"items": [item("F1", "One")]}
         bundle_queue = {"bundles": [{"bundle_id": "G01", "included_specs": [{"feature_id": "F1"}]}]}

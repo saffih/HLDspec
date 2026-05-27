@@ -158,23 +158,31 @@ def seam_score(left: dict[str, Any], right: dict[str, Any]) -> tuple[int, list[s
     return score, reasons
 
 
-def _bundle_reason(items: list[dict[str, Any]]) -> str:
+def _bundle_reason(items: list[dict[str, Any]], internal_seams: list[dict[str, Any]]) -> str:
     if len(items) == 1:
-        return "Single spec bundle: no adjacent spec can be grouped safely without weakening boundaries."
+        return (
+            "Single-spec bundle: adjacent specs had a strong boundary "
+            "(layer/contract/theme seam) that made grouping unsafe."
+        )
     layers = sorted({spec_layer(item) for item in items})
     themes = sorted({infer_theme(item) for item in items})
     shared_contracts = set.intersection(*(contracts(item) for item in items)) if items and all(contracts(item) for item in items) else set()
     shared_data = set.intersection(*(data_objects(item) for item in items)) if items and all(data_objects(item) for item in items) else set()
 
-    parts = [f"Grouped because specs are adjacent in dependency order and fit safe bundle size ({len(items)} specs)."]
+    parts = [f"Grouped {len(items)} dependency-adjacent specs."]
     if len(layers) == 1:
-        parts.append(f"Primary layer: {layers[0]}.")
+        parts.append(f"Shared layer: {layers[0]}.")
+    else:
+        parts.append("Layers: " + ", ".join(layers) + ".")
     if themes:
         parts.append("Themes: " + ", ".join(themes) + ".")
     if shared_contracts:
         parts.append("Shared contracts: " + ", ".join(sorted(shared_contracts)) + ".")
     if shared_data:
         parts.append("Shared data objects: " + ", ".join(sorted(shared_data)) + ".")
+    tolerated = sorted({reason for seam in internal_seams for reason in as_list(seam.get("differences"))})
+    if tolerated:
+        parts.append("Minor boundaries kept together: " + "; ".join(tolerated) + ".")
     return " ".join(parts)
 
 
@@ -246,31 +254,43 @@ def plan_bundles_from_items(
     if not items:
         return []
 
-    raw_groups: list[list[dict[str, Any]]] = []
-    current: list[dict[str, Any]] = [items[0]]
+    raw_groups: list[dict[str, Any]] = []
+    current_items: list[dict[str, Any]] = [items[0]]
+    current_internal: list[dict[str, Any]] = []
 
     for item in items[1:]:
-        score, _reasons = seam_score(current[-1], item)
+        score, reasons = seam_score(current_items[-1], item)
         cut = False
-        if len(current) >= hard_max:
+        if len(current_items) >= hard_max:
             cut = True
         elif score >= 5:
             cut = True
-        elif score >= 3 and len(current) >= 2:
+        elif score >= 3 and len(current_items) >= 2:
             cut = True
-        elif len(current) >= default_max and score >= 2:
+        elif len(current_items) >= default_max and score >= 2:
             cut = True
 
         if cut:
-            raw_groups.append(current)
-            current = [item]
+            raw_groups.append({"items": current_items, "internal": current_internal})
+            current_items = [item]
+            current_internal = []
         else:
-            current.append(item)
+            current_internal.append(
+                {
+                    "from": spec_id(current_items[-1]),
+                    "to": spec_id(item),
+                    "seam_score": score,
+                    "differences": reasons,
+                }
+            )
+            current_items.append(item)
 
-    raw_groups.append(current)
+    raw_groups.append({"items": current_items, "internal": current_internal})
 
     bundles: list[dict[str, Any]] = []
-    for idx, group in enumerate(raw_groups, start=1):
+    for idx, entry in enumerate(raw_groups, start=1):
+        group = entry["items"]
+        internal = entry["internal"]
         bundle_id = f"G{idx:02d}"
         bundle_name = _bundle_name(group, bundle_id)
         bundle_slug = f"{bundle_id.lower()}-{slugify(bundle_name)}"
@@ -289,7 +309,8 @@ def plan_bundles_from_items(
                 "bundle_name": bundle_name,
                 "bundle_slug": bundle_slug,
                 "included_specs": included,
-                "why_grouped": _bundle_reason(group),
+                "why_grouped": _bundle_reason(group, internal),
+                "internal_boundaries": internal,
                 "dependency_position": idx,
                 "dependencies": dependencies,
                 "allowed_evidence": [],
@@ -297,7 +318,7 @@ def plan_bundles_from_items(
                 "model_runtime_recommendation": {
                     "orchestrator": "MODEL_CRITICAL",
                     "default_subagent": "MODEL_STRONG",
-                    "clarification": "MODEL_MEDIUM",
+                    "clarification": "MODEL_DEFAULT",
                 },
                 "expected_outputs": [
                     "Per-spec SpecKit outputs for specify, clarify if needed, plan, research/data/contracts if needed, tasks, and verification.",
@@ -334,10 +355,39 @@ def plan_bundles_from_items(
     return bundles
 
 
+def layer_map_from_plan(sync: Path) -> dict[str, str]:
+    """Map planned_spec_id -> layer from spec_build_plan.json.
+
+    The invocation queue items do not carry `layer`; it lives in the build
+    plan. Without this join the seam scorer sees `unspecified` for every spec
+    and the strongest grouping signal (layer change) never fires.
+    """
+    plan = load_json_dict(sync / "spec_build_plan.json")
+    mapping: dict[str, str] = {}
+    for spec in as_list(plan.get("planned_specs")):
+        if not isinstance(spec, dict):
+            continue
+        sid = spec_id(spec)
+        layer = spec.get("layer")
+        if sid and isinstance(layer, str) and layer.strip():
+            mapping[sid] = layer.strip()
+    return mapping
+
+
+def _inject_layers(items: list[dict[str, Any]], layer_map: dict[str, str]) -> None:
+    for item in items:
+        if item.get("layer"):
+            continue
+        sid = spec_id(item)
+        if sid in layer_map:
+            item["layer"] = layer_map[sid]
+
+
 def build_bundle_queue(workspace: Path) -> dict[str, Any]:
     sync = select_sync_dir(workspace, ("speckit_invocation_queue.json", "spec_build_plan.json"))
     queue = load_json_dict(sync / "speckit_invocation_queue.json")
     items = [item for item in as_list(queue.get("items")) if isinstance(item, dict)]
+    _inject_layers(items, layer_map_from_plan(sync))
     bundles = plan_bundles_from_items(items)
     evidence = default_allowed_evidence(sync)
     for bundle in bundles:

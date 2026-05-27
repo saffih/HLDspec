@@ -30,7 +30,7 @@ class SpecBundlePromptTests(unittest.TestCase):
             "model_runtime_recommendation": {
                 "orchestrator": "MODEL_CRITICAL",
                 "default_subagent": "MODEL_STRONG",
-                "clarification": "MODEL_MEDIUM",
+                "clarification": "MODEL_DEFAULT",
             },
             "expected_outputs": ["outputs"],
             "tests_required": ["tests"],

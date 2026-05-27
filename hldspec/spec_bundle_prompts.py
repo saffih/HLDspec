@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +56,108 @@ def _runtime_guidance(runtime: str) -> list[str]:
     raise ValueError(f"unsupported runtime: {runtime}")
 
 
-def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path, runtime: str) -> str:
+# Abstract model tier -> concrete model per runtime. Mirrors the CLAUDE.md
+# model routing table so a prompt names the model the runtime actually uses.
+RUNTIME_MODELS: dict[str, dict[str, str]] = {
+    "claude": {
+        "MODEL_ROUTINE": "Haiku 4.5",
+        "MODEL_DEFAULT": "Sonnet 4.6",
+        "MODEL_STRONG": "Sonnet 4.6",
+        "MODEL_CRITICAL": "Opus 4.7",
+    },
+    "codex": {
+        "MODEL_ROUTINE": "gpt-5.5 low",
+        "MODEL_DEFAULT": "gpt-5.5 medium",
+        "MODEL_STRONG": "gpt-5.5 high",
+        "MODEL_CRITICAL": "gpt-5.5 xhigh",
+    },
+    "devin": {
+        "MODEL_ROUTINE": "SWE 1.6",
+        "MODEL_DEFAULT": "SWE 1.6",
+        "MODEL_STRONG": "Sonnet 4.5",
+        "MODEL_CRITICAL": "Opus 4.6",
+    },
+}
+
+
+def _concrete_model(runtime: str, tier: str) -> str:
+    return RUNTIME_MODELS.get(runtime, {}).get(tier, tier)
+
+
+def _spawn_directive(runtime: str, tier: str, role: str) -> str:
+    """How this runtime spawns a bounded subagent for a delegated phase."""
+    model = _concrete_model(runtime, tier)
+    if runtime == "claude":
+        return f"Spawn a subagent via the Task tool (model: {model}, tier {tier}) as **{role}**. Brief:"
+    if runtime == "codex":
+        return f"Open a Codex subtask (model: {model}, tier {tier}) as **{role}**, scoped to this brief:"
+    if runtime == "devin":
+        return f"Start a Devin sub-session (model: {model}, tier {tier}) as **{role}** with this brief:"
+    raise ValueError(f"unsupported runtime: {runtime}")
+
+
+def _orchestrator_directive(runtime: str, tier: str) -> str:
+    """How this runtime keeps a phase in the orchestrator (no delegation)."""
+    model = _concrete_model(runtime, tier)
+    if runtime == "claude":
+        return f"Run directly as the orchestrator (model: {model}, tier {tier}); do not spawn a subagent."
+    if runtime == "codex":
+        return f"Handle in the main Codex session (model: {model}, tier {tier}); do not open a subtask."
+    if runtime == "devin":
+        return f"Handle in the main Devin session (model: {model}, tier {tier}); do not open a sub-session."
+    raise ValueError(f"unsupported runtime: {runtime}")
+
+
+def _user_checkpoint(prompt_text: str, options: str) -> list[str]:
+    return [
+        "",
+        f"> **USER CHECKPOINT** — {prompt_text}",
+        f"> Reply required: `{options}`. Do not proceed until the user replies.",
+        "",
+    ]
+
+
+# Phase-specific RunSkeptic scan content (what to actually inspect).
+RUNSKEPTIC_SCAN: dict[str, tuple[str, ...]] = {
+    "specify": (
+        "Scope creep beyond this spec's source HLD sections.",
+        "Acceptance criteria that are missing, vague, or untestable.",
+        "Boundary or source-of-truth claims not backed by allowed evidence.",
+    ),
+    "plan": (
+        "Architecture boundary correctness vs HLD facts and constitution rules.",
+        "Contract and data-ownership conflicts with already-built specs in the bundle.",
+        "Dependency safety: this spec depends only on already-completed work.",
+        "Interface stability: contracts stay separable from processing behavior.",
+    ),
+    "tasks": (
+        "Tasks are bounded and independently testable.",
+        "Task order respects dependency direction.",
+        "No hidden coupling or duplicated ownership across tasks.",
+    ),
+}
+
+
+def _runskeptic_block(runtime: str, phase: str, spec_id_value: str, skeptic_path: str) -> list[str]:
+    scan = RUNSKEPTIC_SCAN.get(phase, ("Apply the general RunSkeptic scan for this phase.",))
+    return [
+        f"**RunSkeptic gate ({phase})** — {_orchestrator_directive(runtime, 'MODEL_CRITICAL')}",
+        "",
+        f"Apply the framework at `{skeptic_path}` (read the real file; do not rely on memory):",
+        "",
+        "- **GATE:** Is the phase output testable and the scope bounded? If not, stop.",
+        "- **SCAN:**",
+        *[f"  - {item}" for item in scan],
+        "- **MAP:** List concrete findings with evidence references before deciding.",
+        "- **DECIDE:** Record one status for this phase.",
+        "",
+        f"Report: `RunSkeptic {spec_id_value} ({phase}): PASS | ACTION | CONFLICT — <finding or clean>`.",
+        "Stop on ACTION or CONFLICT unless the user explicitly resolves it.",
+        "",
+    ]
+
+
+def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path, runtime: str, skeptic_path: str = "~/code/skeptic/skeptic.md") -> str:
     if runtime not in RUNTIMES:
         raise ValueError(f"unsupported runtime: {runtime}")
 
@@ -112,9 +214,13 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "",
         "## Runtime and model recommendation",
         "",
-        f"- orchestrator: `{model.get('orchestrator', 'MODEL_CRITICAL')}`",
-        f"- default subagent: `{model.get('default_subagent', 'MODEL_STRONG')}`",
-        f"- clarification: `{model.get('clarification', 'MODEL_MEDIUM')}`",
+        f"Runtime `{runtime}` maps the abstract tiers to these concrete models:",
+        "",
+        f"- orchestrator: `{model.get('orchestrator', 'MODEL_CRITICAL')}` -> `{_concrete_model(runtime, model.get('orchestrator', 'MODEL_CRITICAL'))}`",
+        f"- default subagent: `{model.get('default_subagent', 'MODEL_STRONG')}` -> `{_concrete_model(runtime, model.get('default_subagent', 'MODEL_STRONG'))}`",
+        f"- clarification: `{model.get('clarification', 'MODEL_DEFAULT')}` -> `{_concrete_model(runtime, model.get('clarification', 'MODEL_DEFAULT'))}`",
+        "",
+        "Pick the weakest sufficient model per phase to avoid wasting tokens; promote to the orchestrator tier only for governance, plan, analyze, and RunSkeptic decisions.",
         "",
         "Runtime-specific guidance:",
         "",
@@ -128,6 +234,23 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "- Control returns to the orchestrator after every phase and before every human checkpoint.",
         "- Do not let subagents continue into the next phase without explicit orchestrator handoff.",
         "",
+        "## Where to find answers",
+        "",
+        "When SpecKit asks a question, resolve it in this order before escalating:",
+        "",
+        "- spec-level intent and acceptance: `.specify/sync/speckit_answer_dossier.md`, `.specify/sync/hld_usecase_api_map.md`",
+        "- architecture/contracts/data ownership: `.specify/sync/speckit_proxy_dossier.json`, `.specify/sync/speckit_invocation_queue.json`",
+        "- governance/constitution rules: `.specify/sync/constitution_update_plan.json`, `.specify/memory/constitution.md` (if present)",
+        "- prior clarify answers: run `lookup_speckit_clarify_answer.py` against the dossier",
+        "- if no evidence exists: escalate to the user; do not invent an answer.",
+        "",
+        "## Constitution preflight",
+        "",
+        f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')}",
+        "- Confirm `.specify/memory/constitution.md` exists and matches `constitution_update_plan.json`.",
+        "- If missing or stale, run `/speckit.constitution` from the update plan before any specify call.",
+        "- Constitution rules govern every phase below; treat a violation as a CONFLICT.",
+        *_user_checkpoint("Constitution confirmed for this bundle.", "continue / fix / stop"),
         "## SpecKit lifecycle",
         "",
         "For each spec, execute in dependency order. Do not skip forward.",
@@ -135,28 +258,53 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
     ]
 
     for idx, spec in enumerate(specs, start=1):
+        fid = str(spec.get("feature_id", ""))
+        specify_input = str(spec.get("speckit_specify_input", "")).strip() or "No speckit_specify_input recorded. Use allowed evidence only and stop if insufficient."
         lines += [
-            f"### Spec {idx}/{len(specs)} - `{spec.get('feature_id', '')}` - {spec.get('feature_name', '')}",
+            f"### Spec {idx}/{len(specs)} - `{fid}` - {spec.get('feature_name', '')}",
             "",
             "Allowed phase evidence remains limited to this bundle's allowed evidence list.",
             "",
-            "1. Specify: create or update the SpecKit specification input for this spec.",
-            "2. Clarify if needed: ask only questions that cannot be answered from allowed evidence.",
-            "3. RunSkeptic checkpoint: classify as PASS/ACTION/CONFLICT before planning.",
-            "4. Plan: produce the SpecKit plan for this spec.",
-            "5. Research/data/contracts if needed: produce only if the plan requires them.",
-            "6. RunSkeptic checkpoint: verify contracts, data ownership, dependency safety, and constitution alignment.",
-            "7. Tasks: produce implementation tasks for this spec.",
-            "8. RunSkeptic checkpoint: verify tasks are bounded, testable, and dependency-safe.",
-            "9. Implementation: only if implementation_allowed=true and explicit human approval exists.",
-            "10. Verification: run required tests or record why no runnable test exists.",
-            "11. Per-spec summary: outputs, evidence used, questions, RunSkeptic status, next safe action.",
+            "#### Phase 1 - Specify",
+            _spawn_directive(runtime, "MODEL_STRONG", "SpecKit Specify Proxy"),
+            "- Run `/speckit.specify` with the spec input below; produce exactly one feature spec.",
+            "- Use allowed evidence only; answer or escalate per the answer-location order above.",
+            "- Required output: files created/changed, questions answered/escalated, evidence used.",
             "",
             "Spec input:",
             "",
             "```text",
-            str(spec.get("speckit_specify_input", "")).strip() or "No speckit_specify_input recorded. Use allowed evidence only and stop if insufficient.",
+            specify_input,
             "```",
+            *_user_checkpoint(f"Specify done for `{fid}` - review spec.md.", "continue / fix / stop"),
+            "#### Phase 2 - Clarify (only if open questions remain)",
+            _spawn_directive(runtime, "MODEL_DEFAULT", "SpecKit Clarify Proxy"),
+            "- Answer only questions resolvable from allowed evidence; escalate the rest to the user.",
+            *_user_checkpoint(f"Clarify done for `{fid}`.", "continue / fix / stop"),
+            *_runskeptic_block(runtime, "specify", fid, skeptic_path),
+            "#### Phase 3 - Plan",
+            f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')} Plan sets architecture, data, dependency, and contract boundaries, so do not delegate it.",
+            "- Run `/speckit.plan`.",
+            "- Produce Research/data/contracts artifacts only if the plan requires them.",
+            *_runskeptic_block(runtime, "plan", fid, skeptic_path),
+            *_user_checkpoint(f"Plan + contracts done for `{fid}` - review boundaries.", "approve / fix / stop"),
+            "#### Phase 4 - Analyze",
+            f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')} Analyze judges cross-artifact consistency (spec vs plan vs constitution).",
+            "- Run `/speckit.analyze`; resolve inconsistencies before tasks.",
+            *_user_checkpoint(f"Analyze done for `{fid}`.", "continue / fix / stop"),
+            "#### Phase 5 - Tasks",
+            _spawn_directive(runtime, "MODEL_STRONG", "SpecKit Tasks Proxy"),
+            "- Run `/speckit.tasks`; decompose the approved plan into bounded, testable tasks without changing architecture.",
+            *_runskeptic_block(runtime, "tasks", fid, skeptic_path),
+            *_user_checkpoint(f"Tasks done for `{fid}` - review task list.", "approve / fix / stop"),
+            "#### Phase 6 - Implementation",
+            "- Blocked. Run `/speckit.implement` only if implementation_allowed=true AND explicit user approval exists for this spec.",
+            "",
+            "#### Phase 7 - Verification",
+            "- Run the spec's tests, or record why no runnable test exists.",
+            "",
+            "#### Per-spec summary",
+            "- Outputs, evidence used, questions answered/escalated, RunSkeptic statuses, next safe action.",
             "",
         ]
 
@@ -212,12 +360,16 @@ def validate_prompt_text(text: str) -> list[str]:
     return errors
 
 
-def write_bundle_prompts(workspace: Path, *, runtimes: tuple[str, ...] = RUNTIMES) -> dict[str, Any]:
+def write_bundle_prompts(workspace: Path, *, runtimes: tuple[str, ...] = RUNTIMES, skeptic_path: str = "~/code/skeptic/skeptic.md") -> dict[str, Any]:
     sync = select_sync_dir(workspace, ("speckit_bundle_queue.json", "speckit_invocation_queue.json"))
     queue_path = sync / "speckit_bundle_queue.json"
     queue = load_json_dict(queue_path)
     bundles = [bundle for bundle in as_list(queue.get("bundles")) if isinstance(bundle, dict)]
     prompt_root = sync / "speckit_bundle_prompts"
+    # Clear prior output so a regrouping (renamed bundles) leaves no orphan
+    # prompt directories that would mislead the next reader.
+    if prompt_root.exists():
+        shutil.rmtree(prompt_root)
     prompt_root.mkdir(parents=True, exist_ok=True)
 
     for bundle in bundles:
@@ -226,7 +378,7 @@ def write_bundle_prompts(workspace: Path, *, runtimes: tuple[str, ...] = RUNTIME
         for runtime in runtimes:
             prompt_path = prompt_root / runtime / slug / "prompt.md"
             prompt_path.parent.mkdir(parents=True, exist_ok=True)
-            prompt_path.write_text(render_bundle_prompt(bundle, workspace=workspace, sync=sync, runtime=runtime), encoding="utf-8")
+            prompt_path.write_text(render_bundle_prompt(bundle, workspace=workspace, sync=sync, runtime=runtime, skeptic_path=skeptic_path), encoding="utf-8")
             prompt_paths[runtime] = str(prompt_path.relative_to(workspace))
         bundle["prompt_paths"] = prompt_paths
 
