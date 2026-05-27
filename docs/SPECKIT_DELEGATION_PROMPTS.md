@@ -12,6 +12,8 @@ For each feature package, HLDspec should generate prompts under:
 
 ```text
 target/prompts/speckit/<feature>/
+  RUN_CARD.md
+  RUN_CARD.json
   01-specify.md
   02-clarify.md
   03-plan.md
@@ -21,7 +23,29 @@ target/prompts/speckit/<feature>/
   07-implement.md
 ```
 
+`RUN_CARD.md` and `RUN_CARD.json` are the first-class execution handoff
+contract. The numbered phase prompts are supporting material for running the
+approved package through the SpecKit lifecycle.
+
 Implementation prompts may be generated but must remain blocked until explicit approval.
+
+## SpecKit Run Card contract
+
+The Run Card is a Markdown/JSON contract. It should declare:
+
+```text
+Requires:
+- approved prework
+- dependency graph and invocation queue
+- bounded evidence
+- clean RunSkeptic status
+
+Ensures:
+- one bounded execution handoff
+- explicit stop conditions
+- explicit report-back format
+- reassessment triggers for HLDspec
+```
 
 ## Required prompt fields
 
