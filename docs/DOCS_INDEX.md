@@ -11,6 +11,7 @@ These docs are living references. Follow links in AGENTS.md for session bootstra
 | Doc | Purpose |
 |---|---|
 | [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | **Authoritative** canonical terminology, ownership boundaries, full flow, and SpecKit Run Card — wins on any conflict |
+| [`HLDSPEC_ARCHITECTURE_README.md`](HLDSPEC_ARCHITECTURE_README.md) | HLDspec architecture README: source-package model, SpecKit handoff, slice-controlled implementation, generated artifacts, gates, and test requirements |
 | [`../TASKS.md`](../TASKS.md) | Living task list — P0/P1/P2 pending work |
 | [`../AGENTS.md`](../AGENTS.md) | Universal agent bootstrap for HLDspec workflow invocation |
 | [`HLDSPEC_USE_CASES_AND_API.md`](HLDSPEC_USE_CASES_AND_API.md) | Product use-case catalog and rewrite council scenarios used to evaluate whether implementation work covers the real workflows |

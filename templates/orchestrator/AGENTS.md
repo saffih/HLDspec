@@ -132,6 +132,7 @@ Each junior call or subtask must:
 - Do not search the web for workflow steps
 - Source HLD is read-only — work only on workspace copies
 - Do not invoke SpecKit until `SPECKIT_PREWORK_APPROVAL_GATE` is APPROVED
+- Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, `.specify/source/implementation_slices.json`, and `.specify/source/slice_test_policy.md`; use one full specify/plan/tasks/analyze cycle, then implement only the explicitly selected slice unless full implementation is approved.
 - Do not implement code before explicit implementation approval
 - Do not answer checkpoint questions silently — surface them to the user
 - Do not promote artifacts without judge approval

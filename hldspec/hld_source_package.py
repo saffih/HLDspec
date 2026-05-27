@@ -49,6 +49,11 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     "runner_prompt": "runner_prompt.md",
     "consultant_prompt": "consultant_prompt.md",
     "human_review_package": "human_review_package.md",
+    "implementation_slicing_policy": "implementation_slicing_policy.md",
+    "implementation_slices": "implementation_slices.json",
+    "slice_test_policy": "slice_test_policy.md",
+    "speckit_slice_execution_prompt": "speckit_slice_execution_prompt.md",
+    "anchor_coverage_schema": "anchor_coverage_schema.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -258,7 +263,7 @@ def build_source_package_content(
     gate, matching the SourcePackageValidation pattern).
     """
     # Imported here to avoid an import cycle (those modules import this one).
-    from . import hld_marking, single_spec_input
+    from . import hld_marking, single_spec_input, implementation_slicing
 
     adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
     source_dir = adapter.source_package_dir
@@ -273,6 +278,9 @@ def build_source_package_content(
 
     spec_input = single_spec_input.build_single_spec_input(hld_text, project_name=project_name)
     (source_dir / AUTHORITATIVE_FILES["single_spec_input"]).write_text(spec_input, encoding="utf-8")
+
+    for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
+        (source_dir / filename).write_text(content, encoding="utf-8")
 
     valid_anchors = set(ref_map["anchors"].keys())
     unsupported = single_spec_input.find_unsupported_claims(spec_input, valid_anchors)
