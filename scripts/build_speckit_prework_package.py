@@ -26,6 +26,7 @@ def build_package(workspace: Path) -> dict[str, Any]:
     quality = load_json(sync / "speckit_prework_quality_review.json")
     dossier = load_json(sync / "speckit_proxy_dossier.json")
     usecase_map = load_json(sync / "hld_usecase_api_map.json")
+    bundle_queue = load_json(sync / "speckit_bundle_queue.json")
 
     findings = as_list(quality.get("findings"))
     blockers = [f for f in findings if isinstance(f, dict) and str(f.get("severity", "")).upper() == "BLOCKER"]
@@ -113,6 +114,44 @@ def build_package(workspace: Path) -> dict[str, Any]:
             ".specify/sync/target_spec_work_order.md",
             ".specify/sync/spec_branch_queue.md",
         ],
+        "spec_bundle_case": {
+            "claim": "Related specs should be grouped into bite-size dependency-safe bundles before one-go SpecKit execution prompts are used.",
+            "bundle_count": len(as_list(bundle_queue.get("bundles"))),
+            "bundles": [
+                {
+                    "bundle_id": bundle.get("bundle_id", ""),
+                    "bundle_name": bundle.get("bundle_name", ""),
+                    "spec_count": len(as_list(bundle.get("included_specs"))),
+                    "prompt_paths": bundle.get("prompt_paths", {}),
+                }
+                for bundle in as_list(bundle_queue.get("bundles"))
+                if isinstance(bundle, dict)
+            ],
+            "source_artifacts": [
+                ".specify/sync/speckit_bundle_queue.md",
+                ".specify/sync/speckit_bundle_prompts/README.md",
+                ".specify/sync/validation/speckit_bundle_validation.md",
+            ],
+        },
+        "spec_bundle_case": {
+            "claim": "Related specs should be grouped into bite-size dependency-safe bundles before one-go SpecKit execution prompts are used.",
+            "bundle_count": len(as_list(bundle_queue.get("bundles"))),
+            "bundles": [
+                {
+                    "bundle_id": bundle.get("bundle_id", ""),
+                    "bundle_name": bundle.get("bundle_name", ""),
+                    "spec_count": len(as_list(bundle.get("included_specs"))),
+                    "prompt_paths": bundle.get("prompt_paths", {}),
+                }
+                for bundle in as_list(bundle_queue.get("bundles"))
+                if isinstance(bundle, dict)
+            ],
+            "source_artifacts": [
+                ".specify/sync/speckit_bundle_queue.md",
+                ".specify/sync/speckit_bundle_prompts/README.md",
+                ".specify/sync/validation/speckit_bundle_validation.md",
+            ],
+        },
         "human_checkpoint": checkpoint,
     }
 
@@ -196,6 +235,34 @@ def render_md(pkg: dict[str, Any]) -> str:
         lines.append("- No bottom-up order found. This requires review.")
     for idx, item in enumerate(order, start=1):
         lines.append(f"{idx}. `{item}`")
+
+    bundle_case = pkg.get("spec_bundle_case", {}) if isinstance(pkg.get("spec_bundle_case"), dict) else {}
+    lines += [
+        "",
+        "## Spec Bundles / Bite Groups",
+        "",
+        bundle_case.get("claim", "Spec bundle plan is missing."),
+        "",
+        f"- bundle count: `{bundle_case.get('bundle_count', 0)}`",
+        "- source artifacts:",
+    ]
+    for artifact in as_list(bundle_case.get("source_artifacts")):
+        lines.append(f"  - `{artifact}`")
+    bundles = as_list(bundle_case.get("bundles"))
+    if bundles:
+        lines += ["", "| Bundle | Specs | Prompt paths |", "|---|---:|---|"]
+        for bundle in bundles:
+            if not isinstance(bundle, dict):
+                continue
+            prompt_paths = bundle.get("prompt_paths", {}) if isinstance(bundle.get("prompt_paths"), dict) else {}
+            prompt_text = "<br>".join(f"`{runtime}`: `{path}`" for runtime, path in sorted(prompt_paths.items())) or "pending"
+            lines.append(
+                f"| `{bundle.get('bundle_id', '')}` {bundle.get('bundle_name', '')} | "
+                f"{bundle.get('spec_count', 0)} | {prompt_text} |"
+            )
+    else:
+        lines.append("- No bundles generated yet. Rebuild SpecKit bundle queue before approval.")
+    lines.append("")
 
     lines += [
         "",
