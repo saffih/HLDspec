@@ -11,6 +11,7 @@ from hldspec.state_machine import (
     CheckpointKind,
     MachineContext,
     MachineResult,
+    RunSkepticStatus,
     blocked_result,
     continue_result,
 )
@@ -55,6 +56,25 @@ class SpeckitPreworkMachine:
 
         review = self._load_json(review_json)
         gate = prework_gate_status(review)
+        runskeptic = self._runskeptic_status_from_review(review, str(review_json), str(review_md))
+
+        if runskeptic.status in {"ACTION", "CONFLICT"}:
+            return blocked_result(
+                machine=self.name,
+                state="SPECKIT_PREWORK_RUNSKEPTIC_REWORK",
+                kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+                blocking_reason=(
+                    f"RunSkeptic status is {runskeptic.status}. "
+                    "Resolve RunSkeptic findings before invoking SpecKit."
+                ),
+                controlling_artifacts=(
+                    ArtifactRef(path=str(review_json), role="runskeptic_review_json"),
+                    ArtifactRef(path=str(review_md), role="runskeptic_review_report", required=False),
+                    ArtifactRef(path=str(package), role="speckit_prework_package"),
+                ),
+                forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+                runskeptic=runskeptic,
+            )
 
         if not gate.ready:
             return blocked_result(
@@ -70,6 +90,7 @@ class SpeckitPreworkMachine:
                     ArtifactRef(path=str(package), role="speckit_prework_package"),
                 ),
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+                runskeptic=runskeptic,
             )
 
         workspace_root = adapter.target_root
@@ -88,6 +109,7 @@ class SpeckitPreworkMachine:
                     ArtifactRef(path=str(package), role="speckit_prework_package"),
                 ),
                 forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+                runskeptic=runskeptic,
             )
 
         return continue_result(
@@ -100,7 +122,48 @@ class SpeckitPreworkMachine:
                 ArtifactRef(path=str(proxy), role="speckit_proxy_dossier", required=False),
                 ArtifactRef(path=str(state), role="hldspec_state", required=False),
             ),
+            runskeptic=runskeptic,
         )
+
+    @staticmethod
+    def _runskeptic_status_from_review(
+        review: dict[str, Any],
+        review_json_path: str,
+        review_md_path: str,
+    ) -> RunSkepticStatus:
+        explicit_value = None
+        for key in ("runskeptic_status", "run_skeptic_status", "skeptic_status"):
+            if key in review:
+                explicit_value = review.get(key)
+                break
+
+        status = SpeckitPreworkMachine._normalize_runskeptic_status(explicit_value)
+        next_safe_action = (
+            "Resolve RunSkeptic ACTION/CONFLICT findings before invoking SpecKit."
+            if status in {"ACTION", "CONFLICT"}
+            else ""
+        )
+        return RunSkepticStatus(
+            status=status,
+            evidence=(
+                ArtifactRef(path=review_json_path, role="runskeptic_review_json"),
+                ArtifactRef(path=review_md_path, role="runskeptic_review_report", required=False),
+            ),
+            next_safe_action=next_safe_action,
+        )
+
+    @staticmethod
+    def _normalize_runskeptic_status(value: object) -> str:
+        text = str(value or "").strip().upper()
+        if not text or text in {"MISSING", "UNKNOWN", "NOT_RUN"}:
+            return "NOT_RUN"
+        if text.startswith("PASS") or text in {"OK", "GREEN"}:
+            return "PASS"
+        if text.startswith("CONFLICT"):
+            return "CONFLICT"
+        if text.startswith("ACTION") or text in {"REWORK", "REWORK_REQUIRED", "FIX", "FAILED", "FAIL", "BLOCKER", "BLOCKED"}:
+            return "ACTION"
+        return "NOT_RUN"
 
     @staticmethod
     def _load_json(path: Path) -> dict[str, Any]:

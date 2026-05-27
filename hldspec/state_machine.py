@@ -38,6 +38,13 @@ class ArtifactRef:
 
 
 @dataclass(frozen=True)
+class RunSkepticStatus:
+    status: str = "NOT_RUN"  # PASS | ACTION | CONFLICT | NOT_RUN
+    evidence: tuple[ArtifactRef, ...] = ()
+    next_safe_action: str = ""
+
+
+@dataclass(frozen=True)
 class HumanQuestion:
     question_id: str
     title: str
@@ -83,6 +90,7 @@ class MachineResult:
     actions_run: tuple[str, ...] = ()
     artifacts_written: tuple[ArtifactRef, ...] = ()
     errors: tuple[str, ...] = ()
+    runskeptic: RunSkepticStatus = field(default_factory=RunSkepticStatus)
 
     def exit_code(self) -> ExitCode:
         if self.status in {MachineStatus.DONE, MachineStatus.CONTINUE}:
@@ -126,6 +134,7 @@ def human_checkpoint(
     forbidden_actions: tuple[str, ...],
     actions_run: tuple[str, ...] = (),
     artifacts_written: tuple[ArtifactRef, ...] = (),
+    runskeptic: RunSkepticStatus | None = None,
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
@@ -141,6 +150,7 @@ def human_checkpoint(
         ),
         actions_run=actions_run,
         artifacts_written=artifacts_written,
+        runskeptic=runskeptic or RunSkepticStatus(),
     )
 
 
@@ -153,6 +163,7 @@ def blocked_result(
     controlling_artifacts: tuple[ArtifactRef, ...] = (),
     forbidden_actions: tuple[str, ...] = (),
     errors: tuple[str, ...] = (),
+    runskeptic: RunSkepticStatus | None = None,
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
@@ -165,6 +176,7 @@ def blocked_result(
             forbidden_actions=forbidden_actions,
         ),
         errors=errors,
+        runskeptic=runskeptic or RunSkepticStatus(),
     )
 
 
@@ -174,6 +186,7 @@ def continue_result(
     state: str,
     actions_run: tuple[str, ...] = (),
     artifacts_written: tuple[ArtifactRef, ...] = (),
+    runskeptic: RunSkepticStatus | None = None,
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
@@ -181,6 +194,7 @@ def continue_result(
         status=MachineStatus.CONTINUE,
         actions_run=actions_run,
         artifacts_written=artifacts_written,
+        runskeptic=runskeptic or RunSkepticStatus(),
     )
 
 
@@ -190,6 +204,7 @@ def done_result(
     state: str,
     actions_run: tuple[str, ...] = (),
     artifacts_written: tuple[ArtifactRef, ...] = (),
+    runskeptic: RunSkepticStatus | None = None,
 ) -> MachineResult:
     return MachineResult(
         machine=machine,
@@ -197,13 +212,21 @@ def done_result(
         status=MachineStatus.DONE,
         actions_run=actions_run,
         artifacts_written=artifacts_written,
+        runskeptic=runskeptic or RunSkepticStatus(),
     )
 
 
-def error_result(*, machine: str, state: str, message: str) -> MachineResult:
+def error_result(
+    *,
+    machine: str,
+    state: str,
+    message: str,
+    runskeptic: RunSkepticStatus | None = None,
+) -> MachineResult:
     return MachineResult(
         machine=machine,
         state=state,
         status=MachineStatus.ERROR,
         errors=(message,),
+        runskeptic=runskeptic or RunSkepticStatus(),
     )

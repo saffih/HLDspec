@@ -57,7 +57,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         producer="build_speckit_prework_quality_review.py",
         consumers=["SpeckitPreworkMachine"],
         required_fields=["status", "findings"],
-        optional_fields=[],
+        optional_fields=["runskeptic_status", "run_skeptic_status", "skeptic_status"],
         input_artifacts=["speckit_invocation_queue.json", "constitution_update_plan.json"],
         output_artifacts=[],
     ),

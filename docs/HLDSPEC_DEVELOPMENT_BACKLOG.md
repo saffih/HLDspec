@@ -130,11 +130,14 @@ Implemented:
 - context prompt validation blocks prompts that omit RunSkeptic triggers
 - promotion gate blocks validator ACTION/CONFLICT findings
 - promotion gate blocks promoted capabilities unless RunSkeptic status is PASS with evidence
+- `MachineResult` carries structured RunSkeptic status and evidence metadata
+- `SpeckitPreworkMachine` blocks explicit RunSkeptic ACTION/CONFLICT before SpecKit continuation
 
 Still open:
 
-- gate-machine outputs must surface RunSkeptic PASS/ACTION/CONFLICT directly
-- generated handoff packets must include RunSkeptic status
+- remaining gate-machine outputs must surface RunSkeptic PASS/ACTION/CONFLICT directly
+- generated handoff packets must include structured RunSkeptic evidence, not only a status string
+- review output must link RunSkeptic findings to exact evidence and next safe action
 - missing evidence must be enforced beyond prompt text and promotion-scorecard cases
 
 ### Promotion gate
@@ -318,11 +321,13 @@ Covered now:
 
 - prompt validators check RunSkeptic triggers
 - promotion gate checks promoted capability RunSkeptic PASS evidence
+- `MachineResult` carries structured RunSkeptic status and evidence metadata
+- `SpeckitPreworkMachine` blocks explicit RunSkeptic ACTION/CONFLICT before SpecKit continuation
 
 Still needed:
 
-- gate machines surface RunSkeptic PASS/ACTION/CONFLICT status directly
-- generated handoff packet lists RunSkeptic status
+- remaining gate machines surface RunSkeptic PASS/ACTION/CONFLICT status directly
+- generated handoff packet lists structured RunSkeptic evidence, not only a status string
 - review output links RunSkeptic findings to exact evidence and next safe action
 
 ## Mostly addressed former P0 items
