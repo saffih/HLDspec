@@ -351,7 +351,10 @@ RunSkeptic returns ACTION or CONFLICT
 
 SpecKit plans the whole product once.
 
-HLDspec controls implementation slice by slice.
+HLDspec controls implementation slice by slice by producing the slice contract,
+allowed scope, required tests, and stop conditions. It does not hard-enforce the
+slice at runtime; the user or Agent Mediator enforces the contract while the
+implementation agent works.
 
 ## Artifact contract style for slices
 

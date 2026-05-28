@@ -8,7 +8,7 @@ It does not replace SpecKit. It prepares product truth, validates evidence, gate
 
 Large HLDs are too dense for one-shot implementation. If an agent slices the HLD manually, it can lose requirements, invent missing product truth, duplicate logic across layers, or implement too much at once.
 
-HLDspec solves this by keeping the full HLD intact while controlling execution:
+HLDspec solves this by keeping the full HLD intact while bounding execution:
 
 ```text
 One complete HLD
@@ -112,7 +112,9 @@ Tmux/session state is visibility only, never approval state.
 | Implementation Agent | The hands: runs SpecKit, edits code, runs tests — only within bounded run card or slice scope |
 | SpecKit | Constitution, final spec, plan, tasks, implementation artifacts |
 
-HLDspec can prepare and constrain work. It cannot silently approve human-owned decisions.
+HLDspec can prepare and constrain work. The user or Agent Mediator enforces
+implementation boundaries during the live implementation session. HLDspec cannot
+silently approve human-owned decisions.
 
 ## Target workspace layout
 
@@ -183,16 +185,18 @@ flowchart TD
 4. HLDspec builds a source package and a single SpecKit input from the full HLD.
 5. HLDspec mirrors read-only source context into `.specify/source/`.
 6. SpecKit creates the full product spec, plan, task graph, and analysis.
-7. HLDspec does not allow raw all-task implementation by default.
-8. HLDspec selects one approved implementation slice and task list.
-9. The build agent implements only that selected slice.
+7. HLDspec guidance does not allow raw all-task implementation by default.
+8. The user or Agent Mediator selects one approved implementation slice and task list from HLDspec guidance.
+9. The build agent is instructed to implement only that selected slice.
 10. The build agent runs focused tests and prior-slice regression.
 11. The build agent reports back with changed files, test evidence, anchor coverage, and blockers.
 12. HLDspec reassesses and decides the next safe action.
 
 ## Slice-controlled implementation
 
-HLDspec keeps one complete HLD and one complete SpecKit task graph. It controls implementation through named slices.
+HLDspec keeps one complete HLD and one complete SpecKit task graph. It bounds
+implementation through named slices; the user or Agent Mediator enforces those
+bounds while the implementation agent works.
 
 Canonical slices:
 

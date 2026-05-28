@@ -76,8 +76,10 @@ This closes the core "it runs but produces no implementation" failure.
 | State-version guard: live mode discards stale/simulated state | ✅ Done | `STATE_VERSION=2` |
 | Tests (invoker, artifact gate, live mode, stale-state) | ✅ Done | `tests_v2/test_speckit_invoker.py`, `test_speckit_execution_machine.py` |
 
-### Open decisions (RunSkeptic CONFLICT — need human call)
-- **Design ownership**: an older proxy (`scripts/build_speckit_proxy_dry_run.py`) *forbids* auto-implement and enforces one-phase-only. New live mode auto-runs all phases incl. IMPLEMENT (opt-in). Reconcile: keep auto-drive as opt-in capability vs. default-gated? Current stance: opt-in (invoker must be injected; default stays gated).
+### Resolved decisions
+- **Design ownership / auto-implement boundary**: resolved by the three-journey product model in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §13. Implementation Guidance is guidance and reassessment, not default auto-implementation. The live `SpecKitInvoker` auto-drive-all-phases path remains an opt-in capability only; default operation is mediator/user-steered with bounded prompts, slice scope, stop conditions, and explicit approvals.
+
+### Open decisions (need human call)
 - **`/home/sio/flow` vs `~/code/flow/impl`**: a Flow substrate was hand-built reading the HLD. Decide whether it's the implementation target the pipeline writes into, or discarded.
 
 ### Still TODO (from RunSkeptic + user)
@@ -85,6 +87,7 @@ This closes the core "it runs but produces no implementation" failure.
 - **Gap analysis (desired vs. actual)** — NEW capability: when the HLD changes or a feature is added, derive specs THEN diff against the current implementation to surface the delta (what to add/change) and guide the feature work, before writing code. Needed for existing/evolving projects, not just greenfield.
 - **Verify the real mechanism**: one true headless run end-to-end on a *code* feature (not 027, which is governance/scope); confirm `claude --model haiku` alias is accepted.
 - **Prove minimal chain before relying on all 8 phases.**
+- **Slice-control runtime verification**: active docs now define HLDspec slice control as generated scope and bounds, enforced by the user or Agent Mediator at runtime. `SpecKitExecutionMachine` still operates at feature/phase granularity; that is acceptable under the current model as long as docs and prompts do not claim HLDspec hard-enforces slices during implementation.
 
 ---
 
