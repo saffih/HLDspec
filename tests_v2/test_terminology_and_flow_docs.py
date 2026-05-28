@@ -11,6 +11,8 @@ CANONICAL_NAME = "HLDSPEC_TERMINOLOGY_AND_FLOW.md"
 
 REQUIRED_TERMS = (
     "Judge Agent",
+    "Agent Mediator",
+    "Implementation Agent",
     "Scout Agent",
     "Architecture Reviewer",
     "Product Reviewer",

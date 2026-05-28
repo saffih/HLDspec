@@ -21,6 +21,10 @@ HLDspec does **not** replace SpecKit.
 > which evidence to use, which checkpoints to enforce, when to run RunSkeptic, when
 > to delegate to subagents, and when to stop and return to HLDspec for reassessment.
 
+HLDspec serves **three user journeys** — HLD Authoring (precondition), SpecKit
+Preparation (the core), and Implementation Guidance (extension). They are not
+equal; see §13.
+
 ---
 
 ## 2. Ownership boundaries
@@ -56,7 +60,10 @@ Hard rules:
   state machine, delegates to role reviewers and subagents, stops at gates, and
   produces the next safe action. Owns state transitions, checkpoint decisions, human
   questions, subagent delegation, safety boundaries, artifact completeness, and the
-  final readiness decision before handoff.
+  final readiness decision before handoff. This is the **original** orchestration
+  framing and remains accurate through SpecKit Preparation; for the post-SpecKit
+  implementation journey the driver is the user-side **Agent Mediator** (§13), not a
+  process-continuing Judge.
 - **ProjectMachine** — the **code-level** state-machine engine the Judge Agent uses.
   Owns continue/block/stop/error decisions, machine sequencing, and state
   transitions. Does **not** own specialist judgment or human-owned decisions.
@@ -151,6 +158,11 @@ Scripts        = deterministic tools
 - **SpecKit Run Card** — the complete execution instruction contract for the next
   agent (see §8). Distinct from the dossier.
 - **Build Agent / SpecKit Proxy Junior** — the external executor of a Run Card.
+- **Implementation Agent** — the hands of the implementation journey: runs SpecKit,
+  edits code, and runs tests, only within a bounded Run Card or approved slice scope.
+  Synonym for Build Agent / SpecKit Proxy in implementation context.
+- **Agent Mediator** — user-side observer and prompt/control assistant during an
+  active implementation session. **Not** the implementing agent; see §13.
 - **Run Card Scope / Stop Condition / Report Back** — the bounded scope, the
   conditions that force a stop, and the required report format.
 - **Reassessment Trigger** — a condition that requires returning to HLDspec.
@@ -593,3 +605,74 @@ HLD marking + single-spec input + content flow (`test_hld_marking.py`). Remainin
 slices (constitution/guidelines content, target `AGENTS.md`, HLD diff/stale-check,
 state-machine extension, legacy deprecation) are decomposed in the RunSkeptic review
 packets and each returns to GATE.
+
+---
+
+## 13. User journeys and the implementation mediator
+
+### Three journeys
+
+HLDspec is one workflow with three entry points, weighted around a single core:
+
+1. **HLD Authoring** *(precondition)* — when no reliable HLD exists yet: interview,
+   shape, repair, and clarify the source until it can be a dependable source of
+   truth.
+2. **SpecKit Preparation** *(the core / finish line)* — the primary deliverable: a
+   full, anchored, answer-prepared source package and a real SpecKit workspace ready
+   to run one complete `specify -> plan -> tasks -> analyze` flow with good software
+   principles and healthy, tested output.
+3. **Implementation Guidance** *(extension)* — after SpecKit outputs exist, drive
+   implementation to *proper* completion through guidance and reassessment. HLDspec
+   does not implement the product itself.
+
+### Why a mediator (design rationale)
+
+Driving implementation to completion was approached three ways, in order:
+
+1. **The Judge continues the process.** Rejected: too complex to make a single
+   orchestrator reliably own every post-handoff step.
+2. **One button / one large prompt does it all.** This is the auto-drive-all-phases
+   path (the live `SpecKitInvoker`, opt-in). Kept as a capability, but rejected as
+   the default — it removes the human from the loop and hides drift.
+3. **A mediator working with the human and HLDspec.** Chosen: the human keeps
+   control and visibility, HLDspec knowledge stays at hand, and prompts stay bounded.
+
+### Implementation Guidance modes
+
+- **Manual** — the user implements using HLDspec slice scope and checklists.
+- **Agent-assisted** — an Implementation Agent receives bounded prompts and scope.
+- **Mediator-assisted** — an Agent Mediator observes the implementation session and
+  helps the user steer it.
+
+### The Agent Mediator
+
+The Agent Mediator is **not** the implementing agent. It is the user's eyes, ears,
+memory, prompt engineer, and safety assistant for an active implementation session.
+The Implementation Agent has SpecKit and feature context and may edit code; the
+mediator observes that session (usually via tmux or another session surface), reads
+the HLDspec source package / run guide / slice scope, detects drift or blockers,
+prepares better prompts, and helps the user decide when to: **go, stop, clarify,
+rerun tests, or reassess with HLDspec**.
+
+Control words: `go`, `stop`, `stop now`, `clarify`, `rerun tests`, `reassess`.
+
+Cost/runtime modes:
+
+- **Devin** — the mediator runs as a cheap/free agent and bakes complete prompts so
+  each paid Implementation Agent turn lands in one shot. It also defines when free
+  sub-agents (`SWE-1.6 regular`) suffice for SpecKit work vs. when a stronger paid
+  model is required (see the model-routing tiers in `AGENTS.md`; do not duplicate the
+  table).
+- **Codex / Claude** — the mediator acts as an interactive consultant: the user can
+  ask "what's known", request better prompts, and push the SpecKit process forward.
+
+### Mediator boundary (hard rules)
+
+- Must not become the source of truth.
+- Must not silently answer human-owned decisions.
+- Must not approve completion alone.
+- Must not let the Implementation Agent expand scope.
+- Must not hide failed tests.
+- Tmux/session state is visibility only, never approval state.
+
+Operational prompt contract: `docs/MEDIATOR_PROMPT_PROTOCOL.md`.

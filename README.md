@@ -39,14 +39,78 @@ HLDspec is not:
 - a silent product-decision owner
 - a system that splits product truth into partial specs by default
 
+## Three user journeys
+
+HLDspec is one workflow with three entry points. They are not equal: **SpecKit
+Preparation is the core** — the other two are the bookends around it.
+
+### 1. HLD Authoring — *precondition*
+
+You do not yet have a reliable HLD. HLDspec helps interview, shape, repair, and
+clarify the source material until it can become a dependable source-of-truth
+document. This is the front-end helper, not the main event.
+
+### 2. SpecKit Preparation — *the core product*
+
+You have an HLD and want it to become **SpecKit-ready**. This is where HLDspec's
+job is essentially done. HLDspec:
+
+- preserves the full HLD (never splits product truth to make smaller specs),
+- anchors it with stable markers (`HLD-001`, …),
+- builds a single source package,
+- mirrors read-only context into `.specify/source/`,
+- initializes or validates a **real** SpecKit workspace,
+- and gives SpecKit the prepared context and answers to run one complete
+  `specify -> plan -> tasks -> analyze` flow with good software principles and
+  healthy, tested output.
+
+The finish line is a high-quality, anchored, answer-prepared package so the
+SpecKit process simply goes well.
+
+### 3. Implementation Guidance — *extension*
+
+After SpecKit outputs exist, things can still go wrong, and you need to drive
+implementation to *proper* completion. **HLDspec does not implement the product
+itself** — it provides guidance: slice scope, prompts, clarification rules, test
+requirements, stop conditions, and reassessment.
+
+Three modes:
+
+- **Manual** — you implement using HLDspec slice scope and checklists.
+- **Agent-assisted** — an Implementation Agent receives bounded prompts and scope.
+- **Mediator-assisted** — an **Agent Mediator** works alongside you and watches
+  the Implementation Agent.
+
+```mermaid
+flowchart LR
+    User["User — decision owner"] <--> Mediator["Agent Mediator — observe, prompt, safety, cost"]
+    Mediator <--> Impl["Implementation Agent — runs SpecKit, edits code, runs tests"]
+    HLDspec[("HLDspec source package / run guide / slice scope")] --> Mediator
+```
+
+The **Agent Mediator is not the implementing agent.** It is your eyes, ears,
+memory, prompt engineer, and safety assistant for an active implementation
+session: it watches the session (usually via tmux), reads the HLDspec source
+package / run guide / slice scope, detects drift or blockers, prepares better
+prompts, and helps you decide when to **go, stop, clarify, rerun tests, or
+reassess with HLDspec**. On Devin it bakes complete prompts to spend paid turns
+efficiently; on Codex or Claude it acts as an interactive consultant you can ask
+"what's known" and request better prompts from.
+
+Mediator boundary — the mediator must not become the source of truth, must not
+silently answer human-owned decisions, must not approve completion alone, must
+not let the Implementation Agent expand scope, and must not hide failed tests.
+Tmux/session state is visibility only, never approval state.
+
 ## Core ownership model
 
 | Owner | Owns |
 |---|---|
-| Human decision owner | Intent, product/architecture decisions, source-of-truth changes, risky approvals |
-| HLDspec | HLD source package, gates, validation, prompts, run cards, reassessment |
+| User (decision owner) | Intent, product/architecture decisions, source-of-truth changes, risky approvals |
+| HLDspec | Source-truth/process/gate system: HLD source package, gates, validation, prompts, run cards, reassessment |
+| Agent Mediator | User-side observer and prompt/control assistant during an implementation session |
+| Implementation Agent | The hands: runs SpecKit, edits code, runs tests — only within bounded run card or slice scope |
 | SpecKit | Constitution, final spec, plan, tasks, implementation artifacts |
-| Build agent / SpecKit proxy | Executes only the bounded run card or slice prompt |
 
 HLDspec can prepare and constrain work. It cannot silently approve human-owned decisions.
 

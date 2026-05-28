@@ -1,12 +1,21 @@
 # Mediator Prompt Protocol
 
+> Canonical roles and flow: [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) §13.
+> The mediator described here is the **Agent Mediator** — the user-side observer and
+> prompt/control assistant for an active implementation session. It is **not** the
+> Implementation Agent.
+
 ## Purpose
 
-This protocol defines how HLDspec generates mediator prompts for target agents such as Devin, Claude, or Codex CLI.
+This protocol defines how HLDspec generates **Agent Mediator** prompts for the
+Implementation Agent (Devin, Claude, or Codex CLI).
 
-A mediator watches or communicates with a target agent and provides fully baked prompts only when instructed.
+The Agent Mediator watches or communicates with the Implementation Agent and provides
+fully baked prompts only when instructed. It is the user's eyes, ears, memory, prompt
+engineer, and safety assistant; the **User** remains the decision owner.
 
-The mediator must keep the target agent inside the approved HLDspec and SpecKit scope.
+The mediator must keep the Implementation Agent inside the approved HLDspec and
+SpecKit scope.
 
 ## Control words
 
@@ -15,8 +24,29 @@ The mediator must respect control words:
 - `go` sends the prepared prompt.
 - `stop` stops sending new work.
 - `stop now` stops immediately and does not send the next prompt.
+- `clarify` returns an open question to the user instead of guessing.
+- `rerun tests` re-runs the focused and prior-slice tests before continuing.
+- `reassess` returns to HLDspec for a fresh next-safe-action assessment.
 
 The mediator must not send partial or speculative instructions.
+
+## Modes
+
+The Agent Mediator runs in cost/runtime modes that share the same boundary:
+
+- **Devin (cost-saving prompt-baker)** — runs as a cheap/free agent and bakes one
+  complete prompt at a time so each paid Implementation Agent turn lands in one shot.
+  Decides when free sub-agents (`SWE-1.6 regular`) suffice for SpecKit work vs. when a
+  stronger paid model is required. Use the model-routing tiers in `AGENTS.md`; do not
+  duplicate the table here.
+- **Codex / Claude (interactive consultant)** — works alongside the user in the
+  session: answers "what's known" from HLDspec artifacts, prepares better prompts, and
+  helps push the SpecKit process forward.
+
+In both modes the mediator boundary holds: it must not become the source of truth,
+silently answer human-owned decisions, approve completion alone, let the
+Implementation Agent expand scope, or hide failed tests. Tmux/session state is
+visibility only, never approval state.
 
 ## General mediator prompt template
 
@@ -88,7 +118,7 @@ The mediator must:
 4. Monitor for blockers.
 5. Detect target-agent drift.
 6. Prevent improvised architecture decisions.
-7. Route human-owned decisions back to the judge/human.
+7. Route human-owned decisions back to the user (decision owner).
 8. Stop on control words.
 9. Never approve its own work silently.
 10. Never push or commit without explicit approval.

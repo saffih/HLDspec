@@ -60,6 +60,15 @@ The full task graph is known.
 Only this selected part may be implemented now.
 ```
 
+## What "control" means (HLDspec provides, the user/mediator enforces)
+
+HLDspec **generates** the slice scope (`implementation_slices.json`,
+`implementation_slicing_policy.md`) and **bounds** each implementation pass with
+allowed task IDs, forbidden files, anchors, tests, and stop conditions. HLDspec does
+**not** execute or hard-enforce slices at runtime — the **user or Agent Mediator**
+enforces the boundary by deciding when to go, stop, clarify, rerun tests, or reassess.
+Slices are guidance/scope handed to the implementer, not phases HLDspec runs itself.
+
 ## Canonical slices and tests
 
 ### FOUNDATION

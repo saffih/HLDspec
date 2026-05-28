@@ -6,6 +6,12 @@
 > operational instruction contract); the proxy dossier is the evidence bundle. See
 > the canonical doc §8 for the Run Card schema.
 
+> The SpecKit Proxy Subagent is the **Implementation Agent** of the implementation
+> journey (§13). In **mediator-assisted** mode an **Agent Mediator** observes this
+> proxy's session, bakes its prompts, and helps the user steer (go/stop/clarify/rerun
+> tests/reassess); the mediator never executes SpecKit itself. See
+> `docs/MEDIATOR_PROMPT_PROTOCOL.md`.
+
 This protocol defines how HLDspec should use SpecKit through a bounded subagent.
 
 HLDspec does not replace SpecKit. HLDspec prepares the data, constitution context, architecture constraints, dependency order, and evidence. A SpecKit proxy subagent then engages with SpecKit as a prepared client.

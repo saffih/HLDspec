@@ -4,6 +4,31 @@
 
 > **HLDspec repo-development handoff:** before editing this repo or handing work to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` and `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`. `AGENTS.md`, compatibility shims, and generated `HANDOFF.md` files are pointers; the docs files are the source of truth.
 
+## Product model: three journeys
+
+HLDspec is an agent-first control layer around HLD-driven SpecKit work, serving three
+user journeys (full detail: `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §13):
+
+1. **HLD Authoring** *(precondition)* — interview/shape/repair/clarify until the HLD is
+   a reliable source of truth.
+2. **SpecKit Preparation** *(the core)* — anchor the full HLD, build the source package,
+   mirror read-only context into `.specify/source/`, init/validate a real SpecKit
+   workspace, and prepare answers for one complete specify -> plan -> tasks -> analyze
+   flow.
+3. **Implementation Guidance** *(extension)* — HLDspec does not implement; it provides
+   slice scope, prompts, clarification rules, test requirements, stop conditions, and
+   reassessment. Modes: manual, agent-assisted, mediator-assisted.
+
+Roles: **User** = decision owner; **HLDspec** = source-truth/process/gate system;
+**Agent Mediator** = user-side observer/prompt assistant; **Implementation Agent** =
+runs SpecKit/edits code/runs tests; **SpecKit** = owns spec/plan/tasks/implementation.
+
+The **Agent Mediator** observes an implementation session (usually tmux), keeps the
+Implementation Agent in scope, and helps the user steer with go/stop/clarify/rerun
+tests/reassess. It must not become the source of truth, answer human-owned decisions
+silently, approve completion alone, let scope expand, or hide failed tests. Prompt
+contract: `docs/MEDIATOR_PROMPT_PROTOCOL.md`.
+
 ## HLDspec trigger
 
 When a user prompt starts with `HLDspec`, use the minimal agent UX contract:

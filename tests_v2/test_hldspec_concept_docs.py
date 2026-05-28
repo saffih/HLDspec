@@ -23,6 +23,20 @@ class HldspecConceptDocsTests(unittest.TestCase):
         ):
             self.assertIn(phrase, text)
 
+    def test_readme_describes_three_journeys_and_mediator(self):
+        text = self.read("README.md")
+        for phrase in (
+            "## Three user journeys",
+            "HLD Authoring",
+            "SpecKit Preparation",
+            "Implementation Guidance",
+            "Agent Mediator",
+            "Implementation Agent",
+            "must not become the source of truth",
+            "interactive consultant",
+        ):
+            self.assertIn(phrase, text)
+
     def test_slice_control_doc_defines_required_slices_and_phase_behavior(self):
         text = self.read("docs/SPECKIT_SLICE_CONTROL.md")
         for phrase in (
