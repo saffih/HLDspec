@@ -29,6 +29,7 @@ class DetectInitCommandTests(unittest.TestCase):
     def test_detect_local_specify_command(self):
         commands = sw.detect_init_commands(which=_which_only("specify"))
         self.assertEqual(("specify", "init", "."), commands[0].argv)
+        self.assertEqual("specify init .", commands[0].display)
 
     def test_detect_spec_kit_command(self):
         commands = sw.detect_init_commands(which=_which_only("spec-kit"))
@@ -48,10 +49,37 @@ class DetectInitCommandTests(unittest.TestCase):
             commands[0].argv,
         )
 
-    def test_no_command_available_returns_blocker(self):
+    def test_no_command_available_returns_blocker_when_not_initialized(self):
         result = sw.plan_or_init_workspace("/tmp/nowhere", which=lambda _: None)
-        self.assertEqual("No supported SpecKit init command is available.", result.blocker)
+        self.assertIn("No supported SpecKit init command is available", result.blocker or "")
         self.assertFalse(result.ok)
+
+
+class WorkspaceStatusTests(unittest.TestCase):
+    def test_inspect_reports_uninitialized_missing_specify(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            status = sw.inspect_workspace(Path(tmp))
+        self.assertFalse(status.initialized)
+        self.assertFalse(status.specify_dir_exists)
+        self.assertIn("SpecKit init did not create", status.validation_error or "")
+
+    def test_inspect_reports_source_mirror_without_memory_as_not_initialized(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".specify" / "source").mkdir(parents=True)
+            status = sw.inspect_workspace(target)
+        self.assertFalse(status.initialized)
+        self.assertTrue(status.source_mirror_exists)
+        self.assertIn("only the generated .specify/source/ mirror is present", status.validation_error or "")
+
+    def test_inspect_accepts_real_speckit_memory_layout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".specify" / "memory").mkdir(parents=True)
+            status = sw.inspect_workspace(target)
+        self.assertTrue(status.initialized)
+        self.assertIsNone(status.validation_error)
+        self.assertTrue(status.metadata()["initialized"])
 
 
 class InitPlanningTests(unittest.TestCase):
@@ -73,6 +101,7 @@ class InitPlanningTests(unittest.TestCase):
         self.assertFalse(called)
         self.assertFalse(result.executed)
         self.assertTrue(result.ok)
+        self.assertFalse(result.initialized)
 
     def test_execute_requires_explicit_flag(self):
         called = False
@@ -85,6 +114,38 @@ class InitPlanningTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             sw.plan_or_init_workspace(tmp, which=_which_only("specify"), run=fake_run)
         self.assertFalse(called)
+
+    def test_execute_does_not_rerun_init_when_workspace_already_initialized(self):
+        called = False
+
+        def fake_run(*args, **kwargs):
+            nonlocal called
+            called = True
+            raise AssertionError("already initialized workspace must not rerun init")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".specify" / "memory").mkdir(parents=True)
+            result = sw.plan_or_init_workspace(
+                target,
+                execute=True,
+                which=lambda _: None,
+                run=fake_run,
+            )
+        self.assertFalse(called)
+        self.assertTrue(result.ok)
+        self.assertTrue(result.initialized)
+        self.assertEqual("already_initialized", result.skipped_reason)
+
+    def test_existing_initialized_workspace_does_not_require_command_on_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            (target / ".specify" / "memory").mkdir(parents=True)
+            result = sw.plan_or_init_workspace(target, execute=False, which=lambda _: None)
+        self.assertTrue(result.ok)
+        self.assertTrue(result.initialized)
+        self.assertIsNone(result.blocker)
+        self.assertIsNone(result.selected)
 
     def test_validate_specify_exists_after_init(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,6 +164,8 @@ class InitPlanningTests(unittest.TestCase):
         self.assertTrue(result.executed)
         self.assertTrue(result.initialized)
         self.assertIsNone(result.validation_error)
+        self.assertEqual(0, result.returncode)
+        self.assertEqual("ok", result.stdout)
 
     def test_execute_reports_missing_specify_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -114,6 +177,27 @@ class InitPlanningTests(unittest.TestCase):
             )
         self.assertFalse(result.ok)
         self.assertIn(".specify", result.validation_error or "")
+
+    def test_execute_reports_command_start_failure_without_faking_workspace(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = sw.plan_or_init_workspace(
+                tmp,
+                execute=True,
+                which=_which_only("specify"),
+                run=lambda *args, **kwargs: (_ for _ in ()).throw(OSError("boom")),
+            )
+        self.assertFalse(result.ok)
+        self.assertIn("failed to start", result.blocker or "")
+        self.assertEqual(127, result.returncode)
+        self.assertFalse((Path(tmp) / ".specify").exists())
+
+    def test_metadata_includes_workspace_status_and_command_display(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = sw.plan_or_init_workspace(tmp, execute=False, which=_which_only("uvx"))
+            meta = result.metadata()
+        self.assertIn("uvx --from", meta["selected_command_display"])
+        self.assertIsInstance(meta["workspace_status"], dict)
+        self.assertFalse(meta["workspace_status"]["initialized"])
 
 
 class SpecifyLayoutValidationTests(unittest.TestCase):
@@ -204,6 +288,7 @@ class StartIntegrationTests(unittest.TestCase):
             ["specify", "init", "."],
             session_plan["speckit_workspace_init"]["selected_command"],
         )
+        self.assertIn("workspace_status", agent_session["speckit_workspace_init"])
 
     def test_start_prompt_no_longer_defaults_legacy_bundle_outputs(self):
         self._run_start()
@@ -225,6 +310,27 @@ class StartIntegrationTests(unittest.TestCase):
         self.assertIn(".hldspec/source_package/session_plan.json", prompt)
         self.assertIn("Default mode is dry-run planning only.", prompt)
         self.assertFalse((self.target / ".specify").exists())
+
+    def test_start_on_existing_initialized_workspace_records_initialized_true(self):
+        (self.target / ".specify" / "memory").mkdir(parents=True)
+        with mock.patch.object(facade.sw, "detect_init_commands", return_value=()):
+            rc = facade.main(
+                [
+                    "start",
+                    "--source",
+                    str(self.source),
+                    "--target",
+                    str(self.target),
+                ]
+            )
+        self.assertEqual(0, rc)
+        agent_session = json.loads(
+            (self.target / ".hldspec" / "agent_session.json").read_text(encoding="utf-8")
+        )
+        init = agent_session["speckit_workspace_init"]
+        self.assertTrue(init["initialized"])
+        self.assertEqual("already_initialized", init["skipped_reason"])
+        self.assertIsNone(init["blocker"])
 
 
 if __name__ == "__main__":
