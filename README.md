@@ -128,8 +128,11 @@ target/
       HLD.marked.md
       hld_reference_map.json
       speckit_single_spec_input.md
+      implementation_slicing_policy.md
       implementation_slices.json
-      slice_execution_policy.md
+      slice_test_policy.md
+      speckit_slice_execution_prompt.md
+      anchor_coverage_schema.json
       source_manifest.json
       source_package.json
       session_plan.json

@@ -1,7 +1,18 @@
 import unittest
 from pathlib import Path
 
+from hldspec import implementation_slicing as slicing
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+SLICE_ARTIFACT_FILENAMES = (
+    slicing.IMPLEMENTATION_SLICING_POLICY_FILE,
+    slicing.IMPLEMENTATION_SLICES_FILE,
+    slicing.SLICE_TEST_POLICY_FILE,
+    slicing.SPECKIT_SLICE_EXECUTION_PROMPT_FILE,
+    slicing.ANCHOR_COVERAGE_SCHEMA_FILE,
+)
 
 
 class HldspecConceptDocsTests(unittest.TestCase):
@@ -22,6 +33,19 @@ class HldspecConceptDocsTests(unittest.TestCase):
             "docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md",
         ):
             self.assertIn(phrase, text)
+
+    def test_slice_artifact_filenames_match_runtime_constants(self):
+        for rel in ("README.md", "AGENTS.md", "docs/SPECKIT_SLICE_CONTROL.md"):
+            text = self.read(rel)
+            for filename in SLICE_ARTIFACT_FILENAMES:
+                self.assertIn(filename, text, msg=f"{filename} missing from {rel}")
+
+    def test_agents_has_single_canonical_speckit_read_rule(self):
+        text = self.read("AGENTS.md")
+        self.assertEqual(text.count("Before any SpecKit phase"), 1)
+        self.assertIn("before any SpecKit proxy task, read the same context", text)
+        self.assertNotIn("any slice-control files mirrored under `.specify/source/`", text)
+        self.assertNotIn("`.specify/source/implementation_slices.json`, and `.specify/source/slice_test_policy.md`", text)
 
     def test_readme_describes_three_journeys_and_mediator(self):
         text = self.read("README.md")
@@ -89,9 +113,12 @@ class HldspecConceptDocsTests(unittest.TestCase):
         for phrase in (
             "../README.md",
             "SPECKIT_SLICE_CONTROL.md",
+            "SPECKIT_PROXY_PROTOCOL.md",
             "HLDSPEC_GAP_HANDOFF_TEMPLATE.md",
         ):
             self.assertIn(phrase, text)
+        handoff_rows = [line for line in text.splitlines() if "HLDSPEC_DEVELOPMENT_HANDOFF.md" in line]
+        self.assertEqual(len(handoff_rows), 1)
 
 
 if __name__ == "__main__":

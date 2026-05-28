@@ -81,11 +81,9 @@ ownership, dependency, security, rollout, split/merge, or promotion decisions.
 
 Process specs in order. Complete **specify → clarify when needed → plan → tasks
 → analyze** before moving to implementation or the next controlling gate.
-Before any SpecKit phase, the junior must read `.specify/source/HLD.md`,
-`.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`,
-and any slice-control files mirrored under `.specify/source/`. Complete one full
-specify -> plan -> tasks -> analyze sequence before implementation. During
-implementation, execute only the selected approved slice/task IDs and stop.
+Complete one full specify -> plan -> tasks -> analyze sequence before
+implementation. During implementation, execute only the selected approved
+slice/task IDs and stop.
 
 
 Optional tmux is a convenience surface only. If used, launch it from the
@@ -164,7 +162,6 @@ Each junior call or subtask must:
 - Do not search the web for workflow steps
 - Source HLD is read-only — work only on workspace copies
 - Do not invoke SpecKit until `SPECKIT_PREWORK_APPROVAL_GATE` is APPROVED
-- Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, `.specify/source/implementation_slices.json`, and `.specify/source/slice_test_policy.md`; use one full specify/plan/tasks/analyze cycle, then implement only the explicitly selected slice unless full implementation is approved.
 - Do not implement code before explicit implementation approval
 - Do not answer checkpoint questions silently — surface them to the user
 - Do not promote artifacts without judge approval
@@ -172,7 +169,18 @@ Each junior call or subtask must:
 
 ## SpecKit slice-control rule
 
-Before any SpecKit phase or SpecKit proxy task, read `docs/SPECKIT_SLICE_CONTROL.md` and the generated source context under `.specify/source/` when present.
+Before any SpecKit phase, read `.specify/source/HLD.md` and the generated source context under `.specify/source/` when present; before any SpecKit proxy task, read the same context:
+
+- `.specify/source/HLD.md`
+- `.specify/source/hld_reference_map.json`
+- `.specify/source/speckit_single_spec_input.md`
+- `.specify/source/implementation_slicing_policy.md`
+- `.specify/source/implementation_slices.json`
+- `.specify/source/slice_test_policy.md`
+- `.specify/source/speckit_slice_execution_prompt.md`
+- `.specify/source/anchor_coverage_schema.json`
+
+Also read `docs/SPECKIT_SLICE_CONTROL.md` before any SpecKit phase or proxy task.
 
 Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
 

@@ -69,6 +69,19 @@ allowed task IDs, forbidden files, anchors, tests, and stop conditions. HLDspec 
 enforces the boundary by deciding when to go, stop, clarify, rerun tests, or reassess.
 Slices are guidance/scope handed to the implementer, not phases HLDspec runs itself.
 
+## Generated source-package artifacts
+
+HLDspec writes the slice-control artifacts under `.hldspec/source_package/` and
+mirrors them as generated read-only context under `.specify/source/`:
+
+```text
+implementation_slicing_policy.md
+implementation_slices.json
+slice_test_policy.md
+speckit_slice_execution_prompt.md
+anchor_coverage_schema.json
+```
+
 ## Canonical slices and tests
 
 ### FOUNDATION

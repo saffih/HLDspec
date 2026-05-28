@@ -68,9 +68,7 @@ HLDspec HLD: /Users/saffi/code/flow/flow-hld.md create /Users/saffi/code/flowHld
 - Treat the source HLD as read-only.
 - Work only on workspace copies.
 - HLDspec must use SpecKit instead of reimplementing SpecKit.
-- Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, `.specify/source/implementation_slices.json`, and `.specify/source/slice_test_policy.md`; use one full specify/plan/tasks/analyze cycle, then implement only the explicitly selected slice unless full implementation is approved.
 - Invoke SpecKit only via the proxy script after SPECKIT_PREWORK_APPROVAL_GATE is passed and prework is APPROVED.
-- Before any SpecKit phase, read `.specify/source/HLD.md`, `.specify/source/hld_reference_map.json`, `.specify/source/speckit_single_spec_input.md`, and any slice-control files mirrored under `.specify/source/`. Run one complete specify -> plan -> tasks -> analyze sequence, then implement only selected approved slice/task IDs.
 
 - Do not create final specs manually.
 - Do not implement.
@@ -264,7 +262,18 @@ These concerns are mandatory and must be visible in generated artifacts before p
 
 ## SpecKit slice-control rule
 
-Before any SpecKit phase or SpecKit proxy task, read `docs/SPECKIT_SLICE_CONTROL.md` and the generated source context under `.specify/source/` when present.
+Before any SpecKit phase, read `.specify/source/HLD.md` and the generated source context under `.specify/source/` when present; before any SpecKit proxy task, read the same context:
+
+- `.specify/source/HLD.md`
+- `.specify/source/hld_reference_map.json`
+- `.specify/source/speckit_single_spec_input.md`
+- `.specify/source/implementation_slicing_policy.md`
+- `.specify/source/implementation_slices.json`
+- `.specify/source/slice_test_policy.md`
+- `.specify/source/speckit_slice_execution_prompt.md`
+- `.specify/source/anchor_coverage_schema.json`
+
+Also read `docs/SPECKIT_SLICE_CONTROL.md` before any SpecKit phase or proxy task.
 
 Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
 

@@ -1,7 +1,18 @@
 import unittest
 from pathlib import Path
 
+from hldspec import implementation_slicing as slicing
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+SLICE_ARTIFACT_FILENAMES = (
+    slicing.IMPLEMENTATION_SLICING_POLICY_FILE,
+    slicing.IMPLEMENTATION_SLICES_FILE,
+    slicing.SLICE_TEST_POLICY_FILE,
+    slicing.SPECKIT_SLICE_EXECUTION_PROMPT_FILE,
+    slicing.ANCHOR_COVERAGE_SCHEMA_FILE,
+)
 
 
 class ArtifactContractDocsTests(unittest.TestCase):
@@ -40,6 +51,8 @@ class ArtifactContractDocsTests(unittest.TestCase):
         self.assertIn("Forbidden work", text)
         self.assertIn("Focused tests", text)
         self.assertIn("Regression tests", text)
+        for filename in SLICE_ARTIFACT_FILENAMES:
+            self.assertIn(filename, text)
 
     def test_gap_handoff_template_uses_contract_shape(self):
         text = self.read("docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md")
@@ -61,6 +74,20 @@ class ArtifactContractDocsTests(unittest.TestCase):
             self.assertIn("artifact contract", text.lower())
             self.assertIn("Inputs", text)
             self.assertIn("Stop Conditions", text)
+            for filename in SLICE_ARTIFACT_FILENAMES:
+                self.assertIn(filename, text)
+
+    def test_docs_index_has_no_duplicate_development_handoff_row(self):
+        text = self.read("docs/DOCS_INDEX.md")
+        handoff_rows = [line for line in text.splitlines() if "HLDSPEC_DEVELOPMENT_HANDOFF.md" in line]
+        self.assertEqual(len(handoff_rows), 1)
+        for filename in (
+            "../README.md",
+            "SPECKIT_SLICE_CONTROL.md",
+            "SPECKIT_PROXY_PROTOCOL.md",
+            "HLDSPEC_GAP_HANDOFF_TEMPLATE.md",
+        ):
+            self.assertIn(filename, text)
 
 
 if __name__ == "__main__":
