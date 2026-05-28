@@ -71,15 +71,40 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 
 ## Contract 3: Slice, mediator, and implementation guidance contract
 
+### Operator / Doctor / Devin Mediator Boundary
+
+- HLDspec Operator is HLDspec core behavior.
+- SpecKit Doctor is the diagnostic/preflight part of the SpecKit Operator.
+- SpecKit Doctor is not the whole Operator.
+- SpecKit Operator is broader than Doctor.
+- SpecKit Operator's planned next layer is lifecycle state and next-safe-action guidance.
+- HLDspec Operator uses target facts, source-package state, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today.
+- Until Operator State exists, Doctor provides readiness/preflight facts only and must not pretend to decide the full lifecycle.
+- Devin Mediator is a Devin-specific runtime adapter.
+- Devin Mediator is not HLDspec core behavior.
+- HLDspec does not mediate Devin directly.
+- HLDspec produces operator facts, source package, Engineering Toolbox guidance, slices, and test policy.
+- Devin Mediator consumes HLDspec Operator facts/artifacts to drive Devin safely.
+- Devin-specific exact go/stop/session rules must not define the generic Operator layer.
+- Operator / Doctor / Devin Mediator are not interchangeable names for the same thing.
+
 ### What must remain true
 
+- HLDspec core behavior is the SpecKit Operator.
+- SpecKit Doctor is the diagnostic/preflight part of the Operator.
+- SpecKit Doctor is not the whole Operator.
 - HLDspec uses one complete `specify -> plan -> tasks -> analyze` flow before implementation.
 - Implementation then proceeds through many guided implementation slices.
 - HLDspec provides and bounds slice-control.
 - The user or Agent Mediator enforces slice scope during runtime.
+- Devin Mediator is a Devin-specific runtime adapter.
+- HLDspec does not mediate Devin directly.
+- HLDspec produces operator facts, lifecycle state, and next-safe-action guidance.
+- Devin Mediator consumes HLDspec Operator facts/artifacts.
 - Agent Mediator is not the Implementation Agent.
 - Implementation Agent runs SpecKit, edits code, and runs tests.
 - Tmux or session state is visibility only, not approval state.
+- Devin-specific exact go/stop/session rules must not define the generic Operator layer.
 - Journey 3 mediator support preserves mode-specific control words: Devin uses exact `go` and exact `stop`; direct mediator mode may document `stop now` as optional behavior only; both modes preserve `clarify`, `rerun tests`, and `reassess`.
 - Devin mediator activation syntax remains: `create agent on {path} as {session-name} using model {model} [permission-mode {mode}]`.
 - Codex and Claude may use direct mediator mode, but must preserve the same mediator boundaries and evidence rules.
@@ -96,6 +121,9 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - Do not claim HLDspec hard-enforces runtime slices unless code actually does.
 - Do not let agents run all tasks by default.
 - Do not confuse Agent Mediator with Implementation Agent.
+- Do not let Devin-specific exact go/stop/session rules define the generic Operator layer.
+- Do not let generic Operator guidance require Devin/tmux/session behavior.
+- Do not let Doctor readiness be treated as full lifecycle operation.
 - Do not let the mediator approve completion alone.
 - Do not treat tmux output as source truth or approval.
 - Do not remove or weaken the Devin mediator activation syntax without an explicitly reviewed replacement.

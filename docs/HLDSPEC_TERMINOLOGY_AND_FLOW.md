@@ -53,6 +53,26 @@ Hard rules:
 - **HLDspec Product Facade** — the small public command surface (`start`, `status`,
   `review`, `continue`, `diff`, `doctor`). Hides internal scripts; prints
   decision-oriented output.
+- **HLDspec Operator** — the core HLDspec behavior that produces operator facts,
+  source-package context, slice control, and next-safe-action guidance today.
+  Its planned next layer is lifecycle state and next-safe-action guidance.
+- **SpecKit Doctor** — the diagnostic/preflight part of the HLDspec Operator. It
+  checks readiness for real `specify`, `spec-kit`, or `uvx --from
+  git+https://github.com/github/spec-kit.git spec-kit` invocation paths and
+  reports the next safe action.
+- **Operator Facts** — the factual outputs the HLDspec Operator provides about
+  target state, source-package state, SpecKit readiness, engineering guidance,
+  slices, and test policy.
+- **Planned Operator State** — the future HLDspec Operator layer that will
+  represent lifecycle state; until it exists, Doctor stays in readiness/preflight
+  mode.
+- **Planned Next Safe Action** — the future HLDspec Operator output that will
+  summarize what should happen next from lifecycle state; until it exists, Doctor
+  provides readiness facts only and must not pretend to decide the full
+  lifecycle.
+- **Next Safe Action** — the action HLDspec recommends after weighing operator
+  facts and readiness checks; it answers what should happen next without
+  becoming implementation execution.
 - **HLDspec Agent Session** — agent-guided session that interprets user intent and
   drives the system safely using machines and scripts as tools. Does not silently
   answer human-owned decisions.
@@ -163,6 +183,14 @@ Scripts        = deterministic tools
   Synonym for Build Agent / SpecKit Proxy in implementation context.
 - **Agent Mediator** — user-side observer and prompt/control assistant during an
   active implementation session. **Not** the implementing agent; see §13.
+- **Devin Mediator** — Devin-specific runtime adapter that consumes HLDspec
+  Operator facts to drive a Devin session safely. HLDspec does not mediate Devin
+  directly.
+- **Devin Mediator is not a replacement for the Operator** — the adapter can
+  drive a Devin session safely, but generic HLDspec Operator guidance remains
+  usable without Devin.
+- **Operator / Doctor / Devin Mediator** — not interchangeable names for the
+  same thing.
 - **Run Card Scope / Stop Condition / Report Back** — the bounded scope, the
   conditions that force a stop, and the required report format.
 - **Reassessment Trigger** — a condition that requires returning to HLDspec.
@@ -655,6 +683,8 @@ mediator observes that session (usually via tmux or another session surface), re
 the HLDspec source package / run guide / slice scope, detects drift or blockers,
 prepares better prompts, and helps the user decide when to: **go, stop, clarify,
 rerun tests, or reassess with HLDspec**.
+
+The generic HLDspec Operator sits above this mediator layer. It produces operator facts and next-safe-action guidance; the Devin Mediator consumes those facts and related artifacts to drive Devin safely. HLDspec does not mediate Devin directly, and Devin-specific exact go/stop/session rules do not define the generic Operator layer.
 
 The mediator uses mode-specific control words:
 

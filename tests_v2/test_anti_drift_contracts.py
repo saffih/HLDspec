@@ -59,12 +59,26 @@ class AntiDriftContractTests(unittest.TestCase):
         self.assert_contains_all(
             text,
             (
+                "Operator / Doctor / Devin Mediator Boundary",
+                "HLDspec Operator is HLDspec core behavior",
+                "SpecKit Doctor is the diagnostic/preflight part of the SpecKit Operator",
+                "SpecKit Doctor is not the whole Operator",
+                "SpecKit Operator is broader than Doctor",
+                "planned next layer is lifecycle state and next-safe-action guidance",
+                "Until Operator State exists, Doctor provides readiness/preflight facts only and must not pretend to decide the full lifecycle",
+                "Devin Mediator is a Devin-specific runtime adapter",
+                "Devin Mediator is not HLDspec core behavior",
+                "HLDspec does not mediate Devin directly",
+                "Devin Mediator consumes HLDspec Operator facts/artifacts to drive Devin safely",
+                "Devin-specific exact go/stop/session rules must not define the generic Operator layer",
+                "Operator / Doctor / Devin Mediator are not interchangeable names for the same thing",
                 "specify -> plan -> tasks -> analyze",
                 "many guided implementation slices",
                 "HLDspec provides and bounds slice-control",
                 "user or Agent Mediator enforces slice scope during runtime",
                 "Agent Mediator is not the Implementation Agent",
                 "Tmux or session state is visibility only",
+                "Do not let Doctor readiness be treated as full lifecycle operation",
             ),
         )
 

@@ -324,10 +324,27 @@ def _run_init_help_smoke(
 ) -> dict[str, Any] | None:
     if command is None:
         return None
-    smoke_argv_options = (
-        [command.argv[0], "--help"],
-        [command.argv[0], "--version"],
-    )
+    smoke_argv_options: tuple[list[str], ...]
+    if command.label == "specify":
+        smoke_argv_options = (
+            ["specify", "--help"],
+            ["specify", "--version"],
+        )
+    elif command.label == "spec-kit":
+        smoke_argv_options = (
+            ["spec-kit", "--help"],
+            ["spec-kit", "--version"],
+        )
+    elif command.label == "uvx-spec-kit":
+        smoke_argv_options = (
+            ["uvx", "--from", sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"],
+            ["uvx", "--from", sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"],
+        )
+    else:
+        smoke_argv_options = (
+            [command.argv[0], "--help"],
+            [command.argv[0], "--version"],
+        )
     for argv in smoke_argv_options:
         try:
             completed = _run_command(run, list(argv), cwd=target)
@@ -345,8 +362,8 @@ def _run_init_help_smoke(
             }
     return {
         "status": "ACTION",
-        "details": f"{command.display} did not pass a help/version smoke check.",
-        "next_action": f"Repair or reinstall {command.argv[0]} and rerun the readiness doctor.",
+        "details": f"SpecKit smoke check did not pass for {shlex.join(list(smoke_argv_options[0]))} or {shlex.join(list(smoke_argv_options[1]))}.",
+        "next_action": f"Repair or reinstall the selected SpecKit command for {command.label} and rerun the readiness doctor.",
     }
 
 

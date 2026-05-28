@@ -104,6 +104,16 @@ silently answer human-owned decisions, must not approve completion alone, must
 not let the Implementation Agent expand scope, and must not hide failed tests.
 Tmux/session state is visibility only, never approval state.
 
+Operator / Doctor / Devin Mediator boundary — HLDspec Operator is the core
+layer that today uses target facts, source-package state, Engineering Toolbox
+guidance, implementation slicing, mediator/operator guidance, and SpecKit
+Doctor readiness facts. Its planned next layer is lifecycle state and
+next-safe-action guidance. SpecKit Doctor is the diagnostic/preflight part of
+the Operator, not the whole Operator. Devin Mediator is Devin-specific adapter
+behavior that consumes HLDspec Operator facts/artifacts to drive Devin safely;
+HLDspec does not mediate Devin directly, and Devin exact go/stop/tmux/session
+rules do not define the generic Operator layer.
+
 ## Core ownership model
 
 | Owner | Owns |

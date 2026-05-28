@@ -10,6 +10,13 @@
 This protocol defines how HLDspec generates **Agent Mediator** prompts for the
 Implementation Agent (Devin, Claude, or Codex CLI).
 
+The generic HLDspec Operator is the core HLDspec behavior that today produces
+operator facts and readiness guidance. Its planned next layer is lifecycle state
+and next-safe-action guidance. The Devin Mediator is a Devin-specific runtime
+adapter that consumes those operator facts and related artifacts. HLDspec does
+not mediate Devin directly, and Devin-specific exact go/stop/session rules do
+not define the generic Operator layer.
+
 The Agent Mediator watches or communicates with the Implementation Agent and provides
 fully baked prompts only when instructed. It is the user's eyes, ears, memory, prompt
 engineer, and safety assistant; the **User** remains the decision owner.

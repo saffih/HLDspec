@@ -45,6 +45,24 @@ class _RunStub:
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
 
+class _UvXSmokeStub:
+    def __init__(self, *, bare_uvx_ok: bool, real_uvx_ok: bool):
+        self.bare_uvx_ok = bare_uvx_ok
+        self.real_uvx_ok = real_uvx_ok
+        self.calls: list[list[str]] = []
+
+    def __call__(self, argv, cwd, text, capture_output, check):
+        argv = list(argv)
+        self.calls.append(argv)
+        if argv == ["uvx", "--help"] or argv == ["uvx", "--version"]:
+            return SimpleNamespace(returncode=0 if self.bare_uvx_ok else 1, stdout="help\n" if self.bare_uvx_ok else "", stderr="")
+        real_help = ["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"]
+        real_version = ["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"]
+        if argv == real_help or argv == real_version:
+            return SimpleNamespace(returncode=0 if self.real_uvx_ok else 1, stdout="help\n" if self.real_uvx_ok else "", stderr="" if self.real_uvx_ok else "boom")
+        return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+
 def _which_only(*names: str):
     allowed = set(names)
 
@@ -106,6 +124,28 @@ class SpeckitReadinessTests(unittest.TestCase):
         self.assertEqual("uvx-spec-kit", report["selected_init_command"]["label"])
         self.assertTrue(any(item["label"] == "uvx-spec-kit" for item in report["available_init_commands"]))
         self.assertTrue(report["workspace_status"]["initialized"])
+
+    def test_uvx_smoke_uses_real_spec_kit_invocation(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        run = _UvXSmokeStub(bare_uvx_ok=False, real_uvx_ok=True)
+        report = self._report(target, which=_which_only("uvx"), run=run)
+        smoke = next(item for item in report["checks"] if item["name"] == "command help/version smoke check")
+        self.assertEqual("PASS", smoke["status"])
+        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"], run.calls)
+        self.assertNotIn(["uvx", "--help"], run.calls)
+        self.assertNotIn(["uvx", "--version"], run.calls)
+
+    def test_uvx_help_success_does_not_mask_spec_kit_invocation_failure(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        run = _UvXSmokeStub(bare_uvx_ok=True, real_uvx_ok=False)
+        report = self._report(target, which=_which_only("uvx"), run=run)
+        smoke = next(item for item in report["checks"] if item["name"] == "command help/version smoke check")
+        self.assertEqual("ACTION", smoke["status"])
+        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"], run.calls)
+        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"], run.calls)
+        self.assertNotIn(["uvx", "--help"], run.calls)
 
     def test_branch_hook_missing_reports_action(self) -> None:
         target = self.root / "target"
