@@ -19,6 +19,9 @@ def _seed_min_package(source_dir: Path) -> None:
     (source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).write_text(
         "# Single spec input\n", encoding="utf-8"
     )
+    (source_dir / sp.AUTHORITATIVE_FILES["engineering_guidelines"]).write_text(
+        "# Engineering Guidelines\n", encoding="utf-8"
+    )
 
 
 class SourcePackageContractTests(unittest.TestCase):
@@ -26,11 +29,11 @@ class SourcePackageContractTests(unittest.TestCase):
         for filename in sp.REQUIRED_FILES:
             self.assertIn(filename, sp.AUTHORITATIVE_FILES.values())
 
-    def test_engineering_guidelines_are_known_but_not_required(self):
+    def test_engineering_guidelines_are_required_and_mirrored(self):
         filename = sp.AUTHORITATIVE_FILES["engineering_guidelines"]
         self.assertIn(filename, sp.AUTHORITATIVE_FILES.values())
         self.assertIn(filename, sp.MIRROR_FILES)
-        self.assertNotIn(filename, sp.REQUIRED_FILES)
+        self.assertIn(filename, sp.REQUIRED_FILES)
 
     def test_constitution_proposal_not_mirrored(self):
         self.assertNotIn(sp.CONSTITUTION_PROPOSAL_FILE, sp.MIRROR_FILES)
@@ -66,9 +69,12 @@ class SourcePackageBuildTests(unittest.TestCase):
         manifest = sp.compute_manifest(self.source_dir)
         self.assertTrue(manifest["hld"]["present"])
         self.assertIsNotNone(manifest["hld"]["sha256"])
-        # engineering_guidelines not seeded -> absent, no hash.
-        self.assertFalse(manifest["engineering_guidelines"]["present"])
-        self.assertIsNone(manifest["engineering_guidelines"]["sha256"])
+        # engineering_guidelines is seeded -> present with a hash.
+        self.assertTrue(manifest["engineering_guidelines"]["present"])
+        self.assertIsNotNone(manifest["engineering_guidelines"]["sha256"])
+        # constitution proposal is not seeded -> absent, no hash.
+        self.assertFalse(manifest["constitution_proposal"]["present"])
+        self.assertIsNone(manifest["constitution_proposal"]["sha256"])
 
     def test_source_package_metadata_keys(self):
         meta = sp.write_source_package(
@@ -112,7 +118,9 @@ class SourcePackageBuildTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn(sp.AUTHORITATIVE_FILES["hld"], result.hash_mismatches)
 
-    def test_build_does_not_generate_engineering_guidelines_by_default(self):
+    def test_build_generates_engineering_guidelines_and_mirrors_it(self):
+        from hldspec import engineering_selection as es
+
         build = sp.build_source_package_content(
             self.root,
             "# HLD\n\n## Intro\n\nText.\n",
@@ -122,14 +130,20 @@ class SourcePackageBuildTests(unittest.TestCase):
         self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
         engineering_guidelines = self.source_dir / sp.AUTHORITATIVE_FILES["engineering_guidelines"]
         mirror_guidelines = self.mirror_dir / sp.AUTHORITATIVE_FILES["engineering_guidelines"]
-        self.assertFalse(
+        self.assertTrue(
             engineering_guidelines.exists(),
-            msg="engineering_guidelines.md should be absent until generation is implemented",
+            msg="engineering_guidelines.md must be generated for a real source package build",
         )
-        self.assertFalse(
+        self.assertTrue(
             mirror_guidelines.exists(),
-            msg="mirror should not invent engineering_guidelines.md when source_package lacks it",
+            msg="engineering_guidelines.md must be mirrored into .specify/source",
         )
+        # Generated content is real selected guidance, not a stub.
+        self.assertEqual([], es.validate_engineering_guidelines(engineering_guidelines.read_text(encoding="utf-8")))
+        # Manifest tracks it as present with a hash.
+        manifest = sp.compute_manifest(self.source_dir)
+        self.assertTrue(manifest["engineering_guidelines"]["present"])
+        self.assertIsNotNone(manifest["engineering_guidelines"]["sha256"])
 
 
 class SpecifyMirrorTests(unittest.TestCase):
@@ -175,9 +189,9 @@ class SpecifyMirrorTests(unittest.TestCase):
         # A managed file present in the mirror but absent from the source package
         # must be removed on re-materialise (no stale orphans).
         self.mirror_dir.mkdir(parents=True, exist_ok=True)
-        orphan = sp.AUTHORITATIVE_FILES["engineering_guidelines"]
+        orphan = sp.AUTHORITATIVE_FILES["runbook"]
         self.assertNotIn(orphan, sp.REQUIRED_FILES)  # not seeded -> absent in source
-        (self.mirror_dir / orphan).write_text("stale guidelines\n", encoding="utf-8")
+        (self.mirror_dir / orphan).write_text("stale runbook\n", encoding="utf-8")
         sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
         self.assertFalse((self.mirror_dir / orphan).exists())
 

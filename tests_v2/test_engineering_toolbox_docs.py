@@ -39,14 +39,16 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
             ),
         )
 
-    def test_engineering_guidelines_generation_is_not_yet_implemented(self):
+    def test_minimal_engineering_guidelines_generation_is_implemented(self):
         text = self.read("docs/ENGINEERING_TOOLBOX.md")
         self.assert_contains_all(
             text,
             (
-                "selection -> generated engineering_guidelines.md generation step is NOT yet implemented",
-                "engineering_guidelines.md is optional context",
-                "read only when present",
+                "minimal P0 `engineering_guidelines.md` generation is implemented",
+                "hldspec/engineering_selection.py",
+                "P0-card selected guidance, not the full enforcement loop",
+                "`selection.json` / `decisions.jsonl`",
+                "must not copy the whole toolbox into every target",
             ),
         )
 

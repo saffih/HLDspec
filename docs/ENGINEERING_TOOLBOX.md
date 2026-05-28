@@ -749,7 +749,9 @@ selected card
 The catalog itself is not the product. The selected, enforced target guidance is
 the product behavior.
 
-Status: the selection -> generated engineering_guidelines.md generation step is NOT yet implemented. Until it is, engineering_guidelines.md is optional context and is read only when present.
+Status: minimal P0 `engineering_guidelines.md` generation is implemented. Every new source package build generates a real, target-specific `engineering_guidelines.md` (and its `.specify/source/` mirror) from the always-on baseline cards plus the P0 cards triggered by the HLD (`hldspec/engineering_selection.py`).
+
+This is P0-card selected guidance, not the full enforcement loop. The machine-readable `selection.json` / `decisions.jsonl` records and the gate that blocks missing card evidence are still future work. HLDspec must not copy the whole toolbox into every target: generation stays limited to selected and baseline P0 cards.
 
 ## Gate flags
 

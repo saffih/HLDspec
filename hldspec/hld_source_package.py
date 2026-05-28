@@ -88,6 +88,7 @@ REQUIRED_FILES: tuple[str, ...] = (
     AUTHORITATIVE_FILES["marked_hld"],
     AUTHORITATIVE_FILES["reference_map"],
     AUTHORITATIVE_FILES["single_spec_input"],
+    AUTHORITATIVE_FILES["engineering_guidelines"],
 )
 
 
@@ -264,7 +265,7 @@ def build_source_package_content(
     gate, matching the SourcePackageValidation pattern).
     """
     # Imported here to avoid an import cycle (those modules import this one).
-    from . import hld_marking, single_spec_input, implementation_slicing
+    from . import hld_marking, single_spec_input, implementation_slicing, engineering_selection
 
     adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
     source_dir = adapter.source_package_dir
@@ -282,6 +283,11 @@ def build_source_package_content(
 
     for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
         (source_dir / filename).write_text(content, encoding="utf-8")
+
+    (source_dir / AUTHORITATIVE_FILES["engineering_guidelines"]).write_text(
+        engineering_selection.render_engineering_guidelines_md(hld_text, project_name=project_name),
+        encoding="utf-8",
+    )
 
     valid_anchors = set(ref_map["anchors"].keys())
     unsupported = single_spec_input.find_unsupported_claims(spec_input, valid_anchors)
