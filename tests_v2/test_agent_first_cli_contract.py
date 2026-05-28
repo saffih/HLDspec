@@ -301,7 +301,22 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn("## Final Summary", result.stdout)
+        self.assertIn("## SpecKit Readiness", result.stdout)
+        self.assertIn("Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror.", result.stdout)
         self.assertIn("Summary: PASS", result.stdout)
+
+    def test_speckit_doctor_reports_readiness(self) -> None:
+        target = self.tmp_path / "target"
+        target.mkdir()
+
+        result = self.run_facade("speckit-doctor", target)
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("STATUS:", result.stdout)
+        self.assertIn("Next actions:", result.stdout)
+        self.assertIn("Workspace initialized:", result.stdout)
+        self.assertIn("Branch hook/manual branch path ready:", result.stdout)
+        self.assertIn("Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror.", result.stdout)
 
     def test_output_docs_exist_and_mention_exit_code_semantics(self) -> None:
         output_contract = self.repo / "docs" / "HLDSPEC_OUTPUT_CONTRACT.md"

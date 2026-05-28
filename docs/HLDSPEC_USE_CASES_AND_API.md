@@ -68,6 +68,7 @@ These commands are current product behavior:
 | `hldspec continue` | current | Run ProjectMachine to the next safe checkpoint through the new target layout. |
 | `hldspec diff` | current | Compare current source hash against the recorded target session hash. |
 | `hldspec doctor` | current | Check required docs/tools and target session files. |
+| `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and branch/manual workflow state. |
 
 ### Future product commands
 

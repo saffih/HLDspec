@@ -18,7 +18,7 @@ class ProductContractAlignmentTests(unittest.TestCase):
             capture_output=True,
             check=True,
         ).stdout
-        for command in ("start", "status", "review", "continue", "diff", "doctor"):
+        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor"):
             self.assertIn(command, help_text)
 
     def test_user_run_model_marks_unsupported_commands_future(self) -> None:
@@ -30,7 +30,8 @@ class ProductContractAlignmentTests(unittest.TestCase):
         text = (ROOT / "docs" / "AGENT_FIRST_PRODUCT_MODEL.md").read_text(encoding="utf-8")
         public_section = text.split("Future controls", 1)[0]
         self.assertIn("hldspec continue", public_section)
-        self.assertNotIn("hldspec speckit", public_section)
+        self.assertIn("hldspec speckit-doctor", public_section)
+        self.assertNotIn("hldspec speckit --target", public_section)
         self.assertNotIn("hldspec stop", public_section)
 
     def test_target_workspace_doc_uses_canonical_hldspec_sync(self) -> None:

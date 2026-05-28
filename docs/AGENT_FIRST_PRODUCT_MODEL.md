@@ -61,6 +61,7 @@ hldspec review
 hldspec continue
 hldspec diff
 hldspec doctor
+hldspec speckit-doctor
 ```
 
 Future controls must stay explicitly marked future until implemented and tested:

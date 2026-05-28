@@ -18,6 +18,7 @@ Current public product commands:
 | `hldspec continue` | current | Run ProjectMachine to the next safe checkpoint. |
 | `hldspec diff` | current | Compare source hash with recorded target source hash. |
 | `hldspec doctor` | current | Check repo and target session prerequisites. |
+| `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and next actions. |
 
 Future product commands:
 
@@ -131,9 +132,9 @@ hldspec speckit --target ./target --next
 ```
 
 Future command. The current product facade is `start`, `status`, `review`,
-`continue`, `diff`, and `doctor`. Today, `hldspec continue` advances the
-ProjectMachine to the next safe checkpoint and blocks before unapproved SpecKit
-work.
+`continue`, `diff`, `doctor`, and `speckit-doctor`. Today, `hldspec continue`
+advances the ProjectMachine to the next safe checkpoint and blocks before
+unapproved SpecKit work.
 
 SpecKit owns:
 

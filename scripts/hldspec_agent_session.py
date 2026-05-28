@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
+from hldspec import speckit_readiness as sr
 from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
@@ -788,6 +789,24 @@ def command_doctor(args: argparse.Namespace) -> int:
             if not exists:
                 action_items.append(f"Missing interview file: {path}")
 
+        readiness = sr.build_speckit_readiness_report(target)
+        print("")
+        print("## SpecKit Readiness")
+        print(f"Status: {readiness['status']}")
+        print(f"Workspace initialized: {str((readiness.get('workspace_status') or {}).get('initialized', False)).lower()}")
+        print(f"Branch hook/manual branch path ready: {readiness.get('branch_hook_status', {}).get('status', 'ACTION')}")
+        print("Selected init command:")
+        selected = readiness.get("selected_init_command")
+        if selected:
+            print(f"- {selected['display']}")
+        else:
+            print("- none")
+        print("Available init commands:")
+        print_bullet_list([item["display"] for item in readiness.get("available_init_commands", [])])
+        print(readiness.get("summary", ""))
+        print("Next actions:")
+        print_bullet_list(readiness.get("next_actions", []))
+
         print("")
         print("## Control Plane Checks")
         adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
@@ -851,6 +870,13 @@ def command_doctor(args: argparse.Namespace) -> int:
     return 0 if ok else 2
 
 
+def command_speckit_doctor(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    report = sr.build_speckit_readiness_report(target)
+    print(sr.summarize_speckit_readiness(report), end="")
+    return 0 if report["status"] == "PASS" else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Agent-first HLDspec session facade.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -884,6 +910,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("doctor", help="Check agent-first docs and target session files.")
     p.add_argument("--target", default=None)
     p.set_defaults(func=command_doctor)
+
+    p = sub.add_parser("speckit-doctor", help="Check target-level SpecKit readiness.")
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=command_speckit_doctor)
 
     return parser
 

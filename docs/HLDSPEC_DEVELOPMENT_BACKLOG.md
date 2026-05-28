@@ -44,7 +44,7 @@ Scale:
 | Area | Mark | Current assessment |
 |---|---:|---|
 | Development handoff discipline | 7 | Canonical handoff/backlog docs and generator exist; generated handoff still needs stronger open-action, conflict, and RunSkeptic status quality. |
-| Agent-first product model | 6 | Public facade is narrowed to `start`, `status`, `review`, `continue`, `diff`, and `doctor`; richer commands are marked future or legacy/debug; full end-to-end orchestration coverage remains open. |
+| Agent-first product model | 6 | Public facade is narrowed to `start`, `status`, `review`, `continue`, `diff`, `doctor`, and `speckit-doctor`; richer commands are marked future or legacy/debug; full end-to-end orchestration coverage remains open. |
 | Target workspace clarity | 7 | New-layout paths are stabilized: `target/.hldspec/sync/`, `target/.hldspec/events.jsonl`, `target/targetHLD/HLD.md`, `target/targetHLD/raw/HLD.raw.md`, and SpecKit-owned `target/.specify/`; broader migration coverage remains. |
 | TargetWorkspaceAdapter | 7 | Adapter supports legacy/new modes and `hldspec continue` uses ProjectMachine with new-layout metadata; remaining machines still need migration coverage. |
 | Use-case/API definition | 6 | Use-case catalog and command matrix exist; implementation and journey tests do not yet cover every use case. |
@@ -292,6 +292,7 @@ Acceptance:
 
 - `hldspec diff` reports stale or changed artifacts clearly
 - `hldspec doctor` reports whether the target is safe to continue
+- `hldspec speckit-doctor` reports target-level SpecKit readiness
 - regeneration scope is bounded to affected outputs
 
 ### P0-005 Domain validators before product-stable promotion
@@ -544,7 +545,7 @@ Decision:
 
 Decision: keep the current public surface small; mark richer commands as future and old names as legacy/debug.
 
-Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`.
+Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`.
 
 Future commands: `interview`, `prework`, `speckit`, `pause`.
 

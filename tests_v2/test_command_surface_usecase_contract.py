@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class CommandSurfaceUseCaseContractTests(unittest.TestCase):
     def test_usecase_doc_has_canonical_command_statuses(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
-        for command in ("start", "status", "review", "continue", "diff", "doctor"):
+        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor"):
             self.assertIn(f"`hldspec {command}` | current", text)
         for command in ("interview", "prework", "speckit", "pause"):
             self.assertIn(f"`hldspec {command}` | future", text)
@@ -47,7 +47,7 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         self.assertIn("Promoted capability RunSkeptic evidence", text)
         self.assertIn("Self-dogfood", text)
         self.assertIn("Decision: keep the current public surface small", text)
-        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`.", text)
+        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`.", text)
         self.assertIn("Future commands: `interview`, `prework`, `speckit`, `pause`.", text)
         self.assertIn("Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.", text)
 
@@ -55,7 +55,7 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         agent = (ROOT / "docs" / "AGENT_FIRST_PRODUCT_MODEL.md").read_text(encoding="utf-8")
         current_part = agent.split("Future controls", 1)[0]
         self.assertIn("hldspec continue", current_part)
-        self.assertNotIn("hldspec speckit", current_part)
+        self.assertNotIn("hldspec speckit --target", current_part)
         self.assertNotIn("hldspec pause", current_part)
 
         user = (ROOT / "docs" / "USER_RUN_MODEL.md").read_text(encoding="utf-8")
