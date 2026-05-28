@@ -184,6 +184,23 @@ Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-deriv
 
 When handing work to another agent or session, use `docs/HLDSPEC_GAP_HANDOFF_TEMPLATE.md`. The gap handoff is current status and next-safe-action evidence, not architecture truth.
 
+## Engineering Toolbox and anti-drift rule
+
+The Engineering Toolbox is protected product doctrine. Read
+`docs/ENGINEERING_TOOLBOX.md` together with `docs/ANTI_DRIFT_CONTRACTS.md`
+before weakening, renaming, deleting, or relocating any engineering guidance.
+
+When selected engineering guidance exists in `.hldspec/source_package/engineering_guidelines.md`
+or `.specify/source/engineering_guidelines.md`, agents must read it before
+SpecKit planning, implementation, mediator prompting, or phase reporting.
+Treat those `engineering_guidelines.md` files as required guidance when present,
+not optional context.
+
+Selected engineering guidance is not optional advice. Report which selected
+cards apply, what evidence was produced, and which selected guidance could not
+be satisfied. Do not mutate production or user-owned data without explicit
+approval.
+
 ## Artifact contract rule
 
 Operational handoffs, prompts, reports, slice instructions, and gap handoffs must
