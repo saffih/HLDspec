@@ -74,6 +74,13 @@ class MediatorGuidanceTests(unittest.TestCase):
                 self.assertIn("missing evidence is not pass", text.lower())
                 self.assertIn("scope expansion requires stop or reassess", text.lower())
                 self.assertNotIn("hard-enforces runtime slices", text)
+                self.assertIn("engineering_guidelines.md was read when present", text)
+                self.assertIn("engineering_guidelines.md (when present)", text)
+                self.assertIn("HLDspec does not yet auto-generate it", text)
+                self.assertIn(
+                    "Engineering Toolbox guidance (engineering_guidelines.md) is read only when present; HLDspec does not yet auto-generate it.",
+                    text,
+                )
 
         self.assertIn("stop now is a direct-mode optional behavior only", start)
         self.assertIn("stop now is a direct-mode optional behavior only", direct)
@@ -83,10 +90,17 @@ class MediatorGuidanceTests(unittest.TestCase):
 
         self.assertIn("create agent on {path} as {session-name} using model {model} [permission-mode {mode}]", devin)
         self.assertIn("Devin mediator skill", devin)
-        self.assertIn("target/.hldspec/source_package/engineering_guidelines.md", devin)
+        self.assertIn("target/.hldspec/source_package/engineering_guidelines.md (when present)", devin)
         self.assertIn("target/.hldspec/source_package/implementation_slices.json", devin)
         self.assertIn("target/.hldspec/source_package/slice_test_policy.md", devin)
         self.assertIn("target/.hldspec/source_package/speckit_slice_execution_prompt.md", devin)
+        self.assertIn("engineering_guidelines.md was read when present", devin)
+        self.assertIn("engineering_guidelines.md (when present)", devin)
+        self.assertIn("HLDspec does not yet auto-generate it", devin)
+        self.assertIn(
+            "Engineering Toolbox guidance (engineering_guidelines.md) is read only when present; HLDspec does not yet auto-generate it.",
+            devin,
+        )
         self.assertIn("Exact Devin control words:", devin)
         self.assertIn("`go`", devin)
         self.assertIn("`stop`", devin)
@@ -100,10 +114,17 @@ class MediatorGuidanceTests(unittest.TestCase):
 
         self.assertIn("Codex / Claude direct mediator mode", direct)
         self.assertIn("User != Agent Mediator != Implementation Agent", direct)
-        self.assertIn("target/.hldspec/source_package/engineering_guidelines.md", direct)
+        self.assertIn("target/.hldspec/source_package/engineering_guidelines.md (when present)", direct)
         self.assertIn("target/.hldspec/source_package/implementation_slices.json", direct)
         self.assertIn("target/.hldspec/source_package/slice_test_policy.md", direct)
         self.assertIn("target/.hldspec/source_package/speckit_slice_execution_prompt.md", direct)
+        self.assertIn("engineering_guidelines.md was read when present", direct)
+        self.assertIn("engineering_guidelines.md (when present)", direct)
+        self.assertIn("HLDspec does not yet auto-generate it", direct)
+        self.assertIn(
+            "Engineering Toolbox guidance (engineering_guidelines.md) is read only when present; HLDspec does not yet auto-generate it.",
+            direct,
+        )
         for phrase in (
             "Journey 3 implementation run",
             "Read before prompting",

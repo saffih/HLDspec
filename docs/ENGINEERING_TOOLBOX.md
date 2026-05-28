@@ -749,6 +749,10 @@ selected card
 The catalog itself is not the product. The selected, enforced target guidance is
 the product behavior.
 
+Status: the selection -> generated engineering_guidelines.md generation step is
+NOT yet implemented. Until it is, engineering_guidelines.md is optional context
+and is read only when present.
+
 ## Gate flags
 
 Mark ACTION or block when:
