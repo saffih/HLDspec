@@ -24,7 +24,10 @@ class MediatorJourney3DocsTests(unittest.TestCase):
             "slice_test_policy.md",
             "speckit_slice_execution_prompt.md",
             "explicitly says `go`",
-            "`stop` and `stop now` dominate",
+            "mode-specific control words",
+            "Devin mediator skill uses exact `go` and exact `stop`",
+            "`stop now` is not a valid Devin control word",
+            "direct-mode behavior only",
             "`rerun tests`, `clarify`, or `reassess`",
         ]
 
@@ -65,11 +68,12 @@ class MediatorJourney3DocsTests(unittest.TestCase):
         required = [
             "go",
             "stop",
-            "stop now",
             "clarify",
             "rerun tests",
             "reassess",
             "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]",
+            "mode-specific control words",
+            "direct mediator mode may document `stop now` as optional behavior only",
             "Codex and Claude may use direct mediator mode",
             "Do not remove or weaken the Devin mediator activation syntax",
             "failed tests, missing evidence, or scope expansion",

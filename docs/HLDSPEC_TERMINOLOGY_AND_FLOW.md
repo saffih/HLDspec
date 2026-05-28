@@ -654,7 +654,11 @@ the HLDspec source package / run guide / slice scope, detects drift or blockers,
 prepares better prompts, and helps the user decide when to: **go, stop, clarify,
 rerun tests, or reassess with HLDspec**.
 
-Control words: `go`, `stop`, `stop now`, `clarify`, `rerun tests`, `reassess`.
+The mediator uses mode-specific control words:
+
+- Devin mediator skill uses exact `go` and exact `stop`.
+- `stop now` is not a valid Devin control word.
+- Codex / Claude direct mediator mode may optionally document `stop now` as direct-mode behavior only.
 
 Cost/runtime modes:
 
@@ -721,6 +725,10 @@ evidence requirements, and stop conditions.
 
 The mediator may prepare a fully baked prompt for the Implementation Agent, but it
 must not send or imply approval unless the user explicitly says `go` or the current
-handoff explicitly permits automatic send. `stop` and `stop now` dominate all pending
-work. Failed tests, scope expansion, missing source evidence, production-data risk,
-or human-owned source-truth questions require `rerun tests`, `clarify`, or `reassess`, not silent continuation.
+handoff explicitly permits automatic send. `stop` is the exact Devin stop command.
+`stop now` is direct-mode optional behavior only and is not valid for the Devin
+skill. Failed tests, scope expansion, missing source evidence, production-data risk,
+or human-owned source-truth questions require `rerun tests`, `clarify`, or
+`reassess`, not silent continuation. The mediator also preserves the exact
+`rerun tests`, `clarify`, or `reassess` control-word set when documenting next
+safe actions.

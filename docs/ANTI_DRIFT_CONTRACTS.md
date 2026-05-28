@@ -80,7 +80,7 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - Agent Mediator is not the Implementation Agent.
 - Implementation Agent runs SpecKit, edits code, and runs tests.
 - Tmux or session state is visibility only, not approval state.
-- Journey 3 mediator support preserves the control words: `go`, `stop`, `stop now`, `clarify`, `rerun tests`, `reassess`.
+- Journey 3 mediator support preserves mode-specific control words: Devin uses exact `go` and exact `stop`; direct mediator mode may document `stop now` as optional behavior only; both modes preserve `clarify`, `rerun tests`, and `reassess`.
 - Devin mediator activation syntax remains: `create agent on {path} as {session-name} using model {model} [permission-mode {mode}]`.
 - Codex and Claude may use direct mediator mode, but must preserve the same mediator boundaries and evidence rules.
 
@@ -103,7 +103,7 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 
 ### Test expectations
 
-Tests must fail if docs remove the one-full-flow-then-slices model, if mediator and implementation-agent roles collapse into one role, if docs claim runtime slice enforcement that HLDspec does not actually perform, if the Devin mediator activation syntax disappears, or if control words and failed-test boundaries disappear.
+Tests must fail if docs remove the one-full-flow-then-slices model, if mediator and implementation-agent roles collapse into one role, if docs claim runtime slice enforcement that HLDspec does not actually perform, if the Devin mediator activation syntax disappears, or if mode-specific control words and failed-test boundaries disappear.
 
 ## Contract 4: Engineering Toolbox contract
 

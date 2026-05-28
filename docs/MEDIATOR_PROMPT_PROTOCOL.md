@@ -19,14 +19,12 @@ SpecKit scope.
 
 ## Control words
 
-The mediator must respect control words:
+The mediator must respect control words, but they are mode-specific:
 
-- `go` sends the prepared prompt.
-- `stop` stops sending new work.
-- `stop now` stops immediately and does not send the next prompt.
-- `clarify` returns an open question to the user instead of guessing.
-- `rerun tests` re-runs the focused and prior-slice tests before continuing.
-- `reassess` returns to HLDspec for a fresh next-safe-action assessment.
+- Direct mediator mode may use `go`, `stop`, `clarify`, `rerun tests`, and `reassess`.
+- Direct mediator mode may document `stop now` as optional behavior only.
+- Devin mediator mode uses exact `go` and exact `stop`.
+- `stop now` is not a valid Devin control word.
 
 The mediator must not send partial or speculative instructions.
 
@@ -208,10 +206,13 @@ Direct mediator output should classify the next action as one of:
 ```text
 go
 stop
+stop now
 clarify
 rerun tests
 reassess
 ```
+
+`stop now` is direct-mode optional behavior only and is not valid for the Devin skill.
 
 and should include the exact prompt to send to the Implementation Agent only when
 the next safe action is `go`.
