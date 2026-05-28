@@ -121,6 +121,19 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertEqual(str(target.resolve() / ".hldspec" / "events.jsonl"), session["paths"]["events"])
         self.assertIn("start an agent session", result.stdout)
         self.assertIn("Interview answers:", result.stdout)
+        self.assertIn("Mediator guidance:", result.stdout)
+        self.assertIn(".hldspec/mediator/mediator_packet.json", result.stdout)
+        self.assertIn("prompts/mediator/START_MEDIATOR.md", result.stdout)
+        self.assertIn("prompts/mediator/DEVIN_MEDIATOR_SKILL.md", result.stdout)
+        self.assertIn("prompts/mediator/CODEX_CLAUDE_MEDIATOR.md", result.stdout)
+        self.assertIn(
+            "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]",
+            result.stdout,
+        )
+        self.assertIn(
+            "HLDspec generates mediator guidance only; it does not create live Devin/tmux sessions.",
+            result.stdout,
+        )
 
         interview = json.loads(interview_json_path.read_text(encoding="utf-8"))
         self.assertEqual(str(source.resolve()), interview["source"]["path"])
@@ -138,6 +151,18 @@ class AgentFirstCliContractTests(unittest.TestCase):
         prompt_text = prompt_path.read_text(encoding="utf-8")
         self.assertIn("scripts/hldspec continue --target", prompt_text)
         self.assertNotIn("target/.hldspec/firstrun/.specify/sync", prompt_text)
+        self.assertIn(".hldspec/mediator/mediator_packet.json", prompt_text)
+        self.assertIn("prompts/mediator/START_MEDIATOR.md", prompt_text)
+        self.assertIn("prompts/mediator/DEVIN_MEDIATOR_SKILL.md", prompt_text)
+        self.assertIn("prompts/mediator/CODEX_CLAUDE_MEDIATOR.md", prompt_text)
+        self.assertIn(
+            "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]",
+            prompt_text,
+        )
+        self.assertIn(
+            "HLDspec generates mediator guidance only; it does not create live Devin/tmux sessions.",
+            prompt_text,
+        )
 
         after_entries = {path.relative_to(self.tmp_path) for path in self.tmp_path.rglob("*")}
         created_entries = after_entries - before_entries

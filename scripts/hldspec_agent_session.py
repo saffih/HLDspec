@@ -350,9 +350,32 @@ Generate or refresh target-specific artifacts:
 target/.hldspec/source_package/source_package.json
 target/.hldspec/source_package/session_plan.json
 target/.hldspec/source_package/source_manifest.json
+target/.hldspec/mediator/mediator_packet.json
+target/prompts/mediator/START_MEDIATOR.md
+target/prompts/mediator/DEVIN_MEDIATOR_SKILL.md
+target/prompts/mediator/CODEX_CLAUDE_MEDIATOR.md
 target/.specify/                 (from real SpecKit init only; not hand-authored)
 target/.specify/source/          (generated mirror only)
 target/prompts/
+```
+
+## Journey 3 mediator guidance
+
+HLDspec generates mediator guidance only; it does not create live Devin/tmux sessions.
+
+Mediator artifacts:
+
+```text
+target/.hldspec/mediator/mediator_packet.json
+target/prompts/mediator/START_MEDIATOR.md
+target/prompts/mediator/DEVIN_MEDIATOR_SKILL.md
+target/prompts/mediator/CODEX_CLAUDE_MEDIATOR.md
+```
+
+Devin activation sentence:
+
+```text
+create agent on {{path}} as {{session-name}} using model {{model}} [permission-mode {{mode}}]
 ```
 
 ## SpecKit workspace/init boundary
@@ -527,6 +550,20 @@ def command_start(args: argparse.Namespace) -> int:
         print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
         if source_build.unsupported_claims:
             print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
+    mediator_packet = target / ".hldspec" / "mediator" / "mediator_packet.json"
+    mediator_start = target / "prompts" / "mediator" / "START_MEDIATOR.md"
+    mediator_devin = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
+    mediator_direct = target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"
+    print("Mediator guidance:")
+    print(f"  Mediator packet: {mediator_packet}")
+    print(f"  Mediator start prompt: {mediator_start}")
+    print(f"  Devin mediator prompt: {mediator_devin}")
+    print(f"  Codex/Claude mediator prompt: {mediator_direct}")
+    print(
+        "  Devin activation sentence: "
+        "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]"
+    )
+    print("  HLDspec generates mediator guidance only; it does not create live Devin/tmux sessions.")
     print("Next: start an agent session with the prompt above.")
     return 0
 
