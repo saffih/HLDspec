@@ -78,6 +78,7 @@ This closes the core "it runs but produces no implementation" failure.
 
 ### Resolved decisions
 - **Design ownership / auto-implement boundary**: resolved by the three-journey product model in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §13. Implementation Guidance is guidance and reassessment, not default auto-implementation. The live `SpecKitInvoker` auto-drive-all-phases path remains an opt-in capability only; default operation is mediator/user-steered with bounded prompts, slice scope, stop conditions, and explicit approvals.
+- **Slice-control ownership**: settled by the source-package model. HLDspec generates `implementation_slices.json`, `implementation_slicing_policy.md`, and `slice_test_policy.md` once in `.hldspec/source_package/` and mirrors them read-only into `.specify/source/`. `AGENTS.md` and `templates/orchestrator/AGENTS.md` point implementing agents to those files. HLDspec provides and bounds; the user or Agent Mediator enforces during runtime. `SpecKitExecutionMachine` operating at feature granularity is by design.
 
 ### Open decisions (need human call)
 - **`/home/sio/flow` vs `~/code/flow/impl`**: a Flow substrate was hand-built reading the HLD. Decide whether it's the implementation target the pipeline writes into, or discarded.
@@ -87,7 +88,6 @@ This closes the core "it runs but produces no implementation" failure.
 - **Gap analysis (desired vs. actual)** — NEW capability: when the HLD changes or a feature is added, derive specs THEN diff against the current implementation to surface the delta (what to add/change) and guide the feature work, before writing code. Needed for existing/evolving projects, not just greenfield.
 - **Verify the real mechanism**: one true headless run end-to-end on a *code* feature (not 027, which is governance/scope); confirm `claude --model haiku` alias is accepted.
 - **Prove minimal chain before relying on all 8 phases.**
-- **Slice-control runtime verification**: active docs now define HLDspec slice control as generated scope and bounds, enforced by the user or Agent Mediator at runtime. `SpecKitExecutionMachine` still operates at feature/phase granularity; that is acceptable under the current model as long as docs and prompts do not claim HLDspec hard-enforces slices during implementation.
 
 ---
 

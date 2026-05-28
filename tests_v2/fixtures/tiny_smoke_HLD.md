@@ -1,25 +1,34 @@
-# Smoke Test Product
+# Tiny Smoke HLD
 
 ## HLD-001 - Product Goal
 HLD-ID: HLD-001
-HLD-ROLE: product
-HLD-STATUS: approved
+HLD-ROLE: purpose
+HLD-STATUS: active
 HLD-RISK: LOW
+HLD-SPECS: smoke
+HLD-RESOURCES: tiny_HLD.md
 
-The product enables automated specification generation from structured requirements.
+### Purpose
+Build a tiny notes service that can create and list notes.
 
 ## HLD-002 - Domain Behavior
 HLD-ID: HLD-002
-HLD-ROLE: domain
-HLD-STATUS: approved
-HLD-RISK: MEDIUM
+HLD-ROLE: business-logic
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: smoke
+HLD-RESOURCES: tiny_HLD.md
 
-The domain model captures requirements, anchors, and dependency relationships.
+### Purpose
+A note has text. Empty notes are rejected. Created notes can be listed.
 
 ## HLD-003 - Interface
 HLD-ID: HLD-003
 HLD-ROLE: interface
-HLD-STATUS: approved
+HLD-STATUS: active
 HLD-RISK: LOW
+HLD-SPECS: smoke
+HLD-RESOURCES: tiny_HLD.md
 
-The interface exposes the specification through a structured document format.
+### Purpose
+Expose the notes behavior through a CLI first. API and UI are deferred.

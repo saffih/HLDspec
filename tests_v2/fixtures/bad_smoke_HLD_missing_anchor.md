@@ -1,17 +1,23 @@
-# Bad Smoke Test Product
+# Bad Tiny Smoke HLD
 
 ## HLD-001 - Product Goal
 HLD-ID: HLD-001
-HLD-ROLE: product
-HLD-STATUS: approved
+HLD-ROLE: purpose
+HLD-STATUS: active
 HLD-RISK: LOW
+HLD-SPECS: smoke
+HLD-RESOURCES: bad_smoke_HLD_missing_anchor.md
 
-The product enables automated specification generation from structured requirements.
+### Purpose
+Build a tiny notes service.
 
-## HLD-002 - Domain Behavior
-HLD-ID: HLD-002
-HLD-ROLE: domain
-HLD-STATUS: approved
-HLD-RISK: MEDIUM
+## HLD-003 - Interface
+HLD-ID: HLD-003
+HLD-ROLE: interface
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: smoke
+HLD-RESOURCES: bad_smoke_HLD_missing_anchor.md
 
-The domain model captures requirements, anchors, and dependency relationships.
+### Purpose
+Expose the behavior through a CLI first.

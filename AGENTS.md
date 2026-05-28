@@ -262,7 +262,7 @@ These concerns are mandatory and must be visible in generated artifacts before p
 
 ## SpecKit slice-control rule
 
-Before any SpecKit phase, read `.specify/source/HLD.md` and the generated source context under `.specify/source/` when present; before any SpecKit proxy task, read the same context:
+Before any SpecKit phase, read `.specify/source/HLD.md` plus `docs/SPECKIT_SLICE_CONTROL.md` and the generated source context under `.specify/source/` when present; before any SpecKit proxy task, read the same context:
 
 - `.specify/source/HLD.md`
 - `.specify/source/hld_reference_map.json`
@@ -272,8 +272,6 @@ Before any SpecKit phase, read `.specify/source/HLD.md` and the generated source
 - `.specify/source/slice_test_policy.md`
 - `.specify/source/speckit_slice_execution_prompt.md`
 - `.specify/source/anchor_coverage_schema.json`
-
-Also read `docs/SPECKIT_SLICE_CONTROL.md` before any SpecKit phase or proxy task.
 
 Use one complete specify -> plan -> tasks -> analyze flow for the full HLD-derived product truth. Do not split the HLD into partial specs. Implementation must be executed only through an explicitly approved slice and allowed task IDs unless full implementation is explicitly approved.
 

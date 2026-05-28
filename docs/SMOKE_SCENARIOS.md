@@ -2,115 +2,108 @@
 
 ## Purpose
 
-Smoke scenarios are deterministic, self-contained end-to-end checks that prove
-a specific HLDspec pipeline path works without requiring a real HLD project,
-agents, or SpecKit invocation. Each scenario creates its own temp workspace,
-runs real production code, validates the output, and reports PASS or FAIL.
+Smoke scenarios are deterministic local checks for the real HLDspec workflow. They are small enough to debug and strict enough to catch broken source-package, mirror, anchor, and slice-artifact behavior early.
 
----
+## Smoke 1: source package, mirror, anchors, and slice artifacts
 
-## Scenario: slice-controlled source package (3-anchor HLD)
+Command:
 
-**Script:** `scripts/hldspec_smoke_slice_e2e.py`
-**Test:** `tests_v2/test_hldspec_smoke_slice_e2e.py`
-**Fixtures:**
-
-```text
-tests_v2/fixtures/tiny_smoke_HLD.md
-tests_v2/fixtures/bad_smoke_HLD_missing_anchor.md
-tests_v2/fixtures/expected_smoke_artifacts.txt
+```bash
+python3 scripts/hldspec_smoke_slice_e2e.py --keep
 ```
 
-Proves the local source-package build pipeline works on a minimal 3-anchor HLD:
+Machine-readable output:
 
-```
-HLD-001  Product Goal
-HLD-002  Domain Behavior
-HLD-003  Interface
+```bash
+python3 scripts/hldspec_smoke_slice_e2e.py --json --keep
 ```
 
-The smoke is deterministic and local. It does not spawn Claude, Codex, Devin, or
-SpecKit.
+Optional visibility surface:
 
-### Workspace layout
+```bash
+python3 scripts/hldspec_smoke_slice_e2e.py --tmux --keep
+```
 
-Each default run creates:
+Tmux is optional UI only. If tmux is unavailable, the smoke reports `SKIP_TMUX`; this is not a failure.
+
+## Destination layout
+
+The smoke creates a temp root such as:
 
 ```text
 /tmp/hldspec-smoke-XXXXXX/
   tiny_HLD.md
   target/
+    targetHLD/
     .hldspec/source_package/
     .specify/source/
 ```
 
-All generated artifacts stay under `target/`. The copied source HLD is the only
-file outside `target/` in the temp root.
+The destination target is always:
 
-### What it validates
-
-| Check | Detail |
-|---|---|
-| Expected artifact manifest | Every path in `tests_v2/fixtures/expected_smoke_artifacts.txt` exists under `target/` |
-| Source package files | `.hldspec/source_package/` exists and contains the source package artifacts |
-| SpecKit mirror files | `.specify/source/` exists and contains the derived mirror artifacts |
-| Reference map anchors | HLD-001, HLD-002, HLD-003 each appear in `hld_reference_map.json` |
-| Single spec input citations | HLD-001, HLD-002, HLD-003 each cited in `speckit_single_spec_input.md` |
-| Slice policy | If slice policy artifacts are present, `implementation_slices.json` is valid and the policy states one specify/plan/tasks/analyze flow with controlled implementation passes |
-| Mirror banner | `.specify/source/HLD.md` carries the GENERATED banner |
-| Idempotency | Running the build twice produces the same result |
-| Negative fixture | `bad_smoke_HLD_missing_anchor.md` fails because HLD-003 is absent |
-
-### Usage
-
-```bash
-# Run once, clean up temp dir on exit.
-python3 scripts/hldspec_smoke_slice_e2e.py
-
-# Keep the temp dir for inspection.
-python3 scripts/hldspec_smoke_slice_e2e.py --keep
-
-# Use a specific temp root.
-python3 scripts/hldspec_smoke_slice_e2e.py --root /tmp/hldspec-smoke-manual --keep
-
-# Emit a JSON summary before the final result line.
-python3 scripts/hldspec_smoke_slice_e2e.py --json
-
-# Create a tmux visibility session (skipped if tmux absent).
-python3 scripts/hldspec_smoke_slice_e2e.py --tmux
-
-# Create and attach to the tmux session.
-python3 scripts/hldspec_smoke_slice_e2e.py --tmux --attach
-
-# Prove the negative fixture fails.
-python3 scripts/hldspec_smoke_slice_e2e.py --hld tests_v2/fixtures/bad_smoke_HLD_missing_anchor.md
+```text
+<temp_root>/target
 ```
 
-### Output contract
+Generated target artifacts must stay under the temp target. The HLDspec repo must not receive generated target artifacts.
 
-For normal non-JSON runs, stdout is exactly one of:
+## What Smoke 1 proves
 
-```
+- `scripts/hldspec_agent_session.py start` can prepare a target.
+- `hldspec.hld_source_package.build_source_package_content` can build source-package content.
+- `.hldspec/source_package/` contains the expected HLD, anchor, manifest, single SpecKit input, and slice files.
+- `.specify/source/` receives a generated read-only mirror.
+- `HLD.marked.md` contains anchors for `HLD-001`, `HLD-002`, and `HLD-003`.
+- `hld_reference_map.json` contains the same anchors.
+- `speckit_single_spec_input.md` cites those anchors.
+- Slice artifacts use the real generated filenames:
+  - `implementation_slicing_policy.md`
+  - `implementation_slices.json`
+  - `slice_test_policy.md`
+  - `speckit_slice_execution_prompt.md`
+  - `anchor_coverage_schema.json`
+
+## What Smoke 1 does not prove
+
+- It does not run real SpecKit implementation.
+- It does not spawn Claude, Codex, Devin, or uncontrolled agents.
+- It does not prove a production app works.
+- It does not make tmux an approval source.
+
+## Output contract
+
+The final output includes exactly one result line:
+
+```text
 HLDSPEC_SMOKE_RESULT: PASS
+```
+
+or:
+
+```text
 HLDSPEC_SMOKE_RESULT: FAIL
 ```
 
-For `--json`, stdout contains the JSON summary followed by the same final result
-line. Failure details are written to stderr.
+The output also prints:
 
-Exit code 0 on PASS, 1 on FAIL.
+```text
+source_hld:
+target_dir:
+source_package:
+specify_source:
+tmux:
+checks_passed:
+checks_failed:
+```
 
-### What it does NOT do
+On failure, output includes:
 
-- Does not invoke Claude, Codex, Devin, or any uncontrolled agent.
-- Does not run SpecKit (`specify init` / `specify run`).
-- Does not modify any source HLD.
-- Tmux is a visibility window only. If tmux is absent the run reports `SKIP_TMUX` to stderr and continues.
+```text
+failed_check:
+details:
+next_action:
+```
 
----
+## Troubleshooting
 
-## Adding a new scenario
-
-1. Write `scripts/hldspec_smoke_<name>.py` with `run_smoke(target) -> (bool, list[str])` and a `main()` that prints `HLDSPEC_SMOKE_RESULT: PASS/FAIL` as the last line.
-2. Write `tests_v2/test_hldspec_smoke_<name>.py` with direct unit tests and a subprocess test for the output contract.
-3. Add an entry to this file and to `docs/DOCS_INDEX.md`.
+Use `--keep` to preserve the target for inspection. On failure, the target is preserved automatically.

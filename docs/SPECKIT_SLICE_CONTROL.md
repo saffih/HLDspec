@@ -62,8 +62,9 @@ Only this selected part may be implemented now.
 
 ## What "control" means (HLDspec provides, the user/mediator enforces)
 
-HLDspec **generates** the slice scope (`implementation_slices.json`,
-`implementation_slicing_policy.md`) and **bounds** each implementation pass with
+HLDspec **generates** the slice scope (`implementation_slicing_policy.md`,
+`implementation_slices.json`, `slice_test_policy.md`,
+`speckit_slice_execution_prompt.md`, and `anchor_coverage_schema.json`) and **bounds** each implementation pass with
 allowed task IDs, forbidden files, anchors, tests, and stop conditions. HLDspec does
 **not** execute or hard-enforce slices at runtime — the **user or Agent Mediator**
 enforces the boundary by deciding when to go, stop, clarify, rerun tests, or reassess.
@@ -81,6 +82,22 @@ slice_test_policy.md
 speckit_slice_execution_prompt.md
 anchor_coverage_schema.json
 ```
+
+
+
+## Generated slice artifacts
+
+HLDspec generates slice scope and guidance as source-package artifacts, then mirrors them read-only into `.specify/source/`:
+
+```text
+implementation_slicing_policy.md
+implementation_slices.json
+slice_test_policy.md
+speckit_slice_execution_prompt.md
+anchor_coverage_schema.json
+```
+
+These files are generated bounds. They do not mean HLDspec hard-enforces the slice during runtime. The user or Agent Mediator enforces the contract while the Implementation Agent works.
 
 ## Canonical slices and tests
 

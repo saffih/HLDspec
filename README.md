@@ -261,6 +261,26 @@ python3 scripts/hldspec_agent_session.py doctor --target /path/to/target
 
 Agents should prefer the facade over low-level scripts unless debugging a failure.
 
+
+
+## Production smoke
+
+HLDspec includes a deterministic smoke scenario for the current product path. It is not a real product implementation test. It proves that a tiny HLD can be copied into a temp target, turned into a source package, mirrored into `.specify/source/`, checked for anchors and SpecKit input citations, and reported with an exact PASS/FAIL result.
+
+```bash
+python3 scripts/hldspec_smoke_slice_e2e.py --keep
+python3 scripts/hldspec_smoke_slice_e2e.py --json --keep
+python3 scripts/hldspec_smoke_slice_e2e.py --tmux --keep
+```
+
+The smoke destination is always a temp target directory such as:
+
+```text
+/tmp/hldspec-smoke-XXXXXX/target
+```
+
+Smoke output must never write generated target artifacts into the HLDspec repo. See `docs/SMOKE_SCENARIOS.md`.
+
 ## Development and handoff discipline
 
 Local repo state is authoritative. GitHub is only the sync target. Do not push unless explicitly instructed.

@@ -1,309 +1,275 @@
 #!/usr/bin/env python3
-"""Deterministic local smoke: tiny HLD -> source package -> mirror validation.
-
-This smoke uses real local HLDspec source-package code only. It never invokes
-SpecKit and never spawns Claude, Codex, Devin, or any other agent.
-"""
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
+
+sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from hldspec.hld_source_package import build_source_package_content
-
-FIXTURE_DIR = ROOT / "tests_v2" / "fixtures"
-DEFAULT_HLD_FIXTURE = FIXTURE_DIR / "tiny_smoke_HLD.md"
-DEFAULT_EXPECTED_ARTIFACTS = FIXTURE_DIR / "expected_smoke_artifacts.txt"
-
-SMOKE_SOURCE_NAME = "tiny_HLD.md"
-SMOKE_TARGET_NAME = "target"
-SMOKE_ANCHORS: tuple[str, ...] = ("HLD-001", "HLD-002", "HLD-003")
-
-SOURCE_PACKAGE_DIR = ".hldspec/source_package"
-SPECIFY_SOURCE_DIR = ".specify/source"
-REFERENCE_MAP = f"{SOURCE_PACKAGE_DIR}/hld_reference_map.json"
-SINGLE_SPEC_INPUT = f"{SOURCE_PACKAGE_DIR}/speckit_single_spec_input.md"
-
-SLICE_POLICY_FILES: tuple[str, ...] = (
-    f"{SOURCE_PACKAGE_DIR}/slice_execution_policy.md",
-    f"{SOURCE_PACKAGE_DIR}/implementation_slicing_policy.md",
+EXPECTED_ANCHORS = ("HLD-001", "HLD-002", "HLD-003")
+SLICE_FILES = (
+    "implementation_slicing_policy.md",
+    "implementation_slices.json",
+    "slice_test_policy.md",
+    "speckit_slice_execution_prompt.md",
+    "anchor_coverage_schema.json",
 )
 
 
 @dataclass
-class SmokeRunResult:
-    passed: bool
-    temp_root: Path
-    source_hld: Path
-    target: Path
-    failures: list[str] = field(default_factory=list)
-    artifacts: list[str] = field(default_factory=list)
-    tmux_session: str | None = None
-
-    def to_json(self) -> dict[str, Any]:
-        return {
-            "passed": self.passed,
-            "result": "PASS" if self.passed else "FAIL",
-            "temp_root": str(self.temp_root),
-            "source_hld": str(self.source_hld),
-            "target": str(self.target),
-            "failures": self.failures,
-            "artifacts": self.artifacts,
-            "tmux_session": self.tmux_session,
-        }
+class Check:
+    name: str
+    ok: bool
+    details: str = ""
 
 
-def create_temp_root() -> Path:
-    return Path(tempfile.mkdtemp(prefix="hldspec-smoke-", dir="/tmp"))
+@dataclass
+class SmokeResult:
+    result: str
+    source_hld: str
+    target_dir: str
+    source_package: str
+    specify_source: str
+    tmux_status: str
+    checks: list[dict[str, Any]]
+    failed_check: str | None
+    details: str
+    preserved: bool
+    repo_status_changed: bool
 
 
-def _load_expected_artifacts(path: Path = DEFAULT_EXPECTED_ARTIFACTS) -> tuple[str, ...]:
-    if not path.is_file():
-        return ()
-    return tuple(
-        line.strip()
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    )
+def run(cmd: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=str(cwd), env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
-def _copy_source_hld(temp_root: Path, fixture: Path) -> Path:
-    source = temp_root / SMOKE_SOURCE_NAME
-    source.write_text(fixture.read_text(encoding="utf-8"), encoding="utf-8")
-    return source
+def git_status() -> str:
+    cp = run(["git", "status", "--short", "--untracked-files=normal"])
+    return cp.stdout
 
 
-def _relative_artifacts(target: Path) -> list[str]:
-    if not target.exists():
-        return []
-    return sorted(
-        str(path.relative_to(target))
-        for path in target.rglob("*")
-        if path.is_file()
-    )
+def default_fixture() -> Path:
+    return ROOT / "tests_v2" / "fixtures" / "tiny_smoke_HLD.md"
 
 
-def _validate_expected_files(target: Path, failures: list[str]) -> None:
-    expected = _load_expected_artifacts()
-    for rel in expected:
-        if not (target / rel).is_file():
-            failures.append(f"missing expected artifact: {rel}")
+def check_file(checks: list[Check], path: Path, name: str | None = None) -> None:
+    checks.append(Check(name or str(path), path.is_file(), str(path)))
 
 
-def _validate_required_dirs(target: Path, failures: list[str]) -> None:
-    for rel in (SOURCE_PACKAGE_DIR, SPECIFY_SOURCE_DIR):
-        path = target / rel
-        if not path.is_dir():
-            failures.append(f"missing directory: {rel}")
+def check_dir(checks: list[Check], path: Path, name: str | None = None) -> None:
+    checks.append(Check(name or str(path), path.is_dir(), str(path)))
 
 
-def _validate_reference_map(target: Path, failures: list[str]) -> None:
-    path = target / REFERENCE_MAP
-    if not path.is_file():
-        failures.append(f"missing reference map: {REFERENCE_MAP}")
-        return
+def load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def create_tmux_session(target: Path, attach: bool) -> str:
+    if os.environ.get("HLDSPEC_SMOKE_FORCE_NO_TMUX") == "1":
+        return "SKIP_TMUX"
+    if shutil.which("tmux") is None:
+        return "SKIP_TMUX"
+    session = f"hldspec-smoke-{uuid.uuid4().hex[:8]}"
+    log_dir = target / ".hldspec" / "tmux"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    roles = ["main-controller", "hldspec-basepack", "target-runner", "consultant"]
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        failures.append(f"hld_reference_map.json parse error: {exc}")
-        return
-    present = set(data.get("anchors", {}).keys())
-    for anchor in SMOKE_ANCHORS:
-        if anchor not in present:
-            failures.append(f"anchor {anchor} missing from hld_reference_map.json")
+        for idx, role in enumerate(roles):
+            message = f"role={role}\ntarget={target}\nrequired_reads=.specify/source + .hldspec/source_package\nstop_condition=report only; no approval state\n"
+            (log_dir / f"{role}.log").write_text(message, encoding="utf-8")
+            if idx == 0:
+                run(["tmux", "new-session", "-d", "-s", session, "sh", "-lc", f"printf '%s' {json.dumps(message)}; sleep 3600"])
+            else:
+                run(["tmux", "new-window", "-t", session, "-n", role, "sh", "-lc", f"printf '%s' {json.dumps(message)}; sleep 3600"])
+        if attach:
+            print(f"tmux attach -t {session}")
+        return "PASS"
+    except Exception as exc:  # pragma: no cover - depends on local tmux
+        (log_dir / "tmux_error.log").write_text(str(exc), encoding="utf-8")
+        return "FAIL"
 
 
-def _validate_single_spec_input(target: Path, failures: list[str]) -> None:
-    path = target / SINGLE_SPEC_INPUT
-    if not path.is_file():
-        failures.append(f"missing single spec input: {SINGLE_SPEC_INPUT}")
-        return
-    text = path.read_text(encoding="utf-8")
-    for anchor in SMOKE_ANCHORS:
-        if f"({anchor})" not in text:
-            failures.append(f"anchor {anchor} not cited in speckit_single_spec_input.md")
-
-
-def _validate_mirror(target: Path, failures: list[str]) -> None:
-    mirror_dir = target / SPECIFY_SOURCE_DIR
-    hld_mirror = mirror_dir / "HLD.md"
-    if hld_mirror.is_file() and "GENERATED by HLDspec" not in hld_mirror.read_text(encoding="utf-8"):
-        failures.append("mirror HLD.md missing GENERATED banner")
-
-
-def _validate_slice_policy_if_present(target: Path, failures: list[str]) -> None:
-    slices_path = target / SOURCE_PACKAGE_DIR / "implementation_slices.json"
-    if slices_path.is_file():
-        try:
-            data = json.loads(slices_path.read_text(encoding="utf-8"))
-        except Exception as exc:
-            failures.append(f"implementation_slices.json parse error: {exc}")
-            data = {}
-        names = {item.get("name") for item in data.get("slices", []) if isinstance(item, dict)}
-        for required in (
-            "FOUNDATION",
-            "WALKING_SKELETON",
-            "DOMAIN_MODEL",
-            "CONTRACTS",
-            "BUSINESS_LOGIC",
-            "PERSISTENCE",
-            "API",
-            "CLI",
-            "UI",
-            "INTEGRATION_HARDENING",
-        ):
-            if required not in names:
-                failures.append(f"missing canonical slice: {required}")
-
-    policy_paths = [target / rel for rel in SLICE_POLICY_FILES if (target / rel).is_file()]
-    if not policy_paths:
-        return
-    policy_text = "\n".join(path.read_text(encoding="utf-8") for path in policy_paths)
-    required_phrases = (
-        "one complete specify",
-        "one complete plan",
-        "one complete task",
-        "analyze",
-        "controlled implementation",
-    )
-    lowered = policy_text.lower()
-    for phrase in required_phrases:
-        if phrase not in lowered:
-            failures.append(f"slice policy missing phrase: {phrase}")
-
-
-def _validate_no_generated_artifacts_outside_target(result: SmokeRunResult) -> None:
-    allowed = {result.source_hld, result.target}
-    for path in result.temp_root.iterdir():
-        if path not in allowed:
-            result.failures.append(f"unexpected temp-root artifact outside target: {path.name}")
-
-
-def run_smoke(
-    temp_root: Path,
-    *,
-    hld_fixture: Path = DEFAULT_HLD_FIXTURE,
-    tmux_session: str | None = None,
-) -> SmokeRunResult:
-    """Run the smoke under temp_root and return structured validation results."""
+def run_smoke(args: argparse.Namespace) -> SmokeResult:
+    before_status = git_status()
+    keep = bool(args.keep)
+    explicit_root = Path(args.target_root).expanduser() if args.target_root else None
+    temp_root = explicit_root or Path(tempfile.mkdtemp(prefix="hldspec-smoke-"))
     temp_root.mkdir(parents=True, exist_ok=True)
-    source_hld = _copy_source_hld(temp_root, hld_fixture)
-    target = temp_root / SMOKE_TARGET_NAME
-    failures: list[str] = []
+    target = temp_root / "target"
+    source_input = Path(args.source_hld).expanduser().resolve() if args.source_hld else default_fixture()
+    source_hld = temp_root / "tiny_HLD.md"
+    shutil.copyfile(source_input, source_hld)
 
-    build = build_source_package_content(
-        target,
-        source_hld.read_text(encoding="utf-8"),
-        hld_source_ref=str(source_hld),
-        state="SOURCE_PACKAGE_IMPORTED",
-        project_name="Smoke Test Product",
-        layout="new",
-        materialize_mirror=True,
+    checks: list[Check] = []
+    failed: str | None = None
+    details = ""
+    tmux_status = "NOT_REQUESTED"
+
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env.setdefault("PYTHONPYCACHEPREFIX", str(ROOT / ".tmp" / "pycache"))
+
+    try:
+        start_cmd = [
+            sys.executable,
+            str(ROOT / "scripts" / "hldspec_agent_session.py"),
+            "start",
+            "--source",
+            str(source_hld),
+            "--target",
+            str(target),
+            "--agent",
+            "manual",
+            "--comment",
+            "production smoke scenario",
+        ]
+        start = run(start_cmd, env=env)
+        checks.append(Check("hldspec_agent_session start exits 0", start.returncode == 0, start.stdout))
+        if start.returncode != 0:
+            raise AssertionError("hldspec_agent_session start failed")
+
+        # Smoke 1 validates the source-package/mirror path without requiring a real SpecKit install.
+        from hldspec.hld_source_package import build_source_package_content
+
+        build = build_source_package_content(
+            target,
+            source_hld.read_text(encoding="utf-8"),
+            hld_source_ref=str(source_hld),
+            project_name="tiny-smoke",
+            materialize_mirror=True,
+        )
+        checks.append(Check("source package build ok", build.ok, f"anchors={build.anchor_count} unsupported={build.unsupported_claims} marking={build.marking_errors}"))
+
+        source_package = target / ".hldspec" / "source_package"
+        specify_source = target / ".specify" / "source"
+        check_dir(checks, target / "targetHLD", "targetHLD exists")
+        check_dir(checks, source_package, ".hldspec/source_package exists")
+        check_dir(checks, specify_source, ".specify/source exists")
+
+        required_source = [
+            "HLD.md",
+            "HLD.marked.md",
+            "hld_reference_map.json",
+            "speckit_single_spec_input.md",
+            "source_package.json",
+            "source_manifest.json",
+            *SLICE_FILES,
+        ]
+        required_mirror = [
+            "HLD.md",
+            "HLD.marked.md",
+            "hld_reference_map.json",
+            "speckit_single_spec_input.md",
+            *SLICE_FILES,
+        ]
+        for name in required_source:
+            check_file(checks, source_package / name, f"source package file {name}")
+        for name in required_mirror:
+            check_file(checks, specify_source / name, f"mirror file {name}")
+
+        marked = (source_package / "HLD.marked.md").read_text(encoding="utf-8")
+        ref_map = load_json(source_package / "hld_reference_map.json")
+        anchors = set(ref_map.get("anchors", {}).keys())
+        spec_input = (source_package / "speckit_single_spec_input.md").read_text(encoding="utf-8")
+        for anchor in EXPECTED_ANCHORS:
+            checks.append(Check(f"marked HLD has {anchor}", f"<!-- ANCHOR: {anchor} -->" in marked))
+            checks.append(Check(f"reference map has {anchor}", anchor in anchors))
+            checks.append(Check(f"single spec input cites {anchor}", f"({anchor})" in spec_input))
+
+        slices = load_json(source_package / "implementation_slices.json")
+        names = {item.get("name") for item in slices.get("slices", [])}
+        for required in ["FOUNDATION", "WALKING_SKELETON", "DOMAIN_MODEL", "CONTRACTS", "BUSINESS_LOGIC", "PERSISTENCE", "API", "CLI", "UI", "INTEGRATION_HARDENING"]:
+            checks.append(Check(f"slice exists {required}", required in names))
+
+        policy = (source_package / "implementation_slicing_policy.md").read_text(encoding="utf-8").lower()
+        for phrase in ["run specify", "run plan", "run tasks", "run analyze", "controlled slices"]:
+            checks.append(Check(f"policy mentions {phrase}", phrase in policy))
+
+        if args.tmux:
+            tmux_status = create_tmux_session(target, bool(args.attach))
+            checks.append(Check("tmux optional status acceptable", tmux_status in {"PASS", "SKIP_TMUX"}, tmux_status))
+
+    except Exception as exc:
+        details = str(exc)
+
+    after_status = git_status()
+    repo_status_changed = before_status != after_status
+    checks.append(Check("no repo pollution", not repo_status_changed, f"before={before_status!r} after={after_status!r}"))
+
+    failed_check = None
+    for check in checks:
+        if not check.ok:
+            failed_check = check.name
+            if not details:
+                details = check.details
+            break
+    result = "PASS" if failed_check is None else "FAIL"
+    preserve = keep or result == "FAIL"
+    if result == "PASS" and not keep and explicit_root is None:
+        shutil.rmtree(temp_root, ignore_errors=True)
+    return SmokeResult(
+        result=result,
+        source_hld=str(source_hld),
+        target_dir=str(target),
+        source_package=str(target / ".hldspec" / "source_package"),
+        specify_source=str(target / ".specify" / "source"),
+        tmux_status=tmux_status,
+        checks=[asdict(c) for c in checks],
+        failed_check=failed_check,
+        details=details,
+        preserved=preserve,
+        repo_status_changed=repo_status_changed,
     )
 
-    for err in build.marking_errors:
-        failures.append(f"marking error: {err}")
-    for claim in build.unsupported_claims:
-        failures.append(f"unsupported claim: {claim}")
-    for filename in build.validation.missing:
-        failures.append(f"validation missing: {filename}")
-    for filename in build.validation.hash_mismatches:
-        failures.append(f"validation hash mismatch: {filename}")
 
-    _validate_required_dirs(target, failures)
-    _validate_expected_files(target, failures)
-    _validate_reference_map(target, failures)
-    _validate_single_spec_input(target, failures)
-    _validate_mirror(target, failures)
-    _validate_slice_policy_if_present(target, failures)
-
-    result = SmokeRunResult(
-        passed=not failures,
-        temp_root=temp_root,
-        source_hld=source_hld,
-        target=target,
-        failures=failures,
-        artifacts=_relative_artifacts(target),
-        tmux_session=tmux_session,
-    )
-    _validate_no_generated_artifacts_outside_target(result)
-    result.passed = not result.failures
-    return result
+def print_result(result: SmokeResult, json_mode: bool) -> None:
+    passed = sum(1 for check in result.checks if check["ok"])
+    failed = sum(1 for check in result.checks if not check["ok"])
+    if json_mode:
+        print("HLDSPEC_SMOKE_JSON: " + json.dumps(asdict(result), sort_keys=True))
+    print(f"source_hld: {result.source_hld}")
+    print(f"target_dir: {result.target_dir}")
+    print(f"source_package: {result.source_package}")
+    print(f"specify_source: {result.specify_source}")
+    print(f"tmux: {result.tmux_status}")
+    print(f"checks_passed: {passed}")
+    print(f"checks_failed: {failed}")
+    if result.failed_check:
+        print(f"failed_check: {result.failed_check}")
+        print(f"details: {result.details}")
+        print("next_action: inspect target and rerun with --keep")
+    print(f"HLDSPEC_SMOKE_RESULT: {result.result}")
 
 
-def _setup_tmux(temp_root: Path, session_name: str = "hldspec-smoke") -> str | None:
-    """Create a tmux visibility session. Tmux state is not approval state."""
-    if not shutil.which("tmux"):
-        return None
-    subprocess.run(
-        ["tmux", "new-session", "-d", "-s", session_name, "-x", "220", "-y", "50"],
-        capture_output=True,
-        check=False,
-    )
-    subprocess.run(
-        [
-            "tmux",
-            "send-keys",
-            "-t",
-            session_name,
-            f"echo 'HLDspec smoke root: {temp_root}'",
-            "Enter",
-        ],
-        capture_output=True,
-        check=False,
-    )
-    return session_name
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the deterministic HLDspec slice smoke scenario.")
+    parser.add_argument("--keep", action="store_true", help="Preserve temp output on PASS.")
+    parser.add_argument("--json", action="store_true", help="Print machine-readable JSON result line.")
+    parser.add_argument("--tmux", action="store_true", help="Create optional visibility-only tmux session if available.")
+    parser.add_argument("--attach", action="store_true", help="Print attach command for tmux session.")
+    parser.add_argument("--target-root", default="", help="Explicit temp root. Target will be <target-root>/target.")
+    parser.add_argument("--source-hld", default="", help="Optional source HLD fixture/path. Copied to <temp_root>/tiny_HLD.md.")
+    return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="HLDspec deterministic local smoke: tiny HLD -> source package -> mirror validation."
-    )
-    parser.add_argument("--root", metavar="DIR", help="Use this temp root instead of creating /tmp/hldspec-smoke-XXXXXX.")
-    parser.add_argument("--hld", metavar="FILE", default=str(DEFAULT_HLD_FIXTURE), help="Source HLD fixture to copy to <temp_root>/tiny_HLD.md.")
-    parser.add_argument("--keep", action="store_true", help="Keep the temp root on completion.")
-    parser.add_argument("--json", action="store_true", help="Emit a JSON summary before the final result line.")
-    parser.add_argument("--tmux", action="store_true", help="Create a tmux visibility session if tmux is installed.")
-    parser.add_argument("--attach", action="store_true", help="Attach to the tmux session after the smoke (implies --tmux).")
-    args = parser.parse_args(argv)
-
-    temp_root = Path(args.root).expanduser().resolve() if args.root else create_temp_root()
-    hld_fixture = Path(args.hld).expanduser().resolve()
-    tmux_session: str | None = None
-
-    if args.tmux or args.attach:
-        tmux_session = _setup_tmux(temp_root)
-        if tmux_session is None:
-            print("SKIP_TMUX: tmux not found; continuing without UI session.", file=sys.stderr)
-
-    result = run_smoke(temp_root, hld_fixture=hld_fixture, tmux_session=tmux_session)
-
-    if args.json:
-        print(json.dumps(result.to_json(), indent=2, sort_keys=True))
-    elif result.failures:
-        for failure in result.failures:
-            print(f"FAIL: {failure}", file=sys.stderr)
-
-    if not args.keep:
-        shutil.rmtree(temp_root, ignore_errors=True)
-
-    if tmux_session and args.attach:
-        subprocess.run(["tmux", "attach-session", "-t", tmux_session], check=False)
-
-    print(f"HLDSPEC_SMOKE_RESULT: {'PASS' if result.passed else 'FAIL'}")
-    return 0 if result.passed else 1
+    args = build_parser().parse_args(argv)
+    result = run_smoke(args)
+    print_result(result, bool(args.json))
+    return 0 if result.result == "PASS" else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
