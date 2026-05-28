@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
+from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
 from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
@@ -877,6 +878,13 @@ def command_speckit_doctor(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "PASS" else 2
 
 
+def command_operator_state(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve() if args.target else None
+    report = sos.build_speckit_operator_state_report(target)
+    print(sos.summarize_speckit_operator_state(report), end="")
+    return 0 if report["status"] == "PASS" else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Agent-first HLDspec session facade.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -914,6 +922,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("speckit-doctor", help="Check target-level SpecKit readiness.")
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_speckit_doctor)
+
+    p = sub.add_parser("operator-state", aliases=["speckit-state"], help="Check target-level SpecKit Operator State.")
+    p.add_argument("--target", default=None)
+    p.set_defaults(func=command_operator_state)
 
     return parser
 

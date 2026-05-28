@@ -107,9 +107,10 @@ Tmux/session state is visibility only, never approval state.
 Operator / Doctor / Devin Mediator boundary — HLDspec Operator is the core
 layer that today uses target facts, source-package state, Engineering Toolbox
 guidance, implementation slicing, mediator/operator guidance, and SpecKit
-Doctor readiness facts. Its planned next layer is lifecycle state and
-next-safe-action guidance. SpecKit Doctor is the diagnostic/preflight part of
-the Operator, not the whole Operator. Devin Mediator is Devin-specific adapter
+Doctor readiness facts. Its Operator State for the readiness boundary is
+implemented; broader post-specify lifecycle state and richer next-safe-action
+guidance remain planned. SpecKit Doctor is the diagnostic/preflight part of the
+Operator, not the whole Operator. Devin Mediator is Devin-specific adapter
 behavior that consumes HLDspec Operator facts/artifacts to drive Devin safely;
 HLDspec does not mediate Devin directly, and Devin exact go/stop/tmux/session
 rules do not define the generic Operator layer.

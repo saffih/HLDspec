@@ -64,15 +64,18 @@ class AntiDriftContractTests(unittest.TestCase):
                 "SpecKit Doctor is the diagnostic/preflight part of the SpecKit Operator",
                 "SpecKit Doctor is not the whole Operator",
                 "SpecKit Operator is broader than Doctor",
-                "planned next layer is lifecycle state and next-safe-action guidance",
-                "Until Operator State exists, Doctor provides readiness/preflight facts only and must not pretend to decide the full lifecycle",
+                "HLDspec Operator includes an implemented Operator State for the readiness boundary today",
+                "HLDspec Operator uses target facts, source-package state, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today",
+                "Broader post-specify lifecycle Operator State and richer next-safe-action guidance remain planned",
+                "Doctor remains readiness/preflight only and must not decide the full lifecycle",
                 "Devin Mediator is a Devin-specific runtime adapter",
                 "Devin Mediator is not HLDspec core behavior",
                 "HLDspec does not mediate Devin directly",
+                "HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, SpecKit Doctor readiness facts, and the implemented Operator State for the readiness boundary today",
+                "Broader post-specify lifecycle state and richer next-safe-action guidance are future work, not already implemented",
                 "Devin Mediator consumes HLDspec Operator facts/artifacts to drive Devin safely",
                 "Devin-specific exact go/stop/session rules must not define the generic Operator layer",
                 "Operator / Doctor / Devin Mediator are not interchangeable names for the same thing",
-                "Planned Operator State and planned next-safe-action guidance are future work, not already implemented",
                 "specify -> plan -> tasks -> analyze",
                 "many guided implementation slices",
                 "HLDspec provides and bounds slice-control",
@@ -84,6 +87,7 @@ class AntiDriftContractTests(unittest.TestCase):
         )
         self.assertNotIn("HLDspec produces operator facts, lifecycle state, and next-safe-action guidance", text)
         self.assertNotIn("next-safe-action guidance today", text)
+        self.assertNotIn("Until Operator State exists", text)
 
     def test_engineering_toolbox_contract_is_protected(self):
         text = self.read("docs/ANTI_DRIFT_CONTRACTS.md")

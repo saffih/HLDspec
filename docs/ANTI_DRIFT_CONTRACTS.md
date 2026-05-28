@@ -77,9 +77,10 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - SpecKit Doctor is the diagnostic/preflight part of the SpecKit Operator.
 - SpecKit Doctor is not the whole Operator.
 - SpecKit Operator is broader than Doctor.
-- SpecKit Operator's planned next layer is lifecycle state and next-safe-action guidance.
+- HLDspec Operator includes an implemented Operator State for the readiness boundary today.
 - HLDspec Operator uses target facts, source-package state, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today.
-- Until Operator State exists, Doctor provides readiness/preflight facts only and must not pretend to decide the full lifecycle.
+- Broader post-specify lifecycle Operator State and richer next-safe-action guidance remain planned.
+- Doctor remains readiness/preflight only and must not decide the full lifecycle.
 - Devin Mediator is a Devin-specific runtime adapter.
 - Devin Mediator is not HLDspec core behavior.
 - HLDspec does not mediate Devin directly.
@@ -99,8 +100,8 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - The user or Agent Mediator enforces slice scope during runtime.
 - Devin Mediator is a Devin-specific runtime adapter.
 - HLDspec does not mediate Devin directly.
-- HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today.
-- Planned Operator State and planned next-safe-action guidance are future work, not already implemented.
+- HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, SpecKit Doctor readiness facts, and the implemented Operator State for the readiness boundary today.
+- Broader post-specify lifecycle state and richer next-safe-action guidance are future work, not already implemented.
 - Devin Mediator consumes HLDspec Operator facts/artifacts.
 - Agent Mediator is not the Implementation Agent.
 - Implementation Agent runs SpecKit, edits code, and runs tests.

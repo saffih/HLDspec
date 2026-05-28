@@ -16,8 +16,8 @@ REQUIRED_TERMS = (
     "SpecKit Doctor",
     "Devin Mediator",
     "Operator Facts",
-    "Planned Operator State",
-    "Planned Next Safe Action",
+    "Operator State",
+    "Next Safe Action",
     "Implementation Agent",
     "Scout Agent",
     "Architecture Reviewer",
@@ -89,12 +89,21 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         self.assertIn("Devin Mediator", text)
         self.assertIn("Operator / Doctor / Devin Mediator", text)
         self.assertIn("SpecKit Doctor readiness facts today", text)
-        self.assertIn("planned next layer is Operator State plus next-safe-action guidance", text)
+        self.assertIn("Its Operator State for the readiness boundary is implemented; broader", text)
+        self.assertIn("post-specify lifecycle expansion remains planned.", text)
+        self.assertIn("feeds", text)
+        self.assertIn("readiness facts into Operator State.", text)
+        self.assertIn("The current implementation is", text)
+        self.assertIn("limited to the readiness boundary", text)
+        self.assertIn("broader lifecycle refinement", text)
+        self.assertIn("remains planned.", text)
         self.assertIn("HLDspec does not mediate Devin directly", text)
         self.assertIn("Devin Mediator consumes those facts and related artifacts", text)
         self.assertIn("not interchangeable names for the", text)
         self.assertNotIn("next_safe_action.json", text)
         self.assertNotIn("speckit_operator_state.json", text)
+        self.assertNotIn("Planned Operator State", text)
+        self.assertNotIn("Planned Next Safe Action", text)
         self.assertNotIn("next-safe-action guidance today", text)
         self.assertNotIn("produces operator facts and next-safe-action guidance;", text)
 

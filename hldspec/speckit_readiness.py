@@ -310,6 +310,9 @@ def build_speckit_readiness_report(
         "available_init_commands": [_json_command(cmd) for cmd in available],
         "workspace_status": workspace_status.metadata(),
         "branch_hook_status": branch_hook,
+        "git_root": git_root,
+        "git_branch": git_branch,
+        "dirty_tree": dirty_tree,
         "manual_branch_equivalent_allowed": True,
         "summary": (
             "Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror."
