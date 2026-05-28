@@ -72,6 +72,7 @@ class AntiDriftContractTests(unittest.TestCase):
                 "Devin Mediator consumes HLDspec Operator facts/artifacts to drive Devin safely",
                 "Devin-specific exact go/stop/session rules must not define the generic Operator layer",
                 "Operator / Doctor / Devin Mediator are not interchangeable names for the same thing",
+                "Planned Operator State and planned next-safe-action guidance are future work, not already implemented",
                 "specify -> plan -> tasks -> analyze",
                 "many guided implementation slices",
                 "HLDspec provides and bounds slice-control",
@@ -81,6 +82,8 @@ class AntiDriftContractTests(unittest.TestCase):
                 "Do not let Doctor readiness be treated as full lifecycle operation",
             ),
         )
+        self.assertNotIn("HLDspec produces operator facts, lifecycle state, and next-safe-action guidance", text)
+        self.assertNotIn("next-safe-action guidance today", text)
 
     def test_engineering_toolbox_contract_is_protected(self):
         text = self.read("docs/ANTI_DRIFT_CONTRACTS.md")

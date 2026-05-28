@@ -54,8 +54,8 @@ Hard rules:
   `review`, `continue`, `diff`, `doctor`). Hides internal scripts; prints
   decision-oriented output.
 - **HLDspec Operator** — the core HLDspec behavior that produces operator facts,
-  source-package context, slice control, and next-safe-action guidance today.
-  Its planned next layer is lifecycle state and next-safe-action guidance.
+  source-package context, slice control, and SpecKit Doctor readiness facts today.
+  Its planned next layer is Operator State plus next-safe-action guidance.
 - **SpecKit Doctor** — the diagnostic/preflight part of the HLDspec Operator. It
   checks readiness for real `specify`, `spec-kit`, or `uvx --from
   git+https://github.com/github/spec-kit.git spec-kit` invocation paths and
@@ -71,8 +71,9 @@ Hard rules:
   provides readiness facts only and must not pretend to decide the full
   lifecycle.
 - **Next Safe Action** — the action HLDspec recommends after weighing operator
-  facts and readiness checks; it answers what should happen next without
-  becoming implementation execution.
+  facts and readiness checks. In the current system this is a planning concept,
+  not a live Operator output; the live operator boundary today remains readiness
+  facts and guidance.
 - **HLDspec Agent Session** — agent-guided session that interprets user intent and
   drives the system safely using machines and scripts as tools. Does not silently
   answer human-owned decisions.
@@ -684,7 +685,7 @@ the HLDspec source package / run guide / slice scope, detects drift or blockers,
 prepares better prompts, and helps the user decide when to: **go, stop, clarify,
 rerun tests, or reassess with HLDspec**.
 
-The generic HLDspec Operator sits above this mediator layer. It produces operator facts and next-safe-action guidance; the Devin Mediator consumes those facts and related artifacts to drive Devin safely. HLDspec does not mediate Devin directly, and Devin-specific exact go/stop/session rules do not define the generic Operator layer.
+The generic HLDspec Operator sits above this mediator layer. It produces operator facts, source-package context, slicing guidance, and SpecKit Doctor readiness facts today; planned next-safe-action guidance belongs to the future Operator State layer. The Devin Mediator consumes those facts and related artifacts to drive Devin safely. HLDspec does not mediate Devin directly, and Devin-specific exact go/stop/session rules do not define the generic Operator layer.
 
 The mediator uses mode-specific control words:
 

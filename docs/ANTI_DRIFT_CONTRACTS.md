@@ -99,7 +99,8 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - The user or Agent Mediator enforces slice scope during runtime.
 - Devin Mediator is a Devin-specific runtime adapter.
 - HLDspec does not mediate Devin directly.
-- HLDspec produces operator facts, lifecycle state, and next-safe-action guidance.
+- HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today.
+- Planned Operator State and planned next-safe-action guidance are future work, not already implemented.
 - Devin Mediator consumes HLDspec Operator facts/artifacts.
 - Agent Mediator is not the Implementation Agent.
 - Implementation Agent runs SpecKit, edits code, and runs tests.

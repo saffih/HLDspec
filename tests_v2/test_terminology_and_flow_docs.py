@@ -88,12 +88,15 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         self.assertIn("SpecKit Doctor", text)
         self.assertIn("Devin Mediator", text)
         self.assertIn("Operator / Doctor / Devin Mediator", text)
-        self.assertIn("planned next layer is lifecycle state and next-safe-action guidance", text)
+        self.assertIn("SpecKit Doctor readiness facts today", text)
+        self.assertIn("planned next layer is Operator State plus next-safe-action guidance", text)
         self.assertIn("HLDspec does not mediate Devin directly", text)
         self.assertIn("Devin Mediator consumes those facts and related artifacts", text)
         self.assertIn("not interchangeable names for the", text)
         self.assertNotIn("next_safe_action.json", text)
         self.assertNotIn("speckit_operator_state.json", text)
+        self.assertNotIn("next-safe-action guidance today", text)
+        self.assertNotIn("produces operator facts and next-safe-action guidance;", text)
 
     def test_speckit_proxy_protocol_uses_canonical_control_plane_paths(self) -> None:
         text = _read(DOCS / "SPECKIT_PROXY_PROTOCOL.md")
