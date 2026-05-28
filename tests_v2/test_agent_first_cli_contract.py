@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hldspec import mediator_guidance as mg
+
 
 class AgentFirstCliContractTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -89,6 +91,26 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertTrue(prompt_path.exists())
         self.assertTrue((target / "targetHLD" / "raw" / "HLD.raw.md").exists())
         self.assertTrue((target / "targetHLD" / "HLD.md").exists())
+        packet_path = target / ".hldspec" / "mediator" / "mediator_packet.json"
+        start_prompt = target / "prompts" / "mediator" / "START_MEDIATOR.md"
+        devin_prompt = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
+        direct_prompt = target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"
+        self.assertTrue(packet_path.exists())
+        self.assertTrue(start_prompt.exists())
+        self.assertTrue(devin_prompt.exists())
+        self.assertTrue(direct_prompt.exists())
+
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+        self.assertEqual([], mg.validate_mediator_packet(packet))
+        devin_text = devin_prompt.read_text(encoding="utf-8")
+        direct_text = direct_prompt.read_text(encoding="utf-8")
+        self.assertIn("create agent on {path} as {session-name} using model {model} [permission-mode {mode}]", devin_text)
+        self.assertIn("`go`", devin_text)
+        self.assertIn("`stop`", devin_text)
+        self.assertIn("Stop now is not a valid Devin control word.", devin_text)
+        self.assertNotIn("stop now is a valid Devin control word", devin_text)
+        self.assertIn("stop now is a direct-mode optional behavior only", direct_text)
+        self.assertIn("Codex / Claude direct mediator mode", direct_text)
         self.assertEqual(source_text, source.read_text(encoding="utf-8"))
 
         session = json.loads(session_path.read_text(encoding="utf-8"))

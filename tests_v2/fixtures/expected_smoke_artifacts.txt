@@ -11,6 +11,10 @@ targetHLD/raw/HLD.raw.md
 .hldspec/source_package/slice_test_policy.md
 .hldspec/source_package/speckit_slice_execution_prompt.md
 .hldspec/source_package/anchor_coverage_schema.json
+.hldspec/mediator/mediator_packet.json
+prompts/mediator/START_MEDIATOR.md
+prompts/mediator/DEVIN_MEDIATOR_SKILL.md
+prompts/mediator/CODEX_CLAUDE_MEDIATOR.md
 .specify/source/HLD.md
 .specify/source/HLD.marked.md
 .specify/source/hld_reference_map.json

@@ -51,6 +51,11 @@ Generated target artifacts must stay under the temp target. The HLDspec repo mus
 
 - `scripts/hldspec_agent_session.py start` can prepare a target.
 - `hldspec.hld_source_package.build_source_package_content` can build source-package content.
+- Journey 3 mediator guidance artifacts are materialized in the target workspace:
+  - `.hldspec/mediator/mediator_packet.json`
+  - `prompts/mediator/START_MEDIATOR.md`
+  - `prompts/mediator/DEVIN_MEDIATOR_SKILL.md`
+  - `prompts/mediator/CODEX_CLAUDE_MEDIATOR.md`
 - `.hldspec/source_package/` contains the expected HLD, anchor, manifest, single SpecKit input, and slice files.
 - `.specify/source/` receives a generated read-only mirror.
 - `HLD.marked.md` contains anchors for `HLD-001`, `HLD-002`, and `HLD-003`.

@@ -23,6 +23,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import mediator_guidance
 from .script_io import load_json_dict, write_json_dict
 from .workspace_adapter import TargetWorkspaceAdapter
 
@@ -291,6 +292,13 @@ def build_source_package_content(
     mirrored: list[str] = []
     if materialize_mirror:
         mirrored = materialize_specify_mirror(source_dir, adapter.specify_source_mirror_dir)
+
+    try:
+        mediator_guidance.write_mediator_guidance_artifacts(target_root)
+    except Exception as exc:
+        raise RuntimeError(
+            f"failed to write Journey 3 mediator guidance artifacts under {target_root}: {exc}"
+        ) from exc
 
     return SourcePackageBuild(
         source_dir=source_dir,

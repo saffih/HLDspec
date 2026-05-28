@@ -141,6 +141,7 @@ def run_smoke(args: argparse.Namespace) -> SmokeResult:
             raise AssertionError("hldspec_agent_session start failed")
 
         # Smoke 1 validates the source-package/mirror path without requiring a real SpecKit install.
+        from hldspec import mediator_guidance as mg
         from hldspec.hld_source_package import build_source_package_content
 
         build = build_source_package_content(
@@ -151,6 +152,26 @@ def run_smoke(args: argparse.Namespace) -> SmokeResult:
             materialize_mirror=True,
         )
         checks.append(Check("source package build ok", build.ok, f"anchors={build.anchor_count} unsupported={build.unsupported_claims} marking={build.marking_errors}"))
+
+        packet_path = target / ".hldspec" / "mediator" / "mediator_packet.json"
+        start_prompt = target / "prompts" / "mediator" / "START_MEDIATOR.md"
+        devin_prompt = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
+        direct_prompt = target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"
+        check_file(checks, packet_path, "mediator packet exists")
+        check_file(checks, start_prompt, "mediator start prompt exists")
+        check_file(checks, devin_prompt, "mediator Devin prompt exists")
+        check_file(checks, direct_prompt, "mediator direct prompt exists")
+
+        packet = load_json(packet_path)
+        checks.append(Check("mediator packet validates", not mg.validate_mediator_packet(packet), str(packet_path)))
+        devin_text = devin_prompt.read_text(encoding="utf-8")
+        direct_text = direct_prompt.read_text(encoding="utf-8")
+        checks.append(Check("devin prompt has exact activation sentence", "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]" in devin_text))
+        checks.append(Check("devin prompt has exact go", "`go`" in devin_text))
+        checks.append(Check("devin prompt has exact stop", "`stop`" in devin_text))
+        checks.append(Check("devin prompt rejects stop now", "Stop now is not a valid Devin control word." in devin_text))
+        checks.append(Check("direct prompt documents stop now optional", "stop now is a direct-mode optional behavior only" in direct_text))
+        checks.append(Check("direct prompt preserves mediator boundary", "Agent Mediator is not the Implementation Agent." in direct_text))
 
         source_package = target / ".hldspec" / "source_package"
         specify_source = target / ".specify" / "source"
