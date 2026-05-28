@@ -26,6 +26,12 @@ class SourcePackageContractTests(unittest.TestCase):
         for filename in sp.REQUIRED_FILES:
             self.assertIn(filename, sp.AUTHORITATIVE_FILES.values())
 
+    def test_engineering_guidelines_are_known_but_not_required(self):
+        filename = sp.AUTHORITATIVE_FILES["engineering_guidelines"]
+        self.assertIn(filename, sp.AUTHORITATIVE_FILES.values())
+        self.assertIn(filename, sp.MIRROR_FILES)
+        self.assertNotIn(filename, sp.REQUIRED_FILES)
+
     def test_constitution_proposal_not_mirrored(self):
         self.assertNotIn(sp.CONSTITUTION_PROPOSAL_FILE, sp.MIRROR_FILES)
 
@@ -41,6 +47,7 @@ class SourcePackageBuildTests(unittest.TestCase):
         self.root = Path(self._tmp.name)
         self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
         self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
         _seed_min_package(self.source_dir)
 
     def tearDown(self):
@@ -104,6 +111,25 @@ class SourcePackageBuildTests(unittest.TestCase):
         result = sp.validate_source_package(self.source_dir)
         self.assertFalse(result.ok)
         self.assertIn(sp.AUTHORITATIVE_FILES["hld"], result.hash_mismatches)
+
+    def test_build_does_not_generate_engineering_guidelines_by_default(self):
+        build = sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## Intro\n\nText.\n",
+            hld_source_ref=str(self.root / "SourceHLD.md"),
+            layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+        engineering_guidelines = self.source_dir / sp.AUTHORITATIVE_FILES["engineering_guidelines"]
+        mirror_guidelines = self.mirror_dir / sp.AUTHORITATIVE_FILES["engineering_guidelines"]
+        self.assertFalse(
+            engineering_guidelines.exists(),
+            msg="engineering_guidelines.md should be absent until generation is implemented",
+        )
+        self.assertFalse(
+            mirror_guidelines.exists(),
+            msg="mirror should not invent engineering_guidelines.md when source_package lacks it",
+        )
 
 
 class SpecifyMirrorTests(unittest.TestCase):

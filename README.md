@@ -74,6 +74,8 @@ implementation to *proper* completion. **HLDspec does not implement the product
 itself** — it provides guidance: slice scope, prompts, clarification rules, test
 requirements, stop conditions, and reassessment.
 
+Greenfield-first MVP: the supported path is `HLD -> HLDspec source package -> SpecKit preparation -> implementation slicing -> mediator guidance`. Existing-product change mode is future scope unless a later patch explicitly documents it.
+
 Three modes:
 
 - **Manual** — you implement using HLDspec slice scope and checklists.

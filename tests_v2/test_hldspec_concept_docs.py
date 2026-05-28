@@ -61,6 +61,15 @@ class HldspecConceptDocsTests(unittest.TestCase):
         ):
             self.assertIn(phrase, text)
 
+    def test_readme_states_greenfield_first_mvp_scope(self):
+        text = self.read("README.md").lower()
+        for phrase in (
+            "greenfield-first MVP",
+            "hld -> hldspec source package -> speckit preparation -> implementation slicing -> mediator guidance",
+            "existing-product change mode is future scope",
+        ):
+            self.assertIn(phrase.lower(), text)
+
     def test_slice_control_doc_defines_required_slices_and_phase_behavior(self):
         text = self.read("docs/SPECKIT_SLICE_CONTROL.md")
         for phrase in (

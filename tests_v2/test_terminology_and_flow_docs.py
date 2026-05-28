@@ -64,6 +64,18 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         self.assertIn("Execution Handoff", text)
         self.assertIn("Reassessment Point", text)
 
+    def test_canonical_flow_states_greenfield_first_mvp_scope(self) -> None:
+        text = _read(CANONICAL).lower()
+        for phrase in (
+            "greenfield-first MVP",
+            "hld -> hldspec source package -> speckit preparation -> implementation slicing -> mediator guidance",
+            "existing-product change mode is future scope",
+            "Product Truth Set",
+            "Feature Derivation Package",
+            "overlap classification",
+        ):
+            self.assertIn(phrase.lower(), text)
+
     def test_speckit_proxy_protocol_uses_canonical_control_plane_paths(self) -> None:
         text = _read(DOCS / "SPECKIT_PROXY_PROTOCOL.md")
         self.assertIn("target/.hldspec/sync/speckit_proxy_dossier.json", text)

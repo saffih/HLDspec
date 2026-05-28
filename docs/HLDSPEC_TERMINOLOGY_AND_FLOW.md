@@ -625,6 +625,8 @@ HLDspec is one workflow with three entry points, weighted around a single core:
    implementation to *proper* completion through guidance and reassessment. HLDspec
    does not implement the product itself.
 
+   Greenfield-first MVP: the supported path is `HLD -> HLDspec source package -> SpecKit preparation -> implementation slicing -> mediator guidance`. Existing-product change mode is future scope unless a later patch explicitly documents it. Future change-mode work may introduce Product Truth Set, Feature Derivation Package, and overlap classification, but those are not current MVP behavior.
+
 ### Why a mediator (design rationale)
 
 Driving implementation to completion was approached three ways, in order:

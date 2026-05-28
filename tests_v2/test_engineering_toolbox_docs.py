@@ -39,6 +39,17 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
             ),
         )
 
+    def test_engineering_guidelines_generation_is_not_yet_implemented(self):
+        text = self.read("docs/ENGINEERING_TOOLBOX.md")
+        self.assert_contains_all(
+            text,
+            (
+                "selection -> generated engineering_guidelines.md generation step is NOT yet implemented",
+                "engineering_guidelines.md is optional context",
+                "read only when present",
+            ),
+        )
+
     def test_required_clean_software_cards_exist(self):
         text = self.read("docs/ENGINEERING_TOOLBOX.md")
         self.assert_contains_all(
