@@ -22,6 +22,8 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | Doc | Purpose |
 |---|---|
 | [`HLDSPEC_ARTIFACT_CONTRACT_STYLE.md`](HLDSPEC_ARTIFACT_CONTRACT_STYLE.md) | Standard interface-contract shape for handoffs, prompts, reports, gap handoffs, and slice execution artifacts. |
+| [`ENGINEERING_TOOLBOX.md`](ENGINEERING_TOOLBOX.md) | Durable engineering doctrine for constitution candidates, preferred choice selection, and selected target guidance. |
+| [`ANTI_DRIFT_CONTRACTS.md`](ANTI_DRIFT_CONTRACTS.md) | Non-droppable product, ownership, slice/mediator, and engineering-toolbox contracts that future changes must preserve. |
 | [`HLDSPEC_GAP_HANDOFF_TEMPLATE.md`](HLDSPEC_GAP_HANDOFF_TEMPLATE.md) | Status handoff template for gaps, dirty state, next patch, and tests actually run. Not architecture truth. |
 | [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Development handoff protocol for moving HLDspec repo work between models/agents/sessions. |
 | [`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) | Durable backlog of unfinished repo-development work and open design decisions. |
