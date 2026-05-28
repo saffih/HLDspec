@@ -50,6 +50,29 @@ visibility only, never approval state.
 
 ## General mediator prompt template
 
+## Devin mediator activation
+
+The protected Devin activation sentence is:
+
+```text
+create agent on {path} as {session-name} using model {model} [permission-mode {mode}]
+```
+
+Meaning:
+
+- `{path}` is the target repo/workspace path to observe and guide.
+- `{session-name}` is the named implementation session or mediator session.
+- `{model}` is the selected Devin model.
+- `[permission-mode {mode}]` is optional and must restrict what the mediator may do.
+
+This activation creates a Devin-side **devin mediator** session. The mediator is not
+the Implementation Agent. It observes, summarizes, detects drift, prepares prompts,
+and waits for user control unless the current handoff explicitly allows sending.
+
+The mediator must not treat the activation sentence as implementation approval,
+commit approval, push approval, production-data approval, or completion approval.
+
+
 ```text
 Prompt ID: [ID]
 
@@ -110,6 +133,32 @@ Stop condition:
 
 ## Mediator responsibilities
 
+## Required mediator inputs
+
+Before preparing implementation prompts, the mediator must inspect or explicitly
+report missing required inputs.
+
+Required when present:
+
+```text
+target/.hldspec/source_package/
+target/.hldspec/source_package/engineering_guidelines.md
+target/.hldspec/source_package/implementation_slices.json
+target/.hldspec/source_package/implementation_slicing_policy.md
+target/.hldspec/source_package/slice_test_policy.md
+target/.hldspec/source_package/speckit_slice_execution_prompt.md
+target/.specify/source/
+target/specs/
+```
+
+The mediator must use these inputs to keep the Implementation Agent inside the
+approved lifecycle scope, feature/change branch, slice scope, allowed files,
+forbidden files, focused tests, prior-slice regressions, and stop conditions.
+
+If a required input is missing, stale, contradictory, or insufficient for the next
+action, the mediator must return `clarify` or `reassess` instead of guessing.
+
+
 The mediator must:
 
 1. Pre-load context from HLDspec artifacts.
@@ -128,6 +177,7 @@ The mediator must:
 For Devin-style agents, prompts must include:
 
 - exact target repo path
+- exact Devin activation sentence when using Devin
 - exact branch expectation
 - exact phase command or phase goal
 - bounded allowed evidence
@@ -136,6 +186,36 @@ For Devin-style agents, prompts must include:
 - clear stop condition
 
 ## Design principle enforcement
+
+## Codex / Claude direct mediator mode
+
+Codex and Claude do not need the Devin activation sentence. They use the same
+mediator protocol directly by inspecting the repo, reading provided logs/session
+output, and preparing prompts or recommendations in the current conversation.
+
+Direct mediator mode must still preserve:
+
+```text
+User != Agent Mediator != Implementation Agent
+tmux/session output != approval state
+failed tests != completion
+missing evidence != PASS
+scope expansion != allowed work
+```
+
+Direct mediator output should classify the next action as one of:
+
+```text
+go
+stop
+clarify
+rerun tests
+reassess
+```
+
+and should include the exact prompt to send to the Implementation Agent only when
+the next safe action is `go`.
+
 
 Mediator prompts must enforce `docs/SOFTWARE_DESIGN_PRINCIPLES.md`.
 

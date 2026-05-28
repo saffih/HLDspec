@@ -676,3 +676,51 @@ Cost/runtime modes:
 - Tmux/session state is visibility only, never approval state.
 
 Operational prompt contract: `docs/MEDIATOR_PROMPT_PROTOCOL.md`.
+
+### Journey 3 mediator skill contract
+
+Journey 3 has one shared mediator protocol and two execution surfaces:
+
+```text
+Devin mediator skill
+  = skill-style mediator invoked by the user in Devin.
+
+Codex / Claude direct mediator
+  = direct repo/session/log inspection and prompt preparation without a Devin skill
+    activation command.
+```
+
+The Devin mediator activation sentence is protected product syntax:
+
+```text
+create agent on {path} as {session-name} using model {model} [permission-mode {mode}]
+```
+
+This sentence starts a mediator session for the target path and named session. The
+optional `permission-mode` names the allowed execution/write mode. The mediator must
+still obey HLDspec gates, implementation slice scope, Engineering Toolbox guidance,
+stage-safe testing, and the user approval boundary.
+
+The Devin mediator skill must read or cite, when present:
+
+```text
+target/.hldspec/source_package/
+target/.hldspec/source_package/engineering_guidelines.md
+target/.hldspec/source_package/implementation_slices.json
+target/.hldspec/source_package/implementation_slicing_policy.md
+target/.hldspec/source_package/slice_test_policy.md
+target/.hldspec/source_package/speckit_slice_execution_prompt.md
+target/.specify/source/
+target/specs/
+```
+
+For Codex and Claude, the same mediator role is performed directly through repo
+inspection, provided logs, or session output. They do not require the Devin
+activation command, but they must preserve the same boundaries, control words,
+evidence requirements, and stop conditions.
+
+The mediator may prepare a fully baked prompt for the Implementation Agent, but it
+must not send or imply approval unless the user explicitly says `go` or the current
+handoff explicitly permits automatic send. `stop` and `stop now` dominate all pending
+work. Failed tests, scope expansion, missing source evidence, production-data risk,
+or human-owned source-truth questions require `rerun tests`, `clarify`, or `reassess`, not silent continuation.
