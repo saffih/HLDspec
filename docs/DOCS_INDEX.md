@@ -9,7 +9,9 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | Doc | Purpose |
 |---|---|
 | [`../README.md`](../README.md) | Conceptual front door: what HLDspec does, the three journeys, and the normal workflow. |
-| [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | Authoritative canonical architecture, terminology, ownership boundaries, full flow, and SpecKit Run Card. Wins on conflicts. |
+| [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | Authoritative canonical architecture, terminology, ownership boundaries, full flow, and SpecKit Run Card. Wins on conflicts. The canonical terminology/command-surface source. |
+| [`ARCHITECTURE_LAYERS.md`](ARCHITECTURE_LAYERS.md) | The product/layer map: product purpose, three journeys, implementation modes, the seven product layers, and current/intended/future honesty. |
+| [`REPO_MIGRATION_PLAN.md`](REPO_MIGRATION_PLAN.md) | The phased change plan: top-level classification and the migration phases (no broad moves first; tests before moves; rollback per phase). |
 | [`../AGENTS.md`](../AGENTS.md) | Repo agent bootstrap and HLDspec invocation rules. |
 | [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical slice-control model and generated slice artifact contract. |
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec-to-SpecKit handoff and proxy protocol. |

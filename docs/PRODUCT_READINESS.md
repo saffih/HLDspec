@@ -6,6 +6,11 @@ gates are actually met.** Production-ready overclaiming is forbidden.
 
 Status date: 2026-05-29. Re-run the evidence commands before trusting it.
 
+For the product/layer map and the phased repository migration plan, see
+`docs/ARCHITECTURE_LAYERS.md` and `docs/REPO_MIGRATION_PLAN.md`. Those improve
+architecture alignment and anti-drift; they do **not** by themselves change
+production readiness, which remains NO until the production gates below are met.
+
 ## Tiers and gates
 
 ### Supervised MVP — status: YES
