@@ -6,11 +6,29 @@ This document defines the simple user workflow for HLDspec.
 
 The user should not need to understand internal scripts to start.
 
+## Public user interface (agent-first)
+
+The public HLDspec user interface is **a one-line instruction to an agent**, not
+direct script execution. The user gives an agent a short instruction; the agent
+uses HLDspec's command/tool surface internally; the user receives **STATUS,
+blockers, evidence, and the next safe action** — not script mechanics.
+
+Copy-ready instruction to give the agent:
+
+```text
+Use HLDspec with source HLD: <path-to-HLD.md> and target project: <path-to-target>. Prepare the target, check SpecKit readiness, and report STATUS, blockers, evidence, and next safe action. Do not implement or run SpecKit unless HLDspec says it is safe.
+```
+
+In this agent-first model the user sees results, not script paths. The command
+surface below is the **internal tool surface** the agent (or a maintainer)
+invokes; it is documented for reference, not as the primary human UX.
+
 ## Command surface
 
 The canonical command surface is defined in
 [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) (HLDspec
-Product Facade); this doc presents the same set for the user workflow.
+Product Facade); this doc presents the same set as the internal tool surface the
+agent runs for the user.
 
 Current public product commands:
 

@@ -262,18 +262,45 @@ Agents must stop when:
 
 ## Main user workflow
 
-The public facade is one script, `scripts/hldspec_agent_session.py`. A new user
-needs only two commands to begin and to know what to do next:
+The normal way to use HLDspec is **agent-first**: you give an agent a single
+one-line instruction, and the agent uses HLDspec's internal tools to prepare the
+target and report back. You do **not** normally run any script path yourself.
+
+What you do:
+
+- Give an agent one short HLDspec instruction (below).
+- The agent uses HLDspec's internal tools to prepare the target workspace and
+  check SpecKit readiness.
+- The agent reports **STATUS, blockers, evidence, and the next safe action**.
+- You stay the decision owner; HLDspec never runs SpecKit or implements code
+  until it reports that doing so is safe.
+
+Copy-ready instruction to give the agent:
+
+```text
+Use HLDspec with source HLD: <path-to-HLD.md> and target project: <path-to-target>. Prepare the target, check SpecKit readiness, and report STATUS, blockers, evidence, and next safe action. Do not implement or run SpecKit unless HLDspec says it is safe.
+```
+
+A normal user does not need to know any script path: the agent runs HLDspec's
+internal command surface and reports the results back to you.
+
+### Internal command/tool surface (what the agent may run)
+
+The commands below are **internal/manual tooling** — what the agent runs on your
+behalf, and what maintainers use for debug/fallback. They are **not** the normal
+user entry point; the agent one-liner above is. `scripts/hldspec_agent_session.py`
+is HLDspec's internal command surface, not the public product interface, so a
+normal user should not need to invoke it directly.
 
 ```bash
-# 1. Prepare a target workspace from an HLD
+# Prepare or resume a target workspace from an HLD
 python3 scripts/hldspec_agent_session.py start --source /path/to/HLD.md --target /path/to/target
 
-# 2. See current state and the next safe action (run this whenever unsure)
+# Report current state and the next safe action
 python3 scripts/hldspec_agent_session.py operator-state --target /path/to/target
 ```
 
-### Public command surface
+The full internal command/tool surface the agent may run:
 
 | Command | What it does |
 |---|---|
@@ -291,9 +318,11 @@ today; broader post-specify lifecycle Operator State remains planned.
 
 The canonical command list is maintained in
 [`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`](docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md)
-(HLDspec Product Facade); this table presents the same set.
+(HLDspec Product Facade / runtime command surface); this table presents the same
+set. It is a command/tool surface, not the primary human UX.
 
-Agents should prefer the facade over low-level scripts unless debugging a failure.
+Agents run this command surface on the user's behalf and should prefer it over
+low-level scripts; a normal user does not invoke it directly.
 
 ### Reading results: PASS / ACTION / CONFLICT
 
