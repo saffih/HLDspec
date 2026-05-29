@@ -14,6 +14,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical slice-control model and generated slice artifact contract. |
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec-to-SpecKit handoff and proxy protocol. |
 | [`SMOKE_SCENARIOS.md`](SMOKE_SCENARIOS.md) | Deterministic smoke scenarios, commands, target layout, and PASS/FAIL output contract. |
+| [`REPO_LAYOUT.md`](REPO_LAYOUT.md) | Compact map of root files: active V2 source, shared parser, V1 pipeline, root docs, and the three test roots. |
 
 ---
 
@@ -43,7 +44,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 
 | Script / Module | Role |
 |---|---|
-| `scripts/hldspec_agent_session.py` | Agent-first facade: start/status/review/continue/diff/doctor. |
+| `scripts/hldspec_agent_session.py` | Agent-first facade: start/status/review/continue/diff/doctor/speckit-doctor/operator-state (alias speckit-state). |
 | `scripts/hldspec_smoke_slice_e2e.py` | Production smoke scenario for source package, mirror, anchors, slice artifacts, and optional tmux visibility. |
 | `scripts/hldspec_v2.py` | V2 CLI entry point. |
 | `scripts/hldspec_run.sh` | Canonical run entry for the full pipeline. |
