@@ -20,8 +20,8 @@ evidence-backed next safe action.
 | CLI exposes current state + next safe action | YES | `operator-state` / `speckit-state` in `scripts/hldspec_agent_session.py` |
 | Tests cover the command path | YES | `test_cli_operator_state_prints_summary` |
 | Docs are not misleading | YES | command surface + boundaries in `README.md`, terminology/anti-drift tests |
-| Full `tests_v2` passes | YES | `python3 -m unittest discover -s tests_v2` → 673 OK |
-| Smoke passes | YES | `python3 scripts/hldspec_smoke_slice_e2e.py --json` → 72 checks PASS |
+| Full `tests_v2` passes | YES | `python3 -m unittest discover -s tests_v2 -v` passes |
+| Smoke passes | YES | `python3 scripts/hldspec_smoke_slice_e2e.py --json` reports `HLDSPEC_SMOKE_RESULT: PASS` |
 | Known limitations explicit | YES | this file + README boundaries |
 | No known P0 ACTION/CONFLICT | YES | — |
 

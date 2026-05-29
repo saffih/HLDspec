@@ -11,6 +11,7 @@ Two kinds of checks:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -85,6 +86,18 @@ class ProductReadinessDocsTests(unittest.TestCase):
 
     def test_scorecard_names_runskeptic_verification(self) -> None:
         self.assertIn("RunSkeptic", _read(SCORECARD))
+
+    def test_scorecard_uses_nonbrittle_test_evidence(self) -> None:
+        # The full-suite evidence must be a re-runnable command, not a hardcoded
+        # pass count that goes stale as tests are added. Guards against
+        # reintroducing wording like "discover -s tests_v2 -> 673 OK".
+        text = _read(SCORECARD)
+        self.assertIn("discover -s tests_v2", text)
+        stale = re.search(r"\b\d+\s+OK\b", text)
+        self.assertIsNone(
+            stale,
+            f"scorecard has a brittle hardcoded test count: {stale.group(0) if stale else ''}",
+        )
 
 
 if __name__ == "__main__":
