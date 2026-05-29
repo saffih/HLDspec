@@ -28,11 +28,15 @@ evidence-backed next safe action.
 ### Standalone user — status: YES (with the docs in this branch)
 
 A new user with no project history can orient and run one validation command.
+The standalone path is **the agent one-liner plus internal HLDspec tooling** —
+the user gives an agent one instruction and reads back STATUS/blockers/evidence/
+next safe action — **not** direct script execution.
 
 | Gate | Met | Evidence |
 |---|---|---|
-| README quickstart for a new user | YES | README "Main user workflow" |
-| Public command surface documented | YES | README command-surface table; `test_product_readiness_docs` binds it to `build_parser()` |
+| Agent one-liner is the primary user entry point | YES | README "Main user workflow" one-liner; `tests_v2/test_agent_first_user_interface.py` |
+| README quickstart for a new user | YES | README "Main user workflow" (agent one-liner) |
+| Public command surface documented as internal tool surface | YES | README command-surface table; `test_product_readiness_docs` binds it to `build_parser()` |
 | start/status/doctor/speckit-doctor/operator-state/speckit-state roles explained | YES | README command-surface table |
 | PASS/ACTION/CONFLICT explained | YES | README "Reading results" table |
 | Failure messages tell what to do next | YES | `next_safe_action` on every operator-state result |
@@ -87,6 +91,10 @@ workspace. Tracked as production-tier work.
   docs.
 - The "Standalone user: YES" call is justified and not overclaiming, and
   "Production: NO" is preserved.
+- The standalone path is the **agent one-liner plus internal HLDspec tooling**,
+  not direct script execution; scripts are documented as internal/manual/debug/
+  fallback tooling and `tests_v2/test_agent_first_user_interface.py` keeps that
+  drift from returning.
 - The command surface is reconciled to one canonical source
   (`HLDSPEC_TERMINOLOGY_AND_FLOW.md`); confirm no doc reintroduces a competing
   "canonical" command list.
