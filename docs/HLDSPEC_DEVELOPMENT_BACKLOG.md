@@ -551,6 +551,22 @@ Future commands: `interview`, `prework`, `speckit`, `pause`.
 
 Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.
 
+### DOC-DRIFT-001 Command-surface drift in USER_RUN_MODEL.md (2026-05-29)
+
+The real public surface is `start`, `status`, `review`, `continue`, `diff`,
+`doctor`, `speckit-doctor`, `operator-state` (alias `speckit-state`), verified
+against `build_parser()` by `tests_v2/test_product_readiness_docs.py`. `README.md`,
+`docs/DOCS_INDEX.md`, and `AGENTS.md` are now aligned. `docs/USER_RUN_MODEL.md`
+still lists the older `start/status/review/continue/speckit/diff/doctor` set and
+was out of the allowed edit scope for the product-readiness branch.
+
+- Severity: cosmetic (no behavior impact); not a standalone-readiness blocker.
+- Fix: align `USER_RUN_MODEL.md` with README's command-surface table.
+- Also defer: rename the root `Dev` session pointer to a self-describing name
+  (e.g. `SESSION_RESTART.md`). Nothing in active code references the filename
+  (only `docs/archive/`), so the rename is safe but is a user-preference call;
+  it is documented in `docs/REPO_LAYOUT.md` for now.
+
 ## Next safe patch sequence
 
 1. Review GitHub diff and RunSkeptic on this stale-truth update.

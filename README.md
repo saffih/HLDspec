@@ -262,17 +262,52 @@ Agents must stop when:
 
 ## Main user workflow
 
-The public facade is intentionally small:
+The public facade is one script, `scripts/hldspec_agent_session.py`. A new user
+needs only two commands to begin and to know what to do next:
 
 ```bash
+# 1. Prepare a target workspace from an HLD
 python3 scripts/hldspec_agent_session.py start --source /path/to/HLD.md --target /path/to/target
-python3 scripts/hldspec_agent_session.py status --target /path/to/target
-python3 scripts/hldspec_agent_session.py review --target /path/to/target
-python3 scripts/hldspec_agent_session.py continue --target /path/to/target
-python3 scripts/hldspec_agent_session.py doctor --target /path/to/target
+
+# 2. See current state and the next safe action (run this whenever unsure)
+python3 scripts/hldspec_agent_session.py operator-state --target /path/to/target
 ```
 
+### Public command surface
+
+| Command | What it does |
+|---|---|
+| `start` | Prepare or resume a session: copy the HLD into the target, build the source package, mirror read-only context, plan SpecKit init. |
+| `status` | Show session status, blockers, open questions, and the next safe action. |
+| `review` | List the human review files and which blocking ones are missing. |
+| `continue` | Run the pipeline to the next safe checkpoint (gated). |
+| `diff` | Compare the source HLD hash to the recorded session hash. |
+| `doctor` | Check agent-first docs and target session/layout files. |
+| `speckit-doctor` | Readiness/preflight only: is the target ready for real SpecKit work? Does not decide the lifecycle. |
+| `operator-state` (alias `speckit-state`) | Report the readiness-boundary Operator State and the evidence-backed next safe action. Consumes `speckit-doctor` facts; it does **not** replace the doctor. |
+
+`operator-state` / `speckit-state` are scoped to the **readiness boundary**
+today; broader post-specify lifecycle Operator State remains planned.
+
 Agents should prefer the facade over low-level scripts unless debugging a failure.
+
+### Reading results: PASS / ACTION / CONFLICT
+
+`status`, `doctor`, `speckit-doctor`, and `operator-state` report one decision
+word so you always know whether it is safe to proceed:
+
+| Result | Meaning | What to do |
+|---|---|---|
+| `PASS` | No blockers at this boundary. | Proceed with the printed next safe action. |
+| `ACTION` | Something is missing or not ready. | Do the printed next safe action, then rerun. |
+| `CONFLICT` | Evidence disagrees or a human-owned decision is required. | Stop; resolve the conflict / make the decision, then rerun. |
+
+Every result prints an explicit **next safe action** and exits non-zero on
+`ACTION`/`CONFLICT`, so failure messages always tell you what to do next.
+
+For where this sits against full product readiness (and what is **not** yet
+production-ready), see [`docs/PRODUCT_READINESS.md`](docs/PRODUCT_READINESS.md).
+For a map of the repository itself, see [`docs/REPO_LAYOUT.md`](docs/REPO_LAYOUT.md).
 
 
 

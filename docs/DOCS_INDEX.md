@@ -15,6 +15,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec-to-SpecKit handoff and proxy protocol. |
 | [`SMOKE_SCENARIOS.md`](SMOKE_SCENARIOS.md) | Deterministic smoke scenarios, commands, target layout, and PASS/FAIL output contract. |
 | [`REPO_LAYOUT.md`](REPO_LAYOUT.md) | Compact map of root files: active V2 source, shared parser, V1 pipeline, root docs, and the three test roots. |
+| [`PRODUCT_READINESS.md`](PRODUCT_READINESS.md) | Readiness scorecard: tiers, gates, current status, evidence, path-safety summary, and what independent RunSkeptic must verify. |
 
 ---
 
