@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "check_product_readiness.sh"
 README = ROOT / "README.md"
+WORKFLOW = ROOT / ".github" / "workflows" / "product-readiness.yml"
 
 
 class ProductReadinessScriptTests(unittest.TestCase):
@@ -43,6 +44,24 @@ class ProductReadinessScriptTests(unittest.TestCase):
 
     def test_readme_references_the_script(self) -> None:
         self.assertIn("check_product_readiness.sh", README.read_text(encoding="utf-8"))
+
+    def test_workflow_exists(self) -> None:
+        self.assertTrue(WORKFLOW.is_file(), f"missing {WORKFLOW}")
+
+    def test_workflow_runs_on_pull_request_and_main(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("pull_request:", text)
+        self.assertIn("push:", text)
+        self.assertIn("- main", text)
+
+    def test_workflow_runs_the_product_readiness_script(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("bash -n scripts/check_product_readiness.sh", text)
+        self.assertIn("scripts/check_product_readiness.sh", text)
+
+    def test_workflow_uses_python_3_10(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("python-version: \"3.10\"", text)
 
 
 if __name__ == "__main__":

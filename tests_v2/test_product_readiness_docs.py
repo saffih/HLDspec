@@ -83,6 +83,14 @@ class ProductReadinessDocsTests(unittest.TestCase):
     def test_scorecard_does_not_overclaim_production(self) -> None:
         text = _read(SCORECARD)
         self.assertIn("Production-ready: NO", text)
+        self.assertNotIn("Production-ready: YES", text)
+
+    def test_scorecard_ci_is_no_longer_local_only(self) -> None:
+        text = _read(SCORECARD)
+        self.assertRegex(
+            text,
+            r"Reproducible release check or CI \| (PARTIAL|YES) \|",
+        )
 
     def test_scorecard_names_runskeptic_verification(self) -> None:
         self.assertIn("RunSkeptic", _read(SCORECARD))

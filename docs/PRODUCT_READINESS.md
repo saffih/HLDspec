@@ -49,7 +49,7 @@ Not production-ready. The following gates are not met.
 | Gate | Met | Blocker |
 |---|---|---|
 | Install/release story | NO | no `pyproject.toml`/`setup`/packaged release; run from a clone only |
-| Reproducible release check or CI | NO | no `.github/` CI; `scripts/check_product_readiness.sh` is local-only |
+| Reproducible release check or CI | PARTIAL | `.github/workflows/product-readiness.yml` runs `scripts/check_product_readiness.sh` on `pull_request` and `push` to `main` with Python 3.10; release/install story still absent |
 | Stable public command surface | PARTIAL | surface is documented but not version-frozen or deprecation-policed |
 | Recovery/rollback docs | PARTIAL | path-safety summarized below; no full recovery/rollback runbook |
 | Security/path-safety review | PARTIAL | reviewed (below); no independent security sign-off |
@@ -57,6 +57,10 @@ Not production-ready. The following gates are not met.
 | No independent RunSkeptic blocker | UNKNOWN | needs an independent RunSkeptic pass on this branch |
 
 **Production-ready: NO** until every production gate above is met and verified.
+
+CI uses Python 3.10 because the core `hld_spec_sync.py` and `hld_spec_downstream.py`
+scripts declare `requires-python = ">=3.10"` and the local compatibility check
+for this slice did not find a lower supported version to target.
 
 ## Path safety and recovery (review summary)
 
