@@ -17,6 +17,7 @@ This matrix tracks whether HLDspec enforces its own design principles on the HLD
 | Quality gates | Context prompt validation, promotion gate, doctor final summary. | validator, promotion, CLI contract tests | Full domain validators: backend triggers, principle evidence, constitution purity, package testability, graph/queue parity, handoff pointers. |
 | UX/output quality | Output contract; status/review/doctor sections; next safe action. | CLI contract tests; self-dogfood smoke | Sectioned output for `start` and `diff`; stage-aware doctor checks. |
 | Safety | Source read-only behavior, target-only durable writes, implementation approval guard in prompts. | CLI contract, context prompt, promotion gate, self-dogfood tests | Stronger enforcement for every write path and every generated prompt. |
+| Invariant-to-test binding (HLD-VERIFY coverage) | `scripts/hld_verify_coverage.py --strict` requires every HIGH-risk HLD anchor (each carries an HLD-VERIFY invariant) to be cited by a failing-if-violated test; the citation convention is wired into `hldspec/implementation_slicing.py` slice policy. | `tests_v2/test_hld_verify_coverage.py`; `tests_v2/test_invariant_coverage_principle.py` | Per-language test-file auto-discovery, citation-style linting, and integration into the ready-gate ladder. |
 
 ## Rule
 

@@ -571,6 +571,70 @@ asserts `operator-state`/`speckit-state` as current.
   references the filename (only `docs/archive/`), so the rename is safe but is a
   user-preference call; it is documented in `docs/REPO_LAYOUT.md` for now.
 
+## Gap: raw->anchored conversion exists but is not reachable from `agent_session --mode create`
+
+Logged 2026-05-29 while anchoring the Baton Flow HLD (`~/code/flow/HLD.md`).
+**Correction of an earlier claim in this same investigation:** a first draft of this
+entry asserted "there is no deterministic first-pass anchor seeder." **That was wrong.**
+A structured raw->anchored conversion process exists and is canonical.
+
+**What actually exists (verified by running it).** `scripts/first_run_readonly.sh HLD.md`
+runs `hld_spec_sync.py --hld-format-report` first, auto-detects readiness, and if the HLD
+is raw it emits the full **marking path** and stops at stage `CONVERSION_READY_TO_APPLY`:
+`logs/.../hld_format_report.md`, `logs/.../suggested_hld_sections.json`,
+`.specify/sync/raw_hld_marking_plan.json|md` (one item per section, from
+`scripts/build_raw_hld_marking_plan.py` ROLE_KEYWORDS heuristics),
+`.specify/sync/hld_conversion_plan.json|md`, `hld_conversion_decision_queue.json|md`,
+`RAW_HLD_MARKING_PROMPT.md`, `HLD_CONVERSION_PROMPT.md`. The agent then converts in
+bounded 3-5 section batches using `grep`/`rg`/`sed -n`/`awk`, preserving `HLD.raw.md`
+(see `docs/FIRST_RUN.md`), and reruns -> HLD map -> Spec Build Plan -> Plan Quality Gate
+-> Review (the **slice/build path**). On Baton Flow: the raw run produced 12 marking
+items + `PROCEED_CHUNKED_CONVERSION`; the anchored run produced a full `spec_build_plan`
++ SpecKit prework package. The `apply_hld_conversion` machine
+(`hldspec/machines/apply_hld_conversion.py`) can apply the decisions. Earlier confusion
+came from testing only `classify_hld_sections.py` (which *does* require existing anchors)
+and `agent_session --mode create` (which does not route into this flow) — not the
+`first_run_readonly.sh` entry point.
+
+**The real gap (two parts).**
+1. **Unreconciled entry points.** `agent_session start --mode create` copies the source,
+   reports `0 HLD anchors`, and hands a generic `HLD_GENERATION.md` prose prompt — it does
+   NOT trigger the `first_run_readonly.sh` readiness-detection/conversion flow. A user who
+   enters via `agent_session` never sees the marking plan / conversion prompt / decision
+   queue that the documented first-run path provides. These should converge.
+2. **The demonstrated run was deleted.** The full worked example (`.hldspec-first-run/`
+   marking plan, format report, etc.) was removed in commit `9654a5e` ("exclude workspace
+   artifacts from repo") for a correct reason (workspace output != repo), but with it the
+   *example of the process* was lost — itself an instance of the "vibe dev loses key parts"
+   failure mode HLDspec fights. A small fixture/golden under `tests_v2/` or `docs/` should
+   preserve a canonical raw->anchored example so it can't silently disappear again.
+
+**Caveat on `raw_hld_marking_plan` quality.** Its role/risk values are keyword-heuristic
+DRAFTS, not authoritative: on Baton Flow it tagged Technology, Out-of-scope, and
+Extensibility as `governance_context/HIGH` and the lifecycle as `data_model`. The process
+intends the agent to correct these via `HLD_CONVERSION_PROMPT.md`; the value of the tool
+is the never-skip scaffold (every section gets an item, a decision queue, readiness gating,
+`HLD.raw.md` preservation), not finished metadata.
+
+**Minor polish (found by diffing tool output vs hand-anchoring; not blocking).**
+1. `apply_hld_conversion_decisions.py` writes titles as `## HLD-001 - 1. What it is` —
+   it keeps the source's leading `N. ` ordinal, producing double numbering. It should
+   strip a leading `^\d+\.\s` from the title when synthesizing the anchored heading.
+2. `apply` defaults almost every section to `HLD-ROLE: architecture` / `HLD-RISK: MEDIUM`
+   and does NOT carry through the per-section role guesses already computed in
+   `raw_hld_marking_plan.json` (which had governance/data_model/interface_contract/etc.).
+   Wiring the marking-plan roles into the apply step would make the scaffold draft a better
+   starting point. Neither is urgent: the agent judgment pass corrects both, and "if it's
+   good, it's good" — the method works at its job (never-skip scaffold), so this is polish,
+   not a rewrite.
+
+**Baton Flow note.** The Baton Flow HLD was anchored by hand (12 sections -> `## HLD-0NN`
++ HLD_FORMAT metadata, prose verbatim) and validates clean (`validation_errors == []`),
+with cleaner role assignments than the raw draft. That hand-pass *skipped the scaffold*
+(no preserved `HLD.raw.md`, no decision queue) but reached a valid, better-classified
+result. For the next HLD, prefer entering through `first_run_readonly.sh` so the scaffold
+is not skipped.
+
 ## Next safe patch sequence
 
 1. Review GitHub diff and RunSkeptic on this stale-truth update.
