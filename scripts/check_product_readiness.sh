@@ -32,6 +32,8 @@ python3 -m py_compile \
   tests_v2/test_product_readiness_docs.py \
   tests_v2/test_repo_layout_readability.py \
   tests_v2/test_agent_first_user_interface.py \
+  tests_v2/test_architecture_layers_contract.py \
+  tests_v2/test_repo_top_level_classification.py \
   tests_v2/test_product_readiness_script.py
 
 step "focused tests: Operator State"
@@ -54,6 +56,12 @@ python3 -m unittest tests_v2.test_repo_layout_readability
 
 step "focused tests: agent-first user interface"
 python3 -m unittest tests_v2.test_agent_first_user_interface
+
+step "focused tests: architecture layers contract"
+python3 -m unittest tests_v2.test_architecture_layers_contract
+
+step "focused tests: top-level classification"
+python3 -m unittest tests_v2.test_repo_top_level_classification
 
 step "full suite: tests_v2"
 python3 -m unittest discover -s tests_v2

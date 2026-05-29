@@ -61,13 +61,17 @@ command-surface source and every doc defers to it.
   contracts test must pass.
 - **Rollback / revert rule:** docs/tests only; revert the commit.
 
-### Phase 3 — Complete top-level classification
+### Phase 3 — Complete top-level classification  *(enforced)*
 
-Confirm the classification table below covers **every** tracked top-level entry,
-with no file left as "just there".
+The classification table below covers **every** tracked top-level entry, with no
+file left as "just there". This is now **enforced**:
+`tests_v2/test_repo_top_level_classification.py` reads the tracked top-level
+entries from `git ls-files` and fails if any is missing a backticked row in the
+table. Adding a new top-level file/dir therefore requires classifying it in the
+same change.
 
-- **Tests required before any move:** repo-layout readability test plus this
-  doc's classification test must pass.
+- **Tests required before any move:** repo-layout readability test plus the
+  top-level classification test (`test_repo_top_level_classification`) must pass.
 - **Rollback / revert rule:** docs/tests only; revert the commit.
 
 ### Phase 4 — Low-risk doc/pointer migration only

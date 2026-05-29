@@ -188,12 +188,15 @@ These names are **not interchangeable**:
 - Agent one-liner first is the documented front door (Layer 1): the README,
   `USER_RUN_MODEL.md`, and `HLDSPEC_TERMINOLOGY_AND_FLOW.md` lead with it —
   migration Phase 1, landed.
+- Top-level classification is enforced (Layer 7): every tracked top-level entry
+  must appear in the `REPO_MIGRATION_PLAN.md` classification table —
+  `tests_v2/test_repo_top_level_classification.py` (migration Phase 3, landed).
 - Anti-drift tests (Layer 7) protect terminology, UX, command surface, and layout.
 
 **Intended target state [target]:**
 
-- Every tracked top-level file/dir has exactly one *enforced* layer classification
-  — migration Phases 3–5.
+- Per-file move/rename enforcement as files relocate to their layer homes —
+  migration Phases 4–5.
 
 **Future / not yet implemented [future]:**
 
