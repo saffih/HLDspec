@@ -40,7 +40,7 @@ A new user with no project history can orient and run one validation command.
 | Active vs legacy vs compatibility files clear | YES | `docs/REPO_LAYOUT.md` |
 | ≥1 sample/demo/smoke documented | YES | `docs/SMOKE_SCENARIOS.md` |
 | One validation command without project history | YES | `scripts/check_product_readiness.sh` |
-| No known P1 ACTION/CONFLICT | YES | residual `USER_RUN_MODEL.md` command-surface drift is logged in the backlog (cosmetic, not blocking) |
+| No known P1 ACTION/CONFLICT | YES | command-surface drift resolved: `HLDSPEC_TERMINOLOGY_AND_FLOW.md` is the single canonical surface; README, `USER_RUN_MODEL.md`, and `HLDSPEC_USE_CASES_AND_API.md` defer to it and list all 9 commands |
 
 ### Production — status: NO
 
@@ -87,7 +87,9 @@ workspace. Tracked as production-tier work.
   docs.
 - The "Standalone user: YES" call is justified and not overclaiming, and
   "Production: NO" is preserved.
-- Residual `USER_RUN_MODEL.md` command-surface drift is acceptable to defer.
+- The command surface is reconciled to one canonical source
+  (`HLDSPEC_TERMINOLOGY_AND_FLOW.md`); confirm no doc reintroduces a competing
+  "canonical" command list.
 
 ## Re-run the evidence
 

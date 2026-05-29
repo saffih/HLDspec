@@ -6,7 +6,11 @@ This document defines the simple user workflow for HLDspec.
 
 The user should not need to understand internal scripts to start.
 
-## Canonical command surface
+## Command surface
+
+The canonical command surface is defined in
+[`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) (HLDspec
+Product Facade); this doc presents the same set for the user workflow.
 
 Current public product commands:
 
@@ -19,6 +23,8 @@ Current public product commands:
 | `hldspec diff` | current | Compare source hash with recorded target source hash. |
 | `hldspec doctor` | current | Check repo and target session prerequisites. |
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and next actions. |
+| `hldspec operator-state` | current | Show the readiness-boundary Operator State and the next safe action. |
+| `hldspec speckit-state` | current | Alias of `operator-state`. |
 
 Future product commands:
 
@@ -132,9 +138,9 @@ hldspec speckit --target ./target --next
 ```
 
 Future command. The current product facade is `start`, `status`, `review`,
-`continue`, `diff`, `doctor`, and `speckit-doctor`. Today, `hldspec continue`
-advances the ProjectMachine to the next safe checkpoint and blocks before
-unapproved SpecKit work.
+`continue`, `diff`, `doctor`, `speckit-doctor`, and `operator-state` (alias
+`speckit-state`). Today, `hldspec continue` advances the ProjectMachine to the
+next safe checkpoint and blocks before unapproved SpecKit work.
 
 SpecKit owns:
 

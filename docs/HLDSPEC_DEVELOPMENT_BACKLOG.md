@@ -551,21 +551,25 @@ Future commands: `interview`, `prework`, `speckit`, `pause`.
 
 Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.
 
-### DOC-DRIFT-001 Command-surface drift in USER_RUN_MODEL.md (2026-05-29)
+### DOC-DRIFT-001 Command-surface drift (2026-05-29) — RESOLVED
 
 The real public surface is `start`, `status`, `review`, `continue`, `diff`,
 `doctor`, `speckit-doctor`, `operator-state` (alias `speckit-state`), verified
-against `build_parser()` by `tests_v2/test_product_readiness_docs.py`. `README.md`,
-`docs/DOCS_INDEX.md`, and `AGENTS.md` are now aligned. `docs/USER_RUN_MODEL.md`
-still lists the older `start/status/review/continue/speckit/diff/doctor` set and
-was out of the allowed edit scope for the product-readiness branch.
+against `build_parser()` by `tests_v2/test_product_readiness_docs.py`.
 
-- Severity: cosmetic (no behavior impact); not a standalone-readiness blocker.
-- Fix: align `USER_RUN_MODEL.md` with README's command-surface table.
-- Also defer: rename the root `Dev` session pointer to a self-describing name
-  (e.g. `SESSION_RESTART.md`). Nothing in active code references the filename
-  (only `docs/archive/`), so the rename is safe but is a user-preference call;
-  it is documented in `docs/REPO_LAYOUT.md` for now.
+Resolved by the "align canonical command surface" commit:
+`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (HLDspec Product Facade) is now the single
+canonical command-surface source. `README.md`, `docs/USER_RUN_MODEL.md`,
+`docs/HLDSPEC_USE_CASES_AND_API.md`, `docs/DOCS_INDEX.md`, and `AGENTS.md` defer
+to it and list all 9 commands. `USER_RUN_MODEL.md` and `HLDSPEC_USE_CASES_AND_API.md`
+no longer self-declare a competing "canonical" surface. The README command-surface
+test now binds to backtick-quoted command tokens; the use-case contract test now
+asserts `operator-state`/`speckit-state` as current.
+
+- Remaining (deferred, not blocking): rename the root `Dev` session pointer to a
+  self-describing name (e.g. `SESSION_RESTART.md`). Nothing in active code
+  references the filename (only `docs/archive/`), so the rename is safe but is a
+  user-preference call; it is documented in `docs/REPO_LAYOUT.md` for now.
 
 ## Next safe patch sequence
 

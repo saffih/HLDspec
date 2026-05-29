@@ -47,10 +47,17 @@ class ProductReadinessDocsTests(unittest.TestCase):
         self.assertGreaterEqual(len(commands), 9)
 
     def test_readme_documents_every_public_command(self) -> None:
+        # Require each command as a backtick-quoted token (table cell / inline
+        # code), not a bare substring. Prose like "git diff" / "git status" must
+        # not satisfy the check, so deleting a command's documented row fails.
         readme = _read(README)
         for command in sorted(public_commands()):
             with self.subTest(command=command):
-                self.assertIn(command, readme, f"README must document the '{command}' command")
+                self.assertIn(
+                    f"`{command}`",
+                    readme,
+                    f"README must document the '{command}' command as a `{command}` token",
+                )
 
     def test_readme_explains_decision_vocabulary(self) -> None:
         readme = _read(README)

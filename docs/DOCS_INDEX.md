@@ -33,7 +33,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`MEDIATOR_PROMPT_PROTOCOL.md`](MEDIATOR_PROMPT_PROTOCOL.md) | Mediator prompt protocol for Devin/Claude/Codex target agents. |
 | [`CANONICAL_FLOW.md`](CANONICAL_FLOW.md) | Canonical pipeline flow reference. |
 | [`ARCHITECTURE_V2.md`](ARCHITECTURE_V2.md) | V2 architecture: machines, contracts, and pipeline. |
-| [`USER_RUN_MODEL.md`](USER_RUN_MODEL.md) | Simple user workflow: start, status, review, continue, speckit, diff, doctor. |
+| [`USER_RUN_MODEL.md`](USER_RUN_MODEL.md) | Simple user workflow over the public command surface; defers to `HLDSPEC_TERMINOLOGY_AND_FLOW.md` for the canonical command list. |
 | [`AGENT_FIRST_PRODUCT_MODEL.md`](AGENT_FIRST_PRODUCT_MODEL.md) | Agent-first product model: users start sessions; scripts are tools. |
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract. |
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents. |

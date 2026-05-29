@@ -289,6 +289,10 @@ python3 scripts/hldspec_agent_session.py operator-state --target /path/to/target
 `operator-state` / `speckit-state` are scoped to the **readiness boundary**
 today; broader post-specify lifecycle Operator State remains planned.
 
+The canonical command list is maintained in
+[`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`](docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md)
+(HLDspec Product Facade); this table presents the same set.
+
 Agents should prefer the facade over low-level scripts unless debugging a failure.
 
 ### Reading results: PASS / ACTION / CONFLICT

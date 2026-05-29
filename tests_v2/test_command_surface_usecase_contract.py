@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class CommandSurfaceUseCaseContractTests(unittest.TestCase):
     def test_usecase_doc_has_canonical_command_statuses(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
-        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor"):
+        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor", "operator-state", "speckit-state"):
             self.assertIn(f"`hldspec {command}` | current", text)
         for command in ("interview", "prework", "speckit", "pause"):
             self.assertIn(f"`hldspec {command}` | future", text)

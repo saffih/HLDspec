@@ -50,8 +50,10 @@ Hard rules:
 ### Product / workflow
 
 - **HLDspec** — the workflow system as a whole.
-- **HLDspec Product Facade** — the small public command surface (`start`, `status`,
-  `review`, `continue`, `diff`, `doctor`). Hides internal scripts; prints
+- **HLDspec Product Facade** — the canonical public command surface. This list is
+  authoritative; README and other docs defer to it. Current public commands:
+  `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`,
+  `operator-state` (alias `speckit-state`). Hides internal scripts; prints
   decision-oriented output.
 - **HLDspec Operator** — the core HLDspec behavior that produces operator facts,
   source-package context, slice control, and SpecKit Doctor readiness facts today.

@@ -54,7 +54,10 @@ HLDspec must not manually replace SpecKit.
 
 ## Current command surface status - 2026-05-26
 
-This section is the canonical command decision for the current product surface.
+The canonical command surface is defined in
+[`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) (HLDspec
+Product Facade). This section maps those commands to use cases and must stay in
+sync with it.
 
 ### Current public facade
 
@@ -69,6 +72,8 @@ These commands are current product behavior:
 | `hldspec diff` | current | Compare current source hash against the recorded target session hash. |
 | `hldspec doctor` | current | Check required docs/tools and target session files. |
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and branch/manual workflow state. |
+| `hldspec operator-state` | current | Show the readiness-boundary Operator State and the evidence-backed next safe action. |
+| `hldspec speckit-state` | current | Alias of `operator-state`. |
 
 ### Future product commands
 
