@@ -329,6 +329,19 @@ The smoke destination is always a temp target directory such as:
 
 Smoke output must never write generated target artifacts into the HLDspec repo. See `docs/SMOKE_SCENARIOS.md`.
 
+## One-command validation
+
+To validate the repo without knowing its history, run:
+
+```bash
+scripts/check_product_readiness.sh
+```
+
+It runs syntax checks, the focused readiness/operator/anti-drift/terminology and
+product-readiness/layout tests, the full `tests_v2` suite, the smoke, and a
+whitespace check, and prints `PRODUCT_READINESS_CHECK: PASS` only if all pass. It
+is a local check, not CI or a release gate — see `docs/PRODUCT_READINESS.md`.
+
 ## Development and handoff discipline
 
 Local repo state is authoritative. GitHub is only the sync target. Do not push unless explicitly instructed.
