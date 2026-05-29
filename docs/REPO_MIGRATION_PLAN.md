@@ -42,8 +42,9 @@ classification table below, and the contract test
 ### Phase 1 — Public UX alignment (agent one-liner first)
 
 Make the agent one-liner the documented front door everywhere; reframe script
-commands as the internal/agent tool surface. (Delivered on the agent-one-liner
-branch.)
+commands as the internal/agent tool surface. (Landed on `main`: README,
+`USER_RUN_MODEL.md`, and `HLDSPEC_TERMINOLOGY_AND_FLOW.md` now lead with the agent
+one-liner.)
 
 - **Tests required before any move:** the agent-first UX contract test and the
   product-readiness docs test must pass; no script path may appear as the primary

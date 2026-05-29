@@ -95,7 +95,7 @@ it is **not** the generic HLDspec Operator (see §5).
 
 The product expresses **seven layers**. Each layer has one owner and one job.
 
-### Layer 1 — Public Interface  **[target; alignment is migration Phase 1]**
+### Layer 1 — Public Interface  **[current; landed via migration Phase 1]**
 
 The public user experience is **agent one-liner first**: a normal user does not
 need to know any script path. The user gives an agent one short instruction and
@@ -107,9 +107,10 @@ Copy-ready instruction:
 Use HLDspec with source HLD: <path-to-HLD.md> and target project: <path-to-target>. Prepare the target, check SpecKit readiness, and report STATUS, blockers, evidence, and next safe action. Do not implement or run SpecKit unless HLDspec says it is safe.
 ```
 
-Aligning every front-door doc to this is **migration Phase 1** (see
-`docs/REPO_MIGRATION_PLAN.md`); it is delivered on the agent-one-liner branch and
-becomes fully current once that work lands on `main`.
+Aligning every front-door doc to this was **migration Phase 1** (see
+`docs/REPO_MIGRATION_PLAN.md`); that work has landed on `main` — the README,
+`USER_RUN_MODEL.md`, and `HLDSPEC_TERMINOLOGY_AND_FLOW.md` now lead with the agent
+one-liner and frame the command surface as internal tooling.
 
 ### Layer 2 — Agent-Facing Tool Surface  **[current]**
 
@@ -184,14 +185,15 @@ These names are **not interchangeable**:
 - SpecKit Preparation is implemented and tested as the core product.
 - Operator State is implemented for the readiness boundary.
 - The agent-facing tool surface (Layer 2) is implemented and documented.
+- Agent one-liner first is the documented front door (Layer 1): the README,
+  `USER_RUN_MODEL.md`, and `HLDSPEC_TERMINOLOGY_AND_FLOW.md` lead with it —
+  migration Phase 1, landed.
 - Anti-drift tests (Layer 7) protect terminology, UX, command surface, and layout.
 
 **Intended target state [target]:**
 
-- Agent one-liner first is the only documented front door (Layer 1), with every
-  doc aligned — migration Phase 1.
-- Every tracked top-level file/dir has exactly one layer classification — migration
-  Phases 3–5.
+- Every tracked top-level file/dir has exactly one *enforced* layer classification
+  — migration Phases 3–5.
 
 **Future / not yet implemented [future]:**
 
