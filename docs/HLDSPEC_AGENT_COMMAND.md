@@ -350,6 +350,51 @@ Before claiming RunSkeptic compliance:
 6. State unknowns, conflicts, and skipped areas.
 ```
 
+## Resolve open questions from the HLD before escalating
+
+The escalation queue (`speckit_question_escalation_queue.json`) is produced by
+deterministic detectors. A detected item is a *candidate* question, not a proven
+human decision. The HLD is the source of truth and usually already answers it. Before
+treating any queued question as human-blocking, the judge must try to resolve it from
+the HLD itself.
+
+For each open question (`human_decision: TBD`):
+
+```text
+1. Read the cited anchor (source_hld_sections) in full:
+   its structured fields (HLD-ROLE, HLD-RISK, HLD-VERIFY, HLD-SPECS, HLD-RESOURCES)
+   and its prose.
+2. Apply RunSkeptic (see RunSkeptic rule). Separate OBSERVED evidence
+   (a quotable HLD line) from inferred risk.
+3. RESOLVE, do not escalate, when the HLD answers it:
+   - API/interface vs processing boundary  -> answered by the anchor's HLD-ROLE.
+   - source-of-truth ownership / update timing -> answered by HLD-VERIFY, or the
+     prose that names the system of record and when the projection is written.
+   - "TBD metadata" on a descriptive, low-risk, or planned anchor -> the field is
+     legitimately empty (no governing spec, or not built yet), not an open decision.
+4. ESCALATE only a genuine fork: the HLD does NOT answer it AND it is a real
+   decision -- product direction, an unresolved design choice, spend/credentials,
+   irreversible action, or a RunSkeptic CONFLICT.
+```
+
+Record every HLD-derived resolution through the existing recorder, citing the
+evidence line, so the queue unblocks on the same path a human answer would take:
+
+```bash
+uv run python scripts/apply_hldspec_queue_answers.py <workspace> \
+  --answer <QID>="RESOLVED_FROM_HLD: <answer>" \
+  --note   <QID>="<HLD-id>: <quoted evidence line>"
+```
+
+Invert the lens: a `TBD` token or a rhetorical `?` in prose is not a question. An
+unresolved *design fork* the HLD never settled -- e.g. a planned anchor whose
+mechanism is still undecided -- IS a real question; surface it even when no detector
+flagged it.
+
+The test for every resolution: it must cite a specific HLD line, and it must still
+hold on an HLD that states the same fact in different words. If it would not, escalate
+instead of guessing.
+
 ## Ready outcome
 
 The target state is:

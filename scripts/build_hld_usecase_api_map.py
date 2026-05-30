@@ -16,6 +16,23 @@ import hld_map
 
 SYNC_REL = Path(".specify") / "sync"
 
+# A section that carries exactly one of these as its HLD-ROLE has already declared
+# its API/interface-vs-processing boundary; a keyword co-occurrence is not a real
+# ambiguity, so it must not be minted as a human checkpoint question. This is the
+# canonical role vocabulary from HLD_FORMAT.md (plus `reference`, used in practice).
+RECOGNIZED_ROLES = (
+    "purpose",
+    "reference",
+    "governance",
+    "architecture",
+    "processing",
+    "api",
+    "ui",
+    "operations",
+    "testing",
+    "risk",
+)
+
 ACTOR_TERMS = (
     "user",
     "human",
@@ -254,6 +271,9 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
         operations_hits = words_present(text, OPERATIONS_TERMS)
         risk_hits = words_present(text, RISK_TERMS)
         signals = buildability_signals(section)
+        role_tokens = [t for t in re.split(r"[,\s]+", section.metadata_value("HLD-ROLE").strip().lower()) if t]
+        has_clean_role = len(role_tokens) == 1 and role_tokens[0] in RECOGNIZED_ROLES
+        is_high_risk = section.metadata_value("HLD-RISK").strip().upper() == "HIGH"
 
         for actor in actor_hits:
             normalized = actor.title() if actor not in {"api", "ui"} else actor.upper()
@@ -321,7 +341,7 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
                     "name": section.title,
                     "source_hld_sections": [section.id],
                     "terms": api_hits,
-                    "contract_risk": "review_api_processing_split" if processing_hits else "normal",
+                    "contract_risk": "review_api_processing_split" if processing_hits and not has_clean_role else "normal",
                     "summary": short_text(section.text),
                 }
             )
@@ -358,25 +378,21 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
                 }
             )
 
+        # Only a spec-candidate HIGH-risk anchor genuinely needs a governing spec
+        # named: there, a TBD HLD-SPECS is a real gap. On descriptive, low-risk, or
+        # not-yet-built anchors, an empty spec/resources field is legitimate, not a
+        # human decision — flagging it halts the pipeline on noise.
         tbd_fields = [
             key
             for key in ("HLD-SPECS", "HLD-RESOURCES", "HLD-OWNER")
             if section.metadata_value(key).upper() == "TBD"
         ]
-        if tbd_fields:
+        if tbd_fields and spec_candidate and is_high_risk:
             open_questions.append(
                 {
                     "source_hld_sections": [section.id],
                     "question": f"Resolve TBD metadata for {section.title}: {', '.join(tbd_fields)}.",
                     "type": "metadata_tbd",
-                }
-            )
-        if "?" in section.text:
-            open_questions.append(
-                {
-                    "source_hld_sections": [section.id],
-                    "question": f"Review explicit question text in {section.title}.",
-                    "type": "question_mark_in_hld",
                 }
             )
 
