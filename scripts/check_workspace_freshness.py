@@ -75,8 +75,10 @@ def main() -> int:
         record(workspace, hld)
         print("recorded")
         return 0
-    print(status(workspace, hld))
-    return 0
+    st = status(workspace, hld)
+    print(st)
+    # Distinct exit codes so the shell gate keys off the code, not parsed stdout.
+    return {"fresh": 0, "stale": 3, "absent": 4}[st]
 
 
 if __name__ == "__main__":

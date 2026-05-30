@@ -205,6 +205,52 @@ render("SPECKIT_PREWORK_APPROVAL_GATE", 0)
 PY
 }
 
+freshness_code() {
+  # Return the helper's exit code (0 fresh / 3 stale / 4 absent). Does NOT touch
+  # set -e — the caller wraps the call, so this must not re-enable it on return.
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/check_workspace_freshness.py" "$WORK" "$SOURCE_HLD" >/dev/null 2>&1
+}
+
+record_fingerprint() {
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/check_workspace_freshness.py" "$WORK" "$SOURCE_HLD" --record >/dev/null 2>&1 || true
+}
+
+safe_wipe() {
+  # Guarded recursive delete: refuse unless this is plainly an HLDspec workspace we
+  # built (basename .hldspec*, contains HLD.md) and not a dangerous path.
+  local w="$1" base
+  base="$(basename "$w")"
+  if [ -z "$w" ] || [ "$w" = "/" ] || [ "$w" = "$HOME" ]; then
+    echo "ERROR: refusing to wipe unsafe path: $w" >&2; exit 1
+  fi
+  if [ ! -f "$w/HLD.md" ]; then
+    echo "ERROR: refusing to wipe $w (no HLD.md; not an HLDspec workspace)" >&2; exit 1
+  fi
+  case "$base" in .hldspec*) : ;; *) echo "ERROR: refusing to wipe $w (basename not .hldspec*)" >&2; exit 1 ;; esac
+  rm -rf "$w"
+}
+
+# 0. Source-freshness gate (hermeticity). A workspace built from a different source
+# HLD silently mixes old and new content. Detection keys off the helper's exit code
+# (0 fresh / 3 stale / 4 absent), never parsed stdout.
+if [ "${HLDSPEC_FRESH:-0}" = "1" ] && [ -e "$WORK" ]; then
+  echo "State: HLDSPEC_FRESH=1 — rebuilding the workspace from scratch."
+  safe_wipe "$WORK"
+elif [ -f "$WORK/HLD.md" ]; then
+  set +e
+  freshness_code
+  fr=$?
+  set -e
+  REVIEW="$FIRSTRUN/.specify/sync/spec_build_plan_review.md"
+  if [ "$fr" -eq 3 ] || { [ "$fr" -eq 4 ] && [ -f "$REVIEW" ]; }; then
+    echo "STALE WORKSPACE: cannot confirm this workspace was built from the current source HLD (code $fr)." >&2
+    echo "Continuing could mix old and new content. Rebuild cleanly:" >&2
+    echo "  HLDSPEC_FRESH=1 $ROOT/scripts/hldspec_run.sh \"$SOURCE_HLD\"" >&2
+    echo "(or remove the workspace: rm -rf \"$WORK\")" >&2
+    exit 3
+  fi
+fi
+
 # 1. Initial run if workspace does not exist.
 if [ ! -f "$WORK/HLD.md" ]; then
   echo "State: no working HLD found. Running read-only first run."
@@ -212,6 +258,7 @@ if [ ! -f "$WORK/HLD.md" ]; then
   bash "$ROOT/scripts/project_first_run.sh" "$SOURCE_HLD" "$WORK"
   rc=$?
   set -e
+  [ "$rc" -eq 0 ] && record_fingerprint
   exit "$rc"
 fi
 
@@ -252,6 +299,7 @@ if ! is_converted_hld "$WORK/HLD.md"; then
     bash "$ROOT/scripts/project_first_run.sh" "$SOURCE_HLD" "$WORK"
     rc=$?
     set -e
+    [ "$rc" -eq 0 ] && record_fingerprint
     exit "$rc"
   fi
 fi
