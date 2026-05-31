@@ -55,14 +55,22 @@ def architecture_disposition_blockers(arch: dict[str, Any], disposition: dict[st
 
 
 def augmented_rule_counts(constitution: dict) -> dict[str, int]:
-    """Return counts of augmented rule types present in constitution."""
-    counts: dict[str, int] = {"CONTRACT": 0, "DATA": 0}
+    """Return counts of augmented rule types present in constitution.
+
+    CONTRACT/DATA come from build_speckit_constitution_from_contracts.py; ENG
+    rules come from build_speckit_constitution_from_toolbox.py (the Engineering
+    Toolbox constitution-candidate wire). All are augmented rules that must not
+    be silently dropped on regeneration.
+    """
+    counts: dict[str, int] = {"CONTRACT": 0, "DATA": 0, "ENG": 0}
     for rule in constitution.get("required_rules", []):
         rule_id = rule.get("rule_id", "") if isinstance(rule, dict) else ""
         if str(rule_id).startswith("CONTRACT-"):
             counts["CONTRACT"] += 1
         elif str(rule_id).startswith("DATA-"):
             counts["DATA"] += 1
+        elif str(rule_id).startswith("ENG-"):
+            counts["ENG"] += 1
     return counts
 
 
