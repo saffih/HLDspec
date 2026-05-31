@@ -16,19 +16,20 @@ class TestAugmentedRuleCounts(unittest.TestCase):
                 {"rule_id": "CONTRACT-001"},
                 {"rule_id": "CONTRACT-002"},
                 {"rule_id": "DATA-001"},
+                {"rule_id": "ENG-001"},
                 {"rule_id": "UNRELATED-001"},
             ]
         }
         result = augmented_rule_counts(constitution)
-        self.assertEqual(result, {"CONTRACT": 2, "DATA": 1})
+        self.assertEqual(result, {"CONTRACT": 2, "DATA": 1, "ENG": 1})
 
     def test_no_rules_returns_zeros(self):
         result = augmented_rule_counts({})
-        self.assertEqual(result, {"CONTRACT": 0, "DATA": 0})
+        self.assertEqual(result, {"CONTRACT": 0, "DATA": 0, "ENG": 0})
 
     def test_empty_required_rules_returns_zeros(self):
         result = augmented_rule_counts({"required_rules": []})
-        self.assertEqual(result, {"CONTRACT": 0, "DATA": 0})
+        self.assertEqual(result, {"CONTRACT": 0, "DATA": 0, "ENG": 0})
 
 
 class TestAugmentationIntact(unittest.TestCase):
