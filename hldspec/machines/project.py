@@ -141,15 +141,29 @@ class ProjectMachine:
         )
         append_event(log_path, event)
 
+    @staticmethod
+    def _hld_fingerprint(hld: Path) -> str:
+        import hashlib
+        return hashlib.sha256(hld.read_bytes()).hexdigest() if hld.exists() else ""
+
     def _ensure_first_readonly(self, repo: Path, context: MachineContext) -> MachineResult | None:
         adapter = self._adapter(context)
         review = adapter.sync_dir / "spec_build_plan_review.md"
-        if review.exists():
+        # Rebuild when the readonly artifacts are absent OR the working HLD changed since
+        # they were built. Keying only on review.exists() let a changed source reuse a
+        # stale plan (same stale-skip bug fixed for the old layout in project_continue.sh).
+        fp_file = adapter.firstrun_dir / "source_hld_fingerprint.txt"
+        current_fp = self._hld_fingerprint(adapter.working_hld)
+        recorded_fp = fp_file.read_text(encoding="utf-8").strip() if fp_file.exists() else ""
+        if review.exists() and recorded_fp and recorded_fp == current_fp:
             return None
 
         result = self._run_script(repo, "first_run_readonly.sh", str(adapter.working_hld), str(adapter.firstrun_dir), "--force")
         if result.returncode not in {0, 2}:
             return error_result(machine=self.name, state="FIRST_READONLY_FAILED", message=f"first_run_readonly.sh failed rc={result.returncode}: {result.stderr[-1000:]}")
+        if current_fp:
+            fp_file.parent.mkdir(parents=True, exist_ok=True)
+            fp_file.write_text(current_fp + "\n", encoding="utf-8")
         self._mirror_tool_sync(adapter)
         if os.environ.get("HLDSPEC_ROLE_REVIEWS", "").strip().lower() == "local":
             self._ensure_local_role_review_artifacts(adapter.working_hld, adapter.sync_dir)

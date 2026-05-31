@@ -5,7 +5,31 @@ session that drove a real forward run on the Baton Flow HLD. The short answer: H
 works and is materially more correct than a week ago, **but there are two parallel
 implementations and the design (new layout) is ahead of what actually runs (old layout).**
 
-## The core confusion: TWO layouts, two entrypoints
+## CORRECTION (2026-05-31, same day): not two engines — one engine, two front-ends
+
+The table below originally framed this as "two competing implementations." On closer
+inspection that was an overstatement. The new layout (`ProjectMachine`) **orchestrates
+the same scripts** the old layout does — it calls `first_run_readonly.sh`,
+`project_first_run.sh`, and the same `build_*`/`hld_spec_sync.py` generators, then
+re-homes outputs via `TargetWorkspaceAdapter`. So:
+
+- **All four content fixes** (resolve-before-escalate, dossier-from-HLD, rich specify
+  input, plan implementation-marking) live in the **shared generator chain** that
+  `first_run_readonly.sh` runs → **both front-ends already get them.**
+- **Both front-ends had hermeticity** — old via `check_workspace_freshness.py` in
+  `project_continue.sh`; new via the `start`/`diff` source-hash in `agent_session.py`.
+- The **one real seam** was that `ProjectMachine._ensure_first_readonly` rebuilt only
+  when `spec_build_plan_review.md` was *absent* — the same stale-skip bug fixed for the
+  old layout. **FIXED 2026-05-31:** it now also rebuilds when the working HLD's sha256
+  differs from a recorded fingerprint (`source_hld_fingerprint.txt`). Test:
+  `tests_v2/test_project_machine_freshness.py` (red→green). 903 pass.
+
+So "gap #1 = reconcile two layouts" was wrong. The accurate statement: there are two
+**front-ends** over one engine; they are now consistent on hermeticity and share all
+content fixes. What remains is **cosmetic/strategic** (pick one canonical front-end for
+docs + usage), not a functional fork. Table retained below for the layout differences.
+
+## The two front-ends (one engine underneath)
 
 | | **Old layout (what actually ran this session)** | **New layout (what the backlog/design describes)** |
 |---|---|---|
@@ -36,11 +60,12 @@ contracts + several enforcement gates exist; not yet product-ready.
 
 ## Gaps (design vs reality), ranked
 
-1. **Two unreconciled layouts/entrypoints (HIGHEST).** New-layout facade
-   (`hldspec start/...`, `target/.hldspec/`) is partially built but was never run on Flow;
-   the old `project_continue.sh` / `.hldspec-first-run/.specify/sync/` path is what works.
-   Decide: migrate the working fixes into the new layout, or retire the new layout. Until
-   then "what is HLDspec's real entrypoint?" has two answers.
+1. **~~Two unreconciled layouts~~ → DOWNGRADED (see Correction above).** It is one engine
+   under two front-ends; all content fixes are shared and hermeticity is now consistent
+   across both (fixed 2026-05-31). Remaining is **strategic, not functional**: pick ONE
+   canonical front-end for docs/usage so "what is HLDspec's entrypoint?" has one answer.
+   Recommendation: the agent-first `hldspec start/...` is the documented intent; make it
+   the canonical surface and mark `hldspec_run.sh` as the maintainer/debug path.
 2. **Forward SpecKit invocation is human-gated and only partially exercised.** The pipeline
    reaches the approval gate; actually running `/speckit-*` for all stages, by the book,
    end-to-end has only been done for HLD-014 specify (paused at checkpoint). clarify/plan/
