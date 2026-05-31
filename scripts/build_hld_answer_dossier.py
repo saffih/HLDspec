@@ -26,26 +26,10 @@ PM_KEYWORDS = [
     "adoption", "quality metric", "as a user", "goal",
 ]
 
-CONTRACT_NAME_RULES = [
-    ("core.md", "Brain-to-Flow CLI Contract"),
-    ("brain", "Brain-to-Flow CLI Contract"),
-    ("cli", "CLI Protocol Contract"),
-    ("database", "Database API Contract"),
-    ("wip", "WIP Source-of-Truth Contract"),
-    ("socket", "Task Delivery Handshake Contract"),
-    ("task_offer", "Task Delivery Handshake Contract"),
-    ("task_ack", "Task Delivery Handshake Contract"),
-    ("http", "HTTP/UI API Contract"),
-    ("sse", "HTTP/UI API Contract"),
-    ("storage", "Storage Projection Contract"),
-    ("markdown", "Storage Projection Contract"),
-    ("spawn", "Session Spawn Contract"),
-    ("devin-bg", "Session Spawn Contract"),
-    ("flow_env", "Environment Isolation Contract"),
-    ("environment", "Environment Isolation Contract"),
-    ("log", "Logging Contract"),
-    ("reply", "Reply Handling Contract"),
-]
+# HLD-ROLE values whose sections never define an interface/API contract. These are
+# descriptive, vocabulary, or governance sections; minting a contract from them invents
+# scope the HLD does not declare (e.g. reading an out-of-scope list as a feature list).
+NON_CONTRACT_ROLES = {"purpose", "reference", "governance"}
 
 
 def as_list(value: Any) -> list[Any]:
@@ -95,6 +79,7 @@ def parse_hld_sections(hld_text: str) -> list[dict[str, Any]]:
     for pos, (start, sid, title, level) in enumerate(starts):
         end = starts[pos + 1][0] - 1 if pos + 1 < len(starts) else len(lines)
         chunk = "\n".join(lines[start - 1:end])
+        role_m = re.search(r"^HLD-ROLE:\s*(\S+)", chunk, flags=re.M)
         sections.append(
             {
                 "hld_id": sid,
@@ -103,6 +88,7 @@ def parse_hld_sections(hld_text: str) -> list[dict[str, Any]]:
                 "line_start": start,
                 "line_end": end,
                 "text": chunk,
+                "hld_role": role_m.group(1).strip().lower() if role_m else "",
             }
         )
     return sections
@@ -226,11 +212,13 @@ def classify_sections(sections: list[dict[str, Any]], vocabulary_terms: list[str
     }
 
 
-def guess_contract_name(text: str, title: str) -> str:
-    lower = f"{title}\n{text}".lower()
-    for token, name in CONTRACT_NAME_RULES:
-        if token.lower() in lower:
-            return name
+def contract_name_from_section(title: str) -> str:
+    """Name a contract from the HLD section's own title — never a hardcoded vocabulary.
+
+    A keyword table baked in a prior project's terms (e.g. mapping `core.md`->"Brain-to-
+    Flow") invents names this HLD never uses; deriving from the title stays faithful to
+    whatever HLD is the input.
+    """
     return f"{title} Contract"
 
 
@@ -257,12 +245,18 @@ def build_interface_contract_map(sections: list[dict[str, Any]], chunk_map: dict
         row = by_id.get(sid, {})
         if row.get("architect_signal") not in {"high", "medium"}:
             continue
+        # Skip sections whose HLD-ROLE declares them non-contract (purpose / reference /
+        # governance). This is what stops an out-of-scope list (a governance section)
+        # from being mined into phantom contracts. Role-gating applies only when the
+        # section actually carries a role, so unanchored HLDs keep prior behavior.
+        if str(section.get("hld_role", "")) in NON_CONTRACT_ROLES:
+            continue
         text = str(section.get("text", ""))
         title = str(section.get("title", ""))
         if not keyword_hits(text, ["interface", "contract", "protocol", "api", "cli", "socket", "http", "sse", "database", "wip", "spawn", "sync", "projection", "reply", "log"]):
             continue
 
-        name = guess_contract_name(text, title)
+        name = contract_name_from_section(title)
         contract_id = slug(name).upper().replace("-", "_")
         existing = contracts.setdefault(
             contract_id,
