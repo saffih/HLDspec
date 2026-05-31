@@ -94,7 +94,31 @@ def infer_notes(title: str, summary: str = "") -> dict[str, Any]:
     }
 
 
-def build_feature_item(spec: dict[str, Any], idx: int) -> dict[str, Any]:
+def load_hld_section_text(plan_path: Path) -> dict[str, str]:
+    """Map each HLD-### anchor id to its full section prose from the working HLD.
+
+    The spec-input handed to SpecKit must carry everything we already know; the most
+    authoritative WHAT is the anchor's own HLD text. Best-effort: if the working HLD
+    cannot be found (e.g. a raw/unanchored run), return {} and callers fall back to the
+    minimal input — never crash the prework build over a missing file.
+    """
+    candidates = [
+        plan_path.parents[2] / "HLD.md",   # <workspace>/HLD.md (firstrun layout)
+        plan_path.parents[3] / "HLD.md",   # one level up
+    ]
+    hld = next((p for p in candidates if p.exists()), None)
+    if hld is None:
+        return {}
+    text = hld.read_text(encoding="utf-8", errors="replace")
+    out: dict[str, str] = {}
+    matches = list(re.finditer(r"^#{2,6}\s+(HLD-\d{3})\s*-\s*.+$", text, flags=re.M))
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        out[m.group(1)] = text[m.start():end].strip()
+    return out
+
+
+def build_feature_item(spec: dict[str, Any], idx: int, hld_sections: dict[str, str] | None = None) -> dict[str, Any]:
     spec_id = str(spec.get("planned_spec_id") or spec.get("id") or f"{idx:03d}")
     title = text_of(spec.get("title")) or f"Feature {spec_id}"
     slug = text_of(spec.get("slug")) or f"{spec_id}-{slugify(title)}"
@@ -111,6 +135,32 @@ def build_feature_item(spec: dict[str, Any], idx: int) -> dict[str, Any]:
         f"- Planned spec id: {spec_id}",
         f"- Source HLD sections: {', '.join(source_hld_sections) or 'TBD'}",
     ]
+
+    # The first touch point must hand SpecKit everything we already know. The most
+    # authoritative WHAT is the anchor's own HLD prose (it carries the HLD-VERIFY line
+    # and the concrete behavior), so inject it verbatim when available; then the product
+    # acceptance criteria and named contracts HLDspec already extracted for this anchor.
+    hld_sections = hld_sections or {}
+    section_texts = [hld_sections[s] for s in source_hld_sections if s in hld_sections]
+    if section_texts:
+        description_lines += ["", "Authoritative HLD source (derive all requirements from this):", ""]
+        for st in section_texts:
+            description_lines += ["```text", st, "```", ""]
+
+    product_context = spec.get("product_context", {}) if isinstance(spec.get("product_context"), dict) else {}
+    acceptance = [text_of(a) for a in as_list(product_context.get("acceptance_criteria")) if text_of(a)]
+    if acceptance:
+        description_lines += ["Acceptance criteria (from HLDspec product extraction):", *[f"- {a}" for a in acceptance], ""]
+
+    arch_context = spec.get("architecture_context", {}) if isinstance(spec.get("architecture_context"), dict) else {}
+    contract_names = sorted({
+        text_of(c.get("contract_name"))
+        for c in as_list(arch_context.get("contracts"))
+        if isinstance(c, dict) and text_of(c.get("contract_name"))
+    })
+    if contract_names:
+        description_lines += ["Interface/contracts HLDspec identified for this anchor:", *[f"- {c}" for c in contract_names], ""]
+
     if summary:
         description_lines += ["", "HLD summary:", summary]
     if inferred["api_interface_contract_notes"]:
@@ -226,7 +276,8 @@ def ordered_features_from_plan(features: list[dict[str, Any]], plan: dict[str, A
 
 def build_artifacts(plan: dict[str, Any], plan_path: Path) -> dict[str, dict[str, Any]]:
     planned_specs = [item for item in as_list(plan.get("planned_specs")) if isinstance(item, dict)]
-    features = [build_feature_item(spec, idx + 1) for idx, spec in enumerate(planned_specs)]
+    hld_sections = load_hld_section_text(plan_path)
+    features = [build_feature_item(spec, idx + 1, hld_sections) for idx, spec in enumerate(planned_specs)]
     ordered_features, warnings = ordered_features_from_plan(features, plan)
 
     plan_quality = plan.get("plan_quality", {})
