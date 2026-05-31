@@ -1263,6 +1263,56 @@ def section_is_plannable_by_classification(
     return bool(item.get("spec_candidate", True))
 
 
+def _project_roots(workspace: Path) -> list[Path]:
+    """Candidate repo roots where an anchor's HLD-RESOURCES (e.g. test_flow.py) live.
+
+    The firstrun workspace nests under the project (…/.hldspec-first-run[/firstrun]),
+    so the real source tree is a parent. Best-effort; non-existent paths are ignored.
+    """
+    roots = [workspace, workspace.parent, workspace.parent.parent, workspace.parent.parent.parent]
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for r in roots:
+        try:
+            rp = r.resolve()
+        except Exception:
+            continue
+        if rp not in seen:
+            seen.add(rp)
+            out.append(r)
+    return out
+
+
+def anchor_implementation_status(section: hld_map.HldSection, workspace: Path) -> str:
+    """Derive whether an anchor is already built, from the HLD's own structured fields.
+
+    Faithful to the HLD as source of truth (not a guess): an anchor declaring
+    `HLD-STATUS: planned` is `deferred`; otherwise, if its `HLD-RESOURCES` names a test
+    file that cites the anchor id, it is `implemented`; else `not_built`.
+
+    NOTE (provenance / known limit): `implemented` here means "anchor id is cited in a
+    declared test file" — it is drift-blind. If the anchor's prose changes, this still
+    reads `implemented`. A future per-anchor fingerprint (cf. workspace hermeticity) could
+    detect that; deliberately not built now. Callers should MARK, not silently exclude.
+    """
+    if section.metadata_value("HLD-STATUS").strip().lower() == "planned":
+        return "deferred"
+    resources = hld_map.split_metadata_list(section.metadata_value("HLD-RESOURCES"))
+    test_files = [r for r in resources if r and ("test" in r.lower() or r.lower().endswith("_test.py"))]
+    if not test_files:
+        return "unknown"  # HLD declares no test resource; cannot judge from structure
+    for rel in test_files:
+        for root in _project_roots(workspace):
+            p = root / rel
+            if p.exists():
+                try:
+                    if section.id in p.read_text(encoding="utf-8", errors="replace"):
+                        return "implemented"
+                except Exception:
+                    continue
+    return "not_built"
+
+
 def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[dict[str, object], str]:
     sections_by_id = parsed_map.section_by_id()
     used_ids: set[str] = set()
@@ -1416,6 +1466,34 @@ def build_spec_build_plan(parsed_map: hld_map.HldMap, workspace: Path) -> tuple[
             f"{source_id} HLD anchors and related refs are represented in this spec."
             for source_id in source_ids
         ]
+
+        # Mark (do NOT exclude) whether this spec's anchors are already built, so a human
+        # sees "already implemented — re-spec only to extend" instead of silently
+        # re-specifying finished work. Per-anchor status from the HLD's own fields.
+        anchor_statuses = {
+            sid: anchor_implementation_status(sections_by_id[sid], workspace)
+            for sid in source_ids
+            if sid in sections_by_id
+        }
+        item["anchor_implementation_status"] = anchor_statuses
+        statuses = set(anchor_statuses.values())
+        if statuses and statuses <= {"implemented"}:
+            spec_status = "implemented"
+        elif statuses and statuses <= {"implemented", "deferred"}:
+            spec_status = "deferred" if "deferred" in statuses and "implemented" not in statuses else "implemented"
+        elif statuses and statuses <= {"deferred"}:
+            spec_status = "deferred"
+        else:
+            spec_status = "not_built"
+        item["implementation_status"] = spec_status
+        if spec_status == "implemented":
+            item.setdefault("user_decision_needed", "")
+            note = "Anchors already implemented (cited in declared tests); re-spec only to extend, else skip."
+            findings_list = item.get("plan_notes")
+            if isinstance(findings_list, list):
+                findings_list.append(note)
+            else:
+                item["plan_notes"] = [note]
         cycles = item["RunSkeptic_cycles"]
         assert isinstance(cycles, list)
         if any("api_contract" in cycle["key_aspects"] for cycle in cycles):
