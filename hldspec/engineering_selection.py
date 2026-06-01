@@ -55,7 +55,10 @@ TRIGGER_KEYWORDS: dict[str, tuple[str, ...]] = {
         "business",
     ),
     "api.http_json": (
-        "http", "rest", "api", "endpoint", "client", "service boundary", "json",
+        # NOTE: bare "api" is intentionally excluded — it matches non-HTTP APIs
+        # (a CLI, a library, an SDK). HTTP+JSON APIs are caught by the specific
+        # terms below; a generic API surface is covered by contract_boundary.
+        "http", "rest", "endpoint", "service boundary", "json",
     ),
     "data.schema_discipline": (
         "database", "persistence", "table", "record", "schema", "migration",

@@ -24,6 +24,13 @@ class EngineeringTriggerTests(unittest.TestCase):
         self.assertIn("api.http_json", ids)
         self.assertIn("testing.contract_boundary", ids)
 
+    def test_bare_api_word_does_not_select_http_json(self):
+        # A CLI/library "API" with no HTTP/REST/JSON must not match the HTTP+JSON
+        # card (the bare-"api" granularity fix). It is still a contract boundary.
+        ids = self.selected_ids("The runner-facing API is a small set of CLI commands.")
+        self.assertNotIn("api.http_json", ids)
+        self.assertIn("testing.contract_boundary", ids)
+
     def test_persistence_selects_schema_discipline_and_prod_test_separation(self):
         ids = self.selected_ids("Records are stored in a database with migrations and persistence.")
         self.assertIn("data.schema_discipline", ids)
