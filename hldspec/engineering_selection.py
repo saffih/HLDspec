@@ -455,42 +455,104 @@ def _matched_keywords(text: str, keywords: tuple[str, ...]) -> list[str]:
     return [kw for kw in keywords if _mentions(text, kw)]
 
 
+# Which non-baseline cards a declared surface implies. This is the structured
+# alternative to raw-prose keyword matching: when an HLD is fully marked with
+# HLD-DESC canonical lines, cards are selected from each section's declared
+# `surfaces` (agent judgment) instead of scanning prose for mention-not-meaning.
+SURFACE_CARDS: dict[str, set[str]] = {
+    "api": {"architecture.hexagonal_ports_adapters", "api.http_json", "testing.contract_boundary"},
+    "cli": {"architecture.hexagonal_ports_adapters", "testing.contract_boundary"},
+    "ui": {"architecture.hexagonal_ports_adapters", "testing.ui_tester_skill",
+           "testing.contract_boundary", "testing.resettable_fixtures"},
+    "data": {"architecture.hexagonal_ports_adapters", "data.schema_discipline",
+             "testing.contract_boundary", "testing.resettable_fixtures"},
+    "processing": {"testing.business_logic_coverage"},
+    "concurrency": {"concurrency.optimistic_revision"},
+    "environment": set(),   # environment cards are baseline
+    "operations": set(),
+    "testing": set(),       # testing cards are baseline/cross-cutting
+}
+
+
+def _surface_mode_surfaces(hld_text: str) -> set[str] | None:
+    """Return the declared in-scope surface set when the HLD is FULLY marked with
+    canonical lines (every ## HLD-### section has a parseable HLD-DESC). Otherwise
+    return None — the caller falls back to keyword scanning. This gate keeps every
+    unmarked/partially-marked HLD on the existing keyword behavior (no regression)."""
+    from .hld_canonical_line import section_records, _SECTION_RE, EXCLUDED_SCOPES
+    section_ids = [m.group("id") for m in _SECTION_RE.finditer(hld_text)]
+    if not section_ids:
+        return None
+    records = section_records(hld_text)
+    if any(sid not in records for sid in section_ids):
+        return None  # not fully marked
+    surfaces: set[str] = set()
+    for sid in section_ids:
+        rec = records[sid]
+        if rec.get("scope") in EXCLUDED_SCOPES:
+            continue
+        surfaces.update(rec.get("surfaces", []))
+    return surfaces
+
+
+def _evaluate_cards(hld_text: str) -> dict[str, list[str]]:
+    """Return {card_id: evidence list} for every SELECTED card, in no particular
+    order. Surface-driven when the HLD is fully marked; keyword-driven otherwise."""
+    result: dict[str, list[str]] = {}
+    surfaces = _surface_mode_surfaces(hld_text)
+
+    if surfaces is not None:
+        # NOTE: architecture.modular_boundaries is intentionally NOT surface-derivable
+        # — modularity is a multi-domain/ownership signal, not a surface, and inferring
+        # it from surface count produces false positives on deliberately single-module
+        # systems. Such non-surface signals stay keyword-only (a known surface-mode gap).
+        for card_id in CARD_ORDER:
+            if card_id in BASELINE_CARDS:
+                result[card_id] = ["baseline (always selected)"]
+                continue
+            matched = sorted(s for s in surfaces if card_id in SURFACE_CARDS.get(s, set()))
+            if matched:
+                result[card_id] = [f"surface: {s}" for s in matched]
+        return result
+
+    # Keyword fallback. Excluded sections are stripped first so a deliberately
+    # out-of-scope surface never triggers a card.
+    from .hld_canonical_line import strip_excluded_sections
+    stripped = strip_excluded_sections(hld_text)
+    for card_id in CARD_ORDER:
+        if card_id in BASELINE_CARDS:
+            result[card_id] = ["baseline (always selected)"]
+        else:
+            matched = _matched_keywords(stripped, TRIGGER_KEYWORDS[card_id])
+            if matched:
+                result[card_id] = matched
+    return result
+
+
 def detect_engineering_triggers(hld_text: str) -> dict[str, bool]:
     """Map each P0 card to whether it is selected for this HLD.
 
-    Baseline cards are always True. Trigger-selected cards are True when their
-    keywords appear in the HLD (case-insensitive, word-boundary matched).
-
-    Sections marked out_of_scope/non_goal via their HLD-DESC canonical line are
-    stripped first, so a deliberately-excluded surface (e.g. "HTTP API — excluded
-    on purpose") never triggers a card. HLDs without HLD-DESC lines are unaffected.
+    Baseline cards are always True. Other cards are selected from declared
+    `surfaces` (when the HLD is fully marked with HLD-DESC canonical lines) or from
+    keyword matches over the prose (excluded sections stripped). HLDs without
+    canonical lines keep the keyword behavior unchanged.
     """
-    from .hld_canonical_line import strip_excluded_sections
-    hld_text = strip_excluded_sections(hld_text)
-    triggers: dict[str, bool] = {}
-    for card_id in CARD_ORDER:
-        if card_id in BASELINE_CARDS:
-            triggers[card_id] = True
-        else:
-            triggers[card_id] = bool(_matched_keywords(hld_text, TRIGGER_KEYWORDS[card_id]))
-    return triggers
+    selected = _evaluate_cards(hld_text)
+    return {card_id: card_id in selected for card_id in CARD_ORDER}
 
 
 def select_p0_cards(hld_text: str) -> list[dict]:
     """Return the selected P0 card records, in canonical order, with evidence."""
-    triggers = detect_engineering_triggers(hld_text)
-    selected: list[dict] = []
+    selected = _evaluate_cards(hld_text)
+    cards: list[dict] = []
     for card_id in CARD_ORDER:
-        if not triggers[card_id]:
+        if card_id not in selected:
             continue
         card = dict(CARDS[card_id])
         card["id"] = card_id
-        if card_id in BASELINE_CARDS:
-            card["triggered_by"] = ["baseline (always selected)"]
-        else:
-            card["triggered_by"] = _matched_keywords(hld_text, TRIGGER_KEYWORDS[card_id])
-        selected.append(card)
-    return selected
+        card["triggered_by"] = selected[card_id]
+        cards.append(card)
+    return cards
 
 
 def _is_constitution_candidate(value: str) -> bool:
