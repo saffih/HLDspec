@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import hld_map
+from hldspec.hld_canonical_line import EXCLUDED_SCOPES, parse_canonical_line
 
 SYNC_REL = Path(".specify") / "sync"
 
@@ -369,7 +370,11 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
                 }
             )
 
-        if any(term in lower for term in NON_GOAL_TERMS):
+        hld_desc = section.metadata_value("HLD-DESC").strip()
+        canonical = parse_canonical_line(hld_desc) if hld_desc else None
+        if (canonical and canonical.get("scope") in EXCLUDED_SCOPES) or (
+            not canonical and any(term in lower for term in NON_GOAL_TERMS)
+        ):
             non_goals.append(
                 {
                     "source_hld_sections": [section.id],
