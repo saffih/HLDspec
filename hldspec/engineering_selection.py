@@ -55,7 +55,10 @@ TRIGGER_KEYWORDS: dict[str, tuple[str, ...]] = {
         "business",
     ),
     "api.http_json": (
-        "http", "rest", "api", "endpoint", "client", "service boundary", "json",
+        # NOTE: bare "api" is intentionally excluded — it matches non-HTTP APIs
+        # (a CLI, a library, an SDK). HTTP+JSON APIs are caught by the specific
+        # terms below; a generic API surface is covered by contract_boundary.
+        "http", "rest", "endpoint", "service boundary", "json",
     ),
     "data.schema_discipline": (
         "database", "persistence", "table", "record", "schema", "migration",
@@ -457,7 +460,13 @@ def detect_engineering_triggers(hld_text: str) -> dict[str, bool]:
 
     Baseline cards are always True. Trigger-selected cards are True when their
     keywords appear in the HLD (case-insensitive, word-boundary matched).
+
+    Sections marked out_of_scope/non_goal via their HLD-DESC canonical line are
+    stripped first, so a deliberately-excluded surface (e.g. "HTTP API — excluded
+    on purpose") never triggers a card. HLDs without HLD-DESC lines are unaffected.
     """
+    from .hld_canonical_line import strip_excluded_sections
+    hld_text = strip_excluded_sections(hld_text)
     triggers: dict[str, bool] = {}
     for card_id in CARD_ORDER:
         if card_id in BASELINE_CARDS:

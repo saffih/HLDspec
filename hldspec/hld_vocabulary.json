@@ -1,0 +1,8 @@
+{
+  "_comment": "Closed-but-not-fixed vocabulary for the HLD-DESC canonical line. Every term a canonical line uses must appear here; an unknown term is flagged for review, never silently accepted. To extend, add a term (a reviewed, additive change) — the set is closed at parse time but not frozen over time.",
+  "scope": ["in_scope", "out_of_scope", "non_goal"],
+  "role": ["api", "architecture", "governance", "processing", "operations", "purpose", "reference"],
+  "surfaces": ["api", "cli", "ui", "data", "processing", "concurrency", "environment", "operations", "testing", "none"],
+  "risk": ["low", "medium", "high"],
+  "status": ["active", "planned", "deprecated"]
+}
