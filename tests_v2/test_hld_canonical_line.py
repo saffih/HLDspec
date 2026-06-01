@@ -105,5 +105,54 @@ class EngineeringSelectionScopeTests(unittest.TestCase):
         self.assertTrue(triggers["api.http_json"])
 
 
+def _section(sid, desc, prose):
+    return f"## {sid} - x\n\nHLD-ID: {sid}\nHLD-DESC: {desc}\n\n{prose}\n"
+
+
+# Fully marked: every section has an HLD-DESC line.
+FULL_MARKED = (
+    _section("HLD-001",
+             'HLD-001 is in-scope processing at high risk, touching data and processing; "core over SQLite".',
+             "Core domain logic.")
+    + _section("HLD-009",
+               'HLD-009 is in-scope api at high risk, touching cli; "the flow CLI verbs".',
+               "The runner uses an HTTP API endpoint returning JSON.")  # prose must be IGNORED in surface mode
+    + _section("HLD-011",
+               'HLD-011 is out-of-scope governance at low risk, touching none; "HTTP API stripped".',
+               "Excluded on purpose.")
+)
+
+
+class SurfaceDrivenSelectionTests(unittest.TestCase):
+    def ids(self, hld_text):
+        return {c["id"] for c in es.select_p0_cards(hld_text)}
+
+    def test_prose_http_api_ignored_when_fully_marked(self):
+        # HLD-009 prose says "HTTP API ... JSON" but its declared surface is cli only.
+        ids = self.ids(FULL_MARKED)
+        self.assertNotIn("api.http_json", ids)              # prose ignored
+        self.assertIn("data.schema_discipline", ids)        # from data surface
+        self.assertIn("testing.contract_boundary", ids)     # from cli/data
+        self.assertIn("architecture.modular_boundaries", ids)  # >=2 core surfaces
+
+    def test_declaring_api_surface_selects_http_json(self):
+        marked = FULL_MARKED.replace("touching cli;", "touching cli and api;")
+        self.assertIn("api.http_json", self.ids(marked))
+
+    def test_baseline_always_selected_in_surface_mode(self):
+        ids = self.ids(FULL_MARKED)
+        for baseline in es.BASELINE_CARDS:
+            self.assertIn(baseline, ids)
+
+    def test_partial_marking_falls_back_to_keywords(self):
+        # Drop HLD-001's DESC -> not fully marked -> keyword mode -> HLD-009 prose
+        # "HTTP API" triggers http_json again (the fallback path is preserved).
+        partial = FULL_MARKED.replace(
+            'HLD-DESC: HLD-001 is in-scope processing at high risk, touching data and processing; "core over SQLite".\n',
+            "",
+        )
+        self.assertIn("api.http_json", self.ids(partial))
+
+
 if __name__ == "__main__":
     unittest.main()
