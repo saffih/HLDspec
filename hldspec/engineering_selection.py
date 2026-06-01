@@ -472,8 +472,6 @@ SURFACE_CARDS: dict[str, set[str]] = {
     "operations": set(),
     "testing": set(),       # testing cards are baseline/cross-cutting
 }
-# Surfaces that count as distinct "concerns" for the modular-boundaries heuristic.
-CORE_SURFACES = frozenset({"api", "cli", "ui", "data", "processing"})
 
 
 def _surface_mode_surfaces(hld_text: str) -> set[str] | None:
@@ -504,15 +502,15 @@ def _evaluate_cards(hld_text: str) -> dict[str, list[str]]:
     surfaces = _surface_mode_surfaces(hld_text)
 
     if surfaces is not None:
+        # NOTE: architecture.modular_boundaries is intentionally NOT surface-derivable
+        # — modularity is a multi-domain/ownership signal, not a surface, and inferring
+        # it from surface count produces false positives on deliberately single-module
+        # systems. Such non-surface signals stay keyword-only (a known surface-mode gap).
         for card_id in CARD_ORDER:
             if card_id in BASELINE_CARDS:
                 result[card_id] = ["baseline (always selected)"]
                 continue
             matched = sorted(s for s in surfaces if card_id in SURFACE_CARDS.get(s, set()))
-            if card_id == "architecture.modular_boundaries":
-                core = sorted(surfaces & CORE_SURFACES)
-                if len(core) >= 2:
-                    matched = core
             if matched:
                 result[card_id] = [f"surface: {s}" for s in matched]
         return result

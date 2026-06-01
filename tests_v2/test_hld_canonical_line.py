@@ -133,7 +133,8 @@ class SurfaceDrivenSelectionTests(unittest.TestCase):
         self.assertNotIn("api.http_json", ids)              # prose ignored
         self.assertIn("data.schema_discipline", ids)        # from data surface
         self.assertIn("testing.contract_boundary", ids)     # from cli/data
-        self.assertIn("architecture.modular_boundaries", ids)  # >=2 core surfaces
+        # modularity is not surface-derivable, so it is NOT selected in surface mode
+        self.assertNotIn("architecture.modular_boundaries", ids)
 
     def test_declaring_api_surface_selects_http_json(self):
         marked = FULL_MARKED.replace("touching cli;", "touching cli and api;")
