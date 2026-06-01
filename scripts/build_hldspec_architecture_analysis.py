@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hldspec.hld_canonical_line import EXCLUDED_SCOPES, parse_canonical_line
 from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
 LAYER_ORDER = [
@@ -175,6 +176,23 @@ def build_analysis(workspace: Path, explicit_hld: str = "") -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
 
     for section in sections:
+        hld_desc = section.get("metadata", {}).get("HLD-DESC", "")
+        canonical = parse_canonical_line(hld_desc) if hld_desc else None
+        if canonical and canonical.get("scope") in EXCLUDED_SCOPES:
+            analyzed.append(
+                {
+                    "hld_id": section["hld_id"],
+                    "title": section["title"],
+                    "line_start": section["line_start"],
+                    "line_end": section["line_end"],
+                    "metadata": section["metadata"],
+                    "layer": "governance",
+                    "spec_candidate": False,
+                    "requires_layered_split": False,
+                    "findings": [],
+                }
+            )
+            continue
         layer = classify_layer(section)
         section_findings = boundary_findings(section, layer)
         findings.extend([{**f, "hld_id": section["hld_id"], "title": section["title"]} for f in section_findings])
