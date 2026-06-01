@@ -207,6 +207,22 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                             }
                         )
 
+    has_testing_axiom = any(
+        "engineering_toolbox:testing.design_for_testability" in str(r.get("rationale", ""))
+        for r in rules
+    )
+    if not has_testing_axiom:
+        findings.append(
+            {
+                "id": "QG-019",
+                "severity": "BLOCKER",
+                "area": "constitution testing coverage",
+                "finding": "Mandatory 'every product fully tested' axiom is not present in the constitution plan.",
+                "recommendation": "Run build_speckit_constitution_from_toolbox.py to add the engineering-toolbox testing axiom.",
+                "RunSkeptic_decision": "FIX",
+            }
+        )
+
     checkpoint = constitution.get("human_checkpoint", {})
     if isinstance(checkpoint, dict) and checkpoint.get("human_decision") not in ("TBD", "", None):
         findings.append(
