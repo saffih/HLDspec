@@ -47,7 +47,7 @@ class UsecaseMapScopeAwareTests(unittest.TestCase):
                 "HLD-001",
                 "Excluded",
                 'HLD-001 is out-of-scope processing at low risk, touching none; "deliberately excluded".',
-                "This section mentions a non-goal keyword in prose, but should be classified by scope.",
+                "This section mentions an HTTP API endpoint in prose, but should be classified by scope.",
             )
             + section(
                 "HLD-002",
@@ -75,6 +75,13 @@ class UsecaseMapScopeAwareTests(unittest.TestCase):
         self.assertIn("HLD-001", non_goal_ids)
         self.assertIn("HLD-002", non_goal_ids)
         self.assertNotIn("HLD-003", non_goal_ids)
+        self.assertNotIn(
+            "HLD-001",
+            {
+                item["source_hld_sections"][0]
+                for item in data["api_interface_surfaces"]
+            },
+        )
 
 
 if __name__ == "__main__":

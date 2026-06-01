@@ -262,6 +262,17 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
     for section in parsed.sections:
         text = f"{section.title}\n{section.text}"
         lower = text.lower()
+        hld_desc = section.metadata_value("HLD-DESC").strip()
+        canonical = parse_canonical_line(hld_desc) if hld_desc else None
+        if canonical and canonical.get("scope") in EXCLUDED_SCOPES:
+            non_goals.append(
+                {
+                    "source_hld_sections": [section.id],
+                    "title": section.title,
+                    "summary": short_text(section.text),
+                }
+            )
+            continue
         kind = section_kind(section, classes)
         spec_candidate = is_spec_candidate(section, classes)
         actor_hits = words_present(text, ACTOR_TERMS)
@@ -370,11 +381,7 @@ def build_map(parsed: hld_map.HldMap, workspace: Path) -> dict[str, Any]:
                 }
             )
 
-        hld_desc = section.metadata_value("HLD-DESC").strip()
-        canonical = parse_canonical_line(hld_desc) if hld_desc else None
-        if (canonical and canonical.get("scope") in EXCLUDED_SCOPES) or (
-            not canonical and any(term in lower for term in NON_GOAL_TERMS)
-        ):
+        if not canonical and any(term in lower for term in NON_GOAL_TERMS):
             non_goals.append(
                 {
                     "source_hld_sections": [section.id],
