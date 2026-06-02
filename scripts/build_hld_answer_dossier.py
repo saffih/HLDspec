@@ -4,9 +4,16 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.hld_canonical_line import EXCLUDED_SCOPES, parse_canonical_line
 
 
 ARCHITECT_KEYWORDS = [
@@ -80,6 +87,8 @@ def parse_hld_sections(hld_text: str) -> list[dict[str, Any]]:
         end = starts[pos + 1][0] - 1 if pos + 1 < len(starts) else len(lines)
         chunk = "\n".join(lines[start - 1:end])
         role_m = re.search(r"^HLD-ROLE:\s*(\S+)", chunk, flags=re.M)
+        desc_m = re.search(r"^HLD-DESC:\s*(.+?)\s*$", chunk, flags=re.M)
+        canonical = parse_canonical_line(desc_m.group(1)) if desc_m else None
         sections.append(
             {
                 "hld_id": sid,
@@ -89,6 +98,7 @@ def parse_hld_sections(hld_text: str) -> list[dict[str, Any]]:
                 "line_end": end,
                 "text": chunk,
                 "hld_role": role_m.group(1).strip().lower() if role_m else "",
+                "scope": canonical.get("scope", "") if canonical else "",
             }
         )
     return sections
@@ -246,10 +256,9 @@ def build_interface_contract_map(sections: list[dict[str, Any]], chunk_map: dict
         if row.get("architect_signal") not in {"high", "medium"}:
             continue
         # Skip sections whose HLD-ROLE declares them non-contract (purpose / reference /
-        # governance). This is what stops an out-of-scope list (a governance section)
-        # from being mined into phantom contracts. Role-gating applies only when the
-        # section actually carries a role, so unanchored HLDs keep prior behavior.
-        if str(section.get("hld_role", "")) in NON_CONTRACT_ROLES:
+        # governance), and also skip any section whose canonical HLD-DESC scope is
+        # excluded. The canonical scope is the authoritative exclusion signal.
+        if str(section.get("hld_role", "")) in NON_CONTRACT_ROLES or section.get("scope") in EXCLUDED_SCOPES:
             continue
         text = str(section.get("text", ""))
         title = str(section.get("title", ""))
