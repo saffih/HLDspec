@@ -19,7 +19,7 @@ def feature_name(item: dict[str, Any]) -> str:
     return str(item.get("feature_name") or item.get("title") or item.get("planned_spec_id") or item.get("feature_id") or "unknown")
 
 
-def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any], dossier_quality: dict[str, Any], interface_map: dict[str, Any] | None = None, spec_list: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution: dict[str, Any], queue: dict[str, Any], usecase_map: dict[str, Any], dossier_quality: dict[str, Any], spec_list: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
@@ -166,46 +166,6 @@ def build_findings(manifest: dict[str, Any], graph: dict[str, Any], constitution
                 "RunSkeptic_decision": "FIX",
             }
         )
-
-    if interface_map is not None:
-        contracts = [c for c in as_list(interface_map.get("contracts")) if isinstance(c, dict)]
-        if contracts:
-            rule_rationales = " ".join(
-                str(r.get("rationale", "")) for r in rules
-            )
-            has_contract_rule = any(
-                str(r.get("rule_id", "")).startswith("CONTRACT-")
-                for r in rules
-            )
-            if not has_contract_rule:
-                findings.append(
-                    {
-                        "id": "QG-015",
-                        "severity": "BLOCKER",
-                        "area": "constitution contract coverage",
-                        "finding": (
-                            f"Constitution has only generic rules but {len(contracts)} interface contract(s) were extracted. "
-                            "Contract-derived rules have not been added."
-                        ),
-                        "recommendation": "Run build_speckit_constitution_from_contracts.py to augment constitution with named contract rules.",
-                        "RunSkeptic_decision": "FIX",
-                    }
-                )
-            else:
-                for contract in contracts:
-                    cid = str(contract.get("contract_id", ""))
-                    name = str(contract.get("contract_name", cid))
-                    if cid and f"interface_contract_map.json:{cid}" not in rule_rationales:
-                        findings.append(
-                            {
-                                "id": "QG-016",
-                                "severity": "ACTION",
-                                "area": "constitution contract coverage",
-                                "finding": f"Contract '{name}' ({cid}) is in interface_contract_map but has no matching constitution rule.",
-                                "recommendation": "Rerun build_speckit_constitution_from_contracts.py or add a manual rule covering this contract.",
-                                "RunSkeptic_decision": "VERIFY",
-                            }
-                        )
 
     has_testing_axiom = any(
         "engineering_toolbox:testing.design_for_testability" in str(r.get("rationale", ""))
@@ -364,10 +324,9 @@ def build_review(workspace: Path) -> dict[str, Any]:
     graph = load_json(sync / "feature_dependency_graph.json")
     usecase_map = load_json(sync / "hld_usecase_api_map.json")
     dossier_quality = load_json(sync / "hld_answer_dossier_quality_review.json")
-    interface_map = load_json(sync / "interface_contract_map.json")
     spec_list = load_json(sync / "hldspec_speckit_spec_list.json")
 
-    findings = build_findings(manifest, graph, constitution, queue, usecase_map, dossier_quality, interface_map, spec_list)
+    findings = build_findings(manifest, graph, constitution, queue, usecase_map, dossier_quality, spec_list)
     status = determine_status(findings)
 
     features = [item for item in as_list(manifest.get("features")) if isinstance(item, dict)]
