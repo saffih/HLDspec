@@ -95,7 +95,6 @@ rebuild_post_plan_artifacts() {
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_architect_pack.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_answer_pack.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hld_answer_dossier.py" "$FIRSTRUN"
-  "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_constitution_from_contracts.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_constitution_from_hld_verify.py" "$FIRSTRUN" --source-hld "$SOURCE_HLD"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_constitution_from_toolbox.py" "$FIRSTRUN" --source-hld "$SOURCE_HLD"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$FIRSTRUN"
