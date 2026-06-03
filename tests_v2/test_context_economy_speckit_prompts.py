@@ -13,6 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ContextEconomySpecKitPromptTests(unittest.TestCase):
+    EXPECTED_PHASE_TIERS = {
+        "01-specify": "MODEL_STRONG",
+        "02-clarify": "MODEL_STRONG",
+        "03-plan": "MODEL_CRITICAL",
+        "04-research-data-contracts": "MODEL_CRITICAL",
+        "05-tasks": "MODEL_STRONG",
+        "06-implement": "MODEL_STRONG",
+        "07-verify-runskeptic": "MODEL_CRITICAL",
+    }
+
     def make_target(self) -> Path:
         tmp = Path(tempfile.mkdtemp())
         target = tmp / "target"
@@ -83,6 +93,18 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
             self.assertIn("## Stop condition", text)
             self.assertIn("## RunSkeptic triggers", text)
             self.assertEqual([], validate_prompt_file(prompt))
+
+    def test_generated_prompts_use_canonical_phase_model_tiers(self) -> None:
+        target = self.make_target()
+        result = self.build_prompts(target)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+        prompt_dir = target / "prompts" / "speckit" / "001-api-foundation"
+        for phase_id, expected_tier in self.EXPECTED_PHASE_TIERS.items():
+            prompt = prompt_dir / f"{phase_id}.md"
+            text = prompt.read_text(encoding="utf-8")
+            model_section = text.split("## Model tier", 1)[1].split("## ", 1)[0]
+            self.assertIn(expected_tier, model_section, f"{phase_id} should use {expected_tier}")
 
     def test_validate_only_fails_when_prompt_missing_allowed_evidence(self) -> None:
         target = self.make_target()
@@ -189,6 +211,19 @@ class ContextEconomySpecKitPromptTests(unittest.TestCase):
         self.assertTrue(json_report.exists())
         self.assertTrue(md_report.exists())
         self.assertIn("Status: `PASS`", md_report.read_text(encoding="utf-8"))
+
+    def test_validator_rejects_legacy_model_tier_names(self) -> None:
+        target = self.make_target()
+        self.assertEqual(0, self.build_prompts(target).returncode)
+        prompt = target / "prompts" / "speckit" / "001-api-foundation" / "02-clarify.md"
+        text = prompt.read_text(encoding="utf-8").replace("MODEL_STRONG", "MODEL_MEDIUM")
+        prompt.write_text(text, encoding="utf-8")
+
+        result = self.validate_target(target)
+        self.assertEqual(result.returncode, 2)
+
+        report = json.loads((target / ".hldspec" / "validation" / "context_prompt_validation.json").read_text(encoding="utf-8"))
+        self.assertTrue(any(item["check"] == "model_tier" for item in report["findings"]))
 
 
 if __name__ == "__main__":

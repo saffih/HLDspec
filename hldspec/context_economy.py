@@ -11,11 +11,11 @@ SCHEMA_VERSION = "1.0"
 
 PHASES: tuple[tuple[str, str, str], ...] = (
     ("01-specify", "SpecKit specify", "MODEL_STRONG"),
-    ("02-clarify", "SpecKit clarify", "MODEL_MEDIUM"),
-    ("03-plan", "SpecKit plan", "MODEL_STRONG"),
-    ("04-research-data-contracts", "SpecKit research/data/contracts", "MODEL_STRONG"),
+    ("02-clarify", "SpecKit clarify", "MODEL_STRONG"),
+    ("03-plan", "SpecKit plan", "MODEL_CRITICAL"),
+    ("04-research-data-contracts", "SpecKit research/data/contracts", "MODEL_CRITICAL"),
     ("05-tasks", "SpecKit tasks", "MODEL_STRONG"),
-    ("06-implement", "SpecKit implement", "MODEL_CRITICAL"),
+    ("06-implement", "SpecKit implement", "MODEL_STRONG"),
     ("07-verify-runskeptic", "Verify and RunSkeptic", "MODEL_CRITICAL"),
 )
 

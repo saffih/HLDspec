@@ -9,7 +9,7 @@ from typing import Any
 
 from hldspec.context_economy import FORBIDDEN_BROAD_READ_PATTERNS, SCHEMA_VERSION, validate_prompt_file
 
-VALID_MODEL_TIERS = frozenset({"MODEL_CHEAP", "MODEL_MEDIUM", "MODEL_STRONG", "MODEL_CRITICAL"})
+VALID_MODEL_TIERS = frozenset({"MODEL_ROUTINE", "MODEL_DEFAULT", "MODEL_STRONG", "MODEL_CRITICAL"})
 
 
 @dataclass(frozen=True)
