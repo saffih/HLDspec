@@ -152,7 +152,7 @@ class ApplySpecBuildPlanDecisionsTest(unittest.TestCase):
         self.assertEqual(plan["plan_quality"]["decision"], "PASS")
         self.assertEqual(plan["plan_quality"]["recommendation"], "KEEP_PLAN")
 
-    def test_review_after_apply_allows_target_spec_generation(self) -> None:
+    def test_review_after_apply_allows_speckit_prework(self) -> None:
         workspace, tmp = self.make_workspace()
         self.addCleanup(tmp.cleanup)
 
@@ -170,7 +170,7 @@ class ApplySpecBuildPlanDecisionsTest(unittest.TestCase):
         )
 
         review = (workspace / ".specify" / "sync" / "spec_build_plan_review.md").read_text()
-        self.assertIn("Continue to target-spec generation: `true`", review)
+        self.assertIn("Continue to SpecKit prework: `true`", review)
         self.assertIn("Flagged specs: `0`", review)
 
 

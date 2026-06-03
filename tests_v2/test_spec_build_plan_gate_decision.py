@@ -19,7 +19,7 @@ class SpecBuildPlanGateDecisionTests(unittest.TestCase):
         work = Path(tempfile.mkdtemp())
         sync = work / "firstrun" / ".specify" / "sync"
         sync.mkdir(parents=True)
-        (sync / "spec_build_plan_review.md").write_text("Continue to target-spec generation: `false`\n", encoding="utf-8")
+        (sync / "spec_build_plan_review.md").write_text("Continue to SpecKit prework: `false`\n", encoding="utf-8")
         (sync / "spec_build_plan.json").write_text(
             json.dumps(
                 {

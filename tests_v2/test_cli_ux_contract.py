@@ -13,6 +13,7 @@ from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
     HumanQuestion,
+    RunSkepticStatus,
     blocked_result,
     continue_result,
     done_result,
@@ -81,6 +82,30 @@ class UxContractStopCheckpointTests(unittest.TestCase):
         )
         text = render_machine_result(result)
         self.assertIn("/workspace/queue.json", text)
+
+    def test_runskeptic_status_and_evidence_are_shown(self):
+        result = human_checkpoint(
+            machine="TestMachine",
+            state="RUNSKEPTIC_GATE",
+            kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+            blocking_reason="RunSkeptic found rework.",
+            questions=(),
+            controlling_artifacts=(),
+            next_action="Fix RunSkeptic findings.",
+            forbidden_actions=("Do not invoke SpecKit.",),
+            runskeptic=RunSkepticStatus(
+                status="ACTION",
+                evidence=(ArtifactRef(path="/workspace/runskeptic.json", role="runskeptic_review_json"),),
+                next_safe_action="Resolve findings before continuing.",
+            ),
+        )
+
+        text = render_machine_result(result)
+
+        self.assertIn("RunSkeptic:", text)
+        self.assertIn("Status: ACTION", text)
+        self.assertIn("/workspace/runskeptic.json", text)
+        self.assertIn("Resolve findings before continuing.", text)
 
 
 class UxContractOtherStatusTests(unittest.TestCase):

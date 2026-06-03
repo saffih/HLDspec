@@ -46,7 +46,7 @@ class HldspecV2FullSliceTests(unittest.TestCase):
             "out=\"$2\"\n"
             "mkdir -p \"$out/.specify/sync\"\n"
             "cat > \"$out/.specify/sync/spec_build_plan_review.md\" <<'MD'\n"
-            "Continue to target-spec generation: `true`\n"
+            "Continue to SpecKit prework: `true`\n"
             "MD\n"
             "cat > \"$out/.specify/sync/spec_build_plan.json\" <<'JSON'\n"
             "{\"plan_quality\":{\"decision\":\"PASS\",\"recommendation\":\"KEEP_PLAN\",\"conflicts\":[]},\"planned_specs\":[]}\n"

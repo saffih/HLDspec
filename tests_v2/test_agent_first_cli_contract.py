@@ -305,6 +305,22 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertIn("Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror.", result.stdout)
         self.assertIn("Summary: PASS", result.stdout)
 
+    def test_doctor_exits_nonzero_when_final_summary_is_action(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        promotion = target / ".hldspec" / "validation" / "promotion_gate.json"
+        promotion.parent.mkdir(parents=True, exist_ok=True)
+        promotion.write_text(json.dumps({"status": "ACTION"}, indent=2) + "\n", encoding="utf-8")
+
+        result = self.run_facade("doctor", target)
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Summary: ACTION", result.stdout)
+        self.assertIn("Resolve listed ACTION/CONFLICT items", result.stdout)
+
     def test_speckit_doctor_reports_readiness(self) -> None:
         target = self.tmp_path / "target"
         target.mkdir()

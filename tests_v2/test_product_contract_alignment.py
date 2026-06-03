@@ -7,6 +7,24 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LEGACY_SURFACE_TERMS = (
+    "hldspec_run.sh",
+    ".hldspec-first-run",
+    "target-spec generation",
+)
+LEGACY_CONTEXT_TERMS = (
+    "legacy",
+    "debug",
+    "deprecated",
+    "historical",
+    "status memo",
+    "status-vs-design",
+    "backlog",
+    "older",
+    "old layout",
+    "compatibility",
+    "not the current product",
+)
 
 
 class ProductContractAlignmentTests(unittest.TestCase):
@@ -39,6 +57,29 @@ class ProductContractAlignmentTests(unittest.TestCase):
         self.assertIn("target/.hldspec/sync/", text)
         self.assertIn("target/.hldspec/events.jsonl", text)
         self.assertIn("SpecKit-owned workspace files.", text)
+
+    def test_docs_index_does_not_promote_legacy_runner_as_product_surface(self) -> None:
+        text = (ROOT / "docs" / "DOCS_INDEX.md").read_text(encoding="utf-8")
+        runtime_section = text.split("## Runtime Entry Points", 1)[1].split("## Archive / historical", 1)[0]
+        self.assertIn("`scripts/hldspec_agent_session.py` | Current public facade implementation", runtime_section)
+        self.assertIn("`scripts/hldspec_run.sh` | Legacy/debug full-pipeline runner", runtime_section)
+        self.assertNotIn("Canonical run entry", runtime_section)
+        normalized = " ".join(runtime_section.split())
+        self.assertIn("must not be presented as the current product workflow", normalized)
+
+    def test_non_archive_docs_contextualize_legacy_command_surface_terms(self) -> None:
+        failures: list[str] = []
+        for path in (ROOT / "docs").glob("*.md"):
+            if path.name in {"HLDSPEC_TERMINOLOGY_AND_FLOW.md"}:
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            for index, line in enumerate(lines):
+                if not any(term in line for term in LEGACY_SURFACE_TERMS):
+                    continue
+                window = " ".join(lines[max(0, index - 8) : index + 9]).lower()
+                if not any(term in window for term in LEGACY_CONTEXT_TERMS):
+                    failures.append(f"{path.relative_to(ROOT)}:{index + 1}: {line.strip()}")
+        self.assertEqual([], failures)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,10 @@
 # HLDspec Agent Command Protocol
 
+Status: **legacy/debug runner protocol**. This document records the older
+direct-run workflow for maintainers and compatibility debugging. For current
+product behavior and the public facade, use
+`HLDSPEC_TERMINOLOGY_AND_FLOW.md` and `HLDSPEC_MINIMAL_AGENT_UX.md`.
+
 ## Purpose
 
 This document defines the full agent-led HLDspec command.
@@ -7,7 +12,7 @@ This document defines the full agent-led HLDspec command.
 The local scripts are tools. They do not replace the judge/orchestrator.
 
 ```text
-hldspec_run.sh = local tool runner
+hldspec_run.sh = legacy/debug local tool runner
 HLDspec <path-to-HLD> = agent-led protocol that drives the tool runner
 ```
 
@@ -64,16 +69,19 @@ READY_FOR_PAID_AGENT_TEST
 
 the agent may continue to one bounded target-HLD test.
 
-## Tool runner step
+## Legacy/debug tool runner step
 
-Run the local HLDspec tool runner only after readiness passes:
+Run the legacy local HLDspec tool runner only after readiness passes and only for
+maintainer/debug compatibility work:
 
 ```bash
 cd <target-project-repo>
 ~/code/HLDspec/scripts/hldspec_run.sh <path-to-HLD>
 ```
 
-The runner must not be treated as the whole process. It creates or continues the local workspace and stops at a safe checkpoint.
+The runner must not be treated as the current product entry point or the whole
+process. It creates or continues the legacy local workspace and stops at a safe
+checkpoint.
 
 The runner must not:
 
@@ -85,17 +93,17 @@ The runner must not:
 - modify the source HLD directly
 ```
 
-## Workspace rule
+## Legacy workspace rule
 
 The source HLD is read-only unless the user explicitly approves source edits.
 
-The working copy is:
+For this legacy runner path, the working copy is:
 
 ```text
 .hldspec-first-run/HLD.md
 ```
 
-All generated/checkpoint artifacts live under:
+For this legacy runner path, generated/checkpoint artifacts live under:
 
 ```text
 .hldspec-first-run/
@@ -103,11 +111,12 @@ All generated/checkpoint artifacts live under:
 
 The judge may edit only the working copy when marking/converting raw HLD content.
 
-## Artifact discovery order
+## Legacy/debug artifact discovery order
 
-After each tool run, inspect the current controlling artifacts in this order.
+After each legacy/debug tool run, inspect the current controlling artifacts in
+this order.
 
-### Raw-HLD conversion checkpoint
+### Legacy raw-HLD conversion checkpoint
 
 ```text
 .hldspec-first-run/.specify/sync/hld_conversion_decision_queue.md
@@ -116,7 +125,7 @@ After each tool run, inspect the current controlling artifacts in this order.
 .hldspec-first-run/HLD.md
 ```
 
-### Converted/prework checkpoint
+### Legacy converted/prework checkpoint
 
 ```text
 .hldspec-first-run/firstrun/.specify/sync/hldspec_state.md
@@ -425,4 +434,3 @@ Every checkpoint render must include:
 - what happens after the answer
 - what is not modified or not invoked yet
 ```
-

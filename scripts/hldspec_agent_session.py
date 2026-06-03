@@ -868,6 +868,8 @@ def command_doctor(args: argparse.Namespace) -> int:
         print("Continue with hldspec status, review, or continue as appropriate.")
     else:
         print("Resolve listed ACTION/CONFLICT items, then rerun doctor.")
+    if final_status in {"ACTION", "CONFLICT"}:
+        return ExitCode.GATE_BLOCKED.value
     return 0 if ok else 2
 
 

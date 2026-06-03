@@ -43,19 +43,24 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 
 ---
 
-## Runtime entrypoints
+## Runtime Entry Points
 
 | Script / Module | Role |
 |---|---|
-| `scripts/hldspec_agent_session.py` | Agent-first facade: start/status/review/continue/diff/doctor/speckit-doctor/operator-state (alias speckit-state). |
+| `scripts/hldspec_agent_session.py` | Current public facade implementation: start/status/review/continue/diff/doctor/speckit-doctor/operator-state (alias speckit-state). This is the only current product command surface listed here. |
 | `scripts/hldspec_smoke_slice_e2e.py` | Production smoke scenario for source package, mirror, anchors, slice artifacts, and optional tmux visibility. |
-| `scripts/hldspec_v2.py` | V2 CLI entry point. |
-| `scripts/hldspec_run.sh` | Canonical run entry for the full pipeline. |
-| `scripts/project_first_run.sh` | First-time workspace setup. |
-| `scripts/project_continue.sh` | Resume / status check. |
-| `scripts/first_run_readonly.sh` | Bootstrap read-only analysis. |
+| `scripts/hldspec_v2.py` | Compatibility/debug V2 CLI entry point. Do not advertise as the current user-facing product surface. |
+| `scripts/hldspec_run.sh` | Legacy/debug full-pipeline runner. It is not the canonical product entry point; use the public facade above for product behavior. |
+| `scripts/project_first_run.sh` | Internal/compatibility first-time workspace setup runner used by the facade and tests. |
+| `scripts/project_continue.sh` | Internal/compatibility resume/status runner used by ProjectMachine flows. |
+| `scripts/first_run_readonly.sh` | Internal bootstrap read-only analysis runner. Maintainer/debug surface, not a user-facing product command. |
 | `hldspec/machines/project.py` | Orchestrator machine. |
 | `hldspec/skeptic_schema.py` | RunSkeptic canonical finding schema. |
+
+Rule: if this section conflicts with `HLDSPEC_TERMINOLOGY_AND_FLOW.md`, the
+terminology-and-flow command surface wins. Direct scripts may appear in tests,
+debug docs, and compatibility docs, but they must not be presented as the current
+product workflow.
 
 ---
 

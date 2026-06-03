@@ -134,11 +134,12 @@ class TestPlanGateStatusFields(unittest.TestCase):
         gate = plan_gate_status(_base_plan(), _full_review())
         self.assertIsInstance(gate, PlanGateStatus)
 
-    def test_legacy_marker_also_accepted(self):
-        """'target-spec generation' marker is still recognised."""
+    def test_legacy_marker_is_not_accepted(self):
+        """Deprecated target-spec wording must not drive the live gate."""
         legacy_text = "Continue to target-spec generation: `true`"
         gate = plan_gate_status(_base_plan(), legacy_text)
-        self.assertTrue(gate.continue_true)
+        self.assertFalse(gate.continue_true)
+        self.assertFalse(gate.green)
 
 
 # ---------------------------------------------------------------------------

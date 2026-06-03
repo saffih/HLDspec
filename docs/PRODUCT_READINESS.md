@@ -30,12 +30,17 @@ evidence-backed next safe action.
 | Known limitations explicit | YES | this file + README boundaries |
 | No known P0 ACTION/CONFLICT | YES | — |
 
-### Standalone user — status: YES (with the docs in this branch)
+### Standalone user — status: YES
 
 A new user with no project history can orient and run one validation command.
 The standalone path is **the agent one-liner plus internal HLDspec tooling** —
 the user gives an agent one instruction and reads back STATUS/blockers/evidence/
 next safe action — **not** direct script execution.
+
+Current basis: active docs have a single canonical command surface and legacy
+runner/path terms are classified as legacy/debug/deprecated/backlog/status
+contexts by anti-drift tests. Direct scripts remain internal/manual/debug tools,
+not the standalone user path.
 
 | Gate | Met | Evidence |
 |---|---|---|
@@ -49,7 +54,7 @@ next safe action — **not** direct script execution.
 | Active vs legacy vs compatibility files clear | YES | `docs/REPO_LAYOUT.md` |
 | ≥1 sample/demo/smoke documented | YES | `docs/SMOKE_SCENARIOS.md` |
 | One validation command without project history | YES | `scripts/check_product_readiness.sh` |
-| No known P1 ACTION/CONFLICT | YES | command-surface drift resolved: `HLDSPEC_TERMINOLOGY_AND_FLOW.md` is the single canonical surface; README, `USER_RUN_MODEL.md`, and `HLDSPEC_USE_CASES_AND_API.md` defer to it and list all 9 commands |
+| No known P1 ACTION/CONFLICT | YES | command-surface drift is guarded by `test_non_archive_docs_contextualize_legacy_command_surface_terms`; legacy runner references require local legacy/debug/backlog/status context |
 
 ### Production — status: NO
 
@@ -94,14 +99,15 @@ workspace. Tracked as production-tier work.
   PASS/ACTION/CONFLICT branches, not just present.
 - The Operator / Doctor / Devin Mediator boundary is not weakened by the new
   docs.
-- The "Standalone user: YES" call is justified and not overclaiming, and
-  "Production: NO" is preserved.
+- The "Standalone user: YES" call remains bounded to the agent one-liner,
+  command-surface docs, active-doc anti-drift tests, and local validation
+  evidence; "Production: NO" is preserved.
 - The standalone path is the **agent one-liner plus internal HLDspec tooling**,
   not direct script execution; scripts are documented as internal/manual/debug/
   fallback tooling and `tests_v2/test_agent_first_user_interface.py` keeps that
   drift from returning.
-- The command surface is reconciled to one canonical source
-  (`HLDSPEC_TERMINOLOGY_AND_FLOW.md`); confirm no doc reintroduces a competing
+- The command surface remains reconciled to one canonical source
+  (`HLDSPEC_TERMINOLOGY_AND_FLOW.md`) and no active doc reintroduces a competing
   "canonical" command list.
 
 ## Re-run the evidence

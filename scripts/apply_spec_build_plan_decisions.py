@@ -370,9 +370,11 @@ def render_plan_md(plan: dict[str, Any], plan_path: Path) -> str:
     lines += [
         "## Next safe steps",
         "",
-        "1. Review this plan manually.",
-        "2. Do not run target-spec generation unless `spec_build_plan_review.md` allows it.",
-        "3. Continue only to SpecKit prework human approval when the plan gate is green.",
+        "1. Review `spec_build_plan_review.md` and confirm the decision queue is fully resolved.",
+        "2. If the plan is not green, fix the plan inputs and rerun this decision step before anything else.",
+        "3. If the plan is green, run `scripts/build_speckit_bundle_prompts.py <workspace>`.",
+        "4. Immediately after bundle prompts, run `scripts/write_agent_context_handoff.py <workspace>` so the runtime root files stay in sync.",
+        "5. Continue only to SpecKit prework human approval when the plan gate is green and the handoff file exists.",
         "",
     ]
     return "\n".join(lines)

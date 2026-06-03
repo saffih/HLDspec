@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from hldspec.machines.project import ProjectMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
 from hldspec.state_machine import (
     CheckpointKind,
@@ -38,6 +39,20 @@ class RunSkepticStatusPropagationTests(unittest.TestCase):
 
         self.assertEqual(result.runskeptic.status, "ACTION")
         self.assertEqual(result.runskeptic.next_safe_action, "fix findings")
+
+    def test_project_machine_wrap_preserves_runskeptic_status(self) -> None:
+        result = blocked_result(
+            machine="SpeckitPreworkMachine",
+            state="SPECKIT_PREWORK_RUNSKEPTIC_REWORK",
+            kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+            blocking_reason="blocked",
+            runskeptic=RunSkepticStatus(status="CONFLICT", next_safe_action="escalate"),
+        )
+
+        wrapped = ProjectMachine()._wrap(result)
+
+        self.assertEqual(wrapped.runskeptic.status, "CONFLICT")
+        self.assertEqual(wrapped.runskeptic.next_safe_action, "escalate")
 
     def test_prework_blocks_explicit_runskeptic_conflict_before_speckit(self) -> None:
         with TemporaryDirectory() as tmp:

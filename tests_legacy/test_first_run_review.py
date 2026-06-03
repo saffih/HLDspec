@@ -65,7 +65,7 @@ class FirstRunReviewTests(unittest.TestCase):
             self.assertTrue(review_path.exists())
             review = review_path.read_text(encoding="utf-8")
             self.assertIn("Spec Build Plan Review", review)
-            self.assertIn("Continue to target-spec generation: `false`", review)
+            self.assertIn("Continue to SpecKit prework: `false`", review)
             self.assertIn("Should planned spec 002 be split", review)
 
     def test_first_run_detects_raw_hld_and_writes_conversion_prompt(self) -> None:

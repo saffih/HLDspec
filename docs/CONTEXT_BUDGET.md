@@ -97,9 +97,10 @@ Bad:
 <entire 500-line section pasted>
 ```
 
-## Target-spec context budget
+## Bounded SpecKit Context Budget
 
-Future target-spec generation must use a bounded evidence package:
+Future SpecKit prework and run-card generation must use a bounded evidence
+package:
 
 ```text
 Spec Build Plan entry

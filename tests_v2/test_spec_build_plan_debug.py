@@ -19,7 +19,7 @@ class SpecBuildPlanDebugTests(unittest.TestCase):
         sync.mkdir(parents=True)
 
         (sync / "spec_build_plan_review.md").write_text(
-            "Continue to target-spec generation: `false`\n",
+            "Continue to SpecKit prework: `false`\n",
             encoding="utf-8",
         )
         (sync / "spec_build_plan.json").write_text(
@@ -64,7 +64,7 @@ class SpecBuildPlanDebugTests(unittest.TestCase):
         sync.mkdir(parents=True)
 
         (sync / "spec_build_plan_review.md").write_text(
-            "Continue to target-spec generation: `true`\n",
+            "Continue to SpecKit prework: `true`\n",
             encoding="utf-8",
         )
         (sync / "spec_build_plan.json").write_text(

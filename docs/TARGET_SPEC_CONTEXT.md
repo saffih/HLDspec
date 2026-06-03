@@ -1,4 +1,9 @@
-# Target Spec Context Rule
+# Legacy Target Spec Context Rule
+
+Status: **legacy terminology / compatibility reference**. Current HLDspec
+prepares bounded SpecKit prework and Run Cards; it must not manually create final
+SpecKit specs. Treat "target spec" language here as the older name for a bounded
+SpecKit evidence context, not as permission for HLDspec to write final specs.
 
 ## Core rule
 
@@ -56,13 +61,14 @@ They are useful for:
 - showing key aspects quickly
 - helping RunSkeptic spotlights choose evidence
 
-They are not source evidence for final target-spec generation.
+They are not source evidence for final SpecKit prework or run-card context.
 
 The full related HLD Sections remain the source evidence.
 
-## Required target-spec context package
+## Required bounded SpecKit context package
 
-When `--target-spec` exists, it should build a bounded evidence package containing:
+When a compatibility `--target-spec` path exists, it should build a bounded
+evidence package containing:
 
 - Spec Build Plan entry
 - full source HLD Sections listed for the planned spec
@@ -72,7 +78,7 @@ When `--target-spec` exists, it should build a bounded evidence package containi
 - data/state sections when applicable
 - performance/memory sections when applicable
 - reliability/failure-recovery sections when applicable
-- target Spec Kit Constitution context when applicable
+- target SpecKit Constitution context when applicable
 - existing related specs only when needed and bounded
 
 ## RunSkeptic stop conditions
@@ -85,11 +91,12 @@ Stop with `CONFLICT` when:
 - data/state ownership is unclear
 - performance/memory constraints are referenced but unavailable
 - failure/recovery behavior is referenced but unavailable
-- the target spec boundary depends on evidence not loaded
+- the bounded SpecKit context boundary depends on evidence not loaded
 - Section Cards are being used as replacement source evidence
 
 ## Current boundary
 
 This repo currently supports the read-only first-run cycle and Spec Build Plan review.
 
-Do not implement or run target-spec generation until the plan review is clean or explicitly accepted.
+Do not continue to SpecKit prework until the plan review is clean and explicitly
+accepted.

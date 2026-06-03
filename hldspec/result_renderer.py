@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from hldspec.state_machine import ArtifactRef, Checkpoint, HumanQuestion, MachineResult
+from hldspec.state_machine import ArtifactRef, Checkpoint, HumanQuestion, MachineResult, RunSkepticStatus
 
 
 DEFAULT_FORBIDDEN_ACTIONS = (
@@ -19,6 +19,21 @@ def _artifact_lines(artifacts: tuple[ArtifactRef, ...]) -> list[str]:
         f"- {artifact.path} ({artifact.role}, {'required' if artifact.required else 'optional'})"
         for artifact in artifacts
     ]
+
+
+def _runskeptic_lines(runskeptic: RunSkepticStatus) -> list[str]:
+    lines = [
+        "RunSkeptic:",
+        f"- Status: {runskeptic.status}",
+    ]
+    if runskeptic.evidence:
+        lines.append("- Evidence:")
+        lines.extend(f"  - {item.path} ({item.role})" for item in runskeptic.evidence)
+    else:
+        lines.append("- Evidence: none")
+    if runskeptic.next_safe_action:
+        lines.append(f"- Next safe action: {runskeptic.next_safe_action}")
+    return lines
 
 
 def _open_question_lines(questions: tuple[HumanQuestion, ...]) -> list[str]:
@@ -130,6 +145,9 @@ def render_machine_result(result: MachineResult) -> str:
 
     if result.errors:
         lines.extend(["Errors:", *[f"- {item}" for item in result.errors], ""])
+
+    lines.extend(_runskeptic_lines(result.runskeptic))
+    lines.append("")
 
     lines.append(render_checkpoint(result.checkpoint))
     return "\n".join(lines).rstrip() + "\n"

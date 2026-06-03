@@ -2,8 +2,8 @@
 Negative-path tests for SpecBuildPlanMachine._quality() green condition.
 
 The gate goes green only when ALL of:
-  - review text contains "Continue to target-spec generation: true"
-  - review text does NOT contain "Continue to target-spec generation: false"
+  - review text contains "Continue to SpecKit prework: true"
+  - review text does NOT contain "Continue to SpecKit prework: false"
   - plan_quality.decision == "PASS"
   - plan_quality.recommendation == "KEEP_PLAN"
   - no conflicts
@@ -29,8 +29,8 @@ from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
 from hldspec.state_machine import MachineContext, MachineStatus
 
 
-CONTINUE_TRUE = "Continue to target-spec generation: `true`\n"
-CONTINUE_FALSE = "Continue to target-spec generation: `false`\n"
+CONTINUE_TRUE = "Continue to SpecKit prework: `true`\n"
+CONTINUE_FALSE = "Continue to SpecKit prework: `false`\n"
 
 
 def make_workspace(plan_quality: dict, planned_specs: list | None = None, review_text: str = CONTINUE_TRUE) -> Path:

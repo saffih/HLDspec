@@ -27,7 +27,7 @@ class ProjectMachineV2Tests(unittest.TestCase):
         )
 
         (scripts / "first_run_readonly.sh").write_text(
-            "#!/usr/bin/env bash\nset -euo pipefail\nout=\"$2\"\nmkdir -p \"$out/.specify/sync\"\ncat > \"$out/.specify/sync/spec_build_plan_review.md\" <<'MD'\nContinue to target-spec generation: `true`\nMD\ncat > \"$out/.specify/sync/spec_build_plan.json\" <<'JSON'\n{\"plan_quality\":{\"decision\":\"PASS\",\"recommendation\":\"KEEP_PLAN\",\"conflicts\":[]},\"planned_specs\":[]}\nJSON\ncat > \"$out/.specify/sync/speckit_prework_quality_review.json\" <<'JSON'\n{\"status\":\"PASS\",\"findings\":[]}\nJSON\ntouch \"$out/.specify/sync/speckit_prework_package.md\"\ntouch \"$out/.specify/sync/speckit_prework_quality_review.md\"\ntouch \"$out/.specify/sync/speckit_proxy_dossier.md\"\ntouch \"$out/.specify/sync/hldspec_state.md\"\n",
+            "#!/usr/bin/env bash\nset -euo pipefail\nout=\"$2\"\nmkdir -p \"$out/.specify/sync\"\ncat > \"$out/.specify/sync/spec_build_plan_review.md\" <<'MD'\nContinue to SpecKit prework: `true`\nMD\ncat > \"$out/.specify/sync/spec_build_plan.json\" <<'JSON'\n{\"plan_quality\":{\"decision\":\"PASS\",\"recommendation\":\"KEEP_PLAN\",\"conflicts\":[]},\"planned_specs\":[]}\nJSON\ncat > \"$out/.specify/sync/speckit_prework_quality_review.json\" <<'JSON'\n{\"status\":\"PASS\",\"findings\":[]}\nJSON\ntouch \"$out/.specify/sync/speckit_prework_package.md\"\ntouch \"$out/.specify/sync/speckit_prework_quality_review.md\"\ntouch \"$out/.specify/sync/speckit_proxy_dossier.md\"\ntouch \"$out/.specify/sync/hldspec_state.md\"\n",
             encoding="utf-8",
         )
 

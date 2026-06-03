@@ -25,15 +25,15 @@ def spec_action(spec: dict[str, Any]) -> str:
     risk = str(spec.get("boundary_risk", "low"))
 
     if not flags:
-        return "Keep as planned for now. Recheck after target-spec support exists."
+        return "Keep as planned for now. Recheck before SpecKit prework approval."
 
     if risk == "high":
         return (
-            "Do not generate this as one target spec yet. Review whether to split by "
+            "Do not send this as one SpecKit prework item yet. Review whether to split by "
             "capability, layer, API contract, data/state ownership, processing, or operations."
         )
 
-    return "Review before target-spec. The plan may be usable after the flagged concern is resolved."
+    return "Review before SpecKit prework. The plan may be usable after the flagged concern is resolved."
 
 
 def decision_questions(spec: dict[str, Any]) -> list[str]:
@@ -101,14 +101,23 @@ def build_review(plan: dict[str, Any], plan_path: Path) -> str:
         }
 
     planned_specs = [spec for spec in as_list(plan.get("planned_specs")) if isinstance(spec, dict)]
-    flagged_specs = [spec for spec in planned_specs if as_list(spec.get("quality_flags"))]
+    flagged_specs = [
+        spec
+        for spec in planned_specs
+        if as_list(spec.get("quality_flags")) or spec.get("requires_user_review")
+    ]
     conflicts = as_list(quality.get("conflicts"))
     findings = as_list(quality.get("findings"))
     decision = str(quality.get("decision", "CONFLICT"))
     recommendation = str(quality.get("recommendation", "RESOLVE_CONFLICT"))
 
     can_continue_readonly = True
-    can_continue_target_spec = decision not in BLOCKING_DECISIONS and not flagged_specs and not conflicts
+    can_continue_speckit_prework = (
+        decision == "PASS"
+        and recommendation == "KEEP_PLAN"
+        and not flagged_specs
+        and not conflicts
+    )
 
     lines: list[str] = [
         "# Spec Build Plan Review",
@@ -128,14 +137,14 @@ def build_review(plan: dict[str, Any], plan_path: Path) -> str:
         "## Can continue?",
         "",
         f"- Continue read-only review cycle: `{str(can_continue_readonly).lower()}`",
-        f"- Continue to target-spec generation: `{str(can_continue_target_spec).lower()}`",
+        f"- Continue to SpecKit prework: `{str(can_continue_speckit_prework).lower()}`",
         "",
     ]
 
-    if not can_continue_target_spec:
+    if not can_continue_speckit_prework:
         lines.extend(
             [
-                "Target-spec generation should remain blocked until the flagged plan issues are resolved.",
+                "SpecKit prework should remain blocked until the flagged plan issues are resolved.",
                 "",
             ]
         )
@@ -186,7 +195,7 @@ def build_review(plan: dict[str, Any], plan_path: Path) -> str:
             "3. For each flagged spec, decide whether the HLD-SPECS mapping is valid or should split.",
             "4. Edit the working HLD if needed.",
             "5. Re-run `scripts/first_run_readonly.sh`.",
-            "6. Do not use target-spec generation until Plan Quality is clean or explicitly accepted.",
+            "6. Do not continue to SpecKit prework until Plan Quality is clean and explicitly accepted.",
             "",
             "## Important",
             "",

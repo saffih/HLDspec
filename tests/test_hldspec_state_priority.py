@@ -36,7 +36,7 @@ _CONVERTED_HLD = (
     "HLD-VERIFY: covered\n"
 )
 
-_GREEN_PLAN_REVIEW = "Continue to target-spec generation: `true`\n"
+_GREEN_PLAN_REVIEW = "Continue to SpecKit prework: `true`\n"
 
 _GREEN_PLAN_JSON = {
     "plan_quality": {
@@ -165,7 +165,7 @@ class HldspecStateCheckpointCoverageTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             workspace, sync = _make_workspace(tmp)
             (sync / "spec_build_plan_review.md").write_text(
-                "Continue to target-spec generation: `false`\n", encoding="utf-8"
+                "Continue to SpecKit prework: `false`\n", encoding="utf-8"
             )
             (sync / "spec_build_plan.json").write_text(
                 json.dumps({

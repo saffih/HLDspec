@@ -14,9 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 # Marker used in review text to signal continue permission.
-# The legacy label is split to avoid confusing scanners.
-_LEGACY_LABEL = "target-spec " "generation"
-_CONTINUE_MARKER = rf"Continue to (?:SpecKit prework|{re.escape(_LEGACY_LABEL)}):\s*`?"
+_CONTINUE_MARKER = r"Continue to SpecKit prework:\s*`?"
 
 
 @dataclass(frozen=True)

@@ -602,7 +602,8 @@ and `agent_session --mode create` (which does not route into this flow) — not 
    NOT trigger the `first_run_readonly.sh` readiness-detection/conversion flow. A user who
    enters via `agent_session` never sees the marking plan / conversion prompt / decision
    queue that the documented first-run path provides. These should converge.
-2. **The demonstrated run was deleted.** The full worked example (`.hldspec-first-run/`
+2. **Backlog note: the demonstrated legacy run was deleted.** The full worked
+   example (`.hldspec-first-run/`
    marking plan, format report, etc.) was removed in commit `9654a5e` ("exclude workspace
    artifacts from repo") for a correct reason (workspace output != repo), but with it the
    *example of the process* was lost — itself an instance of the "vibe dev loses key parts"

@@ -248,4 +248,5 @@ class ProjectMachine:
             actions_run=(f"{result.machine}:{result.status.value}", *result.actions_run),
             artifacts_written=result.artifacts_written,
             errors=result.errors,
+            runskeptic=result.runskeptic,
         )

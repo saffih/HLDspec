@@ -13,7 +13,7 @@ As a user with a raw HLD, I want to run one HLDspec command so that the system i
 Acceptance tests:
 
 - GIVEN a raw HLD without HLDspec headings
-- WHEN `scripts/hldspec_run.sh <HLD.md>` or `scripts/first_run_readonly.sh <HLD.md>` is run
+- WHEN the user starts the public HLDspec facade with a source HLD and target workspace
 - THEN HLDspec writes a format report
 - AND writes a conversion plan
 - AND writes a conversion decision queue

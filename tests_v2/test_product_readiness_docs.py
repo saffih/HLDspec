@@ -84,6 +84,12 @@ class ProductReadinessDocsTests(unittest.TestCase):
         text = _read(SCORECARD)
         self.assertIn("Production-ready: NO", text)
 
+    def test_scorecard_bounds_standalone_yes_to_anti_drift_evidence(self) -> None:
+        text = _read(SCORECARD)
+        self.assertIn("Standalone user — status: YES", text)
+        self.assertIn("test_non_archive_docs_contextualize_legacy_command_surface_terms", text)
+        self.assertIn("Production-ready: NO", text)
+
     def test_scorecard_names_runskeptic_verification(self) -> None:
         self.assertIn("RunSkeptic", _read(SCORECARD))
 

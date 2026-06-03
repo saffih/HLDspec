@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Checkpoint safety contract:
-# Continue to target-spec generation
+# Continue to SpecKit prework
 # Judge/orchestrator updates:
 # Conversion decisions are still TBD
 # Continuation protocol:
@@ -100,6 +100,7 @@ rebuild_post_plan_artifacts() {
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_quality_review.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_orchestration_state.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_bundle_prompts.py" "$FIRSTRUN"
+  "${PYTHON_RUN[@]}" "$ROOT/scripts/write_agent_context_handoff.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/validate_speckit_bundles.py" "$FIRSTRUN"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_state.py" "$FIRSTRUN" --source-hld "$SOURCE_HLD"
   "${PYTHON_RUN[@]}" "$ROOT/scripts/build_speckit_prework_package.py" "$FIRSTRUN"
@@ -124,6 +125,7 @@ report_spec_gate() {
   echo "- SpecKit invocation queue: $FIRSTRUN/.specify/sync/speckit_invocation_queue.md"
   echo "- SpecKit bundle queue: $FIRSTRUN/.specify/sync/speckit_bundle_queue.md"
   echo "- SpecKit bundle prompts: $FIRSTRUN/.specify/sync/speckit_bundle_prompts/README.md"
+  echo "- Agent context handoff: $FIRSTRUN/.hldspec-run/hldspec-gap-agent-context-handoff.md"
   echo "- SpecKit bundle validation: $FIRSTRUN/.specify/sync/validation/speckit_bundle_validation.md"
   echo "- constitution update plan: $FIRSTRUN/.specify/sync/constitution_update_plan.md"
   echo "- feature dependency graph: $FIRSTRUN/.specify/sync/feature_dependency_graph.md"
@@ -138,7 +140,6 @@ report_spec_gate() {
 
   "${PYTHON_RUN[@]}" - "$review" "$plan" "$prework_review" "$ROOT/scripts/render_hldspec_checkpoint.py" "$FIRSTRUN" <<'PY'
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -148,30 +149,24 @@ plan_path = Path(sys.argv[2])
 prework_path = Path(sys.argv[3])
 renderer = Path(sys.argv[4])
 workspace = Path(sys.argv[5])
+root = renderer.parents[1]
+sys.path.insert(0, str(root))
+
+from hldspec.gates import plan_gate_status, prework_gate_status
 
 text = review.read_text(encoding="utf-8", errors="replace")
 plan = json.loads(plan_path.read_text(encoding="utf-8")) if plan_path.exists() else {}
 pq = plan.get("plan_quality", {}) if isinstance(plan, dict) else {}
 
-decision = pq.get("decision", "")
-recommendation = pq.get("recommendation", "")
-conflicts = pq.get("conflicts", [])
+gate = plan_gate_status(plan, text)
 planned = plan.get("planned_specs", []) if isinstance(plan, dict) else []
-bad = []
-for spec in planned:
-    if isinstance(spec, dict) and (spec.get("quality_flags") or spec.get("requires_user_review")):
-        bad.append(spec.get("planned_spec_id"))
 
-continue_true = bool(re.search(r"Continue to target-spec generation:\s*`?true`?", text, re.I))
-continue_false = bool(re.search(r"Continue to target-spec generation:\s*`?false`?", text, re.I))
-plan_green = continue_true and not continue_false and decision in {"PASS", "FIX", "HANDLED"} and recommendation == "KEEP_PLAN" and not conflicts and not bad
-
-print(f"Plan quality decision: {decision}")
-print(f"Recommendation: {recommendation}")
+print(f"Plan quality decision: {gate.decision}")
+print(f"Recommendation: {gate.recommendation}")
 print(f"Planned specs: {len(planned)}")
-print(f"Conflicts: {len(conflicts)}")
-print(f"Flagged specs: {len(bad)}")
-print(f"Plan gate green: {plan_green}")
+print(f"Conflicts: {gate.conflict_count}")
+print(f"Flagged specs: {gate.flagged_count}")
+print(f"Plan gate green: {gate.green}")
 print()
 
 def render(checkpoint: str, code: int) -> None:
@@ -183,23 +178,22 @@ def render(checkpoint: str, code: int) -> None:
     subprocess.run(cmd, check=False)
     sys.exit(code)
 
-if not plan_green:
+if not gate.green:
     render("SPEC_BUILD_PLAN_CHECKPOINT", 2)
 
 if not prework_path.exists():
     render("SPECKIT_PREWORK_MISSING", 2)
 
 prework = json.loads(prework_path.read_text(encoding="utf-8")) if prework_path.exists() else {}
-prework_status = prework.get("status", "MISSING")
-findings = prework.get("findings", [])
-blockers = [item for item in findings if isinstance(item, dict) and item.get("severity") == "BLOCKER"]
+prework_gate = prework_gate_status(prework)
+findings = prework.get("findings", []) if isinstance(prework, dict) else []
 
-print(f"SpecKit prework quality status: {prework_status}")
+print(f"SpecKit prework quality status: {prework_gate.status}")
 print(f"SpecKit prework findings: {len(findings)}")
-print(f"SpecKit prework blockers: {len(blockers)}")
+print(f"SpecKit prework blockers: {prework_gate.blocker_count}")
 print()
 
-if prework_status == "REWORK_REQUIRED" or blockers:
+if not prework_gate.ready:
     render("SPECKIT_PREWORK_REWORK", 2)
 
 render("SPECKIT_PREWORK_APPROVAL_GATE", 0)

@@ -42,7 +42,7 @@ SpecKit owns:
 
 ```text
 1. Source HLD
-2. Safe .hldspec-first-run workspace
+2. Safe target workspace with HLDspec control plane under target/.hldspec/
 3. Raw-HLD format report
 4. HLD conversion plan
 5. HLD conversion decision queue

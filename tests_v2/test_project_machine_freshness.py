@@ -37,7 +37,7 @@ class _CountingRunner:
 FIRST_READONLY = (
     "#!/usr/bin/env bash\nset -euo pipefail\nout=\"$2\"\n"
     "mkdir -p \"$out/.specify/sync\"\n"
-    "echo 'Continue to target-spec generation: `true`' > \"$out/.specify/sync/spec_build_plan_review.md\"\n"
+    "echo 'Continue to SpecKit prework: `true`' > \"$out/.specify/sync/spec_build_plan_review.md\"\n"
 )
 
 

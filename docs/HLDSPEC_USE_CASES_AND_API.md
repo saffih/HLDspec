@@ -509,7 +509,7 @@ Expected behavior:
 
 ```text
 1. Discover project root.
-2. Create or reuse .hldspec-first-run.
+2. Create or reuse the target workspace and HLDspec control plane.
 3. Inspect raw HLD.
 4. If raw HLD is not in HLDspec format, generate conversion questions.
 5. Ask only the listed conversion questions.
@@ -658,9 +658,13 @@ Expected behavior:
 
 ## Simple command API
 
-### hldspec run
+This section is historical compatibility guidance. The current public facade is
+the "Current command surface status" section above, backed by
+`HLDSPEC_TERMINOLOGY_AND_FLOW.md`.
 
-Primary command:
+### legacy/debug hldspec run
+
+Legacy/debug command:
 
 ```bash
 scripts/hldspec_run.sh <source-HLD.md>
@@ -669,15 +673,15 @@ scripts/hldspec_run.sh <source-HLD.md>
 Behavior:
 
 ```text
-- natural project runner
+- legacy natural project runner
 - creates/reuses .hldspec-first-run
 - stops at safe checkpoints
 - never modifies source HLD without approval
 ```
 
-### hldspec status
+### legacy/debug hldspec status
 
-Recommended wrapper:
+Legacy/debug wrapper:
 
 ```bash
 scripts/hldspec_status.sh [project-root]
