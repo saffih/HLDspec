@@ -129,6 +129,8 @@ class AntiDriftContractTests(unittest.TestCase):
             "resettable fixtures",
             "source-of-truth ownership",
             "safe test/stage environment",
+            "capability stewardship",
+            "anti-drift or contract test",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)

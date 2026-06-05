@@ -76,6 +76,8 @@ discussion triggers. These are practical defaults for SpecKit and agents, not
 permanent law.
 
 Examples:
+- capability stewardship exists -> update durable docs, tests, contracts,
+  runbooks, and agent instructions when key features or workflows change
 - API boundary exists -> prefer simple HTTP + JSON with DTOs/contracts
 - CLI boundary exists -> require command boundary tests or golden tests
 - UI boundary exists -> require UI tester skill on safe test/stage data
@@ -705,6 +707,7 @@ to cards:
 
 | Trigger | Select |
 |---|---|
+| `key_capability_added` | `maintainability.capability_stewardship` |
 | `api_boundary` | `api.http_json`, `testing.contract_boundary`, `architecture.business_logic_container` |
 | `cli_boundary` | `testing.contract_boundary`, `architecture.business_logic_container` |
 | `ui_boundary` | `testing.ui_tester_skill`, `architecture.business_logic_container`, `environment.stage_safe_testing` |
@@ -720,6 +723,50 @@ to cards:
 | `destructive_operation_risk` | `environment.stage_safe_testing`, `environment.prod_test_separation`, `testing.resettable_fixtures` |
 | `migration_or_schema_change` | `data.schema_discipline`, `environment.prod_test_separation`, `testing.resettable_fixtures` |
 | `async_or_message_bus_candidate` | `architecture.hexagonal_ports_adapters`, `testing.contract_boundary` |
+
+### maintainability.capability_stewardship
+
+Trigger:
+- any durable product capability, workflow, public surface, safety rule,
+  architecture boundary, source-of-truth rule, or agent-facing process is added
+  or changed.
+
+Default choice:
+- Treat every key capability as something future humans and agents must
+  maintain: update the durable docs, tests, contracts, runbooks, and agent
+  instructions that explain what changed, what must not drift, and how to
+  verify it.
+
+Required architecture shape:
+- each key capability has a named source of truth or owner document
+- new artifacts have explicit producer/consumer contracts when they affect
+  handoff or automation
+- agent instructions and runbooks mention new workflows that future agents must
+  preserve
+
+Required tests:
+- tests pin the new behavior, invariant, or anti-drift rule
+- docs/tests fail when protected terms, paths, commands, or ownership boundaries
+  disappear
+- verification commands are recorded in the phase report or handoff
+
+Forbidden shortcuts:
+- adding code without updating the durable docs future agents depend on
+- introducing key artifacts without documenting producer, consumer, and
+  validation expectations
+- claiming a capability is stable without tests or anti-drift evidence
+
+Evidence required:
+- updated canonical doc, runbook, or backlog entry
+- test proving the capability or invariant
+- anti-drift or contract test when product identity, architecture, source truth,
+  data ownership, safety, or operational flow changes
+
+Constitution candidate:
+- yes, as maintainability and source-of-truth stewardship
+
+Preferred choice:
+- yes
 
 ## Agent use rule
 

@@ -23,6 +23,7 @@ SCHEMA_VERSION = 1
 
 # Cards selected for nearly every project regardless of HLD wording.
 BASELINE_CARDS: tuple[str, ...] = (
+    "maintainability.capability_stewardship",
     "architecture.business_logic_container",
     "testing.design_for_testability",
     "environment.stage_safe_testing",
@@ -31,6 +32,7 @@ BASELINE_CARDS: tuple[str, ...] = (
 
 # Deterministic output order across all P0 cards (baseline + trigger-selected).
 CARD_ORDER: tuple[str, ...] = (
+    "maintainability.capability_stewardship",
     "architecture.hexagonal_ports_adapters",
     "architecture.business_logic_container",
     "architecture.modular_boundaries",
@@ -94,6 +96,32 @@ TRIGGER_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 # Encoded P0 card content (condensed from docs/ENGINEERING_TOOLBOX.md, kept real).
 CARDS: dict[str, dict] = {
+    "maintainability.capability_stewardship": {
+        "trigger": "any durable product capability, workflow, public surface, safety rule, architecture boundary, source-of-truth rule, or agent-facing process is added or changed.",
+        "default_choice": "Treat every key capability as something future humans and agents must maintain: update the durable docs, tests, contracts, runbooks, and agent instructions that explain what changed, what must not drift, and how to verify it.",
+        "architecture": [
+            "each key capability has a named source of truth or owner document",
+            "new artifacts have explicit producer/consumer contracts when they affect handoff or automation",
+            "agent instructions and runbooks mention new workflows that future agents must preserve",
+        ],
+        "tests": [
+            "tests pin the new behavior, invariant, or anti-drift rule",
+            "docs/tests fail when protected terms, paths, commands, or ownership boundaries disappear",
+            "verification commands are recorded in the phase report or handoff",
+        ],
+        "forbidden": [
+            "adding code without updating the durable docs future agents depend on",
+            "introducing key artifacts without documenting producer, consumer, and validation expectations",
+            "claiming a capability is stable without tests or anti-drift evidence",
+        ],
+        "evidence": [
+            "updated canonical doc, runbook, or backlog entry",
+            "test proving the capability or invariant",
+            "anti-drift or contract test when product identity, architecture, source truth, data ownership, safety, or operational flow changes",
+        ],
+        "constitution_candidate": "yes, as maintainability and source-of-truth stewardship",
+        "preferred_choice": True,
+    },
     "architecture.hexagonal_ports_adapters": {
         "trigger": "API, CLI, UI, persistence, external integration, replaceable infrastructure, or meaningful business behavior exists.",
         "default_choice": "Use hexagonal architecture / ports and adapters; domain and application code define core behavior and ports; HTTP, CLI, UI, database, filesystem, queues, clocks, IDs, and external SDKs are adapters.",

@@ -43,6 +43,12 @@ class BacklogScorecardTruthTests(unittest.TestCase):
         self.assertIn("scripts/validate_hldspec_target.py", self.backlog)
         self.assertIn("context_prompt_validation.json", self.backlog)
 
+    def test_backlog_records_engineering_toolbox_stewardship(self) -> None:
+        self.assertIn("Engineering Toolbox stewardship", self.backlog)
+        self.assertIn("maintainability.capability_stewardship", self.backlog)
+        self.assertIn("key capability changes must update durable docs", self.backlog)
+        self.assertIn("phase/report validators do not yet block missing per-capability stewardship", self.backlog)
+
     def test_scorecard_still_blocks_product_ready_claim(self) -> None:
         self.assertRegex(self.scorecard, r"HLDspec is not fully product-ready\.?")
         self.assertIn("Overall current mark: 6/10", self.scorecard)

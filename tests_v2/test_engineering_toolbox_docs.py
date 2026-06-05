@@ -36,6 +36,7 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
                 "engineering_guidelines.md",
                 "selection.json",
                 "decisions.jsonl",
+                "capability stewardship",
             ),
         )
 
@@ -61,6 +62,7 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
             text,
             (
                 "architecture.hexagonal_ports_adapters",
+                "maintainability.capability_stewardship",
                 "architecture.business_logic_container",
                 "architecture.modular_boundaries",
                 "testing.design_for_testability",
@@ -134,6 +136,21 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
                 "`destructive_operation_risk`",
                 "`migration_or_schema_change`",
                 "`async_or_message_bus_candidate`",
+                "`key_capability_added`",
+            ),
+        )
+
+    def test_capability_stewardship_card_is_documented(self):
+        text = self.read("docs/ENGINEERING_TOOLBOX.md")
+        self.assert_contains_all(
+            text,
+            (
+                "maintainability.capability_stewardship",
+                "update the durable docs, tests, contracts, runbooks, and agent",
+                "instructions that explain what changed",
+                "what must not drift",
+                "updated canonical doc, runbook, or backlog entry",
+                "anti-drift or contract test",
             ),
         )
 
@@ -148,6 +165,8 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
                     "docs/ANTI_DRIFT_CONTRACTS.md",
                     "engineering_guidelines.md",
                     "selected engineering guidance",
+                    "New capability maintenance rule",
+                    "tests that fail if the capability",
                 ),
             )
 

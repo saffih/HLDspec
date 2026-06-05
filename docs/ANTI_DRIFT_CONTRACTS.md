@@ -174,8 +174,10 @@ Tests must fail if docs remove the one-full-flow-then-slices model, if mediator 
 - prod/test separation
 - resettable fixtures
 - source-of-truth ownership
+- capability stewardship
 - safe test/stage environment
 - no feature work corrupts the user's active product or data
+- anti-drift or contract test for key capability changes
 
 ### Canonical docs
 
@@ -191,6 +193,8 @@ Tests must fail if docs remove the one-full-flow-then-slices model, if mediator 
 - Do not treat preferred choices as permanent law.
 - Do not remove the path to `engineering_guidelines.md`.
 - Do not allow SpecKit prework approval to continue when generated `engineering_guidelines.md` is missing or invalid.
+- Do not add key capabilities without durable docs, tests, contracts/runbooks
+  where relevant, and anti-drift coverage for protected behavior.
 - Do not let implementation agents test against production or user-owned data without explicit approval.
 
 ### Test expectations

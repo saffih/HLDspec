@@ -124,6 +124,24 @@ Still open:
 - dependency graph and invocation queue parity
 - generated handoff pointer validation
 
+### Engineering Toolbox stewardship
+
+Implemented:
+
+- `maintainability.capability_stewardship` is an always-selected Engineering
+  Toolbox baseline card.
+- Generated `engineering_guidelines.md` now passes the maintenance method to
+  target projects: key capability changes must update durable docs, tests,
+  contracts/runbooks when relevant, agent guidance, and anti-drift coverage for
+  protected behavior.
+- Repo and generated orchestrator `AGENTS.md` include the matching new
+  capability maintenance rule for HLDspec/project agents.
+
+Still open:
+
+- phase/report validators do not yet block missing per-capability stewardship
+  evidence beyond the generated guidance and pinned docs/tests.
+
 ### RunSkeptic enforcement
 
 Implemented:

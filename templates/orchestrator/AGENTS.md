@@ -201,6 +201,16 @@ cards apply, what evidence was produced, and which selected guidance could not
 be satisfied. Do not mutate production or user-owned data without explicit
 approval.
 
+## New capability maintenance rule
+
+When adding or changing a key project capability, update the maintenance surface
+in the same patch: canonical docs, durable backlog/scorecard when status changes,
+artifact contracts when new artifacts are introduced, agent/runbook guidance when
+future agents must preserve the workflow, and tests that fail if the capability
+or invariant drifts. If the change affects product identity, architecture
+boundaries, source truth, data ownership, safety, or operational flow, add or
+update anti-drift coverage rather than relying on prose.
+
 ## Artifact contract rule
 
 Operational handoffs, prompts, reports, slice instructions, and gap handoffs must
