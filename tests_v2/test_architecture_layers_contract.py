@@ -78,6 +78,9 @@ class ArchitectureLayersContentTests(unittest.TestCase):
     def test_speckit_preparation_is_core(self) -> None:
         self.assertIn("SpecKit Preparation is the core product", self.text)
 
+    def test_speckit_preparation_mirror_is_post_init(self) -> None:
+        self.assertIn("the read-only `.specify/source/` mirror is synced only after real SpecKit init", self.text)
+
     def test_hld_authoring_is_precondition_helper_qualified(self) -> None:
         self.assertIn("HLD Authoring is a precondition/helper", self.text)
         self.assertIn("unless current evidence and tests prove deeper support", self.text)

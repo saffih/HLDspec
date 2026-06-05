@@ -51,6 +51,13 @@ class AntiDriftContractTests(unittest.TestCase):
                 "generated read-only mirror",
                 "real `.specify/` workspace is SpecKit-owned",
                 "HLDspec must not fake a SpecKit workspace",
+                "SOURCE_PACKAGE_READY",
+                "INIT_PREREQS_READY",
+                "WORKSPACE_INITIALIZED",
+                "MIRROR_SYNCED",
+                "READY_FOR_SPECIFY",
+                "BUILD_LOOP_ACTIVE",
+                "post-init mirror sync",
             ),
         )
 

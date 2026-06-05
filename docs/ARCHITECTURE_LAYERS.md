@@ -56,8 +56,9 @@ stated honestly per journey.
 
 - Purpose: turn a reliable HLD into a SpecKit-ready source package and target
   workspace.
-- Output: an anchored source package, a read-only `.specify/source/` mirror,
-  readiness facts, and the next safe action.
+- Output: an anchored source package, readiness facts, and the next safe action;
+  the read-only `.specify/source/` mirror is synced only after real SpecKit init
+  validates.
 - Support level: **SpecKit Preparation is the core product** **[current]** — it is
   the primary deliverable and the journey with the most implementation and test
   coverage today.

@@ -82,6 +82,31 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         ):
             self.assertIn(phrase.lower(), text)
 
+    def test_canonical_doc_defines_build_loop_trigger_ladder(self) -> None:
+        text = _read(CANONICAL)
+        triggers = (
+            "SOURCE_PACKAGE_READY",
+            "INIT_PREREQS_READY",
+            "WORKSPACE_INITIALIZED",
+            "MIRROR_SYNCED",
+            "READY_FOR_SPECIFY",
+            "BUILD_LOOP_ACTIVE",
+        )
+        for trigger in triggers:
+            with self.subTest(trigger=trigger):
+                self.assertIn(trigger, text)
+        ladder = (
+            "SOURCE_PACKAGE_READY\n"
+            "-> INIT_PREREQS_READY\n"
+            "-> WORKSPACE_INITIALIZED\n"
+            "-> MIRROR_SYNCED\n"
+            "-> READY_FOR_SPECIFY\n"
+            "-> BUILD_LOOP_ACTIVE"
+        )
+        self.assertIn(ladder, text)
+        self.assertIn("`.specify/source/` alone never proves initialization", text)
+        self.assertIn("Build Loop bootstrap owns real init execution", text)
+
     def test_canonical_doc_protects_operator_doctor_devin_boundary(self) -> None:
         text = _read(CANONICAL)
         self.assertIn("HLDspec Operator", text)

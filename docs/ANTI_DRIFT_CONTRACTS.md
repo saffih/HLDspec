@@ -51,6 +51,11 @@ Tests must fail if the three journeys disappear, if SpecKit Preparation is no lo
 - The real `.specify/` workspace is SpecKit-owned.
 - SpecKit owns spec, plan, tasks, and implementation artifacts.
 - HLDspec must not fake a SpecKit workspace.
+- Build Loop trigger phrases are protected: `SOURCE_PACKAGE_READY`,
+  `INIT_PREREQS_READY`, `WORKSPACE_INITIALIZED`, `MIRROR_SYNCED`,
+  `READY_FOR_SPECIFY`, and `BUILD_LOOP_ACTIVE`.
+- The trigger order is source package, init prerequisites, real workspace init,
+  post-init mirror sync, ready for specify, then active build loop.
 
 ### Canonical docs and code
 
@@ -62,12 +67,14 @@ Tests must fail if the three journeys disappear, if SpecKit Preparation is no lo
 
 - Do not edit `.specify/source/` as source truth.
 - Do not treat `.specify/source/` as proof of real SpecKit initialization.
+- Do not mirror into `.specify/source/` as the product-flow proof step before
+  real SpecKit init validation.
 - Do not let SpecKit or agents silently rewrite HLD truth.
 - Do not mix HLDspec-owned and SpecKit-owned artifacts.
 
 ### Test expectations
 
-Tests must fail if the source-package ownership model or read-only mirror model is removed, or if a mirror-only `.specify/source/` can be treated as initialized SpecKit workspace.
+Tests must fail if the source-package ownership model or read-only mirror model is removed, if a mirror-only `.specify/source/` can be treated as initialized SpecKit workspace, or if docs put mirror sync before real SpecKit init validation in the product flow.
 
 ## Contract 3: Slice, mediator, and implementation guidance contract
 

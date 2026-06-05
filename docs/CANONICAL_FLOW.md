@@ -91,6 +91,29 @@ is only the evidence bundle. If this document and
 `HLDSPEC_TERMINOLOGY_AND_FLOW.md` disagree, the terminology-and-flow document
 wins.
 
+## Build Loop trigger ladder
+
+The Journey 2 -> Build Loop boundary is ordered by trigger phrases from
+`HLDSPEC_TERMINOLOGY_AND_FLOW.md`:
+
+```text
+SOURCE_PACKAGE_READY
+-> INIT_PREREQS_READY
+-> WORKSPACE_INITIALIZED
+-> MIRROR_SYNCED
+-> READY_FOR_SPECIFY
+-> BUILD_LOOP_ACTIVE
+```
+
+Operational meaning:
+
+- Build `target/.hldspec/source_package/` first.
+- Check SpecKit install/init command, command smoke, git root, branch, dirty-tree
+  state, and branch policy before real SpecKit execution.
+- Run or validate real SpecKit init before treating `.specify/` as a workspace.
+- Mirror into `target/.specify/source/` only after `.specify/memory/` validates.
+- Start `/speckit.specify` only at `READY_FOR_SPECIFY`.
+
 ## Current safe checkpoint after a green plan gate
 
 When the Spec Build Plan is green, the next checkpoint is not "target spec generation".

@@ -61,6 +61,33 @@ class HldspecConceptDocsTests(unittest.TestCase):
         ):
             self.assertIn(phrase, text)
 
+    def test_readme_orders_init_before_specify_source_mirror(self):
+        text = self.read("README.md")
+        for phrase in (
+            "Check SpecKit install + git branch readiness",
+            "Initialize or validate real SpecKit workspace",
+            "Mirror read-only context to .specify/source",
+            "/speckit.specify once",
+            "mirror read-only context only when a real SpecKit workspace already validates",
+            "not proof of real SpecKit init",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+        self.assertLess(
+            text.index("Check SpecKit install + git branch readiness"),
+            text.index("Initialize or validate real SpecKit workspace"),
+        )
+        self.assertLess(
+            text.index("Initialize or validate real SpecKit workspace"),
+            text.index("Mirror read-only context to .specify/source"),
+        )
+        self.assertLess(
+            text.index("Mirror read-only context to .specify/source"),
+            text.index("/speckit.specify once"),
+        )
+        self.assertNotIn("D --> E[Mirror read-only context to .specify/source]", text)
+
     def test_readme_states_greenfield_first_mvp_scope(self):
         text = self.read("README.md").lower()
         for phrase in (

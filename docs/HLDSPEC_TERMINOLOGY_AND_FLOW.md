@@ -656,14 +656,70 @@ HLDspec is one workflow with three entry points, weighted around a single core:
    shape, repair, and clarify the source until it can be a dependable source of
    truth.
 2. **SpecKit Preparation** *(the core / finish line)* — the primary deliverable: a
-   full, anchored, answer-prepared source package and a real SpecKit workspace ready
-   to run one complete `specify -> plan -> tasks -> analyze` flow with good software
-   principles and healthy, tested output.
+   full, anchored, answer-prepared source package plus the readiness path to
+   `READY_FOR_SPECIFY`: real SpecKit workspace validation, post-init mirror sync,
+   branch readiness, and gates for one complete `specify -> plan -> tasks ->
+   analyze` flow with good software principles and healthy, tested output.
 3. **Implementation Guidance** *(extension)* — after SpecKit outputs exist, drive
    implementation to *proper* completion through guidance and reassessment. HLDspec
    does not implement the product itself.
 
    Greenfield-first MVP: the supported path is `HLD -> HLDspec source package -> SpecKit preparation -> implementation slicing -> mediator guidance`. Existing-product change mode is future scope unless a later patch explicitly documents it. Future change-mode work may introduce Product Truth Set, Feature Derivation Package, and overlap classification, but those are not current MVP behavior.
+
+### Build Loop boundary and trigger phrases
+
+The Build Loop is the execution boundary between prepared HLDspec evidence and
+real SpecKit/build-agent work. It must be described with explicit trigger phrases
+so every runtime (Codex, Claude, Devin, or manual) uses the same gates.
+
+`SOURCE_PACKAGE_READY` means the target has a validated
+`target/.hldspec/source_package/` and a current `speckit_single_spec_input.md`.
+This is HLDspec-owned source truth. It is not permission to run SpecKit.
+
+`INIT_PREREQS_READY` means the target has a supported SpecKit init command, the
+command help/version smoke passes, a git root is detected, the current branch is
+known, dirty-tree state is known, and branch policy or an explicit manual branch
+path is ready. This is the last pre-init check.
+
+`WORKSPACE_INITIALIZED` means a real SpecKit workspace exists. The proof is
+`.specify/memory/` from an existing or newly executed real SpecKit init command.
+`.specify/source/` alone never proves initialization.
+
+`MIRROR_SYNCED` means HLDspec regenerated `target/.specify/source/` from the
+current `target/.hldspec/source_package/` after `WORKSPACE_INITIALIZED`.
+The mirror is derived context only; it is never source truth.
+
+`READY_FOR_SPECIFY` means `SOURCE_PACKAGE_READY`, `INIT_PREREQS_READY`,
+`WORKSPACE_INITIALIZED`, and `MIRROR_SYNCED` are true, the branch path is ready,
+and all required approval/RunSkeptic gates are PASS. Only this phrase permits
+the next owner to start `/speckit.specify`.
+
+`BUILD_LOOP_ACTIVE` begins after `/speckit.specify` starts. From this point,
+SpecKit owns `target/.specify/memory/`, `target/specs/`, and generated
+spec/plan/tasks artifacts. HLDspec remains the judge/guidance layer and must
+reassess before implementation slices advance.
+
+Ordering rule:
+
+```text
+SOURCE_PACKAGE_READY
+-> INIT_PREREQS_READY
+-> WORKSPACE_INITIALIZED
+-> MIRROR_SYNCED
+-> READY_FOR_SPECIFY
+-> BUILD_LOOP_ACTIVE
+```
+
+`hldspec start` defaults to preparation: it records selected init metadata and
+builds the source package. It may mirror only when the target already validates
+as `WORKSPACE_INITIALIZED`. Build Loop bootstrap owns real init execution,
+post-init mirror sync, branch readiness, and the transition to
+`READY_FOR_SPECIFY`.
+
+Stop before `READY_FOR_SPECIFY` on any missing SpecKit command, failed command
+smoke, missing git root, unknown branch, unresolved dirty-tree policy, failed
+init, missing `.specify/memory/`, invalid source package, unresolved approval
+gate, or RunSkeptic `ACTION`/`CONFLICT`.
 
 ### Why a mediator (design rationale)
 

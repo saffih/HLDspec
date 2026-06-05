@@ -58,9 +58,10 @@ job is essentially done. HLDspec:
 - preserves the full HLD (never splits product truth to make smaller specs),
 - anchors it with stable markers (`HLD-001`, …),
 - builds a single source package,
-- mirrors read-only context into `.specify/source/`,
-- initializes or validates a **real** SpecKit workspace,
-- and gives SpecKit the prepared context and answers to run one complete
+- records SpecKit install/init readiness,
+- initializes or validates a **real** SpecKit workspace only at the execution boundary,
+- mirrors read-only context into `.specify/source/` only after real SpecKit init validates,
+- and prepares the context and answers for one complete
   `specify -> plan -> tasks -> analyze` flow with good software principles and
   healthy, tested output.
 
@@ -175,22 +176,23 @@ flowchart TD
     A[Human intent + source HLD] --> B[HLDspec start]
     B --> C[Capture source truth]
     C --> D[Build .hldspec/source_package]
-    D --> E[Mirror read-only context to .specify/source]
-    E --> F[Initialize or validate SpecKit workspace]
-    F --> G[/speckit.specify once]
-    G --> H[/speckit.plan once]
-    H --> I[/speckit.tasks once]
-    I --> J[/speckit.analyze once]
-    J --> K{Implementation approved?}
-    K -- no --> L[Stop for review or human decision]
-    K -- yes --> M[Select implementation slice + task IDs]
-    M --> N[Run bounded implementation pass]
-    N --> O[Run focused tests + prior regression]
-    O --> P[Write phase report + anchor coverage]
-    P --> Q[HLDspec reassessment]
-    Q --> R{More approved slices?}
-    R -- yes --> M
-    R -- no --> S[Final hardening or release gate]
+    D --> E[Check SpecKit install + git branch readiness]
+    E --> F[Initialize or validate real SpecKit workspace]
+    F --> G[Mirror read-only context to .specify/source]
+    G --> H[/speckit.specify once]
+    H --> I[/speckit.plan once]
+    I --> J[/speckit.tasks once]
+    J --> K[/speckit.analyze once]
+    K --> L{Implementation approved?}
+    L -- no --> M[Stop for review or human decision]
+    L -- yes --> N[Select implementation slice + task IDs]
+    N --> O[Run bounded implementation pass]
+    O --> P[Run focused tests + prior regression]
+    P --> Q[Write phase report + anchor coverage]
+    Q --> R[HLDspec reassessment]
+    R --> S{More approved slices?}
+    S -- yes --> N
+    S -- no --> T[Final hardening or release gate]
 ```
 
 ## Process in plain language
@@ -199,14 +201,16 @@ flowchart TD
 2. HLDspec copies and normalizes the HLD into controlled workspace evidence.
 3. HLDspec marks HLD sections with stable anchors such as `HLD-001`.
 4. HLDspec builds a source package and a single SpecKit input from the full HLD.
-5. HLDspec mirrors read-only source context into `.specify/source/`.
-6. SpecKit creates the full product spec, plan, task graph, and analysis.
-7. HLDspec guidance does not allow raw all-task implementation by default.
-8. The user or Agent Mediator selects one approved implementation slice and task list from HLDspec guidance.
-9. The build agent is instructed to implement only that selected slice.
-10. The build agent runs focused tests and prior-slice regression.
-11. The build agent reports back with changed files, test evidence, anchor coverage, and blockers.
-12. HLDspec reassesses and decides the next safe action.
+5. HLDspec checks SpecKit install/init readiness plus git branch readiness.
+6. Real SpecKit init creates or validates `.specify/memory/`.
+7. HLDspec mirrors read-only source context into `.specify/source/` after init validates.
+8. SpecKit creates the full product spec, plan, task graph, and analysis.
+9. HLDspec guidance does not allow raw all-task implementation by default.
+10. The user or Agent Mediator selects one approved implementation slice and task list from HLDspec guidance.
+11. The build agent is instructed to implement only that selected slice.
+12. The build agent runs focused tests and prior-slice regression.
+13. The build agent reports back with changed files, test evidence, anchor coverage, and blockers.
+14. HLDspec reassesses and decides the next safe action.
 
 ## Slice-controlled implementation
 
@@ -304,7 +308,7 @@ The full internal command/tool surface the agent may run:
 
 | Command | What it does |
 |---|---|
-| `start` | Prepare or resume a session: copy the HLD into the target, build the source package, mirror read-only context, plan SpecKit init. |
+| `start` | Prepare or resume a session: copy the HLD into the target, build the source package, record SpecKit init readiness, and mirror read-only context only when a real SpecKit workspace already validates. |
 | `status` | Show session status, blockers, open questions, and the next safe action. |
 | `review` | List the human review files and which blocking ones are missing. |
 | `continue` | Run the pipeline to the next safe checkpoint (gated). |
@@ -346,7 +350,7 @@ For a map of the repository itself, see [`docs/REPO_LAYOUT.md`](docs/REPO_LAYOUT
 
 ## Production smoke
 
-HLDspec includes a deterministic smoke scenario for the current product path. It is not a real product implementation test. It proves that a tiny HLD can be copied into a temp target, turned into a source package, mirrored into `.specify/source/`, checked for anchors and SpecKit input citations, and reported with an exact PASS/FAIL result.
+HLDspec includes a deterministic smoke scenario for the current source-package/mirror path. It is not a real product implementation test and it is not proof of real SpecKit init. It proves that a tiny HLD can be copied into a temp target, turned into a source package, mirrored into `.specify/source/` for controlled validation, checked for anchors and SpecKit input citations, and reported with an exact PASS/FAIL result.
 
 ```bash
 python3 scripts/hldspec_smoke_slice_e2e.py --keep
