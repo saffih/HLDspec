@@ -37,6 +37,12 @@ class AntiDriftContractTests(unittest.TestCase):
                 "SpecKit Preparation is the core product",
                 "HLDspec does not replace SpecKit",
                 "HLDspec does not implement the target product by itself",
+                "`check HLD` readiness stage",
+                "cross-examines requirements, features, constraints, and source-truth claims",
+                "auxiliary artifacts",
+                "baked, provisional, unresolved, or superseded",
+                "Do not collapse `check HLD` into full SpecKit Preparation",
+                "Do not turn HLD readiness into a repetitive question interview",
             ),
         )
 

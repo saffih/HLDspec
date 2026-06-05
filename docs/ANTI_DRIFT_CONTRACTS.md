@@ -21,9 +21,15 @@ A change may rewrite docs or code, but it must preserve the four contracts below
   1. HLD Authoring
   2. SpecKit Preparation
   3. Implementation Guidance
+- HLD Authoring may include a practical `check HLD` readiness stage that
+  cross-examines requirements, features, constraints, and source-truth claims
+  before full SpecKit Preparation.
 - SpecKit Preparation is the core product.
 - HLDspec does not replace SpecKit.
 - HLDspec does not implement the target product by itself.
+- Cross-examination reason trails are auxiliary artifacts. They explain why HLD
+  points are baked, provisional, unresolved, or superseded, but they do not
+  replace or bloat the main HLD.
 
 ### Canonical docs
 
@@ -36,10 +42,14 @@ A change may rewrite docs or code, but it must preserve the four contracts below
 - Do not redefine HLDspec as a direct autonomous implementation agent.
 - Do not drop any of the three user journeys.
 - Do not imply Implementation Guidance means HLDspec owns implementation.
+- Do not collapse `check HLD` into full SpecKit Preparation, Build Loop init, or
+  `/speckit.specify`.
+- Do not turn HLD readiness into a repetitive question interview; group
+  clarification by decision family.
 
 ### Test expectations
 
-Tests must fail if the three journeys disappear, if SpecKit Preparation is no longer identified as the core product, or if docs imply HLDspec replaces SpecKit.
+Tests must fail if the three journeys disappear, if SpecKit Preparation is no longer identified as the core product, if docs imply HLDspec replaces SpecKit, or if `check HLD` stops being an auxiliary cross-examination/readiness stage.
 
 ## Contract 2: Source-truth and SpecKit ownership contract
 

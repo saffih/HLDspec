@@ -54,6 +54,23 @@ class TestRegisteredArtifacts(unittest.TestCase):
             ARTIFACT_CONTRACTS["speckit_execution_assessment.json"].producer,
         )
 
+    def test_registers_hld_readiness_cross_examination_artifacts(self):
+        self.assertIn("hld_cross_examination.json", registered_artifacts())
+        self.assertIn("hld_readiness_check.json", registered_artifacts())
+
+        cross = ARTIFACT_CONTRACTS["hld_cross_examination.json"]
+        self.assertIn("examined_items", cross.required_fields)
+        self.assertIn("grouped_questions", cross.required_fields)
+        self.assertIn("polite_clarification_prompt", cross.optional_fields)
+        self.assertIn("hld_readiness_check.json", cross.output_artifacts)
+        self.assertIn("Auxiliary reason trail", cross.notes)
+
+        readiness = ARTIFACT_CONTRACTS["hld_readiness_check.json"]
+        self.assertIn("verdict", readiness.required_fields)
+        self.assertIn("next_safe_action", readiness.required_fields)
+        self.assertIn("hld_cross_examination.json", readiness.input_artifacts)
+        self.assertIn("stop before full SpecKit Preparation", readiness.notes)
+
     def test_returns_list(self):
         self.assertIsInstance(registered_artifacts(), list)
 
@@ -92,6 +109,12 @@ class TestArtifactInput(unittest.TestCase):
         )
         self.assertIsNotNone(hld_raw_spec, "HLD.raw.md must be in input_specs")
         self.assertEqual(WORKSPACE_ROOT, hld_raw_spec.location)
+
+    def test_hld_cross_examination_uses_workspace_hld_input(self):
+        contract = ARTIFACT_CONTRACTS["hld_cross_examination.json"]
+        hld_spec = next((s for s in contract.input_specs if s.name == "HLD.md"), None)
+        self.assertIsNotNone(hld_spec, "HLD.md must be in input_specs")
+        self.assertEqual(WORKSPACE_ROOT, hld_spec.location)
 
 
 class TestStaleRegisteredArtifacts(unittest.TestCase):

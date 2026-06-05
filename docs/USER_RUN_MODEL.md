@@ -23,6 +23,76 @@ In this agent-first model the user sees results, not script paths. The command
 surface below is the **internal tool surface** the agent (or a maintainer)
 invokes; it is documented for reference, not as the primary human UX.
 
+## Trigger phrases
+
+Use short trigger phrases that tell HLDspec how far to go and where to stop.
+These are user-facing workflow phrases, not additional CLI commands.
+
+Recommended phrases:
+
+- `HLDspec <source> target <path>`
+  Enter or resume the HLDspec workflow and stop at the next safe checkpoint.
+- `HLDspec review`
+  Explain current state, blockers, evidence, and next safe action. Read-only.
+- `HLDspec continue`
+  Advance one safe checkpoint through the current workflow state.
+- `check HLD`
+  Cross-examine the HLD for SDD readiness, write auxiliary reason/question
+  artifacts, and stop before full SpecKit Preparation.
+- `Build Loop prereqs`
+  Check SpecKit/install/git/branch/dirty-tree prerequisites only.
+- `Build Loop init`
+  Perform or validate real SpecKit init, then stop before `/speckit.specify`.
+- `Build Loop ready`
+  Drive to `READY_FOR_SPECIFY` if possible, then stop.
+- `SpecKit specify`
+  Start the first real SpecKit phase only when readiness and approvals already
+  allow it.
+
+Do not use vague control words like `on`, `off`, `enable`, `disable`, or `go`
+when an exact trigger phrase exists. HLDspec is gate-based and stop-boundary
+based, not toggle-based.
+
+## Help
+
+Use `HLDspec help` to explain the workflow in task terms instead of script
+terms.
+
+Supported help shapes:
+
+- `HLDspec help`
+- `HLDspec help review`
+- `HLDspec help continue`
+- `HLDspec help check HLD`
+- `HLDspec help Build Loop prereqs`
+- `HLDspec help Build Loop init`
+- `HLDspec help Build Loop ready`
+- `HLDspec help SpecKit specify`
+
+Every help response should use this structure:
+
+- `Purpose`
+- `Does`
+- `Stops at`
+- `Will not`
+- `Example`
+
+Example help meaning:
+
+- `check HLD`
+  Purpose: decide whether the HLD is SDD-ready before heavier preparation work.
+  Does: cross-examine requirements, feature candidates, boundaries, constraints, risks, non-goals, testability, and rollout assumptions.
+  Stops at: readiness verdict, auxiliary reason trail, grouped clarification questions, and next safe action.
+  Will not: mutate the source HLD, run SpecKit, initialize the Build Loop, or ask repetitive line-by-line questions.
+  Example: `HLDspec help check HLD`
+
+- `Build Loop prereqs`
+  Purpose: check whether real SpecKit work can be prepared safely.
+  Does: inspect install/init command, git root, branch, dirty tree, and related prerequisites.
+  Stops at: prerequisite report only.
+  Will not: initialize SpecKit or start `/speckit.specify`.
+  Example: `HLDspec help Build Loop prereqs`
+
 ## Command surface
 
 The canonical command surface is defined in
@@ -43,6 +113,12 @@ Current public product commands:
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and next actions. |
 | `hldspec operator-state` | current | Show readiness-first Operator State, SpecKit lifecycle state when phase artifacts exist, and the next safe action. |
 | `hldspec speckit-state` | current | Alias of `operator-state`. |
+
+Important distinction:
+
+- Trigger phrases such as `check HLD`, `Build Loop prereqs`, `Build Loop init`, `Build Loop ready`, and `HLDspec help ...` are user-facing workflow requests.
+- They are not currently separate CLI commands in the product facade.
+- The internal command/tool surface above remains the real command surface until a later patch explicitly promotes new commands.
 
 Future product commands:
 

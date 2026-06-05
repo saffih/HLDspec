@@ -62,6 +62,11 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         self.assertIn("Future product commands:", user)
         self.assertIn("Legacy/debug commands:", user)
 
+    def test_user_run_model_keeps_trigger_phrases_separate_from_command_surface(self) -> None:
+        user = (ROOT / "docs" / "USER_RUN_MODEL.md").read_text(encoding="utf-8")
+        self.assertIn("Trigger phrases such as `check HLD`, `Build Loop prereqs`, `Build Loop init`, `Build Loop ready`, and `HLDspec help ...` are user-facing workflow requests.", user)
+        self.assertIn("They are not currently separate CLI commands in the product facade.", user)
+
 
 if __name__ == "__main__":
     unittest.main()

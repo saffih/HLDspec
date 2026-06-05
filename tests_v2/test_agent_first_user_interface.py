@@ -129,6 +129,39 @@ class AgentFirstInterfaceTests(unittest.TestCase):
         self.assertIn("agent-first", lower)
         self.assertIn("one-line instruction", lower)
 
+    def test_user_run_model_defines_trigger_phrases_and_help(self) -> None:
+        text = _read(USER_RUN_MODEL)
+        for phrase in (
+            "## Trigger phrases",
+            "`check HLD`",
+            "`Build Loop prereqs`",
+            "`Build Loop init`",
+            "`Build Loop ready`",
+            "`SpecKit specify`",
+            "not toggle-based",
+            "## Help",
+            "`HLDspec help`",
+            "`HLDspec help check HLD`",
+            "`Purpose`",
+            "`Does`",
+            "`Stops at`",
+            "`Will not`",
+            "`Example`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+    def test_user_run_model_defines_check_hld_as_practical_readiness_review(self) -> None:
+        text = _read(USER_RUN_MODEL)
+        for phrase in (
+            "Cross-examine the HLD for SDD readiness",
+            "Stops at: readiness verdict, auxiliary reason trail, grouped clarification questions, and next safe action.",
+            "Will not: mutate the source HLD, run SpecKit, initialize the Build Loop, or ask repetitive line-by-line questions.",
+            "Example: `HLDspec help check HLD`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
     def test_terminology_distinguishes_public_interface_from_command_surface(self) -> None:
         text = _read(TERMINOLOGY)
         self.assertIn("Public HLDspec Interface", text)

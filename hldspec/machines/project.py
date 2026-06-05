@@ -12,6 +12,7 @@ from hldspec.handoff_docs import write_handoff_docs
 from hldspec import engineering_selection, hld_source_package
 from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
+from hldspec.machines.hld_readiness import HldReadinessMachine
 from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
 from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
 from hldspec.machines.speckit_execution import SpecKitExecutionMachine
@@ -25,6 +26,7 @@ class ProjectMachine:
 
     def __init__(self, runner: CommandRunner | None = None) -> None:
         self.runner = runner or CommandRunner()
+        self.hld_readiness = HldReadinessMachine()
         self.raw = RawHldConversionMachine()
         self.apply = ApplyHldConversionMachine(self.runner)
         self.plan = SpecBuildPlanMachine()
@@ -45,6 +47,12 @@ class ProjectMachine:
 
         if adapter.layout == "new":
             self._ensure_new_layout_hld(adapter, Path(context.source_hld))
+
+        if context.metadata.get("trigger") == "check_hld":
+            self._ensure_check_hld_workspace_hld(adapter, Path(context.source_hld))
+            readiness_result = self.hld_readiness.run(context)
+            self._log_terminal(context, readiness_result)
+            return self._wrap(readiness_result)
 
         if not working_hld.exists():
             first = self._run_script(repo, "project_first_run.sh", context.source_hld, str(workspace))
@@ -184,6 +192,17 @@ class ProjectMachine:
         if source_hld.exists() and not adapter.raw_hld.exists():
             shutil.copyfile(source_hld, adapter.raw_hld)
         if source_hld.exists() and not adapter.working_hld.exists():
+            shutil.copyfile(source_hld, adapter.working_hld)
+
+    @staticmethod
+    def _ensure_check_hld_workspace_hld(adapter: TargetWorkspaceAdapter, source_hld: Path) -> None:
+        adapter.raw_hld.parent.mkdir(parents=True, exist_ok=True)
+        adapter.working_hld.parent.mkdir(parents=True, exist_ok=True)
+        if not source_hld.exists():
+            return
+        if not adapter.raw_hld.exists():
+            shutil.copyfile(source_hld, adapter.raw_hld)
+        if not adapter.working_hld.exists():
             shutil.copyfile(source_hld, adapter.working_hld)
 
     @staticmethod

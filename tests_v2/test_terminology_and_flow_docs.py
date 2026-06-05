@@ -107,6 +107,55 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         self.assertIn("`.specify/source/` alone never proves initialization", text)
         self.assertIn("Build Loop bootstrap owns real init execution", text)
 
+    def test_canonical_doc_defines_user_trigger_vocabulary_and_help_contract(self) -> None:
+        text = _read(CANONICAL)
+        for phrase in (
+            "User trigger vocabulary",
+            "`HLDspec <source> [target <path>]`",
+            "`HLDspec review`",
+            "`HLDspec continue`",
+            "`check HLD`",
+            "`Build Loop prereqs`",
+            "`Build Loop init`",
+            "`Build Loop ready`",
+            "`SpecKit specify`",
+            "Do not infer `SpecKit specify`",
+            "Help trigger contract",
+            "`HLDspec help`",
+            "`HLDspec help check HLD`",
+            "`HLDspec help Build Loop prereqs`",
+            "`Purpose`",
+            "`Does`",
+            "`Stops at`",
+            "`Will not`",
+            "`Example`",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+    def test_canonical_doc_defines_practical_hld_cross_examination(self) -> None:
+        text = _read(CANONICAL)
+        for phrase in (
+            "HLD readiness cross-examination",
+            "`check HLD` is the user-facing trigger",
+            "not interrogate the user line by line",
+            "`hld_cross_examination.json`",
+            "`hld_cross_examination.md`",
+            "`reason_kind`",
+            "`temporary_poc_choice`",
+            "`HLD_READY`",
+            "`HLD_READY_WITH_ACTIONS`",
+            "`HLD_BLOCKED`",
+            "`MODEL_ROUTINE` extracts",
+            "`MODEL_STRONG` drafts",
+            "`MODEL_CRITICAL` reviews",
+            "with the current assumptions is also an option",
+            "HLDspec should ask grouped clarification questions",
+            "for every occurrence of the same issue",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
     def test_canonical_doc_protects_operator_doctor_devin_boundary(self) -> None:
         text = _read(CANONICAL)
         self.assertIn("HLDspec Operator", text)

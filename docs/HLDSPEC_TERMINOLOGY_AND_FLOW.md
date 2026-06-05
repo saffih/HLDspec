@@ -656,6 +656,11 @@ HLDspec is one workflow with three entry points, weighted around a single core:
 1. **HLD Authoring** *(precondition)* — when no reliable HLD exists yet: interview,
    shape, repair, and clarify the source until it can be a dependable source of
    truth.
+   A practical **HLD Readiness Check** may run here before full SpecKit
+   Preparation. Its job is to cross-examine the HLD enough to decide whether the
+   requirements, features, constraints, and source-truth claims are reasoned
+   through, provisional, or blocked. It writes auxiliary rationale artifacts; it
+   does not bloat the main HLD.
 2. **SpecKit Preparation** *(the core / finish line)* — the primary deliverable: a
    full, anchored, answer-prepared source package plus the readiness path to
    `READY_FOR_SPECIFY`: real SpecKit workspace validation, post-init mirror sync,
@@ -666,6 +671,76 @@ HLDspec is one workflow with three entry points, weighted around a single core:
    does not implement the product itself.
 
    Greenfield-first MVP: the supported path is `HLD -> HLDspec source package -> SpecKit preparation -> implementation slicing -> mediator guidance`. Existing-product change mode is future scope unless a later patch explicitly documents it. Future change-mode work may introduce Product Truth Set, Feature Derivation Package, and overlap classification, but those are not current MVP behavior.
+
+### HLD readiness cross-examination
+
+`check HLD` is the user-facing trigger for a practical readiness review before
+the heavier SpecKit Preparation path. It should examine the HLD in decision
+families, not interrogate the user line by line.
+
+Cross-examination should cover:
+
+- requirements
+- feature candidates
+- source-of-truth and data ownership claims
+- API/interface boundaries
+- constraints, risks, non-goals, and rollout assumptions
+- testability, staging, UI testability, and validation evidence
+
+For every meaningful item, HLDspec should record an auxiliary reason trail in
+`hld_cross_examination.json` and a human-readable
+`hld_cross_examination.md`. The main HLD remains the source of product truth;
+the cross-examination artifacts explain why each point is considered baked,
+provisional, unresolved, or superseded.
+
+Required fields for each examined item:
+
+- `item_id`
+- `item_type`
+- `statement`
+- `reason`
+- `reason_kind`
+- `confidence`
+- `owner`
+- `phase_target`
+- `revisit_trigger`
+- `conflicts_with`
+- `status`
+
+Allowed `reason_kind` values are `explicit_hld`, `inferred_from_context`,
+`human_choice`, `temporary_poc_choice`, and `external_constraint`.
+
+Allowed item `status` values are `baked`, `provisional`, `unresolved`, and
+`superseded`.
+
+The user-facing clarification tone should be polite and compact:
+
+```text
+I found a few questions that may affect whether this HLD is SDD-ready. Some can
+be resolved from the HLD, some may need external information, and going forward
+with the current assumptions is also an option if you accept the risk.
+```
+
+HLDspec should ask grouped clarification questions only when the reason trail
+shows missing evidence, conflicting evidence, a human-owned decision, or a
+provisional POC choice that affects SDD readiness. It should not ask repetitive
+questions for every occurrence of the same issue.
+
+Model routing:
+
+- `MODEL_ROUTINE` extracts candidate requirements, features, constraints, and
+  evidence links.
+- `MODEL_STRONG` drafts the reason trail and grouped clarification questions.
+- `MODEL_CRITICAL` reviews conflicts, human-owned decisions, final verdicts, and
+  any decision to move forward with accepted risk.
+
+Readiness verdicts:
+
+- `HLD_READY` means the important items are stated, reasoned, and evidence-linked.
+- `HLD_READY_WITH_ACTIONS` means known provisional choices can move forward with
+  accepted risk and revisit triggers.
+- `HLD_BLOCKED` means unresolved or conflicting decisions would make SpecKit
+  Preparation encode unstable product truth.
 
 ### Build Loop boundary and trigger phrases
 
@@ -721,6 +796,84 @@ Stop before `READY_FOR_SPECIFY` on any missing SpecKit command, failed command
 smoke, missing git root, unknown branch, unresolved dirty-tree policy, failed
 init, missing `.specify/memory/`, invalid source package, unresolved approval
 gate, or RunSkeptic `ACTION`/`CONFLICT`.
+
+### User trigger vocabulary
+
+HLDspec should be driven by explicit trigger phrases with bounded stop
+conditions, not by vague "on/off/enable/disable" language.
+
+Use these user-facing trigger phrases:
+
+- `HLDspec <source> [target <path>]`
+  Means: enter or resume the HLDspec workflow and stop at the next safe
+  checkpoint. This is the default workflow trigger.
+- `HLDspec review`
+  Means: explain current state, blockers, evidence, and next safe action.
+  Read-only.
+- `HLDspec continue`
+  Means: advance one safe checkpoint through the current workflow state.
+- `check HLD`
+  Means: cross-examine the HLD for SDD readiness, write auxiliary reason and
+  question artifacts, and stop before full SpecKit Preparation.
+- `Build Loop prereqs`
+  Means: check install/init/git/branch/dirty-tree prerequisites only. Do not run
+  real SpecKit init.
+- `Build Loop init`
+  Means: perform or validate real SpecKit init and then stop before
+  `/speckit.specify`.
+- `Build Loop ready`
+  Means: drive the target to `READY_FOR_SPECIFY` if all gates pass, then stop.
+- `SpecKit specify`
+  Means: start the first real SpecKit phase only when approval and
+  `READY_FOR_SPECIFY` are already satisfied.
+
+Rules:
+
+- `HLDspec` is the workflow entry and reassessment trigger.
+- `check HLD` is the HLD-readiness trigger before full SpecKit Preparation.
+- `Build Loop ...` is the preparation-to-execution boundary vocabulary.
+- `SpecKit ...` is reserved for actual delegated phase execution.
+- Do not treat `Build Loop prereqs`, `Build Loop init`, or `Build Loop ready` as
+  aliases for `/speckit.specify`.
+- Do not infer `SpecKit specify` from `HLDspec`, `Build Loop prereqs`, or
+  `Build Loop init`.
+
+Default behavior:
+
+- If the user says only `HLDspec ...`, stop at the next safe checkpoint.
+- `check HLD` stops after the readiness verdict, reason trail, grouped
+  clarification questions, and next safe action.
+- `Build Loop prereqs` stops after a prerequisite report.
+- `Build Loop init` stops after real init validation and post-init mirror sync
+  when applicable.
+- `Build Loop ready` stops at `READY_FOR_SPECIFY`.
+- Starting `/speckit.specify` requires the explicit stronger trigger
+  `SpecKit specify`.
+
+### Help trigger contract
+
+HLDspec should support task-shaped help based on the same trigger vocabulary.
+
+- `HLDspec help`
+  Show the main trigger phrases and when to use each.
+- `HLDspec help review`
+- `HLDspec help continue`
+- `HLDspec help check HLD`
+- `HLDspec help Build Loop prereqs`
+- `HLDspec help Build Loop init`
+- `HLDspec help Build Loop ready`
+- `HLDspec help SpecKit specify`
+
+Every help response should explain the trigger with the same bounded shape:
+
+- `Purpose`
+- `Does`
+- `Stops at`
+- `Will not`
+- `Example`
+
+Help is a user-facing explanation contract. It must not silently widen command
+authority or blur gate boundaries.
 
 ### Why a mediator (design rationale)
 

@@ -90,6 +90,44 @@ class ProjectMachineV2Tests(unittest.TestCase):
         self.assertEqual(MachineStatus.ERROR, result.status)
         self.assertEqual("FIRST_RUN_FAILED", result.state)
 
+    def test_check_hld_trigger_generates_readiness_artifacts_without_first_run_scripts(self) -> None:
+        repo = Path(tempfile.mkdtemp())
+        source = repo / "Source-HLD.md"
+        source.write_text(
+            "# HLD\n\n"
+            "## HLD-001 - API Boundary\n\n"
+            "HLD-ID: HLD-001\n"
+            "HLD-ROLE: api\n"
+            "HLD-STATUS: draft\n"
+            "HLD-RISK: HIGH\n"
+            "HLD-SPECS: TBD\n"
+            "HLD-RESOURCES: TBD\n"
+            "HLD-VERIFY: TBD\n\n"
+            "The API boundary is not fully decided yet.\n",
+            encoding="utf-8",
+        )
+        workspace = repo / "target"
+
+        result = ProjectMachine().run(
+            MachineContext(
+                repo_root=str(repo),
+                source_hld=str(source),
+                workspace=str(workspace),
+                metadata={"trigger": "check_hld"},
+            )
+        )
+
+        self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
+        self.assertEqual("HLD_BLOCKED", result.state)
+        sync = workspace / "firstrun" / ".specify" / "sync"
+        self.assertTrue((sync / "hld_cross_examination.json").exists())
+        self.assertTrue((sync / "hld_cross_examination.md").exists())
+        self.assertTrue((sync / "hld_readiness_check.json").exists())
+        self.assertTrue((sync / "hld_readiness_check.md").exists())
+        assert result.checkpoint is not None
+        self.assertIn("Do not invoke SpecKit.", result.checkpoint.forbidden_actions)
+        self.assertEqual(source.read_text(encoding="utf-8"), (workspace / "HLD.raw.md").read_text(encoding="utf-8"))
+
     def test_agent_first_new_layout_uses_target_hld_and_hldspec_events(self) -> None:
         repo = Path(tempfile.mkdtemp())
         scripts = repo / "scripts"
