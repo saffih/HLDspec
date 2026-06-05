@@ -133,8 +133,10 @@ readiness logic, and operator state. This is the active V2 source.
   preflight only and is not the whole Operator**; it does not decide the full
   lifecycle.
 - **Operator State** = evidence-backed lifecycle state and the next safe action.
-  Implemented **today for the readiness boundary**; broader post-specify lifecycle
-  state is **[future]**.
+  Implemented **today as readiness-first lifecycle reporting**: readiness blockers
+  still win before `READY_FOR_SPECIFY`, and post-readiness SpecKit phase artifacts
+  can report `PLAN_ACTIVE`, `TASKS_ACTIVE`, `ANALYZE_READY`, or
+  `REASSESSMENT_REQUIRED`. Richer post-implementation reassessment is **[future]**.
 - The **Operator is broader than the Doctor**.
 
 ### Layer 5 — Generated Target Artifacts  **[current]**
@@ -170,9 +172,9 @@ These names are **not interchangeable**:
 
 | Term | What it is | What it is not |
 |---|---|---|
-| **HLDspec Operator** | Core HLDspec behavior producing operator facts, source-package context, slice control, and SpecKit Doctor readiness facts; implements Operator State for the readiness boundary today. | Not just the Doctor; not a Devin-specific thing. |
+| **HLDspec Operator** | Core HLDspec behavior producing operator facts, source-package context, slice control, SpecKit Doctor readiness facts, and readiness-first lifecycle state. | Not just the Doctor; not a Devin-specific thing. |
 | **SpecKit Doctor** | The diagnostic/preflight part of the Operator; readiness facts. | **Readiness/preflight only — not the whole Operator.** |
-| **Operator State** | Evidence-backed lifecycle state + next safe action (readiness boundary today). | Not a full post-specify lifecycle engine yet. |
+| **Operator State** | Evidence-backed state + next safe action: readiness blockers first, then SpecKit phase evidence when artifacts exist. | Not full post-implementation reassessment yet. |
 | **Agent Mediator** | User-side observer/prompt/safety assistant during an implementation session. | **Agent Mediator is not the Implementation Agent.** |
 | **Devin Mediator** | A Devin-specific runtime adapter of the mediator role. | **Devin Mediator is Devin-specific**; it does not define the generic Operator layer. |
 | **Implementation Agent** | The hands: runs SpecKit, edits code, runs tests, only within bounded scope. | Not the mediator; not the decision owner. |
@@ -184,7 +186,7 @@ These names are **not interchangeable**:
 **Current [current]:**
 
 - SpecKit Preparation is implemented and tested as the core product.
-- Operator State is implemented for the readiness boundary.
+- Operator State is implemented as readiness-first lifecycle reporting.
 - The agent-facing tool surface (Layer 2) is implemented and documented.
 - Agent one-liner first is the documented front door (Layer 1): the README,
   `USER_RUN_MODEL.md`, and `HLDSPEC_TERMINOLOGY_AND_FLOW.md` lead with it —
@@ -201,8 +203,9 @@ These names are **not interchangeable**:
 
 **Future / not yet implemented [future]:**
 
-- Broader post-specify lifecycle Operator State and richer next-safe-action
-  guidance.
+- Richer post-implementation reassessment, including feedback classification,
+  rebuild-set decisions, and generated next Run Cards after implementation
+  reports.
 - **Existing-product change mode is future scope** (Product Truth Set, Feature
   Derivation Package, overlap classification are not current MVP behavior).
 

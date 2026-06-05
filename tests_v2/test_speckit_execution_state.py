@@ -10,6 +10,7 @@ from hldspec.speckit_execution_state import (
     build_execution_state,
     first_pending_phase,
     next_action,
+    write_execution_state,
 )
 
 
@@ -31,6 +32,12 @@ def _write_queue(workspace: Path, bundles: list[dict]) -> None:
     sync = workspace / ".specify" / "sync"
     sync.mkdir(parents=True, exist_ok=True)
     (sync / "speckit_bundle_queue.json").write_text(json.dumps({"bundles": bundles}), encoding="utf-8")
+
+
+def _write_canonical_invocation_queue(workspace: Path, items: list[dict]) -> None:
+    sync = workspace / ".hldspec" / "sync"
+    sync.mkdir(parents=True, exist_ok=True)
+    (sync / "speckit_invocation_queue.json").write_text(json.dumps({"items": items}), encoding="utf-8")
 
 
 def _touch(root: Path, short_name: str, *files: str) -> None:
@@ -106,6 +113,23 @@ class BuildExecutionStateTests(unittest.TestCase):
             self.assertEqual("029", state["resume"]["feature_id"])
             self.assertEqual("plan", state["resume"]["phase"])
 
+    def test_canonical_invocation_queue_is_assessable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_canonical_invocation_queue(
+                workspace,
+                [{"feature_id": "F01", "short_name": "001-flow", "prompt_paths": {"codex": "prompt.md"}}],
+            )
+            _touch(speckit_root, "001-flow", "spec.md")
+
+            state = build_execution_state(workspace, speckit_root)
+
+            self.assertEqual("IN_PROGRESS", state["status"])
+            self.assertEqual("F01", state["resume"]["feature_id"])
+            self.assertEqual("plan", state["resume"]["phase"])
+            self.assertEqual("prompt.md", state["resume"]["prompt_paths"]["codex"])
+
     def test_all_tasks_done(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp) / "ws"
@@ -114,6 +138,22 @@ class BuildExecutionStateTests(unittest.TestCase):
             _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
             state = build_execution_state(workspace, speckit_root)
             self.assertEqual("ALL_TASKS_DONE", state["status"])
+
+    def test_write_execution_state_does_not_overwrite_machine_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_canonical_invocation_queue(workspace, [{"feature_id": "F01", "short_name": "001-flow"}])
+            sync = workspace / ".hldspec" / "sync"
+            machine_state = sync / "speckit_execution_state.json"
+            machine_state.write_text('{"state_version":2,"active_phase":"PLAN"}\n', encoding="utf-8")
+            _touch(speckit_root, "001-flow", "spec.md")
+
+            write_execution_state(workspace, speckit_root)
+
+            self.assertEqual('{"state_version":2,"active_phase":"PLAN"}\n', machine_state.read_text(encoding="utf-8"))
+            self.assertTrue((sync / "speckit_execution_assessment.json").is_file())
+            self.assertTrue((sync / "speckit_execution_assessment.md").is_file())
 
 
 class NextActionTests(unittest.TestCase):

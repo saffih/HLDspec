@@ -1,8 +1,8 @@
 """SpecKit Operator State reporting.
 
-This is the first Operator State layer: it turns existing HLDspec readiness facts
-into a narrow readiness-boundary state and next safe action. It does not model the
-full SpecKit lifecycle.
+Operator State first gates the readiness boundary, then, when the target is ready
+for SpecKit, composes existing execution-state evidence into a lifecycle state and
+next safe action.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
+from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
 
 SCHEMA_VERSION = 1
@@ -23,6 +24,10 @@ STATE_SPECKIT_NOT_INITIALIZED = "SPECKIT_NOT_INITIALIZED"
 STATE_BRANCH_POLICY_MISSING = "BRANCH_POLICY_MISSING"
 STATE_REASSESSMENT_REQUIRED = "REASSESSMENT_REQUIRED"
 STATE_READY_FOR_SPECIFY = "READY_FOR_SPECIFY"
+STATE_SPECIFY_ACTIVE = "SPECIFY_ACTIVE"
+STATE_PLAN_ACTIVE = "PLAN_ACTIVE"
+STATE_TASKS_ACTIVE = "TASKS_ACTIVE"
+STATE_ANALYZE_READY = "ANALYZE_READY"
 STATE_BLOCKED = "BLOCKED"
 
 
@@ -45,6 +50,103 @@ def _list_command_labels(report: dict[str, Any]) -> list[str]:
     return labels
 
 
+def _has_any_spec_artifact(execution: dict[str, Any]) -> bool:
+    for bundle in execution.get("bundles") or []:
+        if not isinstance(bundle, dict):
+            continue
+        for spec in bundle.get("specs") or []:
+            if not isinstance(spec, dict):
+                continue
+            if any(value == "DONE" for value in (spec.get("phases") or {}).values()):
+                return True
+    return False
+
+
+def _specs_tree_has_files(specs_root: Path) -> bool:
+    try:
+        return specs_root.is_dir() and any(path.is_file() for path in specs_root.rglob("*"))
+    except OSError:
+        return False
+
+
+def _lifecycle_state_from_execution(target: Path) -> dict[str, Any]:
+    specs_root = target / "specs"
+    execution = ses.build_execution_state(target, specs_root)
+    action = ses.next_action(execution)
+    execution_status = str(execution.get("status", "UNKNOWN"))
+    evidence = [
+        {"fact": "speckit_lifecycle_status", "value": execution_status},
+        {"fact": "speckit_specs_root", "value": str(specs_root)},
+        {"fact": "speckit_specs_root_exists", "value": specs_root.is_dir()},
+        {"fact": "speckit_bundle_count", "value": execution.get("bundle_count", 0)},
+        {"fact": "speckit_resume", "value": execution.get("resume")},
+    ]
+
+    def out(state: str, status: str, next_safe_action: str, blockers: list[str] | None = None) -> dict[str, Any]:
+        return {
+            "status": status,
+            "state": state,
+            "next_safe_action": next_safe_action,
+            "blockers": blockers or [],
+            "evidence": evidence,
+            "execution_state": execution,
+            "next_action": action,
+        }
+
+    if execution_status == "UNKNOWN":
+        return out(
+            STATE_READY_FOR_SPECIFY,
+            "PASS",
+            "Start /speckit.specify from the approved Run Card after readiness and approval gates remain PASS.",
+        )
+
+    if execution_status == "NO_BUNDLES":
+        if _specs_tree_has_files(specs_root):
+            return out(
+                STATE_REASSESSMENT_REQUIRED,
+                "ACTION",
+                "Rebuild HLDspec Run Cards or reassess; SpecKit artifacts exist but no bundle or invocation queue maps them to HLDspec scope.",
+                ["SpecKit artifacts exist without a HLDspec bundle/invocation queue."],
+            )
+        return out(
+            STATE_READY_FOR_SPECIFY,
+            "PASS",
+            "Generate the Run Card or invocation queue, then start /speckit.specify after gates remain PASS.",
+        )
+
+    if execution_status == "ALL_TASKS_DONE":
+        return out(
+            STATE_ANALYZE_READY,
+            "PASS",
+            "Run /speckit.analyze, resolve any findings, then require explicit implementation-slice approval before code changes.",
+        )
+
+    if execution_status == "IN_PROGRESS":
+        resume = execution.get("resume") if isinstance(execution.get("resume"), dict) else {}
+        phase = str(resume.get("phase") or "specify").lower()
+        has_artifact = _has_any_spec_artifact(execution)
+        if phase == "specify" and not has_artifact:
+            return out(
+                STATE_READY_FOR_SPECIFY,
+                "PASS",
+                "Start /speckit.specify from the approved Run Card after readiness and approval gates remain PASS.",
+            )
+        phase_state = {
+            "specify": STATE_SPECIFY_ACTIVE,
+            "plan": STATE_PLAN_ACTIVE,
+            "tasks": STATE_TASKS_ACTIVE,
+        }.get(phase, STATE_REASSESSMENT_REQUIRED)
+        next_safe = str(action.get("instruction") or action.get("headline") or "Resume the next SpecKit phase from the current Run Card.")
+        return out(phase_state, "PASS", next_safe)
+
+    return out(
+        STATE_REASSESSMENT_REQUIRED,
+        "ACTION",
+        "Reassess with HLDspec; lifecycle state could not be mapped to a safe next action.",
+        [f"Unrecognized SpecKit lifecycle status: {execution_status}"],
+    )
+
+
 def build_speckit_operator_state_report(
     target: Path | str | None,
     *,
@@ -54,7 +156,7 @@ def build_speckit_operator_state_report(
 ) -> dict[str, Any]:
     doctor_note = (
         "SpecKit Doctor is readiness/preflight only; Operator State uses those facts "
-        "to decide the next safe action for the readiness boundary."
+        "before composing post-readiness lifecycle evidence."
     )
 
     if target is None:
@@ -182,11 +284,25 @@ def build_speckit_operator_state_report(
             blockers.append("Selected SpecKit init command is not one of the supported labels.")
             next_safe_action = "Select a supported SpecKit init command and rerun operator-state."
 
+    lifecycle: dict[str, Any] | None = None
+    if status == "PASS" and state == STATE_READY_FOR_SPECIFY:
+        lifecycle = _lifecycle_state_from_execution(target_path)
+        evidence.extend(lifecycle.get("evidence", []))
+        lifecycle_state = str(lifecycle.get("state") or STATE_READY_FOR_SPECIFY)
+        if lifecycle_state != STATE_READY_FOR_SPECIFY:
+            status = str(lifecycle.get("status") or status)
+            state = lifecycle_state
+            next_safe_action = str(lifecycle.get("next_safe_action") or next_safe_action)
+            blockers.extend(str(item) for item in lifecycle.get("blockers", []) if str(item).strip())
+
     return {
         "schema_version": SCHEMA_VERSION,
         "target": str(target_path),
         "status": status,
         "state": state,
+        "lifecycle_status": lifecycle.get("status") if isinstance(lifecycle, dict) else None,
+        "lifecycle_state": lifecycle.get("state") if isinstance(lifecycle, dict) else None,
+        "lifecycle_next_safe_action": lifecycle.get("next_safe_action") if isinstance(lifecycle, dict) else None,
         "next_safe_action": next_safe_action,
         "blockers": blockers,
         "evidence": evidence,
@@ -205,6 +321,8 @@ def build_speckit_operator_state_report(
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,
+        "speckit_execution_state": lifecycle.get("execution_state") if isinstance(lifecycle, dict) else None,
+        "speckit_next_action": lifecycle.get("next_action") if isinstance(lifecycle, dict) else None,
     }
 
 
@@ -219,7 +337,7 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
         f"Next safe action: {report.get('next_safe_action', 'none')}",
         "",
         "Boundary:",
-        "- SpecKit Doctor is readiness/preflight only; Operator State uses those facts to choose the next safe action.",
+        "- SpecKit Doctor is readiness/preflight only; Operator State uses those facts first, then adds lifecycle evidence when readiness is PASS.",
         "",
         "Blockers:",
     ]
@@ -254,6 +372,17 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
             lines.append(f"- {key}: {value}")
     else:
         lines.append("- none")
+    lifecycle_state = report.get("lifecycle_state")
+    if lifecycle_state:
+        lines.extend(
+            [
+                "",
+                "Lifecycle:",
+                f"- lifecycle status: {report.get('lifecycle_status', 'UNKNOWN')}",
+                f"- lifecycle state: {lifecycle_state}",
+                f"- lifecycle next safe action: {report.get('lifecycle_next_safe_action', 'none')}",
+            ]
+        )
     doctor_note = report.get("doctor_note")
     if doctor_note:
         lines.extend(["", doctor_note, ""])

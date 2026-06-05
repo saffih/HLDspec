@@ -42,6 +42,18 @@ class TestRegisteredArtifacts(unittest.TestCase):
     def test_contains_spec_build_plan(self):
         self.assertIn("spec_build_plan.json", registered_artifacts())
 
+    def test_separates_speckit_machine_state_from_progress_assessment(self):
+        self.assertIn("speckit_execution_state.json", registered_artifacts())
+        self.assertIn("speckit_execution_assessment.json", registered_artifacts())
+        self.assertEqual(
+            "SpecKitExecutionMachine",
+            ARTIFACT_CONTRACTS["speckit_execution_state.json"].producer,
+        )
+        self.assertEqual(
+            "speckit_execution_state.py",
+            ARTIFACT_CONTRACTS["speckit_execution_assessment.json"].producer,
+        )
+
     def test_returns_list(self):
         self.assertIsInstance(registered_artifacts(), list)
 

@@ -41,7 +41,7 @@ Current public product commands:
 | `hldspec diff` | current | Compare source hash with recorded target source hash. |
 | `hldspec doctor` | current | Check repo and target session prerequisites. |
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and next actions. |
-| `hldspec operator-state` | current | Show the readiness-boundary Operator State and the next safe action. |
+| `hldspec operator-state` | current | Show readiness-first Operator State, SpecKit lifecycle state when phase artifacts exist, and the next safe action. |
 | `hldspec speckit-state` | current | Alias of `operator-state`. |
 
 Future product commands:

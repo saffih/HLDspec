@@ -74,6 +74,7 @@ class ProjectMachineV2Tests(unittest.TestCase):
         assert result.checkpoint is not None
         self.assertFalse(result.checkpoint.has_open_questions())
         self.assertIn("Do not invoke SpecKit until the human approves this gate.", result.checkpoint.forbidden_actions)
+        self.assertTrue((workspace / ".hldspec" / "source_package" / "engineering_guidelines.md").exists())
         self.assertEqual("# Raw HLD\n\n## Milestones\n\nBody.\n", source.read_text(encoding="utf-8"))
 
     def test_project_machine_blocks_when_required_scripts_are_missing(self) -> None:

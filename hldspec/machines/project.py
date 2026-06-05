@@ -9,6 +9,7 @@ from pathlib import Path
 from hldspec.command_runner import CommandRunner
 from hldspec.event_log import HldspecEvent, append_event, make_event_id
 from hldspec.handoff_docs import write_handoff_docs
+from hldspec import engineering_selection, hld_source_package
 from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
 from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
@@ -73,6 +74,7 @@ class ProjectMachine:
         first_readonly = self._ensure_first_readonly(repo, context)
         if first_readonly is not None:
             return first_readonly
+        self._ensure_source_package_guidance(adapter, context)
 
         plan_result = self.plan.run(context)
         self._log_machine_completed(context, plan_result, from_state=apply_result.state)
@@ -183,6 +185,28 @@ class ProjectMachine:
             shutil.copyfile(source_hld, adapter.raw_hld)
         if source_hld.exists() and not adapter.working_hld.exists():
             shutil.copyfile(source_hld, adapter.working_hld)
+
+    @staticmethod
+    def _ensure_source_package_guidance(adapter: TargetWorkspaceAdapter, context: MachineContext) -> None:
+        guidelines = adapter.source_package_dir / "engineering_guidelines.md"
+        if guidelines.exists():
+            errors = engineering_selection.validate_engineering_guidelines(
+                guidelines.read_text(encoding="utf-8", errors="replace")
+            )
+            if not errors:
+                return
+        if not adapter.working_hld.exists():
+            return
+        hld_text = adapter.working_hld.read_text(encoding="utf-8", errors="replace")
+        hld_source_ref = context.source_hld or str(adapter.working_hld)
+        hld_source_package.build_source_package_content(
+            adapter.target_root,
+            hld_text,
+            hld_source_ref=hld_source_ref,
+            project_name=adapter.target_root.name,
+            layout=adapter.layout,
+            materialize_mirror=False,
+        )
 
     @staticmethod
     def _mirror_tool_sync(adapter: TargetWorkspaceAdapter) -> None:

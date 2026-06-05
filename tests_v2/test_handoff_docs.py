@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hldspec.engineering_selection import render_engineering_guidelines_md
 from hldspec.handoff_docs import write_handoff_docs
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
 from hldspec.state_machine import MachineContext, MachineStatus
@@ -62,6 +63,13 @@ class HandoffDocsTests(unittest.TestCase):
 
         (sync / "speckit_prework_quality_review.json").write_text(
             json.dumps({"status": "PASS", "findings": []}),
+            encoding="utf-8",
+        )
+        workspace = sync.parents[2]
+        source_package = workspace / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "engineering_guidelines.md").write_text(
+            render_engineering_guidelines_md("# HLD\n\nA service with business rules.\n"),
             encoding="utf-8",
         )
 

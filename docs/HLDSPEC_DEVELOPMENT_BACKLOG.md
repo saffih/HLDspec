@@ -112,11 +112,13 @@ Validated now:
 - valid model tiers
 - forbidden broad-read phrases
 - implement-phase human approval guards
+- generated source-package `engineering_guidelines.md` exists and validates
+  before SpecKit prework approval
 
 Still open:
 
 - backend upgrade trigger validation
-- selected-principle evidence validation
+- selected-principle phase/implementation evidence validation
 - constitution purity validation
 - package unit/integration/e2e testability validation
 - dependency graph and invocation queue parity

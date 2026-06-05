@@ -84,9 +84,9 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - SpecKit Doctor is the diagnostic/preflight part of the SpecKit Operator.
 - SpecKit Doctor is not the whole Operator.
 - SpecKit Operator is broader than Doctor.
-- HLDspec Operator includes an implemented Operator State for the readiness boundary today.
+- HLDspec Operator includes readiness-first Operator State that gates the readiness boundary and reports post-readiness SpecKit lifecycle evidence when phase artifacts exist.
 - HLDspec Operator uses target facts, source-package state, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, and SpecKit Doctor readiness facts today.
-- Broader post-specify lifecycle Operator State and richer next-safe-action guidance remain planned.
+- Richer post-implementation reassessment remains planned.
 - Doctor remains readiness/preflight only and must not decide the full lifecycle.
 - Devin Mediator is a Devin-specific runtime adapter.
 - Devin Mediator is not HLDspec core behavior.
@@ -107,8 +107,9 @@ Tests must fail if the source-package ownership model or read-only mirror model 
 - The user or Agent Mediator enforces slice scope during runtime.
 - Devin Mediator is a Devin-specific runtime adapter.
 - HLDspec does not mediate Devin directly.
-- HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, SpecKit Doctor readiness facts, and the implemented Operator State for the readiness boundary today.
-- Broader post-specify lifecycle state and richer next-safe-action guidance are future work, not already implemented.
+- HLDspec produces operator facts, source-package state/context, Engineering Toolbox guidance, implementation slicing, mediator/operator guidance, SpecKit Doctor readiness facts, and readiness-first lifecycle Operator State today.
+- Operator State must continue to surface post-readiness lifecycle states such as `PLAN_ACTIVE`, `TASKS_ACTIVE`, `ANALYZE_READY`, and `REASSESSMENT_REQUIRED` when phase artifacts exist.
+- Richer post-implementation reassessment is future work, not already fully implemented.
 - Devin Mediator consumes HLDspec Operator facts/artifacts.
 - Agent Mediator is not the Implementation Agent.
 - Implementation Agent runs SpecKit, edits code, and runs tests.
@@ -189,11 +190,12 @@ Tests must fail if docs remove the one-full-flow-then-slices model, if mediator 
 - Do not dump every toolbox card into the constitution.
 - Do not treat preferred choices as permanent law.
 - Do not remove the path to `engineering_guidelines.md`.
+- Do not allow SpecKit prework approval to continue when generated `engineering_guidelines.md` is missing or invalid.
 - Do not let implementation agents test against production or user-owned data without explicit approval.
 
 ### Test expectations
 
-Tests must fail if the toolbox split disappears, if the selected-guidance artifact path disappears, or if the protected clean-software, testability, and stage-safety concepts are removed.
+Tests must fail if the toolbox split disappears, if the selected-guidance artifact path disappears, if `SpeckitPreworkMachine` stops blocking missing or invalid generated engineering guidance, or if the protected clean-software, testability, and stage-safety concepts are removed.
 
 ## Change policy
 

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hldspec import engineering_selection
 from hldspec.artifact_contracts import stale_registered_artifacts
 from hldspec.gates import prework_gate_status
 from hldspec.state_machine import (
@@ -94,6 +95,46 @@ class SpeckitPreworkMachine:
             )
 
         workspace_root = adapter.target_root
+        engineering_guidelines = adapter.source_package_dir / "engineering_guidelines.md"
+        if not engineering_guidelines.exists():
+            return blocked_result(
+                machine=self.name,
+                state="SPECKIT_PREWORK_ENGINEERING_GUIDANCE_MISSING",
+                kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+                blocking_reason=(
+                    "Generated engineering_guidelines.md is missing. "
+                    "Rebuild the HLDspec source package before invoking SpecKit."
+                ),
+                controlling_artifacts=(
+                    ArtifactRef(path=str(engineering_guidelines), role="engineering_guidelines"),
+                    ArtifactRef(path=str(package), role="speckit_prework_package"),
+                    ArtifactRef(path=str(review_json), role="quality_review_json"),
+                ),
+                forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+                runskeptic=runskeptic,
+            )
+
+        engineering_errors = engineering_selection.validate_engineering_guidelines(
+            engineering_guidelines.read_text(encoding="utf-8")
+        )
+        if engineering_errors:
+            return blocked_result(
+                machine=self.name,
+                state="SPECKIT_PREWORK_ENGINEERING_GUIDANCE_REWORK",
+                kind=CheckpointKind.SPECKIT_PREWORK_REWORK,
+                blocking_reason=(
+                    "Generated engineering_guidelines.md is invalid: "
+                    + "; ".join(engineering_errors)
+                ),
+                controlling_artifacts=(
+                    ArtifactRef(path=str(engineering_guidelines), role="engineering_guidelines"),
+                    ArtifactRef(path=str(package), role="speckit_prework_package"),
+                    ArtifactRef(path=str(review_json), role="quality_review_json"),
+                ),
+                forbidden_actions=("Do not invoke SpecKit.", "Do not implement app code."),
+                runskeptic=runskeptic,
+            )
+
         stale = stale_registered_artifacts(sync, workspace=workspace_root)
         if stale:
             return blocked_result(
@@ -121,6 +162,7 @@ class SpeckitPreworkMachine:
                 ArtifactRef(path=str(review_json), role="quality_review_json"),
                 ArtifactRef(path=str(proxy), role="speckit_proxy_dossier", required=False),
                 ArtifactRef(path=str(state), role="hldspec_state", required=False),
+                ArtifactRef(path=str(engineering_guidelines), role="engineering_guidelines"),
             ),
             runskeptic=runskeptic,
         )

@@ -14,10 +14,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
+from hldspec.script_io import load_json_dict, write_json_dict
 from hldspec.spec_bundles import as_dict, as_list, utc_now
 
 SCHEMA_VERSION = 1
+ASSESSMENT_JSON = "speckit_execution_assessment.json"
+ASSESSMENT_MD = "speckit_execution_assessment.md"
 
 # A phase is considered DONE when its signature artifact exists and is non-empty.
 PHASE_ARTIFACTS: dict[str, tuple[str, ...]] = {
@@ -26,6 +28,40 @@ PHASE_ARTIFACTS: dict[str, tuple[str, ...]] = {
     "tasks": ("tasks.md",),
 }
 PHASE_ORDER: tuple[str, ...] = ("specify", "plan", "tasks")
+
+
+def select_execution_sync_dir(workspace: Path, *, create: bool = False) -> Path:
+    """Prefer the canonical HLDspec control dir while preserving legacy reads."""
+    canonical = workspace / ".hldspec" / "sync"
+    legacy = workspace / ".specify" / "sync"
+    markers = ("speckit_bundle_queue.json", "speckit_invocation_queue.json")
+    for sync in (canonical, legacy):
+        if any((sync / marker).exists() for marker in markers):
+            return sync
+    if create:
+        canonical.mkdir(parents=True, exist_ok=True)
+    return canonical
+
+
+def _bundles_from_queue(queue: dict[str, Any]) -> list[dict[str, Any]]:
+    bundles = [bundle for bundle in as_list(queue.get("bundles")) if isinstance(bundle, dict)]
+    if bundles:
+        return bundles
+
+    items = [item for item in as_list(queue.get("items")) if isinstance(item, dict)]
+    out: list[dict[str, Any]] = []
+    for index, item in enumerate(items, start=1):
+        feature_id = str(item.get("feature_id") or item.get("planned_spec_id") or item.get("id") or f"feature-{index:03d}")
+        short_name = str(item.get("short_name") or item.get("spec_dir") or item.get("slug") or "")
+        out.append(
+            {
+                "bundle_id": feature_id,
+                "bundle_slug": str(item.get("bundle_slug") or item.get("feature_slug") or feature_id.lower()),
+                "prompt_paths": as_dict(item.get("prompt_paths")),
+                "included_specs": [{**item, "feature_id": feature_id, "short_name": short_name}],
+            }
+        )
+    return out
 
 
 def _nonempty(path: Path) -> bool:
@@ -70,9 +106,9 @@ def assess_spec(speckit_root: Path, short_name: str) -> dict[str, Any]:
 
 
 def build_execution_state(workspace: Path, speckit_root: Path) -> dict[str, Any]:
-    sync = select_sync_dir(workspace, ("speckit_bundle_queue.json", "speckit_invocation_queue.json"))
-    queue = load_json_dict(sync / "speckit_bundle_queue.json")
-    bundles = [b for b in as_list(queue.get("bundles")) if isinstance(b, dict)]
+    sync = select_execution_sync_dir(workspace)
+    queue = load_json_dict(sync / "speckit_bundle_queue.json") or load_json_dict(sync / "speckit_invocation_queue.json")
+    bundles = _bundles_from_queue(queue)
     assessable = speckit_root.exists() and speckit_root.is_dir()
 
     out_bundles: list[dict[str, Any]] = []
@@ -142,10 +178,11 @@ def build_execution_state(workspace: Path, speckit_root: Path) -> dict[str, Any]
 
 
 def write_execution_state(workspace: Path, speckit_root: Path) -> dict[str, Any]:
-    sync = select_sync_dir(workspace, ("speckit_bundle_queue.json", "speckit_invocation_queue.json"))
+    """Write derived progress assessment without touching machine continuation state."""
+    sync = select_execution_sync_dir(workspace, create=True)
     payload = build_execution_state(workspace, speckit_root)
-    write_json_dict(sync / "speckit_execution_state.json", payload)
-    (sync / "speckit_execution_state.md").write_text(render_execution_state_md(payload), encoding="utf-8")
+    write_json_dict(sync / ASSESSMENT_JSON, payload)
+    (sync / ASSESSMENT_MD).write_text(render_execution_state_md(payload), encoding="utf-8")
     return payload
 
 

@@ -46,6 +46,9 @@ class EngineeringToolboxDocsTests(unittest.TestCase):
             (
                 "minimal P0 `engineering_guidelines.md` generation is implemented",
                 "hldspec/engineering_selection.py",
+                "SpeckitPreworkMachine",
+                "validate_engineering_guidelines()",
+                "hard prework gate",
                 "P0-card selected guidance, not the full enforcement loop",
                 "`selection.json` / `decisions.jsonl`",
                 "must not copy the whole toolbox into every target",

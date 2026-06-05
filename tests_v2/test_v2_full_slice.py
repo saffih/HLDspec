@@ -123,6 +123,7 @@ class HldspecV2FullSliceTests(unittest.TestCase):
         self.assertIn("Current checkpoint: SPECKIT_PREWORK_APPROVAL_GATE", second.stdout)
         self.assertIn("Do not invoke SpecKit until", second.stdout)
         self.assertIn("## HLD-019 - Milestones", (workspace / "HLD.md").read_text(encoding="utf-8"))
+        self.assertTrue((workspace / ".hldspec" / "source_package" / "engineering_guidelines.md").exists())
         self.assertEqual("# Raw HLD\n\n## Milestones\n\nBody.\n", source.read_text(encoding="utf-8"))
 
         sync = workspace / "firstrun" / ".specify" / "sync"

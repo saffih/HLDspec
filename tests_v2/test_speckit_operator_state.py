@@ -134,6 +134,85 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertEqual("PASS", report["readiness_report"]["status"])
         self.assertIn("readiness/preflight only", report["doctor_note"])
 
+    def test_operator_state_read_does_not_create_sync_dir(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("PASS", report["status"])
+        self.assertEqual("READY_FOR_SPECIFY", report["state"])
+        self.assertFalse((target / ".hldspec" / "sync").exists())
+
+    def test_ready_workspace_with_partial_speckit_artifacts_reports_plan_active(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "speckit_bundle_queue.json").write_text(
+            '{"bundles":[{"bundle_id":"G01","bundle_slug":"g01","included_specs":[{"feature_id":"F01","short_name":"001-flow"}]}]}',
+            encoding="utf-8",
+        )
+        spec_dir = target / "specs" / "001-flow"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("PASS", report["status"])
+        self.assertEqual("PLAN_ACTIVE", report["state"])
+        self.assertEqual("PLAN_ACTIVE", report["lifecycle_state"])
+        self.assertEqual("IN_PROGRESS", report["speckit_execution_state"]["status"])
+        self.assertIn("phase `plan`", report["next_safe_action"])
+
+    def test_tasks_done_reports_analyze_ready_before_implementation(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "speckit_invocation_queue.json").write_text(
+            '{"items":[{"feature_id":"F01","short_name":"001-flow"}]}',
+            encoding="utf-8",
+        )
+        spec_dir = target / "specs" / "001-flow"
+        spec_dir.mkdir(parents=True)
+        for name in ("spec.md", "plan.md", "tasks.md"):
+            (spec_dir / name).write_text("content\n", encoding="utf-8")
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("PASS", report["status"])
+        self.assertEqual("ANALYZE_READY", report["state"])
+        self.assertEqual("ANALYZE_READY", report["lifecycle_state"])
+        self.assertIn("/speckit.analyze", report["next_safe_action"])
+        self.assertIn("implementation-slice approval", report["next_safe_action"])
+
+    def test_unmapped_speckit_artifacts_require_reassessment(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        spec_dir = target / "specs" / "001-flow"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("REASSESSMENT_REQUIRED", report["state"])
+        self.assertIn("no bundle or invocation queue", report["next_safe_action"])
+        self.assertTrue(report["blockers"])
+
     def test_summary_is_boundary_safe_and_devin_free(self) -> None:
         target = self.root / "target"
         (target / ".specify" / "memory").mkdir(parents=True)
@@ -146,6 +225,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertIn("State: READY_FOR_SPECIFY", text)
         self.assertIn("Next safe action:", text)
         self.assertIn("SpecKit Doctor is readiness/preflight only", text)
+        self.assertIn("Lifecycle:", text)
         self.assertNotIn("go/stop", text)
         self.assertNotIn("tmux", text)
         self.assertNotIn("session", text)

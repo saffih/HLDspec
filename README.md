@@ -108,9 +108,10 @@ Tmux/session state is visibility only, never approval state.
 Operator / Doctor / Devin Mediator boundary — HLDspec Operator is the core
 layer that today uses target facts, source-package state, Engineering Toolbox
 guidance, implementation slicing, mediator/operator guidance, and SpecKit
-Doctor readiness facts. Its Operator State for the readiness boundary is
-implemented; broader post-specify lifecycle state and richer next-safe-action
-guidance remain planned. SpecKit Doctor is the diagnostic/preflight part of the
+Doctor readiness facts. Its Operator State gates the readiness boundary first,
+then adds SpecKit lifecycle evidence when the target has phase artifacts to
+inspect. Richer post-implementation reassessment remains planned. SpecKit Doctor
+is the diagnostic/preflight part of the
 Operator, not the whole Operator. Devin Mediator is Devin-specific adapter
 behavior that consumes HLDspec Operator facts/artifacts to drive Devin safely;
 HLDspec does not mediate Devin directly, and Devin exact go/stop/tmux/session
@@ -315,10 +316,12 @@ The full internal command/tool surface the agent may run:
 | `diff` | Compare the source HLD hash to the recorded session hash. |
 | `doctor` | Check agent-first docs and target session/layout files. |
 | `speckit-doctor` | Readiness/preflight only: is the target ready for real SpecKit work? Does not decide the lifecycle. |
-| `operator-state` (alias `speckit-state`) | Report the readiness-boundary Operator State and the evidence-backed next safe action. Consumes `speckit-doctor` facts; it does **not** replace the doctor. |
+| `operator-state` (alias `speckit-state`) | Report readiness first, then SpecKit lifecycle state and the evidence-backed next safe action when phase artifacts exist. Consumes `speckit-doctor` facts; it does **not** replace the doctor. |
 
-`operator-state` / `speckit-state` are scoped to the **readiness boundary**
-today; broader post-specify lifecycle Operator State remains planned.
+`operator-state` / `speckit-state` remain readiness-first: they block before
+`READY_FOR_SPECIFY` when preflight facts fail, and after readiness passes they
+can report `PLAN_ACTIVE`, `TASKS_ACTIVE`, `ANALYZE_READY`, or
+`REASSESSMENT_REQUIRED` from existing SpecKit phase artifacts.
 
 The canonical command list is maintained in
 [`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`](docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md)

@@ -66,8 +66,9 @@ Hard rules:
   prints decision-oriented output.
 - **HLDspec Operator** — the core HLDspec behavior that produces operator facts,
   source-package context, slice control, and SpecKit Doctor readiness facts today.
-  Its Operator State for the readiness boundary is implemented; broader
-  post-specify lifecycle expansion remains planned.
+  Its Operator State gates the readiness boundary first, then reports
+  post-readiness SpecKit lifecycle state when phase artifacts exist. Richer
+  post-implementation reassessment remains planned.
 - **SpecKit Doctor** — the diagnostic/preflight part of the HLDspec Operator. It
   checks readiness for real `specify`, `spec-kit`, or `uvx --from
   git+https://github.com/github/spec-kit.git spec-kit` invocation paths and feeds
@@ -76,13 +77,13 @@ Hard rules:
 - **Operator Facts** — the factual outputs the HLDspec Operator provides about
   target state, source-package state, SpecKit readiness, engineering guidance,
   slices, and test policy.
-- **Operator State** — the implemented readiness-boundary layer that represents
-  lifecycle state for the current target and produces the next safe action for
-  that boundary. Broader post-specify lifecycle state remains planned.
+- **Operator State** — the evidence-backed target state layer. It represents the
+  readiness boundary before SpecKit can start, then composes existing SpecKit
+  phase artifacts into lifecycle states such as `PLAN_ACTIVE`, `TASKS_ACTIVE`,
+  `ANALYZE_READY`, and `REASSESSMENT_REQUIRED`.
 - **Next Safe Action** — the action HLDspec recommends from Operator State after
-  weighing operator facts and readiness evidence. The current implementation is
-  limited to the readiness boundary; broader lifecycle refinement remains
-  planned.
+  weighing readiness facts, lifecycle evidence, blockers, and reassessment
+  triggers.
 - **HLDspec Agent Session** — agent-guided session that interprets user intent and
   drives the system safely using machines and scripts as tools. Does not silently
   answer human-owned decisions.
@@ -750,7 +751,7 @@ the HLDspec source package / run guide / slice scope, detects drift or blockers,
 prepares better prompts, and helps the user decide when to: **go, stop, clarify,
 rerun tests, or reassess with HLDspec**.
 
-The generic HLDspec Operator sits above this mediator layer. It produces operator facts, source-package context, slicing guidance, SpecKit Doctor readiness facts, and the implemented readiness-boundary Operator State today; broader post-specify lifecycle state and richer next-safe-action guidance remain planned. The Devin Mediator consumes those facts and related artifacts to drive Devin safely. HLDspec does not mediate Devin directly, and Devin-specific exact go/stop/session rules do not define the generic Operator layer.
+The generic HLDspec Operator sits above this mediator layer. It produces operator facts, source-package context, slicing guidance, SpecKit Doctor readiness facts, and readiness-first lifecycle Operator State. After readiness passes, Operator State can inspect SpecKit phase artifacts and report `PLAN_ACTIVE`, `TASKS_ACTIVE`, `ANALYZE_READY`, or `REASSESSMENT_REQUIRED` before the mediator prepares the next prompt. The Devin Mediator consumes those facts and related artifacts to drive Devin safely. HLDspec does not mediate Devin directly, and Devin-specific exact go/stop/session rules do not define the generic Operator layer.
 
 The mediator uses mode-specific control words:
 

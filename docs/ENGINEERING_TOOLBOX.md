@@ -751,6 +751,11 @@ the product behavior.
 
 Status: minimal P0 `engineering_guidelines.md` generation is implemented. Every new source package build generates a real, target-specific `engineering_guidelines.md` (and its `.specify/source/` mirror) from the always-on baseline cards plus the P0 cards triggered by the HLD (`hldspec/engineering_selection.py`).
 
+`SpeckitPreworkMachine` blocks before SpecKit prework approval when generated
+`target/.hldspec/source_package/engineering_guidelines.md` is missing or fails
+`validate_engineering_guidelines()`. This turns selected guidance presence and
+basic validity into a hard prework gate.
+
 This is P0-card selected guidance, not the full enforcement loop. The machine-readable `selection.json` / `decisions.jsonl` records and the gate that blocks missing card evidence are still future work. HLDspec must not copy the whole toolbox into every target: generation stays limited to selected and baseline P0 cards.
 
 ## Gate flags

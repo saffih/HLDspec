@@ -83,6 +83,17 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         output_artifacts=[],
         notes="State persistence artifact — read and written by same machine",
     ),
+    "speckit_execution_assessment.json": ArtifactContract(
+        artifact_name="speckit_execution_assessment.json",
+        schema_version=1,
+        producer="speckit_execution_state.py",
+        consumers=["operator-state", "hldspec_speckit_next.py"],
+        required_fields=["schema_version", "status", "bundles"],
+        optional_fields=["resume", "bundle_count", "speckit_root", "assessable"],
+        input_artifacts=["speckit_bundle_queue.json", "speckit_invocation_queue.json"],
+        output_artifacts=[],
+        notes="Derived read-only progress assessment; must not overwrite SpecKitExecutionMachine state",
+    ),
     "hldspec_state.json": ArtifactContract(
         artifact_name="hldspec_state.json",
         schema_version=1,
