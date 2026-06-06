@@ -198,6 +198,19 @@ def active_workflow_blockers(target: Path, session: dict[str, Any]) -> tuple[lis
     return sorted(dict.fromkeys(blockers)), next_action
 
 
+def continuation_gate_blockers(target: Path) -> tuple[list[str], str | None]:
+    preflight = sc.session_continue_preflight(target)
+    if not (preflight.gated and not preflight.allowed):
+        return [], None
+    blockers = [f"Continuation gate blocked: {preflight.gate or 'UNKNOWN_GATE'}"]
+    blockers.extend(str(item) for item in preflight.blockers if str(item).strip())
+    next_action = (
+        "Provide a valid Context Receipt + Phase Report, resolve the blockers above "
+        "(RunSkeptic/Consultant/validation/dirty tree), then rerun continue."
+    )
+    return sorted(dict.fromkeys(blockers)), next_action
+
+
 def update_session_after_result(target: Path, result: MachineResult) -> None:
     session_path = target / ".hldspec" / "agent_session.json"
     session = json_read(session_path)
@@ -1064,6 +1077,7 @@ def command_status(args: argparse.Namespace) -> int:
     operator_report = sos.build_speckit_operator_state_report(target)
     open_questions = collect_open_questions(target)
     workflow_blockers, workflow_next_action = active_workflow_blockers(target, session)
+    gate_blockers, gate_next_action = continuation_gate_blockers(target)
     blockers: list[str] = []
     conflicts: list[str] = []
     for label, status, path in [
@@ -1082,6 +1096,7 @@ def command_status(args: argparse.Namespace) -> int:
         else:
             blockers.append(operator_item)
         blockers.extend(str(item) for item in operator_report.get("blockers", []) if str(item).strip())
+    blockers.extend(gate_blockers)
 
     source = session.get("source", {}).get("path", "UNKNOWN") if isinstance(session.get("source"), dict) else "UNKNOWN"
     print("## HLDspec Status")
@@ -1103,7 +1118,16 @@ def command_status(args: argparse.Namespace) -> int:
     print_bullet_list(open_questions)
     print("")
     print("## Next Safe Action")
-    print(workflow_next_action or operator_report.get("next_safe_action") or next_safe_action(session, conflicts + blockers, open_questions))
+    operator_status = str(operator_report.get("status", "")).upper()
+    if workflow_next_action:
+        selected_next_action = workflow_next_action
+    elif operator_status in {"ACTION", "CONFLICT"} and operator_report.get("next_safe_action"):
+        selected_next_action = str(operator_report.get("next_safe_action"))
+    elif gate_next_action:
+        selected_next_action = gate_next_action
+    else:
+        selected_next_action = str(operator_report.get("next_safe_action") or next_safe_action(session, conflicts + blockers, open_questions))
+    print(selected_next_action)
     return 0
 
 
@@ -1237,15 +1261,21 @@ def command_diff(args: argparse.Namespace) -> int:
 def command_doctor(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve() if args.target else None
     required = [
+        ROOT / "AGENTS.md",
+        ROOT / "TASKS.md",
+        ROOT / "docs" / "DOCS_INDEX.md",
         ROOT / "docs" / "HLDSPEC_TERMINOLOGY_AND_FLOW.md",
         ROOT / "docs" / "HLDSPEC_DEVELOPMENT_HANDOFF.md",
         ROOT / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md",
+        ROOT / "docs" / "CANONICAL_FLOW.md",
+        ROOT / "docs" / "ARCHITECTURE_V2.md",
+        ROOT / "docs" / "HLDSPEC_STABILITY_ARCHITECTURE.md",
+    ]
+    informational = [
         ROOT / "docs" / "HLDSPEC_MINIMAL_AGENT_UX.md",
         ROOT / "docs" / "ANTI_DRIFT_CONTRACTS.md",
         ROOT / "docs" / "AGENT_FIRST_PRODUCT_MODEL.md",
         ROOT / "docs" / "USER_RUN_MODEL.md",
-        ROOT / "docs" / "CANONICAL_FLOW.md",
-        ROOT / "docs" / "ARCHITECTURE_V2.md",
         ROOT / "scripts" / "first_run_readonly.sh",
         ROOT / "scripts" / "hldspec_v2.py",
     ]
@@ -1259,6 +1289,11 @@ def command_doctor(args: argparse.Namespace) -> int:
         ok = ok and exists
         if not exists:
             action_items.append(f"Missing repo file: {path}")
+    print("")
+    print("## Repo Informational Checks")
+    for path in informational:
+        exists = path.exists()
+        print(f"{'OK' if exists else 'MISSING'}: {path}")
 
     if target:
         print("")

@@ -17,7 +17,7 @@ from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
 from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
 from hldspec.machines.speckit_execution import SpecKitExecutionMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
-from hldspec.source_freshness import load_source_freshness
+from hldspec.source_freshness import build_source_freshness, load_source_freshness, write_source_freshness
 from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
@@ -164,18 +164,24 @@ class ProjectMachine:
         # Rebuild when the readonly artifacts are absent OR the working HLD changed since
         # they were built. Keying only on review.exists() let a changed source reuse a
         # stale plan (same stale-skip bug fixed for the old layout in project_continue.sh).
-        fp_file = adapter.firstrun_dir / "source_hld_fingerprint.txt"
+        source = Path(context.source_hld).expanduser()
+        previous_freshness = load_source_freshness(adapter.target_root, recompute=False)
+        freshness = build_source_freshness(adapter.target_root, source) if source.exists() else previous_freshness
         current_fp = self._hld_fingerprint(adapter.working_hld)
-        recorded_fp = fp_file.read_text(encoding="utf-8").strip() if fp_file.exists() else ""
-        if review.exists() and recorded_fp and recorded_fp == current_fp:
+        recorded_fp = str(previous_freshness.get("working_copy_sha256") or "")
+        if (
+            review.exists()
+            and recorded_fp
+            and recorded_fp == current_fp
+            and not freshness.get("blocking")
+        ):
             return None
 
         result = self._run_script(repo, "first_run_readonly.sh", str(adapter.working_hld), str(adapter.firstrun_dir), "--force")
         if result.returncode not in {0, 2}:
             return error_result(machine=self.name, state="FIRST_READONLY_FAILED", message=f"first_run_readonly.sh failed rc={result.returncode}: {result.stderr[-1000:]}")
-        if current_fp:
-            fp_file.parent.mkdir(parents=True, exist_ok=True)
-            fp_file.write_text(current_fp + "\n", encoding="utf-8")
+        if source.exists():
+            write_source_freshness(adapter.target_root, source)
         self._mirror_tool_sync(adapter)
         if os.environ.get("HLDSPEC_ROLE_REVIEWS", "").strip().lower() == "local":
             self._ensure_local_role_review_artifacts(adapter.working_hld, adapter.sync_dir)

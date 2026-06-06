@@ -771,6 +771,61 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertIn("Operator state: ACTION", doctor.stdout)
         self.assertNotEqual(0, operator_state.returncode)
 
+    def test_status_surfaces_continuation_gate_even_when_operator_is_ready(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-status-preflight-parity"
+        env = self.write_fake_build_loop_bin()
+        source.write_text("# HLD\n\n## HLD-001 - Purpose\n\nHLD-ID: HLD-001\n", encoding="utf-8")
+        start = self.run_start(source, target, comment="Build Loop ready", env=env)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+
+        status = self.run_facade("status", target, env=env)
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Operator state: PASS (READY_FOR_SPECIFY)", status.stdout)
+        self.assertIn("Continuation gate blocked: SOURCE_PACKAGE_APPROVAL_GATE", status.stdout)
+        self.assertIn("missing RunSkeptic PASS", status.stdout)
+        self.assertIn("Provide a valid Context Receipt + Phase Report", status.stdout)
+
+    def test_status_doctor_operator_state_surface_blocked_project_checkpoint(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-blocked-project-checkpoint"
+        env = self.write_fake_build_loop_bin()
+        source.write_text("# HLD\n\n## HLD-001 - Purpose\n\nHLD-ID: HLD-001\n", encoding="utf-8")
+        start = self.run_start(source, target, comment="Build Loop ready", env=env)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        state_path = target / ".hldspec" / "sync" / "hldspec_state.json"
+        state_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "current_stage": "HLD_BLOCKED",
+                    "current_checkpoint": "HLD_READINESS_CHECK",
+                    "blocking_questions": [{"question_id": "q1", "title": "Clarify ownership"}],
+                    "next_allowed_actions": ["Answer grouped readiness questions before Build Loop work."],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        status = self.run_facade("status", target, env=env)
+        doctor = self.run_facade("doctor", target, env=env)
+        operator_state = self.run_facade("operator-state", target, env=env)
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Project checkpoint blocks readiness: HLD_BLOCKED / HLD_READINESS_CHECK", status.stdout)
+        self.assertNotEqual(0, doctor.returncode)
+        self.assertIn("Project checkpoint blocks readiness: HLD_BLOCKED / HLD_READINESS_CHECK", doctor.stdout)
+        self.assertNotEqual(0, operator_state.returncode)
+        self.assertIn("State: BLOCKED", operator_state.stdout)
+        self.assertIn("HLD_READINESS_CHECK", operator_state.stdout)
+
     def test_legacy_state_builder_does_not_report_no_workspace_for_new_layout_target(self) -> None:
         source = self.tmp_path / "HLD.md"
         target = self.tmp_path / "target-state-builder"
@@ -797,6 +852,71 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertTrue(state_path.exists())
         state = json.loads(state_path.read_text(encoding="utf-8"))
         self.assertNotEqual("NO_WORKSPACE", state["current_stage"])
+
+    def test_new_layout_state_builder_ignores_legacy_first_run_artifacts(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-state-builder-new-layout"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        legacy_sync = target / "firstrun" / ".specify" / "sync"
+        legacy_sync.mkdir(parents=True)
+        (legacy_sync / "spec_build_plan_review.md").write_text("legacy review", encoding="utf-8")
+        (legacy_sync / "spec_build_plan.json").write_text(json.dumps({"planned_specs": []}), encoding="utf-8")
+        new_report = target / ".hldspec" / "sync" / "build_loop_prereqs_report.json"
+        new_report.write_text(
+            json.dumps({"status": "ACTION", "state": "INIT_PREREQS_BLOCKED", "next_actions": ["repair prereqs"]}),
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "build_hldspec_state.py"),
+                str(target),
+                "--source-hld",
+                str(source),
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        state = json.loads((target / ".hldspec" / "sync" / "hldspec_state.json").read_text(encoding="utf-8"))
+        self.assertEqual("INIT_PREREQS_BLOCKED", state["current_stage"])
+        self.assertEqual("build_loop_prereqs", state["current_checkpoint"])
+        self.assertNotIn("SPECKIT_PREWORK", state["current_stage"])
+
+    def test_doctor_required_repo_checks_match_development_first_read_contract(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                "doctor",
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        repo_checks = result.stdout.split("## Repo Informational Checks", 1)[0]
+        for rel in [
+            "AGENTS.md",
+            "TASKS.md",
+            "docs/DOCS_INDEX.md",
+            "docs/HLDSPEC_DEVELOPMENT_HANDOFF.md",
+            "docs/HLDSPEC_DEVELOPMENT_BACKLOG.md",
+            "docs/CANONICAL_FLOW.md",
+            "docs/ARCHITECTURE_V2.md",
+            "docs/HLDSPEC_STABILITY_ARCHITECTURE.md",
+        ]:
+            self.assertIn(str(self.repo / rel), repo_checks)
+        self.assertNotIn(str(self.repo / "scripts" / "first_run_readonly.sh"), repo_checks)
+        self.assertNotIn(str(self.repo / "scripts" / "hldspec_v2.py"), repo_checks)
 
     def test_status_and_review_surface_build_loop_trigger_artifacts(self) -> None:
         source = self.tmp_path / "HLD.md"

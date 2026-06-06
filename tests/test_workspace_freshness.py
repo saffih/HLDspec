@@ -83,6 +83,34 @@ class FreshnessGateShellTest(unittest.TestCase):
             self.assertEqual(res.returncode, 3, res.stderr)
             self.assertIn("STALE WORKSPACE", res.stderr)
 
+    def test_legacy_freshness_record_does_not_force_new_layout_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / ".hldspec-first-run"
+            ws.mkdir()
+            (ws / "HLD.md").write_text(CONVERTED_HLD, encoding="utf-8")
+            source = Path(tmp) / "HLD.md"
+            source.write_text(CONVERTED_HLD, encoding="utf-8")
+            fresh.record(ws, source)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "build_hldspec_state.py"),
+                    str(ws),
+                    "--source-hld",
+                    str(source),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+            self.assertTrue((ws / ".specify" / "sync" / "hldspec_state.json").exists())
+            self.assertFalse((ws / ".hldspec" / "sync" / "hldspec_state.json").exists())
+            self.assertNotIn("NO_WORKSPACE", result.stdout)
+
     def test_fresh_rebuild_refuses_unsafe_workspace_name(self) -> None:
         # HLDSPEC_FRESH wipe must refuse a workspace whose basename is not .hldspec*.
         with tempfile.TemporaryDirectory() as tmp:

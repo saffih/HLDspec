@@ -63,6 +63,102 @@ def has_first_run_artifacts(workspace: Path) -> bool:
     return any((sync / name).exists() for name in required)
 
 
+def is_new_layout(workspace: Path) -> bool:
+    return (
+        (workspace / "targetHLD" / "HLD.md").exists()
+        or (workspace / ".hldspec" / "agent_session.json").exists()
+        or (workspace / ".hldspec" / "source_package" / "session_plan.json").exists()
+    )
+
+
+def build_new_layout_state(workspace: Path, source_hld: str) -> dict[str, Any]:
+    sync = workspace / ".hldspec" / "sync"
+    working_hld = workspace / "targetHLD" / "HLD.md"
+    existing_state = load_json(sync / "hldspec_state.json")
+    if existing_state:
+        existing_state.setdefault("schema_version", 1)
+        existing_state["source_hld"] = source_hld
+        existing_state["workspace"] = str(workspace)
+        return existing_state
+
+    working_hld_modified = False
+    if working_hld.exists() and source_hld:
+        source_path = Path(source_hld)
+        if source_path.exists():
+            try:
+                working_hld_modified = working_hld.read_text(encoding="utf-8") != source_path.read_text(encoding="utf-8")
+            except OSError:
+                working_hld_modified = False
+
+    base: dict[str, Any] = {
+        "schema_version": 1,
+        "source_hld": source_hld,
+        "workspace": str(workspace),
+        "source_hld_modified": False,
+        "working_hld_modified": working_hld_modified,
+        "current_stage": "UNKNOWN",
+        "last_completed_stage": "",
+        "current_checkpoint": "",
+        "blocking_questions": [],
+        "stale_artifact_warnings": [],
+        "next_allowed_actions": [],
+        "controlling_artifacts": [],
+        "supporting_artifacts": [],
+        "legacy_supporting_artifacts": [],
+        "notes": [],
+    }
+
+    def finish(stage: str, checkpoint: str, last: str, actions: list[str], controlling: list[Path]) -> dict[str, Any]:
+        base["current_stage"] = stage
+        base["current_checkpoint"] = checkpoint
+        base["last_completed_stage"] = last
+        base["next_allowed_actions"] = actions
+        base["controlling_artifacts"] = [str(p) for p in controlling if p]
+        return base
+
+    if not working_hld.exists():
+        return finish(
+            "NO_WORKSPACE",
+            "hldspec_agent_start",
+            "none",
+            ["run scripts/hldspec_agent_session.py start --source <source-HLD.md> --target <target>"],
+            [],
+        )
+
+    report_map = [
+        ("build_loop_ready_report.json", "build_loop_ready"),
+        ("build_loop_init_report.json", "build_loop_init"),
+        ("build_loop_prereqs_report.json", "build_loop_prereqs"),
+        ("hld_readiness_check.json", "check_hld"),
+    ]
+    for name, checkpoint in report_map:
+        report_path = sync / name
+        report = load_json(report_path)
+        if report:
+            status = str(report.get("status") or "")
+            stage = str(report.get("state") or report.get("verdict") or status or "REPORT_AVAILABLE")
+            actions = []
+            if isinstance(report.get("next_safe_action"), str):
+                actions.append(str(report["next_safe_action"]))
+            elif isinstance(report.get("next_actions"), list):
+                actions.extend(str(item) for item in report["next_actions"] if str(item).strip())
+            return finish(
+                stage,
+                checkpoint,
+                "agent_session_prepared",
+                actions or ["run scripts/hldspec_agent_session.py status --target <target>"],
+                [report_path],
+            )
+
+    return finish(
+        "AGENT_SESSION_PREPARED",
+        "hldspec_agent_continue",
+        "agent_session_prepared",
+        ["run scripts/hldspec_agent_session.py continue --target <target>"],
+        [working_hld],
+    )
+
+
 def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]]:
     plan = load_json(plan_path)
     text = review_path.read_text(encoding="utf-8", errors="replace") if review_path.exists() else ""
@@ -78,7 +174,9 @@ def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]
 
 
 def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
-    new_layout = (workspace / "targetHLD" / "HLD.md").exists() or (workspace / ".hldspec").exists()
+    new_layout = is_new_layout(workspace)
+    if new_layout:
+        return build_new_layout_state(workspace, source_hld)
     sync = workspace / ".hldspec" / "sync" if new_layout else workspace / ".specify" / "sync"
     firstrun = workspace if has_first_run_artifacts(workspace) else workspace / "firstrun"
     fsync = firstrun / ".specify" / "sync"
@@ -319,7 +417,7 @@ def main() -> int:
     args = parser.parse_args()
 
     workspace = Path(args.workspace)
-    out = workspace / ".hldspec" / "sync" if (workspace / "targetHLD" / "HLD.md").exists() or (workspace / ".hldspec").exists() else workspace / ".specify" / "sync"
+    out = workspace / ".hldspec" / "sync" if is_new_layout(workspace) else workspace / ".specify" / "sync"
     out.mkdir(parents=True, exist_ok=True)
 
     state = build_state(workspace, args.source_hld)

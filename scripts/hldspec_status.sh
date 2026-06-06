@@ -33,8 +33,13 @@ SOURCE_HLD="${2:-}"
 
 "${PYTHON_RUN[@]}" "$ROOT/scripts/build_hldspec_state.py" "$WORKSPACE" --source-hld "$SOURCE_HLD" >/dev/null
 
-STATE_MD="$WORKSPACE/.specify/sync/hldspec_state.md"
-STATE_JSON="$WORKSPACE/.specify/sync/hldspec_state.json"
+if [ -f "$WORKSPACE/targetHLD/HLD.md" ] || [ -f "$WORKSPACE/.hldspec/agent_session.json" ] || [ -f "$WORKSPACE/.hldspec/source_package/session_plan.json" ]; then
+  STATE_MD="$WORKSPACE/.hldspec/sync/hldspec_state.md"
+  STATE_JSON="$WORKSPACE/.hldspec/sync/hldspec_state.json"
+else
+  STATE_MD="$WORKSPACE/.specify/sync/hldspec_state.md"
+  STATE_JSON="$WORKSPACE/.specify/sync/hldspec_state.json"
+fi
 
 if [ ! -f "$STATE_MD" ]; then
   echo "ERROR: state report was not generated: $STATE_MD" >&2

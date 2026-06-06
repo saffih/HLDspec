@@ -7,6 +7,7 @@ next safe action.
 from __future__ import annotations
 
 import subprocess
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -73,6 +74,50 @@ def _specs_tree_has_files(specs_root: Path) -> bool:
 
 def _source_freshness_gate(target: Path) -> dict[str, Any]:
     return load_source_freshness(target)
+
+
+def _project_checkpoint_gate(target: Path) -> dict[str, Any] | None:
+    state_path = target / ".hldspec" / "sync" / "hldspec_state.json"
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(state, dict):
+        return None
+    stage = str(state.get("current_stage") or state.get("stage") or "").strip()
+    checkpoint = str(state.get("current_checkpoint") or state.get("checkpoint") or "").strip()
+    if not stage:
+        return None
+    blocking_tokens = (
+        "BLOCKED",
+        "CHECKPOINT",
+        "GATE",
+        "MISSING",
+        "REWORK",
+        "NO_WORKSPACE",
+        "CONFLICT",
+    )
+    if not any(token in stage.upper() or token in checkpoint.upper() for token in blocking_tokens):
+        return None
+    next_actions = [str(item) for item in state.get("next_allowed_actions", []) if str(item).strip()]
+    blockers = [f"Project checkpoint blocks readiness: {stage}" + (f" / {checkpoint}" if checkpoint else "")]
+    for item in state.get("stale_artifact_warnings", []) or []:
+        if str(item).strip():
+            blockers.append(str(item))
+    for item in state.get("blocking_questions", []) or []:
+        if isinstance(item, dict):
+            artifact = item.get("artifact") or item.get("question_id") or checkpoint or state_path
+            count = item.get("open_question_count")
+            blockers.append(f"Open checkpoint question: {artifact}" + (f" ({count})" if count is not None else ""))
+        elif str(item).strip():
+            blockers.append(str(item))
+    return {
+        "path": str(state_path),
+        "stage": stage,
+        "checkpoint": checkpoint,
+        "blockers": blockers,
+        "next_safe_action": next_actions[0] if next_actions else "Resolve the blocked ProjectMachine checkpoint, then rerun operator-state.",
+    }
 
 
 def _lifecycle_state_from_execution(target: Path) -> dict[str, Any]:
@@ -214,6 +259,7 @@ def build_speckit_operator_state_report(
     git_branch = readiness.get("git_branch")
     dirty_tree = readiness.get("dirty_tree")
     freshness = _source_freshness_gate(target_path)
+    project_checkpoint = _project_checkpoint_gate(target_path)
 
     evidence: list[dict[str, Any]] = [
         {"fact": "target_path", "value": str(target_path)},
@@ -231,6 +277,8 @@ def build_speckit_operator_state_report(
         {"fact": "available_init_command_labels", "value": _list_command_labels(readiness)},
         {"fact": "source_freshness_state", "value": freshness.get("state")},
         {"fact": "source_freshness_path", "value": freshness.get("path")},
+        {"fact": "project_checkpoint_stage", "value": project_checkpoint.get("stage") if project_checkpoint else None},
+        {"fact": "project_checkpoint_path", "value": project_checkpoint.get("path") if project_checkpoint else None},
     ]
 
     blockers: list[str] = []
@@ -248,6 +296,11 @@ def build_speckit_operator_state_report(
         state = STATE_SOURCE_FRESHNESS_BLOCKED
         blockers.extend(str(item) for item in freshness.get("warnings", []) if str(item).strip())
         next_safe_action = "Reconcile source freshness before rerunning operator-state or starting Build Loop work."
+    elif project_checkpoint is not None:
+        status = "ACTION"
+        state = STATE_BLOCKED
+        blockers.extend(project_checkpoint["blockers"])
+        next_safe_action = str(project_checkpoint["next_safe_action"])
     elif git_root is None:
         status = "ACTION"
         state = STATE_TARGET_NOT_GIT

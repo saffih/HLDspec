@@ -38,8 +38,11 @@ def recorded_source_path(target: Path) -> Path | None:
 def build_source_freshness(target: Path, source: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
     source = Path(source).expanduser().resolve()
-    raw = target / "targetHLD" / "raw" / "HLD.raw.md"
-    working = target / "targetHLD" / "HLD.md"
+    default_raw = target / "targetHLD" / "raw" / "HLD.raw.md"
+    default_working = target / "targetHLD" / "HLD.md"
+    legacy_working = target / "HLD.md"
+    working = default_working if default_working.is_file() or not legacy_working.is_file() else legacy_working
+    raw = default_raw if default_raw.is_file() or working != legacy_working else legacy_working
     warnings: list[str] = []
 
     if not source.is_file():

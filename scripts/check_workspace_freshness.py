@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Tell whether an HLDspec workspace was built from the current source HLD.
 
-The run state machine regenerates a workspace's downstream artifacts only when they
-are absent, so a workspace built from an earlier source HLD is never rebuilt when the
-source changes — it silently mixes old and new content. This records the source HLD's
-content hash at first-run and reports, on later runs, whether the source still matches.
+Compatibility wrapper around ``hldspec.source_freshness``. The durable freshness
+artifact is now ``.hldspec/source_freshness.json`` for both agent-first and legacy
+shell paths.
 
 Status (printed to stdout, one word):
   fresh   - recorded hash matches the current source HLD
@@ -18,45 +17,41 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
-from datetime import datetime, timezone
+import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-def fingerprint(hld: Path) -> str:
-    return hashlib.sha256(hld.read_bytes()).hexdigest()
+from hldspec.source_freshness import build_source_freshness, sha256_file, write_source_freshness  # noqa: E402
 
 
 def fp_path(workspace: Path) -> Path:
-    return workspace / "source_hld_fingerprint.json"
+    return workspace / ".hldspec" / "source_freshness.json"
 
 
 def record(workspace: Path, hld: Path) -> None:
     workspace.mkdir(parents=True, exist_ok=True)
-    fp_path(workspace).write_text(
-        json.dumps(
-            {
-                "source_hld": str(hld),
-                "sha256": fingerprint(hld),
-                "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    write_source_freshness(workspace, hld)
 
 
 def status(workspace: Path, hld: Path) -> str:
     fp = fp_path(workspace)
     if not fp.exists():
         return "absent"
-    try:
-        recorded = json.loads(fp.read_text(encoding="utf-8")).get("sha256")
-    except Exception:
+    if not hld.exists():
         return "absent"
-    return "fresh" if recorded == fingerprint(hld) else "stale"
+    if not (workspace / "targetHLD" / "HLD.md").exists() and not (workspace / "HLD.md").exists():
+        import json
+
+        try:
+            recorded = json.loads(fp.read_text(encoding="utf-8")).get("source_sha256")
+        except Exception:
+            return "absent"
+        return "fresh" if recorded == sha256_file(hld) else "stale"
+    report = build_source_freshness(workspace, hld)
+    return "fresh" if not report.get("blocking") else "stale"
 
 
 def main() -> int:
@@ -70,7 +65,7 @@ def main() -> int:
     hld = Path(args.source_hld)
     if not hld.exists():
         print("absent")
-        return 0
+        return 4
     if args.record:
         record(workspace, hld)
         print("recorded")
