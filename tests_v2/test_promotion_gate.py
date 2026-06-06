@@ -213,8 +213,9 @@ class HldspecPromotionGateTests(unittest.TestCase):
             check=False,
         )
 
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertNotEqual(0, result.returncode)
         self.assertIn("Promotion gate: PASS", result.stdout)
+        self.assertIn("Summary: ACTION", result.stdout)
 
 
 if __name__ == "__main__":

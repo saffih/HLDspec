@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
 from hldspec.minimal_agent_request import _workflow_trigger_candidates, detect_workflow_trigger, parse_minimal_agent_request
+from hldspec.source_freshness import load_source_freshness, write_source_freshness
 from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
 from hldspec import speckit_workspace as sw
@@ -134,21 +135,7 @@ def next_safe_action(session: dict[str, Any], blockers: list[str], open_question
 
 
 def source_freshness(target: Path) -> dict[str, Any]:
-    path = target / ".hldspec" / "source_freshness.json"
-    data = json_read(path)
-    if not data:
-        managed = (target / ".hldspec" / "agent_session.json").is_file() or (
-            target / ".hldspec" / "source_package" / "session_plan.json"
-        ).is_file()
-        return {
-            "state": "absent" if managed else "not_managed",
-            "warnings": [f"Missing source freshness metadata: {path}"] if managed else [],
-            "working_hld_differs_from_source": False,
-            "blocking": managed,
-        }
-    data.setdefault("state", "stale" if data.get("working_hld_differs_from_source") or data.get("warnings") else "fresh")
-    data.setdefault("blocking", data["state"] != "fresh")
-    return data
+    return load_source_freshness(target)
 
 
 def source_freshness_warnings(target: Path) -> list[str]:
@@ -607,28 +594,10 @@ def copy_source(source: Path, target: Path) -> dict[str, Any]:
     raw = target / "targetHLD" / "raw" / "HLD.raw.md"
     working = target / "targetHLD" / "HLD.md"
     raw.parent.mkdir(parents=True, exist_ok=True)
-    source_text = source.read_text(encoding="utf-8")
-    working_existed = working.exists()
-    working_differs = working_existed and working.read_text(encoding="utf-8") != source_text
     shutil.copyfile(source, raw)
     if not working.exists():
         shutil.copyfile(source, working)
-    warnings: list[str] = []
-    if working_differs:
-        warnings.append(
-            "Source HLD content differs from the existing workspace HLD copy; conversion/update must reconcile targetHLD/HLD.md before derived artifacts are promoted."
-        )
-    freshness = {
-        "schema_version": 1,
-        "source": str(source),
-        "raw_copy": str(raw),
-        "working_copy": str(working),
-        "working_hld_existed": working_existed,
-        "working_hld_differs_from_source": working_differs,
-        "warnings": warnings,
-    }
-    json_write(target / ".hldspec" / "source_freshness.json", freshness)
-    return freshness
+    return write_source_freshness(target, source)
 
 
 def classify_intent(comment: str, mode: str) -> str:
@@ -1092,6 +1061,7 @@ def command_status(args: argparse.Namespace) -> int:
 
     validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
     promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
+    operator_report = sos.build_speckit_operator_state_report(target)
     open_questions = collect_open_questions(target)
     workflow_blockers, workflow_next_action = active_workflow_blockers(target, session)
     blockers: list[str] = []
@@ -1105,6 +1075,13 @@ def command_status(args: argparse.Namespace) -> int:
         elif status == "ACTION":
             blockers.append(f"{label}: {status} ({path})")
     blockers.extend(workflow_blockers)
+    if str(operator_report.get("status", "")).upper() in {"ACTION", "CONFLICT"}:
+        operator_item = f"Operator state: {operator_report.get('status')} ({operator_report.get('state')})"
+        if str(operator_report.get("status", "")).upper() == "CONFLICT":
+            conflicts.append(operator_item)
+        else:
+            blockers.append(operator_item)
+        blockers.extend(str(item) for item in operator_report.get("blockers", []) if str(item).strip())
 
     source = session.get("source", {}).get("path", "UNKNOWN") if isinstance(session.get("source"), dict) else "UNKNOWN"
     print("## HLDspec Status")
@@ -1117,6 +1094,7 @@ def command_status(args: argparse.Namespace) -> int:
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
     print(f"Promotion gate status: {promotion_status} ({promotion_path})")
+    print(f"Operator state: {operator_report.get('status')} ({operator_report.get('state')})")
     print("")
     print("## Blockers")
     print_bullet_list(conflicts + blockers)
@@ -1125,7 +1103,7 @@ def command_status(args: argparse.Namespace) -> int:
     print_bullet_list(open_questions)
     print("")
     print("## Next Safe Action")
-    print(workflow_next_action or next_safe_action(session, conflicts + blockers, open_questions))
+    print(workflow_next_action or operator_report.get("next_safe_action") or next_safe_action(session, conflicts + blockers, open_questions))
     return 0
 
 
@@ -1259,6 +1237,11 @@ def command_diff(args: argparse.Namespace) -> int:
 def command_doctor(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve() if args.target else None
     required = [
+        ROOT / "docs" / "HLDSPEC_TERMINOLOGY_AND_FLOW.md",
+        ROOT / "docs" / "HLDSPEC_DEVELOPMENT_HANDOFF.md",
+        ROOT / "docs" / "HLDSPEC_DEVELOPMENT_BACKLOG.md",
+        ROOT / "docs" / "HLDSPEC_MINIMAL_AGENT_UX.md",
+        ROOT / "docs" / "ANTI_DRIFT_CONTRACTS.md",
         ROOT / "docs" / "AGENT_FIRST_PRODUCT_MODEL.md",
         ROOT / "docs" / "USER_RUN_MODEL.md",
         ROOT / "docs" / "CANONICAL_FLOW.md",
@@ -1350,6 +1333,7 @@ def command_doctor(args: argparse.Namespace) -> int:
                 action_items.append(f"Missing interview file: {path}")
 
         readiness = sr.build_speckit_readiness_report(target)
+        operator_report = sos.build_speckit_operator_state_report(target, readiness_report=readiness)
         print("")
         print("## SpecKit Readiness")
         print(f"Status: {readiness['status']}")
@@ -1366,6 +1350,24 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(readiness.get("summary", ""))
         print("Next actions:")
         print_bullet_list(readiness.get("next_actions", []))
+        if str(readiness.get("status", "")).upper() == "CONFLICT":
+            conflict_items.append("SpecKit readiness: CONFLICT")
+        elif str(readiness.get("status", "")).upper() == "ACTION":
+            action_items.append("SpecKit readiness: ACTION")
+            action_items.extend(str(item) for item in readiness.get("next_actions", []) if str(item).strip())
+
+        print("")
+        print("## Operator State")
+        print(f"Status: {operator_report.get('status')}")
+        print(f"State: {operator_report.get('state')}")
+        print(f"Next safe action: {operator_report.get('next_safe_action')}")
+        print("Blockers:")
+        print_bullet_list([str(item) for item in operator_report.get("blockers", [])])
+        if str(operator_report.get("status", "")).upper() == "CONFLICT":
+            conflict_items.append(f"Operator state: CONFLICT ({operator_report.get('state')})")
+        elif str(operator_report.get("status", "")).upper() == "ACTION":
+            action_items.append(f"Operator state: ACTION ({operator_report.get('state')})")
+            action_items.extend(str(item) for item in operator_report.get("blockers", []) if str(item).strip())
 
         print("")
         print("## Control Plane Checks")
@@ -1389,6 +1391,9 @@ def command_doctor(args: argparse.Namespace) -> int:
             print(f"Continuation allowed now: {str(preflight.allowed).lower()}")
             print("Continuation blockers (informational):")
             print_bullet_list(preflight.blockers)
+            if preflight.gated and not preflight.allowed:
+                action_items.append(f"Continuation gate blocked: {preflight.gate}")
+                action_items.extend(preflight.blockers)
         else:
             print(f"MISSING: {plan_path}")
             action_items.append(f"No session plan (run start or hldspec_session_control): {plan_path}")

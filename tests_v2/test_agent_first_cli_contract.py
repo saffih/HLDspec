@@ -259,7 +259,7 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         result = self.run_facade("doctor", target)
 
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertNotEqual(0, result.returncode)
         self.assertIn(str(target / ".hldspec" / "interview_answers.json"), result.stdout)
         self.assertIn(str(target / ".hldspec" / "interview_answers.md"), result.stdout)
 
@@ -314,7 +314,7 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn("## Next Safe Action", result.stdout)
-        self.assertIn("Open prompts/agent/START_HLDSPEC_AGENT.md", result.stdout)
+        self.assertIn("Initialize or point HLDspec at a git workspace", result.stdout)
 
     def test_status_reports_validation_status_when_validation_report_exists(self) -> None:
         source = self.tmp_path / "HLD.md"
@@ -346,7 +346,8 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn("Promotion gate status: ACTION", result.stdout)
-        self.assertIn("Resolve ACTION/CONFLICT blockers", result.stdout)
+        self.assertIn("Promotion gate: ACTION", result.stdout)
+        self.assertIn("Initialize or point HLDspec at a git workspace", result.stdout)
 
     def test_start_detects_check_hld_workflow_trigger(self) -> None:
         source = self.tmp_path / "HLD.md"
@@ -694,6 +695,45 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertIn("Source freshness:", status.stdout)
         self.assertIn("SOURCE_FRESHNESS_BLOCKED", status.stdout)
 
+    def test_build_loop_recomputes_freshness_when_source_changes_after_start(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-live-freshness"
+        env = self.write_fake_build_loop_bin()
+        source.write_text("# HLD\n\nv1\n", encoding="utf-8")
+        start = self.run_start(source, target, comment="Build Loop ready", env=env)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        source.write_text("# HLD\n\nv2\n", encoding="utf-8")
+
+        result = self.run_facade("continue", target, env=env)
+
+        self.assertEqual(2, result.returncode, result.stderr + result.stdout)
+        self.assertIn("State: SOURCE_FRESHNESS_BLOCKED", result.stdout)
+        status = self.run_facade("status", target, env=env)
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Source freshness:", status.stdout)
+        operator_state = self.run_facade("operator-state", target, env=env)
+        self.assertNotEqual(0, operator_state.returncode)
+        self.assertIn("State: SOURCE_FRESHNESS_BLOCKED", operator_state.stdout)
+
+    def test_invalid_source_freshness_metadata_blocks_without_crashing(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-invalid-freshness"
+        source.write_text("# HLD\n\nv1\n", encoding="utf-8")
+        start = self.run_start(source, target, comment="Build Loop prereqs")
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+        (target / ".hldspec" / "source_freshness.json").write_text("{not-json\n", encoding="utf-8")
+
+        status = self.run_facade("status", target)
+        doctor = self.run_facade("doctor", target)
+        result = self.run_facade("continue", target)
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Invalid source freshness metadata", status.stdout)
+        self.assertNotEqual(0, doctor.returncode)
+        self.assertIn("Invalid source freshness metadata", doctor.stdout)
+        self.assertEqual(2, result.returncode, result.stderr + result.stdout)
+        self.assertIn("SOURCE_FRESHNESS_BLOCKED", result.stdout)
+
     def test_build_loop_blocks_when_source_freshness_metadata_is_missing(self) -> None:
         source = self.tmp_path / "HLD.md"
         target = self.tmp_path / "target-missing-freshness"
@@ -702,6 +742,7 @@ class AgentFirstCliContractTests(unittest.TestCase):
         start = self.run_start(source, target, comment="Build Loop init", env=env)
         self.assertEqual(0, start.returncode, start.stderr + start.stdout)
         (target / ".hldspec" / "source_freshness.json").unlink()
+        source.unlink()
 
         result = self.run_facade("continue", target, env=env)
 
@@ -711,7 +752,51 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         status = self.run_facade("status", target, env=env)
         self.assertEqual(0, status.returncode, status.stderr + status.stdout)
-        self.assertIn("Missing source freshness metadata", status.stdout)
+        self.assertIn("Source HLD is missing or unreadable", status.stdout)
+
+    def test_status_and_doctor_surface_operator_state_blockers(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-operator-parity"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        status = self.run_facade("status", target)
+        doctor = self.run_facade("doctor", target)
+        operator_state = self.run_facade("operator-state", target)
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Operator state: ACTION", status.stdout)
+        self.assertNotEqual(0, doctor.returncode)
+        self.assertIn("Operator state: ACTION", doctor.stdout)
+        self.assertNotEqual(0, operator_state.returncode)
+
+    def test_legacy_state_builder_does_not_report_no_workspace_for_new_layout_target(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-state-builder"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "build_hldspec_state.py"),
+                str(target),
+                "--source-hld",
+                str(source),
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        state_path = target / ".hldspec" / "sync" / "hldspec_state.json"
+        self.assertTrue(state_path.exists())
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertNotEqual("NO_WORKSPACE", state["current_stage"])
 
     def test_status_and_review_surface_build_loop_trigger_artifacts(self) -> None:
         source = self.tmp_path / "HLD.md"
@@ -761,11 +846,11 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         result = self.run_facade("doctor", target)
 
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertNotEqual(0, result.returncode)
         self.assertIn("## Final Summary", result.stdout)
         self.assertIn("## SpecKit Readiness", result.stdout)
         self.assertIn("Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror.", result.stdout)
-        self.assertIn("Summary: PASS", result.stdout)
+        self.assertIn("Summary: ACTION", result.stdout)
 
     def test_doctor_exits_nonzero_when_final_summary_is_action(self) -> None:
         source = self.tmp_path / "HLD.md"
@@ -815,7 +900,10 @@ class AgentFirstCliContractTests(unittest.TestCase):
 
         for command in ("status", "review", "doctor"):
             result = self.run_facade(command, target)
-            self.assertEqual(0, result.returncode, command + result.stderr + result.stdout)
+            if command == "doctor":
+                self.assertNotEqual(0, result.returncode)
+            else:
+                self.assertEqual(0, result.returncode, command + result.stderr + result.stdout)
 
         self.assertEqual(source_text, source.read_text(encoding="utf-8"))
 

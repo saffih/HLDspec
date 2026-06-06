@@ -12,6 +12,7 @@ from typing import Any, Callable
 
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
+from .source_freshness import load_source_freshness
 
 SCHEMA_VERSION = 1
 
@@ -71,37 +72,7 @@ def _specs_tree_has_files(specs_root: Path) -> bool:
 
 
 def _source_freshness_gate(target: Path) -> dict[str, Any]:
-    path = target / ".hldspec" / "source_freshness.json"
-    managed = (target / ".hldspec" / "agent_session.json").is_file() or (
-        target / ".hldspec" / "source_package" / "session_plan.json"
-    ).is_file()
-    if not path.exists():
-        return {
-            "state": "absent" if managed else "not_managed",
-            "blocking": managed,
-            "warnings": ["Missing .hldspec/source_freshness.json for this HLDspec-managed target."] if managed else [],
-            "path": str(path),
-        }
-    try:
-        import json
-
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return {
-            "state": "invalid",
-            "blocking": True,
-            "warnings": [f"Invalid source freshness metadata: {exc}"],
-            "path": str(path),
-        }
-    warnings = data.get("warnings", [])
-    warning_list = [str(item) for item in warnings if str(item).strip()] if isinstance(warnings, list) else []
-    stale = bool(data.get("working_hld_differs_from_source") or warning_list)
-    return {
-        "state": "stale" if stale else "fresh",
-        "blocking": stale,
-        "warnings": warning_list,
-        "path": str(path),
-    }
+    return load_source_freshness(target)
 
 
 def _lifecycle_state_from_execution(target: Path) -> dict[str, Any]:

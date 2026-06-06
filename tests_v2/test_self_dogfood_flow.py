@@ -83,8 +83,9 @@ class SelfDogfoodFlowTests(unittest.TestCase):
         self.assertIn("## Next Safe Action", review.stdout)
 
         doctor_before = self.run_hldspec("doctor", "--target", str(target))
-        self.assertEqual(0, doctor_before.returncode, doctor_before.stderr + doctor_before.stdout)
+        self.assertNotEqual(0, doctor_before.returncode)
         self.assertIn("## Final Summary", doctor_before.stdout)
+        self.assertIn("Summary: ACTION", doctor_before.stdout)
 
         self.write_minimal_spec_packages(target)
 

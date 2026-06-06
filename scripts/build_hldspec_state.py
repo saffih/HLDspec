@@ -78,11 +78,12 @@ def plan_green(review_path: Path, plan_path: Path) -> tuple[bool, dict[str, Any]
 
 
 def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
-    sync = workspace / ".specify" / "sync"
+    new_layout = (workspace / "targetHLD" / "HLD.md").exists() or (workspace / ".hldspec").exists()
+    sync = workspace / ".hldspec" / "sync" if new_layout else workspace / ".specify" / "sync"
     firstrun = workspace if has_first_run_artifacts(workspace) else workspace / "firstrun"
     fsync = firstrun / ".specify" / "sync"
 
-    working_hld = workspace / "HLD.md"
+    working_hld = workspace / "targetHLD" / "HLD.md" if new_layout else workspace / "HLD.md"
     working_hld_modified = False
     if working_hld.exists() and source_hld:
         source_path = Path(source_hld)
@@ -167,6 +168,14 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
         )
 
     if not plan_review.exists():
+        if new_layout:
+            return finish(
+                "AGENT_SESSION_PREPARED",
+                "hldspec_agent_continue",
+                "agent_session_prepared",
+                ["run scripts/hldspec_agent_session.py continue --target <target>"],
+                [working_hld],
+            )
         return finish(
             "FIRST_RUN_PENDING",
             "run_first_readonly",
@@ -310,7 +319,7 @@ def main() -> int:
     args = parser.parse_args()
 
     workspace = Path(args.workspace)
-    out = workspace / ".specify" / "sync"
+    out = workspace / ".hldspec" / "sync" if (workspace / "targetHLD" / "HLD.md").exists() or (workspace / ".hldspec").exists() else workspace / ".specify" / "sync"
     out.mkdir(parents=True, exist_ok=True)
 
     state = build_state(workspace, args.source_hld)

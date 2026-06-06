@@ -17,6 +17,7 @@ from hldspec.machines.raw_hld_conversion import RawHldConversionMachine
 from hldspec.machines.spec_build_plan import SpecBuildPlanMachine
 from hldspec.machines.speckit_execution import SpecKitExecutionMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
+from hldspec.source_freshness import load_source_freshness
 from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
@@ -299,19 +300,10 @@ class ProjectMachine:
     def _write_check_hld_state(adapter: TargetWorkspaceAdapter, result: MachineResult) -> None:
         checkpoint_kind = result.checkpoint.kind.value if result.checkpoint is not None else ""
         next_actions = [result.checkpoint.next_action] if result.checkpoint and result.checkpoint.next_action else []
-        freshness_path = adapter.target_root / ".hldspec" / "source_freshness.json"
-        stale_warnings: list[str] = []
-        working_hld_differs = False
-        source_hld_modified = False
-        if freshness_path.exists():
-            try:
-                freshness = json.loads(freshness_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                freshness = {}
-            if isinstance(freshness.get("warnings"), list):
-                stale_warnings = [str(item) for item in freshness["warnings"] if str(item).strip()]
-            working_hld_differs = bool(freshness.get("working_hld_differs_from_source", False))
-            source_hld_modified = bool(freshness.get("source_hld_modified", False))
+        freshness = load_source_freshness(adapter.target_root)
+        stale_warnings = [str(item) for item in freshness.get("warnings", []) if str(item).strip()]
+        working_hld_differs = bool(freshness.get("working_hld_differs_from_source", False))
+        source_hld_modified = bool(freshness.get("source_hld_modified", False))
         state = {
             "schema_version": 1,
             "source_hld_modified": source_hld_modified,
