@@ -139,6 +139,69 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertEqual("PASS", report["readiness_report"]["status"])
         self.assertIn("readiness/preflight only", report["doctor_note"])
 
+    def test_ready_project_checkpoint_does_not_block_operator_state(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "hldspec_state.json").write_text(
+            json.dumps({"schema_version": 1, "current_stage": "READY_FOR_SPECIFY", "current_checkpoint": "BUILD_LOOP_READY"}),
+            encoding="utf-8",
+        )
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("PASS", report["status"])
+        self.assertEqual("READY_FOR_SPECIFY", report["state"])
+
+    def test_unknown_project_checkpoint_requires_reassessment(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "hldspec_state.json").write_text(
+            json.dumps({"schema_version": 1, "current_stage": "SURPRISE_STATE", "current_checkpoint": "SURPRISE_CHECKPOINT"}),
+            encoding="utf-8",
+        )
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("BLOCKED", report["state"])
+        self.assertTrue(any("Unrecognized Project checkpoint state" in item for item in report["blockers"]))
+
+    def test_legacy_conversion_ready_stage_blocks_operator_state(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "hldspec_state.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "current_stage": "CONVERSION_READY_TO_APPLY",
+                    "current_checkpoint": "apply_working_hld_conversion",
+                    "next_allowed_actions": ["apply conversion decisions to working HLD only"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("BLOCKED", report["state"])
+        self.assertTrue(any("CONVERSION_READY_TO_APPLY" in item for item in report["blockers"]))
+
     def test_managed_workspace_with_stale_source_freshness_blocks_operator_state(self) -> None:
         target = self.root / "target"
         (target / ".specify" / "memory").mkdir(parents=True)

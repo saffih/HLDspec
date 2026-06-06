@@ -33,6 +33,34 @@ STATE_TASKS_ACTIVE = "TASKS_ACTIVE"
 STATE_ANALYZE_READY = "ANALYZE_READY"
 STATE_BLOCKED = "BLOCKED"
 
+PROJECT_BLOCKING_STAGES = {
+    "NO_WORKSPACE",
+    "HLD_BLOCKED",
+    "SOURCE_FRESHNESS_BLOCKED",
+    "INIT_PREREQS_BLOCKED",
+    "BUILD_LOOP_INIT_BLOCKED",
+    "SPECKIT_APPROVAL_GATE_BLOCKED",
+    "CONVERSION_CHECKPOINT",
+    "CONVERSION_READY_TO_APPLY",
+    "FIRST_RUN_PENDING",
+    "SPEC_BUILD_PLAN_CHECKPOINT",
+    "SPEC_BUILD_PLAN_BLOCKED",
+    "SPECKIT_PREWORK_MISSING",
+    "SPECKIT_PREWORK_REWORK_REQUIRED",
+    "SPECKIT_PREWORK_APPROVAL_GATE",
+}
+PROJECT_NON_BLOCKING_STAGES = {
+    "AGENT_SESSION_PREPARED",
+    "INIT_PREREQS_READY",
+    "WORKSPACE_INITIALIZED",
+    "MIRROR_SYNCED",
+    STATE_READY_FOR_SPECIFY,
+    STATE_SPECIFY_ACTIVE,
+    STATE_PLAN_ACTIVE,
+    STATE_TASKS_ACTIVE,
+    STATE_ANALYZE_READY,
+}
+
 
 def _next_action_or_default(readiness: dict[str, Any]) -> str:
     next_actions = readiness.get("next_actions") or []
@@ -88,17 +116,18 @@ def _project_checkpoint_gate(target: Path) -> dict[str, Any] | None:
     checkpoint = str(state.get("current_checkpoint") or state.get("checkpoint") or "").strip()
     if not stage:
         return None
-    blocking_tokens = (
-        "BLOCKED",
-        "CHECKPOINT",
-        "GATE",
-        "MISSING",
-        "REWORK",
-        "NO_WORKSPACE",
-        "CONFLICT",
-    )
-    if not any(token in stage.upper() or token in checkpoint.upper() for token in blocking_tokens):
+    stage_upper = stage.upper()
+    has_blocking_details = bool(state.get("blocking_questions") or state.get("stale_artifact_warnings"))
+    if stage_upper in PROJECT_NON_BLOCKING_STAGES and not has_blocking_details:
         return None
+    if stage_upper not in PROJECT_BLOCKING_STAGES and not has_blocking_details:
+        return {
+            "path": str(state_path),
+            "stage": stage,
+            "checkpoint": checkpoint,
+            "blockers": [f"Unrecognized Project checkpoint state requires reassessment: {stage}" + (f" / {checkpoint}" if checkpoint else "")],
+            "next_safe_action": "Reassess the ProjectMachine checkpoint classification before continuing.",
+        }
     next_actions = [str(item) for item in state.get("next_allowed_actions", []) if str(item).strip()]
     blockers = [f"Project checkpoint blocks readiness: {stage}" + (f" / {checkpoint}" if checkpoint else "")]
     for item in state.get("stale_artifact_warnings", []) or []:

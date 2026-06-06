@@ -59,7 +59,7 @@ def build_source_freshness(target: Path, source: Path) -> dict[str, Any]:
         warnings.append("Raw HLD copy differs from the current source HLD.")
     if source_hash and working_hash and working_hash != source_hash:
         warnings.append(
-            "Source HLD content differs from the existing workspace HLD copy; conversion/update must reconcile targetHLD/HLD.md before derived artifacts are promoted."
+            f"Source HLD content differs from the existing workspace HLD copy; conversion/update must reconcile {working} before derived artifacts are promoted."
         )
     if source_text is not None and not working.is_file():
         warnings.append(f"Working HLD copy is missing: {working}")

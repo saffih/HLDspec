@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +40,22 @@ class FreshnessHelperTest(unittest.TestCase):
             self.assertEqual(fresh.status(ws, hld), "fresh")
             hld.write_text("v2 changed", encoding="utf-8")
             self.assertEqual(fresh.status(ws, hld), "stale")
+
+    def test_legacy_stale_warning_names_actual_working_hld_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            ws = Path(tmp) / ".hldspec-first-run"
+            ws.mkdir()
+            working = ws / "HLD.md"
+            working.write_text("workspace copy\n", encoding="utf-8")
+            source = Path(tmp) / "HLD.md"
+            source.write_text("source truth\n", encoding="utf-8")
+
+            fresh.record(ws, source)
+            report = json.loads((ws / ".hldspec" / "source_freshness.json").read_text(encoding="utf-8"))
+
+            warning_text = "\n".join(report["warnings"])
+            self.assertIn(str(working.resolve()), warning_text)
+            self.assertNotIn("targetHLD/HLD.md", warning_text)
 
 
 class FreshnessGateShellTest(unittest.TestCase):

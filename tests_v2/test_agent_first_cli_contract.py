@@ -886,7 +886,7 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         state = json.loads((target / ".hldspec" / "sync" / "hldspec_state.json").read_text(encoding="utf-8"))
         self.assertEqual("INIT_PREREQS_BLOCKED", state["current_stage"])
-        self.assertEqual("build_loop_prereqs", state["current_checkpoint"])
+        self.assertEqual("BUILD_LOOP_PREREQS", state["current_checkpoint"])
         self.assertNotIn("SPECKIT_PREWORK", state["current_stage"])
 
     def test_doctor_required_repo_checks_match_development_first_read_contract(self) -> None:

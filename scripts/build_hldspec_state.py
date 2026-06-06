@@ -126,10 +126,10 @@ def build_new_layout_state(workspace: Path, source_hld: str) -> dict[str, Any]:
         )
 
     report_map = [
-        ("build_loop_ready_report.json", "build_loop_ready"),
-        ("build_loop_init_report.json", "build_loop_init"),
-        ("build_loop_prereqs_report.json", "build_loop_prereqs"),
-        ("hld_readiness_check.json", "check_hld"),
+        ("build_loop_ready_report.json", "BUILD_LOOP_READY"),
+        ("build_loop_init_report.json", "BUILD_LOOP_INIT"),
+        ("build_loop_prereqs_report.json", "BUILD_LOOP_PREREQS"),
+        ("hld_readiness_check.json", "HLD_READINESS_CHECK"),
     ]
     for name, checkpoint in report_map:
         report_path = sync / name
