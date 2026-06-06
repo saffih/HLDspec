@@ -15,11 +15,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class _RunStub:
-    def __init__(self, *, git_root: Path | None = None, branch: str = "main", dirty: bool = False, help_ok: bool = True):
+    def __init__(
+        self,
+        *,
+        git_root: Path | None = None,
+        branch: str = "main",
+        dirty: bool = False,
+        help_ok: bool = True,
+        help_mentions_force: bool = True,
+    ):
         self.git_root = git_root
         self.branch = branch
         self.dirty = dirty
         self.help_ok = help_ok
+        self.help_mentions_force = help_mentions_force
         self.calls: list[list[str]] = []
 
     def __call__(self, argv, cwd, text, capture_output, check):
@@ -40,7 +49,8 @@ class _RunStub:
                 return SimpleNamespace(returncode=0, stdout=(" M file.txt\n" if self.dirty else ""), stderr="")
         if argv and argv[0] in {"specify", "spec-kit", "uvx"} and ("--help" in argv or "--version" in argv):
             if self.help_ok:
-                return SimpleNamespace(returncode=0, stdout="help\n", stderr="")
+                force = "--force\n" if self.help_mentions_force else ""
+                return SimpleNamespace(returncode=0, stdout=f"help\n{force}", stderr="")
             return SimpleNamespace(returncode=1, stdout="", stderr="boom")
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
@@ -55,11 +65,14 @@ class _UvXSmokeStub:
         argv = list(argv)
         self.calls.append(argv)
         if argv == ["uvx", "--help"] or argv == ["uvx", "--version"]:
-            return SimpleNamespace(returncode=0 if self.bare_uvx_ok else 1, stdout="help\n" if self.bare_uvx_ok else "", stderr="")
+            return SimpleNamespace(returncode=0 if self.bare_uvx_ok else 1, stdout="help\n--force\n" if self.bare_uvx_ok else "", stderr="")
+        real_init_help = ["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "init", "--help"]
         real_help = ["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"]
         real_version = ["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"]
+        if argv == real_init_help:
+            return SimpleNamespace(returncode=0 if self.real_uvx_ok else 1, stdout="help\n--force\n" if self.real_uvx_ok else "", stderr="" if self.real_uvx_ok else "boom")
         if argv == real_help or argv == real_version:
-            return SimpleNamespace(returncode=0 if self.real_uvx_ok else 1, stdout="help\n" if self.real_uvx_ok else "", stderr="" if self.real_uvx_ok else "boom")
+            return SimpleNamespace(returncode=0 if self.real_uvx_ok else 1, stdout="help\n--force\n" if self.real_uvx_ok else "", stderr="" if self.real_uvx_ok else "boom")
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
 
@@ -132,7 +145,7 @@ class SpeckitReadinessTests(unittest.TestCase):
         report = self._report(target, which=_which_only("uvx"), run=run)
         smoke = next(item for item in report["checks"] if item["name"] == "command help/version smoke check")
         self.assertEqual("PASS", smoke["status"])
-        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"], run.calls)
+        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "init", "--help"], run.calls)
         self.assertNotIn(["uvx", "--help"], run.calls)
         self.assertNotIn(["uvx", "--version"], run.calls)
 
@@ -143,6 +156,7 @@ class SpeckitReadinessTests(unittest.TestCase):
         report = self._report(target, which=_which_only("uvx"), run=run)
         smoke = next(item for item in report["checks"] if item["name"] == "command help/version smoke check")
         self.assertEqual("ACTION", smoke["status"])
+        self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "init", "--help"], run.calls)
         self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"], run.calls)
         self.assertIn(["uvx", "--from", sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"], run.calls)
         self.assertNotIn(["uvx", "--help"], run.calls)
@@ -176,6 +190,45 @@ class SpeckitReadinessTests(unittest.TestCase):
         report = self._report(target, which=lambda _: None, run=_RunStub(git_root=target))
         text = sr.summarize_speckit_readiness(report)
         self.assertIn("Real SpecKit init means `.specify/memory/` exists; `.specify/source/` alone is only the HLDspec mirror.", text)
+
+    def test_init_prereqs_do_not_require_post_init_specify_dirs(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        report = sr.build_speckit_init_prereq_report(
+            target,
+            which=_which_only("specify"),
+            run=_RunStub(git_root=target),
+        )
+        self.assertEqual("PASS", report["status"])
+        check_names = {item["name"] for item in report["checks"]}
+        self.assertNotIn(".specify/ exists", check_names)
+        self.assertNotIn(".specify/memory/ exists", check_names)
+        self.assertNotIn(".specify/source/ exists", check_names)
+        self.assertIn("pre-init only", report["summary"])
+
+    def test_init_prereqs_block_dirty_tree_before_real_init(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        report = sr.build_speckit_init_prereq_report(
+            target,
+            which=_which_only("specify"),
+            run=_RunStub(git_root=target, dirty=True),
+        )
+        self.assertEqual("ACTION", report["status"])
+        self.assertTrue(any("Clean, commit, or stash" in action for action in report["next_actions"]))
+
+    def test_init_prereqs_block_when_init_help_does_not_advertise_force(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        report = sr.build_speckit_init_prereq_report(
+            target,
+            which=_which_only("specify"),
+            run=_RunStub(git_root=target, help_mentions_force=False),
+        )
+        self.assertEqual("ACTION", report["status"])
+        smoke = next(item for item in report["checks"] if item["name"] == "command help/version smoke check")
+        self.assertEqual("ACTION", smoke["status"])
+        self.assertIn("--force", smoke["details"])
 
     def test_cli_speckit_doctor_prints_status_and_next_actions(self) -> None:
         target = self.root / "target"

@@ -103,11 +103,13 @@ def detect_init_commands(
 ) -> tuple[InitCommand, ...]:
     which = which or shutil.which
     commands: list[InitCommand] = []
+    # HLDspec intentionally prepares a non-empty target before real SpecKit init
+    # runs, so the bootstrap command must be non-interactive for known targets.
     if which("specify"):
         commands.append(
             InitCommand(
                 label="specify",
-                argv=("specify", "init", "."),
+                argv=("specify", "init", ".", "--force"),
                 source="local-binary",
             )
         )
@@ -115,7 +117,7 @@ def detect_init_commands(
         commands.append(
             InitCommand(
                 label="spec-kit",
-                argv=("spec-kit", "init", "."),
+                argv=("spec-kit", "init", ".", "--force"),
                 source="local-binary",
             )
         )
@@ -130,6 +132,7 @@ def detect_init_commands(
                     "spec-kit",
                     "init",
                     ".",
+                    "--force",
                 ),
                 source="uvx",
             )

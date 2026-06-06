@@ -51,6 +51,7 @@ class ProjectMachine:
         if context.metadata.get("trigger") == "check_hld":
             self._ensure_check_hld_workspace_hld(adapter, Path(context.source_hld))
             readiness_result = self.hld_readiness.run(context)
+            self._write_check_hld_state(adapter, readiness_result)
             self._log_terminal(context, readiness_result)
             return self._wrap(readiness_result)
 
@@ -293,3 +294,72 @@ class ProjectMachine:
             errors=result.errors,
             runskeptic=result.runskeptic,
         )
+
+    @staticmethod
+    def _write_check_hld_state(adapter: TargetWorkspaceAdapter, result: MachineResult) -> None:
+        checkpoint_kind = result.checkpoint.kind.value if result.checkpoint is not None else ""
+        next_actions = [result.checkpoint.next_action] if result.checkpoint and result.checkpoint.next_action else []
+        freshness_path = adapter.target_root / ".hldspec" / "source_freshness.json"
+        stale_warnings: list[str] = []
+        working_hld_differs = False
+        source_hld_modified = False
+        if freshness_path.exists():
+            try:
+                freshness = json.loads(freshness_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                freshness = {}
+            if isinstance(freshness.get("warnings"), list):
+                stale_warnings = [str(item) for item in freshness["warnings"] if str(item).strip()]
+            working_hld_differs = bool(freshness.get("working_hld_differs_from_source", False))
+            source_hld_modified = bool(freshness.get("source_hld_modified", False))
+        state = {
+            "schema_version": 1,
+            "source_hld_modified": source_hld_modified,
+            "working_hld_modified": working_hld_differs,
+            "current_stage": result.state,
+            "last_completed_stage": "HLD_READINESS_CHECK",
+            "current_checkpoint": checkpoint_kind,
+            "blocking_questions": [
+                {
+                    "question_id": question.question_id,
+                    "title": question.title,
+                    "current_decision": question.current_decision,
+                }
+                for question in (result.checkpoint.open_questions() if result.checkpoint else ())
+            ],
+            "stale_artifact_warnings": stale_warnings,
+            "next_allowed_actions": next_actions,
+            "controlling_artifacts": [ref.path for ref in (result.checkpoint.controlling_artifacts if result.checkpoint else ())],
+            "supporting_artifacts": [ref.path for ref in result.artifacts_written],
+            "legacy_supporting_artifacts": [],
+            "notes": [
+                "Practical HLD readiness review completed through the check HLD trigger.",
+                "This state stops before full SpecKit Preparation, Build Loop init, or implementation.",
+            ],
+        }
+        lines = [
+            "# HLDspec State",
+            "",
+            f"Current stage: `{state['current_stage']}`",
+            f"Current checkpoint: `{state['current_checkpoint']}`",
+            "",
+            "## Next allowed actions",
+            "",
+        ]
+        if next_actions:
+            lines.extend(f"- {action}" for action in next_actions)
+        else:
+            lines.append("- none")
+        lines.extend(["", "## Controlling artifacts", ""])
+        if state["controlling_artifacts"]:
+            lines.extend(f"- {path}" for path in state["controlling_artifacts"])
+        else:
+            lines.append("- none")
+        if stale_warnings:
+            lines.extend(["", "## Stale artifact warnings", ""])
+            lines.extend(f"- {warning}" for warning in stale_warnings)
+        lines.extend(["", "## Notes", ""])
+        lines.extend(f"- {note}" for note in state["notes"])
+        adapter.sync_dir.mkdir(parents=True, exist_ok=True)
+        (adapter.sync_dir / "hldspec_state.json").write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (adapter.sync_dir / "hldspec_state.md").write_text("\n".join(lines) + "\n", encoding="utf-8")

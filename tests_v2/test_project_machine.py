@@ -124,6 +124,12 @@ class ProjectMachineV2Tests(unittest.TestCase):
         self.assertTrue((sync / "hld_cross_examination.md").exists())
         self.assertTrue((sync / "hld_readiness_check.json").exists())
         self.assertTrue((sync / "hld_readiness_check.md").exists())
+        self.assertTrue((sync / "hldspec_state.json").exists())
+        self.assertTrue((sync / "hldspec_state.md").exists())
+        state = json.loads((sync / "hldspec_state.json").read_text(encoding="utf-8"))
+        self.assertEqual("HLD_BLOCKED", state["current_stage"])
+        self.assertEqual("HLD_READINESS_CHECK", state["current_checkpoint"])
+        self.assertTrue(state["next_allowed_actions"])
         assert result.checkpoint is not None
         self.assertIn("Do not invoke SpecKit.", result.checkpoint.forbidden_actions)
         self.assertEqual(source.read_text(encoding="utf-8"), (workspace / "HLD.raw.md").read_text(encoding="utf-8"))

@@ -83,6 +83,14 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
     fsync = firstrun / ".specify" / "sync"
 
     working_hld = workspace / "HLD.md"
+    working_hld_modified = False
+    if working_hld.exists() and source_hld:
+        source_path = Path(source_hld)
+        if source_path.exists():
+            try:
+                working_hld_modified = working_hld.read_text(encoding="utf-8") != source_path.read_text(encoding="utf-8")
+            except OSError:
+                working_hld_modified = False
     conversion_queue = sync / "hld_conversion_decision_queue.json"
     plan_review = fsync / "spec_build_plan_review.md"
     plan_json = fsync / "spec_build_plan.json"
@@ -94,7 +102,7 @@ def build_state(workspace: Path, source_hld: str) -> dict[str, Any]:
         "source_hld": source_hld,
         "workspace": str(workspace),
         "source_hld_modified": False,
-        "working_hld_modified": working_hld.exists(),
+        "working_hld_modified": working_hld_modified,
         "current_stage": "UNKNOWN",
         "last_completed_stage": "",
         "current_checkpoint": "",

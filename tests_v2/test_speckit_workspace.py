@@ -28,12 +28,12 @@ def _which_only(name: str):
 class DetectInitCommandTests(unittest.TestCase):
     def test_detect_local_specify_command(self):
         commands = sw.detect_init_commands(which=_which_only("specify"))
-        self.assertEqual(("specify", "init", "."), commands[0].argv)
-        self.assertEqual("specify init .", commands[0].display)
+        self.assertEqual(("specify", "init", ".", "--force"), commands[0].argv)
+        self.assertEqual("specify init . --force", commands[0].display)
 
     def test_detect_spec_kit_command(self):
         commands = sw.detect_init_commands(which=_which_only("spec-kit"))
-        self.assertEqual(("spec-kit", "init", "."), commands[0].argv)
+        self.assertEqual(("spec-kit", "init", ".", "--force"), commands[0].argv)
 
     def test_build_uvx_fallback_plan(self):
         commands = sw.detect_init_commands(which=_which_only("uvx"))
@@ -45,6 +45,7 @@ class DetectInitCommandTests(unittest.TestCase):
                 "spec-kit",
                 "init",
                 ".",
+                "--force",
             ),
             commands[0].argv,
         )
@@ -150,8 +151,10 @@ class InitPlanningTests(unittest.TestCase):
     def test_validate_specify_exists_after_init(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
+            seen_argv: list[str] = []
 
             def fake_run(argv, cwd, text, capture_output, check):
+                seen_argv[:] = list(argv)
                 (Path(cwd) / ".specify" / "memory").mkdir(parents=True, exist_ok=True)
                 return SimpleNamespace(returncode=0, stdout="ok", stderr="")
 
@@ -166,6 +169,7 @@ class InitPlanningTests(unittest.TestCase):
         self.assertIsNone(result.validation_error)
         self.assertEqual(0, result.returncode)
         self.assertEqual("ok", result.stdout)
+        self.assertEqual(["specify", "init", ".", "--force"], seen_argv)
 
     def test_execute_reports_missing_specify_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -252,7 +256,7 @@ class StartIntegrationTests(unittest.TestCase):
     def _run_start(self):
         fake_command = sw.InitCommand(
             label="specify",
-            argv=("specify", "init", "."),
+            argv=("specify", "init", ".", "--force"),
             source="local-binary",
         )
         with mock.patch.object(facade.sw, "detect_init_commands", return_value=(fake_command,)):
@@ -281,11 +285,11 @@ class StartIntegrationTests(unittest.TestCase):
             ).read_text(encoding="utf-8")
         )
         self.assertEqual(
-            ["specify", "init", "."],
+            ["specify", "init", ".", "--force"],
             agent_session["speckit_workspace_init"]["selected_command"],
         )
         self.assertEqual(
-            ["specify", "init", "."],
+            ["specify", "init", ".", "--force"],
             session_plan["speckit_workspace_init"]["selected_command"],
         )
         self.assertIn("workspace_status", agent_session["speckit_workspace_init"])
@@ -308,7 +312,7 @@ class StartIntegrationTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn(".hldspec/source_package/source_package.json", prompt)
         self.assertIn(".hldspec/source_package/session_plan.json", prompt)
-        self.assertIn("Default mode is dry-run planning only.", prompt)
+        self.assertIn("`hldspec start` records the planned init command without running it.", prompt)
         self.assertFalse((self.target / ".specify").exists())
 
     def test_start_on_existing_initialized_workspace_records_initialized_true(self):

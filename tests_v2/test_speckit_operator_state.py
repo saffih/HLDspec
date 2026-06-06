@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -36,12 +37,16 @@ class _RunStub:
                 if self.git_root is None:
                     return SimpleNamespace(returncode=1, stdout="", stderr="")
                 return SimpleNamespace(returncode=0, stdout=(" M file.txt\n" if self.dirty else ""), stderr="")
+        if argv[:3] in (["specify", "init", "--help"], ["spec-kit", "init", "--help"]):
+            return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
         if argv[:2] in (["specify", "--help"], ["specify", "--version"], ["spec-kit", "--help"], ["spec-kit", "--version"]):
-            return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+            return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
+        if argv[:7] == ["uvx", "--from", sos.sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "init", "--help"]:
+            return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
         if argv[:6] == ["uvx", "--from", sos.sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--help"]:
-            return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+            return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
         if argv[:6] == ["uvx", "--from", sos.sr.sw.SPEC_KIT_UVX_SOURCE, "spec-kit", "--version"]:
-            return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+            return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
 
@@ -133,6 +138,45 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertTrue(report["source_facts_used"])
         self.assertEqual("PASS", report["readiness_report"]["status"])
         self.assertIn("readiness/preflight only", report["doctor_note"])
+
+    def test_managed_workspace_with_stale_source_freshness_blocks_operator_state(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
+        (target / ".hldspec" / "source_freshness.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "working_hld_differs_from_source": True,
+                    "warnings": ["workspace HLD differs from source"],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("SOURCE_FRESHNESS_BLOCKED", report["state"])
+        self.assertIn("workspace HLD differs from source", report["blockers"])
+
+    def test_managed_workspace_missing_source_freshness_blocks_operator_state(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("SOURCE_FRESHNESS_BLOCKED", report["state"])
+        self.assertTrue(any("source_freshness.json" in item for item in report["blockers"]))
 
     def test_operator_state_read_does_not_create_sync_dir(self) -> None:
         target = self.root / "target"

@@ -22,6 +22,7 @@ STATE_TARGET_DIRTY = "TARGET_DIRTY"
 STATE_SOURCE_PACKAGE_MISSING = "SOURCE_PACKAGE_MISSING"
 STATE_SPECKIT_NOT_INITIALIZED = "SPECKIT_NOT_INITIALIZED"
 STATE_BRANCH_POLICY_MISSING = "BRANCH_POLICY_MISSING"
+STATE_SOURCE_FRESHNESS_BLOCKED = "SOURCE_FRESHNESS_BLOCKED"
 STATE_REASSESSMENT_REQUIRED = "REASSESSMENT_REQUIRED"
 STATE_READY_FOR_SPECIFY = "READY_FOR_SPECIFY"
 STATE_SPECIFY_ACTIVE = "SPECIFY_ACTIVE"
@@ -67,6 +68,40 @@ def _specs_tree_has_files(specs_root: Path) -> bool:
         return specs_root.is_dir() and any(path.is_file() for path in specs_root.rglob("*"))
     except OSError:
         return False
+
+
+def _source_freshness_gate(target: Path) -> dict[str, Any]:
+    path = target / ".hldspec" / "source_freshness.json"
+    managed = (target / ".hldspec" / "agent_session.json").is_file() or (
+        target / ".hldspec" / "source_package" / "session_plan.json"
+    ).is_file()
+    if not path.exists():
+        return {
+            "state": "absent" if managed else "not_managed",
+            "blocking": managed,
+            "warnings": ["Missing .hldspec/source_freshness.json for this HLDspec-managed target."] if managed else [],
+            "path": str(path),
+        }
+    try:
+        import json
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {
+            "state": "invalid",
+            "blocking": True,
+            "warnings": [f"Invalid source freshness metadata: {exc}"],
+            "path": str(path),
+        }
+    warnings = data.get("warnings", [])
+    warning_list = [str(item) for item in warnings if str(item).strip()] if isinstance(warnings, list) else []
+    stale = bool(data.get("working_hld_differs_from_source") or warning_list)
+    return {
+        "state": "stale" if stale else "fresh",
+        "blocking": stale,
+        "warnings": warning_list,
+        "path": str(path),
+    }
 
 
 def _lifecycle_state_from_execution(target: Path) -> dict[str, Any]:
@@ -207,6 +242,7 @@ def build_speckit_operator_state_report(
     git_root = readiness.get("git_root")
     git_branch = readiness.get("git_branch")
     dirty_tree = readiness.get("dirty_tree")
+    freshness = _source_freshness_gate(target_path)
 
     evidence: list[dict[str, Any]] = [
         {"fact": "target_path", "value": str(target_path)},
@@ -222,6 +258,8 @@ def build_speckit_operator_state_report(
         {"fact": "selected_init_command", "value": selected_init_command},
         {"fact": "available_init_commands", "value": available_init_commands},
         {"fact": "available_init_command_labels", "value": _list_command_labels(readiness)},
+        {"fact": "source_freshness_state", "value": freshness.get("state")},
+        {"fact": "source_freshness_path", "value": freshness.get("path")},
     ]
 
     blockers: list[str] = []
@@ -234,6 +272,11 @@ def build_speckit_operator_state_report(
         state = STATE_BLOCKED
         blockers.append("SpecKit readiness reported CONFLICT.")
         next_safe_action = "Resolve conflicting readiness evidence, then rerun operator-state."
+    elif freshness.get("blocking"):
+        status = "ACTION"
+        state = STATE_SOURCE_FRESHNESS_BLOCKED
+        blockers.extend(str(item) for item in freshness.get("warnings", []) if str(item).strip())
+        next_safe_action = "Reconcile source freshness before rerunning operator-state or starting Build Loop work."
     elif git_root is None:
         status = "ACTION"
         state = STATE_TARGET_NOT_GIT
@@ -318,6 +361,7 @@ def build_speckit_operator_state_report(
             "git_branch": git_branch,
             "dirty_tree": dirty_tree,
             "source_package_exists": source_package_exists,
+            "source_freshness": freshness,
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,

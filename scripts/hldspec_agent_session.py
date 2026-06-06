@@ -17,13 +17,14 @@ if str(ROOT) not in sys.path:
 
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
+from hldspec.minimal_agent_request import _workflow_trigger_candidates, detect_workflow_trigger, parse_minimal_agent_request
 from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
 from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
-from hldspec.state_machine import ExitCode, MachineContext
+from hldspec.state_machine import ArtifactRef, CheckpointKind, ExitCode, MachineContext, MachineResult, human_checkpoint
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 SESSION_SCHEMA_VERSION = "1.0"
@@ -126,8 +127,428 @@ def next_safe_action(session: dict[str, Any], blockers: list[str], open_question
     if blockers:
         return "Resolve ACTION/CONFLICT blockers, then rerun status or doctor."
     if open_questions:
+        if str(session.get("workflow_trigger") or "") in {"check_hld", "build_loop_prereqs", "build_loop_init", "build_loop_ready"}:
+            return str(session.get("next_action") or "Resolve the current checkpoint blockers, then rerun hldspec continue.")
         return "Answer open human questions, then rerun hldspec continue."
     return str(session.get("next_action") or "Run hldspec review --target <target> or hldspec continue --target <target>.")
+
+
+def source_freshness(target: Path) -> dict[str, Any]:
+    path = target / ".hldspec" / "source_freshness.json"
+    data = json_read(path)
+    if not data:
+        managed = (target / ".hldspec" / "agent_session.json").is_file() or (
+            target / ".hldspec" / "source_package" / "session_plan.json"
+        ).is_file()
+        return {
+            "state": "absent" if managed else "not_managed",
+            "warnings": [f"Missing source freshness metadata: {path}"] if managed else [],
+            "working_hld_differs_from_source": False,
+            "blocking": managed,
+        }
+    data.setdefault("state", "stale" if data.get("working_hld_differs_from_source") or data.get("warnings") else "fresh")
+    data.setdefault("blocking", data["state"] != "fresh")
+    return data
+
+
+def source_freshness_warnings(target: Path) -> list[str]:
+    data = source_freshness(target)
+    warnings = data.get("warnings", [])
+    if not isinstance(warnings, list):
+        return []
+    return [str(item) for item in warnings if str(item).strip()]
+
+
+def source_freshness_blocks_build_loop(target: Path) -> bool:
+    data = source_freshness(target)
+    return bool(data.get("blocking") or data.get("working_hld_differs_from_source") or source_freshness_warnings(target))
+
+
+def active_workflow_report_path(target: Path, session: dict[str, Any]) -> Path | None:
+    trigger = str(session.get("workflow_trigger") or "")
+    mapping = {
+        "check_hld": target / ".hldspec" / "sync" / "hld_readiness_check.json",
+        "build_loop_prereqs": target / ".hldspec" / "sync" / "build_loop_prereqs_report.json",
+        "build_loop_init": target / ".hldspec" / "sync" / "build_loop_init_report.json",
+        "build_loop_ready": target / ".hldspec" / "sync" / "build_loop_ready_report.json",
+    }
+    return mapping.get(trigger)
+
+
+def active_workflow_blockers(target: Path, session: dict[str, Any]) -> tuple[list[str], str | None]:
+    blockers: list[str] = []
+    next_action: str | None = None
+    for warning in source_freshness_warnings(target):
+        blockers.append(f"Source freshness: {warning}")
+    report_path = active_workflow_report_path(target, session)
+    report = json_read(report_path) if report_path else {}
+    if report:
+        status = str(report.get("status") or "").upper()
+        state = str(report.get("state") or "")
+        if status in {"ACTION", "CONFLICT"}:
+            label = state or report_path.name if report_path else "workflow report"
+            blockers.append(f"Workflow report: {status} ({label})")
+        for item in report.get("blockers") or report.get("warnings") or []:
+            if str(item).strip():
+                blockers.append(str(item))
+        preflight = report.get("approval_preflight")
+        if isinstance(preflight, dict):
+            for item in preflight.get("blockers") or []:
+                if str(item).strip():
+                    blockers.append(str(item))
+        if isinstance(report.get("next_safe_action"), str) and report["next_safe_action"].strip():
+            next_action = str(report["next_safe_action"])
+        elif isinstance(report.get("next_actions"), list) and report["next_actions"]:
+            next_action = str(report["next_actions"][0])
+    state_data = json_read(target / ".hldspec" / "sync" / "hldspec_state.json")
+    if state_data:
+        for warning in state_data.get("stale_artifact_warnings") or []:
+            if str(warning).strip():
+                blockers.append(f"Stale artifact: {warning}")
+        allowed = state_data.get("next_allowed_actions")
+        if not next_action and isinstance(allowed, list) and allowed:
+            next_action = str(allowed[0])
+    return sorted(dict.fromkeys(blockers)), next_action
+
+
+def update_session_after_result(target: Path, result: MachineResult) -> None:
+    session_path = target / ".hldspec" / "agent_session.json"
+    session = json_read(session_path)
+    if not session:
+        return
+    session["last_machine"] = result.machine
+    session["last_state"] = result.state
+    session["last_status"] = result.status.value
+    if result.checkpoint is not None:
+        session["last_checkpoint_kind"] = result.checkpoint.kind.value
+        session["next_action"] = result.checkpoint.next_action or session.get("next_action", "")
+    elif result.actions_run:
+        session["next_action"] = session.get("next_action", "")
+    json_write(session_path, session)
+
+
+def _write_workflow_state(
+    target: Path,
+    *,
+    current_stage: str,
+    checkpoint_kind: CheckpointKind,
+    next_action: str,
+    controlling_artifacts: list[Path],
+    notes: list[str],
+) -> None:
+    sync = target / ".hldspec" / "sync"
+    freshness = source_freshness(target)
+    stale_warnings = source_freshness_warnings(target)
+    state = {
+        "schema_version": 1,
+        "source_hld_modified": bool(freshness.get("source_hld_modified", False)),
+        "working_hld_modified": bool(freshness.get("working_hld_differs_from_source", False)),
+        "current_stage": current_stage,
+        "last_completed_stage": checkpoint_kind.value,
+        "current_checkpoint": checkpoint_kind.value,
+        "blocking_questions": [],
+        "stale_artifact_warnings": stale_warnings,
+        "next_allowed_actions": [next_action] if next_action else [],
+        "controlling_artifacts": [str(path) for path in controlling_artifacts],
+        "supporting_artifacts": [],
+        "legacy_supporting_artifacts": [],
+        "notes": notes,
+    }
+    lines = [
+        "# HLDspec State",
+        "",
+        f"Current stage: `{state['current_stage']}`",
+        f"Current checkpoint: `{state['current_checkpoint']}`",
+        "",
+        "## Next allowed actions",
+        "",
+    ]
+    lines.extend([f"- {next_action}"] if next_action else ["- none"])
+    lines.extend(["", "## Controlling artifacts", ""])
+    lines.extend([f"- {path}" for path in state["controlling_artifacts"]] if state["controlling_artifacts"] else ["- none"])
+    if stale_warnings:
+        lines.extend(["", "## Stale artifact warnings", ""])
+        lines.extend(f"- {warning}" for warning in stale_warnings)
+    lines.extend(["", "## Notes", ""])
+    lines.extend(f"- {note}" for note in notes)
+    json_write(sync / "hldspec_state.json", state)
+    (sync / "hldspec_state.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_report(sync: Path, stem: str, payload: dict[str, Any], markdown: str) -> tuple[Path, Path]:
+    json_path = sync / f"{stem}.json"
+    md_path = sync / f"{stem}.md"
+    json_write(json_path, payload)
+    md_path.write_text(markdown, encoding="utf-8")
+    return json_path, md_path
+
+
+def _build_loop_checkpoint(
+    *,
+    state: str,
+    kind: CheckpointKind,
+    blocking_reason: str,
+    next_action: str,
+    report_paths: tuple[Path, Path],
+    forbidden_actions: tuple[str, ...],
+) -> MachineResult:
+    return human_checkpoint(
+        machine="BuildLoopWorkflow",
+        state=state,
+        kind=kind,
+        blocking_reason=blocking_reason,
+        questions=(),
+        controlling_artifacts=(
+            ArtifactRef(path=str(report_paths[0]), role="workflow_report_json"),
+            ArtifactRef(path=str(report_paths[1]), role="workflow_report_md"),
+        ),
+        next_action=next_action,
+        forbidden_actions=forbidden_actions,
+    )
+
+
+def run_workflow_trigger(target: Path, session: dict[str, Any]) -> MachineResult | None:
+    workflow_trigger = str(session.get("workflow_trigger") or "")
+    if workflow_trigger not in {"build_loop_prereqs", "build_loop_init", "build_loop_ready"}:
+        return None
+
+    sync = target / ".hldspec" / "sync"
+    sync.mkdir(parents=True, exist_ok=True)
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+    source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
+
+    if source_freshness_blocks_build_loop(target):
+        warnings = source_freshness_warnings(target)
+        payload = {
+            "schema_version": 1,
+            "status": "ACTION",
+            "state": "SOURCE_FRESHNESS_BLOCKED",
+            "warnings": warnings,
+            "next_safe_action": "Reconcile targetHLD/HLD.md with the current source HLD or rerun the HLD update/conversion flow before Build Loop work.",
+        }
+        lines = [
+            "# Build Loop Source Freshness Blocker",
+            "",
+            "STATUS: ACTION",
+            "State: SOURCE_FRESHNESS_BLOCKED",
+            "",
+            "Warnings:",
+        ]
+        lines.extend(f"- {warning}" for warning in warnings)
+        lines.extend(["", f"Next safe action: {payload['next_safe_action']}", ""])
+        report_name = {
+            "build_loop_prereqs": "build_loop_prereqs_report",
+            "build_loop_init": "build_loop_init_report",
+            "build_loop_ready": "build_loop_ready_report",
+        }[workflow_trigger]
+        paths = _write_report(sync, report_name, payload, "\n".join(lines))
+        _write_workflow_state(
+            target,
+            current_stage="SOURCE_FRESHNESS_BLOCKED",
+            checkpoint_kind={
+                "build_loop_prereqs": CheckpointKind.BUILD_LOOP_PREREQS,
+                "build_loop_init": CheckpointKind.BUILD_LOOP_INIT,
+                "build_loop_ready": CheckpointKind.BUILD_LOOP_READY,
+            }[workflow_trigger],
+            next_action=str(payload["next_safe_action"]),
+            controlling_artifacts=[paths[0], paths[1]],
+            notes=["Build Loop refused to proceed because the workspace HLD copy does not match current source truth."],
+        )
+        return _build_loop_checkpoint(
+            state="SOURCE_FRESHNESS_BLOCKED",
+            kind={
+                "build_loop_prereqs": CheckpointKind.BUILD_LOOP_PREREQS,
+                "build_loop_init": CheckpointKind.BUILD_LOOP_INIT,
+                "build_loop_ready": CheckpointKind.BUILD_LOOP_READY,
+            }[workflow_trigger],
+            blocking_reason="Source HLD freshness blocks Build Loop work.",
+            next_action=str(payload["next_safe_action"]),
+            report_paths=paths,
+            forbidden_actions=("Do not run SpecKit init.", "Do not start /speckit.specify.", "Do not implement app code."),
+        )
+
+    if workflow_trigger == "build_loop_prereqs":
+        report = sr.build_speckit_init_prereq_report(target)
+        paths = _write_report(sync, "build_loop_prereqs_report", report, sr.summarize_speckit_init_prereqs(report))
+        state = "INIT_PREREQS_READY" if report.get("status") == "PASS" else "INIT_PREREQS_BLOCKED"
+        next_action = str((report.get("next_actions") or ["Use Build Loop init after prerequisite blockers are resolved or remain PASS."])[0])
+        _write_workflow_state(
+            target,
+            current_stage=state,
+            checkpoint_kind=CheckpointKind.BUILD_LOOP_PREREQS,
+            next_action=next_action,
+            controlling_artifacts=[paths[0], paths[1]],
+            notes=["Build Loop prereqs checks install/init/git/branch/dirty-tree readiness only.", "Real SpecKit init was not executed."],
+        )
+        return _build_loop_checkpoint(
+            state=state,
+            kind=CheckpointKind.BUILD_LOOP_PREREQS,
+            blocking_reason="Build Loop prerequisite checkpoint completed.",
+            next_action=next_action,
+            report_paths=paths,
+            forbidden_actions=("Do not start /speckit.specify.", "Do not implement app code."),
+        )
+
+    if workflow_trigger == "build_loop_init":
+        prereq_report = sr.build_speckit_init_prereq_report(target)
+        if prereq_report.get("status") != "PASS":
+            payload = {
+                "prereq_report": prereq_report,
+                "init_result": None,
+                "mirror_synced": False,
+            }
+            lines = [
+                "# Build Loop Init Report",
+                "",
+                "- initialized: `false`",
+                "- executed: `false`",
+                "- selected command: `none`",
+                "- mirror synced: `false`",
+                "",
+                sr.summarize_speckit_init_prereqs(prereq_report).rstrip(),
+                "",
+            ]
+            paths = _write_report(sync, "build_loop_init_report", payload, "\n".join(lines))
+            next_action = str((prereq_report.get("next_actions") or ["Repair Build Loop init prerequisites, then rerun Build Loop init."])[0])
+            _write_workflow_state(
+                target,
+                current_stage="INIT_PREREQS_BLOCKED",
+                checkpoint_kind=CheckpointKind.BUILD_LOOP_INIT,
+                next_action=next_action,
+                controlling_artifacts=[paths[0], paths[1]],
+                notes=["Build Loop init refused to execute real SpecKit init because pre-init prerequisites did not PASS."],
+            )
+            return _build_loop_checkpoint(
+                state="INIT_PREREQS_BLOCKED",
+                kind=CheckpointKind.BUILD_LOOP_INIT,
+                blocking_reason="Build Loop init prerequisites are blocked.",
+                next_action=next_action,
+                report_paths=paths,
+                forbidden_actions=("Do not run SpecKit init until INIT_PREREQS_READY.", "Do not start /speckit.specify.", "Do not implement app code."),
+            )
+
+        init_result = sw.plan_or_init_workspace(target, execute=True)
+        if init_result.workspace_status and init_result.workspace_status.initialized and adapter.working_hld.exists():
+            build_source_package_content(
+                target,
+                adapter.working_hld.read_text(encoding="utf-8"),
+                hld_source_ref=str(source or adapter.working_hld),
+                materialize_mirror=True,
+            )
+        report = sr.build_speckit_readiness_report(target)
+        payload = {
+            "prereq_report": prereq_report,
+            "init_result": init_result.metadata(),
+            "readiness_report": report,
+            "mirror_synced": bool((target / ".specify" / "source").is_dir()),
+        }
+        lines = [
+            "# Build Loop Init Report",
+            "",
+            f"- initialized: `{str(init_result.workspace_status.initialized if init_result.workspace_status else False).lower()}`",
+            f"- executed: `{str(init_result.executed).lower()}`",
+            f"- selected command: `{init_result.selected.display if init_result.selected else 'none'}`",
+            f"- mirror synced: `{str((target / '.specify' / 'source').is_dir()).lower()}`",
+            "",
+            sr.summarize_speckit_readiness(report).rstrip(),
+            "",
+        ]
+        paths = _write_report(sync, "build_loop_init_report", payload, "\n".join(lines))
+        initialized = bool(init_result.workspace_status and init_result.workspace_status.initialized)
+        mirrored = bool((target / ".specify" / "source").is_dir())
+        state = "MIRROR_SYNCED" if initialized and mirrored else ("WORKSPACE_INITIALIZED" if initialized else "BUILD_LOOP_INIT_BLOCKED")
+        next_action = (
+            "Use Build Loop ready to verify READY_FOR_SPECIFY once branch/gate prerequisites remain PASS."
+            if initialized
+            else str((report.get("next_actions") or ["Repair SpecKit init blockers, then rerun Build Loop init."])[0])
+        )
+        _write_workflow_state(
+            target,
+            current_stage=state,
+            checkpoint_kind=CheckpointKind.BUILD_LOOP_INIT,
+            next_action=next_action,
+            controlling_artifacts=[paths[0], paths[1]],
+            notes=["Build Loop init performs or validates real SpecKit init.", "When initialization succeeds, HLDspec rematerializes the .specify/source mirror from the current source package."],
+        )
+        return _build_loop_checkpoint(
+            state=state,
+            kind=CheckpointKind.BUILD_LOOP_INIT,
+            blocking_reason="Build Loop init checkpoint completed.",
+            next_action=next_action,
+            report_paths=paths,
+            forbidden_actions=("Do not start /speckit.specify unless READY_FOR_SPECIFY is reached.", "Do not implement app code."),
+        )
+
+    prereq_report = sr.build_speckit_init_prereq_report(target)
+    if prereq_report.get("status") != "PASS":
+        payload = {
+            "prereq_report": prereq_report,
+            "operator_state_report": None,
+            "init_result": None,
+            "mirror_synced": False,
+        }
+        paths = _write_report(sync, "build_loop_ready_report", payload, sr.summarize_speckit_init_prereqs(prereq_report))
+        next_action = str((prereq_report.get("next_actions") or ["Repair Build Loop prerequisites, then rerun Build Loop ready."])[0])
+        _write_workflow_state(
+            target,
+            current_stage="INIT_PREREQS_BLOCKED",
+            checkpoint_kind=CheckpointKind.BUILD_LOOP_READY,
+            next_action=next_action,
+            controlling_artifacts=[paths[0], paths[1]],
+            notes=["Build Loop ready refused to execute real SpecKit init because pre-init prerequisites did not PASS."],
+        )
+        return _build_loop_checkpoint(
+            state="INIT_PREREQS_BLOCKED",
+            kind=CheckpointKind.BUILD_LOOP_READY,
+            blocking_reason="Build Loop ready prerequisites are blocked.",
+            next_action=next_action,
+            report_paths=paths,
+            forbidden_actions=("Do not run SpecKit init until INIT_PREREQS_READY.", "Do not start /speckit.specify.", "Do not implement app code."),
+        )
+
+    init_result = sw.plan_or_init_workspace(target, execute=True)
+    if init_result.workspace_status and init_result.workspace_status.initialized and adapter.working_hld.exists():
+        build_source_package_content(
+            target,
+            adapter.working_hld.read_text(encoding="utf-8"),
+            hld_source_ref=str(source or adapter.working_hld),
+            materialize_mirror=True,
+        )
+    report = sos.build_speckit_operator_state_report(target)
+    preflight = sc.session_continue_preflight(target)
+    if report.get("state") == sos.STATE_READY_FOR_SPECIFY and preflight.gated and not preflight.allowed:
+        blockers = [str(item) for item in preflight.blockers if str(item).strip()]
+        report["status"] = "ACTION"
+        report["state"] = "SPECKIT_APPROVAL_GATE_BLOCKED"
+        report["next_safe_action"] = (
+            "Provide a valid Context Receipt + Phase Report, RunSkeptic/consultant PASS, validation PASS, and human approval before /speckit.specify."
+        )
+        report["blockers"] = (report.get("blockers") or []) + blockers
+        report["approval_preflight"] = {
+            "gated": preflight.gated,
+            "allowed": preflight.allowed,
+            "gate": preflight.gate,
+            "blockers": blockers,
+        }
+    paths = _write_report(sync, "build_loop_ready_report", report, sos.summarize_speckit_operator_state(report))
+    state = str(report.get("state", "ACTION"))
+    next_action = str(report.get("next_safe_action") or "Resolve Build Loop blockers, then rerun Build Loop ready.")
+    _write_workflow_state(
+        target,
+        current_stage=state,
+        checkpoint_kind=CheckpointKind.BUILD_LOOP_READY,
+        next_action=next_action,
+        controlling_artifacts=[paths[0], paths[1]],
+        notes=["Build Loop ready drives to READY_FOR_SPECIFY when all readiness and lifecycle gates pass.", "This checkpoint stops before /speckit.specify."],
+    )
+    return _build_loop_checkpoint(
+        state=state,
+        kind=CheckpointKind.BUILD_LOOP_READY,
+        blocking_reason="Build Loop ready checkpoint completed.",
+        next_action=next_action,
+        report_paths=paths,
+        forbidden_actions=("Do not start /speckit.specify unless this checkpoint reaches READY_FOR_SPECIFY.", "Do not implement app code."),
+    )
 
 
 def summary_status(blockers: list[str], conflicts: list[str] | None = None) -> str:
@@ -182,13 +603,32 @@ def detect_mode(target: Path, source_hash: str | None, requested_mode: str) -> s
     return "resume"
 
 
-def copy_source(source: Path, target: Path) -> None:
+def copy_source(source: Path, target: Path) -> dict[str, Any]:
     raw = target / "targetHLD" / "raw" / "HLD.raw.md"
     working = target / "targetHLD" / "HLD.md"
     raw.parent.mkdir(parents=True, exist_ok=True)
+    source_text = source.read_text(encoding="utf-8")
+    working_existed = working.exists()
+    working_differs = working_existed and working.read_text(encoding="utf-8") != source_text
     shutil.copyfile(source, raw)
     if not working.exists():
         shutil.copyfile(source, working)
+    warnings: list[str] = []
+    if working_differs:
+        warnings.append(
+            "Source HLD content differs from the existing workspace HLD copy; conversion/update must reconcile targetHLD/HLD.md before derived artifacts are promoted."
+        )
+    freshness = {
+        "schema_version": 1,
+        "source": str(source),
+        "raw_copy": str(raw),
+        "working_copy": str(working),
+        "working_hld_existed": working_existed,
+        "working_hld_differs_from_source": working_differs,
+        "warnings": warnings,
+    }
+    json_write(target / ".hldspec" / "source_freshness.json", freshness)
+    return freshness
 
 
 def classify_intent(comment: str, mode: str) -> str:
@@ -294,10 +734,42 @@ def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
     mode = session["mode"]
     agent = session["agent"]
     comment = session.get("comment") or ""
+    workflow_trigger = session.get("workflow_trigger") or "default"
 
     speckit_plan = session.get("speckit_workspace_init", {})
     selected_command = speckit_plan.get("selected_command")
     selected_command_text = " ".join(selected_command) if isinstance(selected_command, list) else "BLOCKED"
+    stop_boundary = {
+        "check_hld": "Stop after the HLD readiness verdict, grouped clarification questions, and auxiliary reason trail.",
+        "build_loop_prereqs": "Stop after the Build Loop prerequisite report. Do not run real SpecKit init.",
+        "build_loop_init": "Stop after real SpecKit init validation and post-init mirror sync when applicable.",
+        "build_loop_ready": "Stop at READY_FOR_SPECIFY or the first blocking Build Loop checkpoint.",
+    }.get(workflow_trigger, "Stop after the next safe checkpoint and report:")
+    first_tool = {
+        "check_hld": f'scripts/hldspec continue --target "{target}"   # routes to check HLD readiness and stops before SpecKit Preparation',
+        "build_loop_prereqs": f'scripts/hldspec continue --target "{target}"   # routes to Build Loop prerequisite checking only',
+        "build_loop_init": f'scripts/hldspec continue --target "{target}"   # routes to real SpecKit init validation and mirror sync',
+        "build_loop_ready": f'scripts/hldspec continue --target "{target}"   # routes to READY_FOR_SPECIFY when all gates pass',
+    }.get(workflow_trigger, f'scripts/hldspec continue --target "{target}"')
+    init_boundary = {
+        "build_loop_init": (
+            "- `hldspec start` records the planned init command without running it.\n"
+            "- This `Build Loop init` trigger is an explicit request for `continue` to run or validate real SpecKit init and then stop.\n"
+            "- If SpecKit init is blocked, stop and report the blocker. Do not hand-create `.specify/`, `spec.md`, `plan.md`, `tasks.md`, or other final SpecKit artifacts."
+        ),
+        "build_loop_ready": (
+            "- `hldspec start` records the planned init command without running it.\n"
+            "- This `Build Loop ready` trigger is an explicit request for `continue` to run or validate real SpecKit init, sync the mirror, and stop at READY_FOR_SPECIFY or the first blocker.\n"
+            "- Do not start `/speckit.specify` unless the checkpoint reaches READY_FOR_SPECIFY."
+        ),
+    }.get(
+        workflow_trigger,
+        (
+            "- `hldspec start` records the planned init command without running it.\n"
+            "- Run real SpecKit init only through an explicit Build Loop init/ready trigger or an explicit maintainer `--execute` path.\n"
+            "- If SpecKit init is blocked, stop and report the blocker. Do not hand-create `.specify/`, `spec.md`, `plan.md`, `tasks.md`, or other final SpecKit artifacts."
+        ),
+    )
     prompt.write_text(
         f"""# HLDspec Agent Session
 
@@ -311,6 +783,7 @@ This is an agent-first workflow. Scripts are tools. You own orchestration, judgm
 
 - Agent: `{agent}`
 - Mode: `{mode}`
+- Workflow trigger: `{workflow_trigger}`
 - Source: `{source}`
 - Target: `{target}`
 - Comment: `{comment}`
@@ -331,7 +804,7 @@ This is an agent-first workflow. Scripts are tools. You own orchestration, judgm
 ## First tools to consider
 
 ```bash
-scripts/hldspec continue --target "{target}"
+{first_tool}
 ```
 
 Then inspect:
@@ -383,13 +856,11 @@ create agent on {{path}} as {{session-name}} using model {{model}} [permission-m
 ## SpecKit workspace/init boundary
 
 - Planned init command: `{selected_command_text}`
-- Default mode is dry-run planning only.
-- Execute init only with explicit `--execute`.
-- If SpecKit init is blocked, stop and report the blocker. Do not hand-create `.specify/`, `spec.md`, `plan.md`, `tasks.md`, or other final SpecKit artifacts.
+{init_boundary}
 
 ## Stop condition
 
-Stop after the next safe checkpoint and report:
+{stop_boundary}
 
 - files created or changed
 - RunSkeptic PASS/ACTION/CONFLICT findings
@@ -444,8 +915,42 @@ speckit_workspace: {adapter.specify_dir}
 
 
 def command_start(args: argparse.Namespace) -> int:
-    source = Path(args.source).expanduser().resolve()
-    target = Path(args.target).expanduser().resolve()
+    source_arg = args.source
+    target_arg = args.target
+    comment = args.comment or ""
+    requested_runtime: str | None = None
+    effective_agent = args.agent
+
+    if args.request:
+        try:
+            parsed = parse_minimal_agent_request(args.request)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        source_arg = parsed.source_hld
+        target_arg = parsed.target_workspace
+        if not comment:
+            comment = parsed.comment
+        requested_runtime = parsed.runtime
+        if args.agent == "manual":
+            effective_agent = parsed.runtime
+    else:
+        workflow_candidates = _workflow_trigger_candidates(comment)
+        if len(workflow_candidates) > 1:
+            print(
+                "ERROR: ambiguous HLDspec workflow trigger: "
+                + ", ".join(workflow_candidates)
+                + ". Ask for exactly one of: check HLD, Build Loop prereqs, Build Loop init, Build Loop ready.",
+                file=sys.stderr,
+            )
+            return 2
+
+    if not source_arg or not target_arg:
+        print("ERROR: start requires either --request or both --source and --target", file=sys.stderr)
+        return 2
+
+    source = Path(source_arg).expanduser().resolve()
+    target = Path(target_arg).expanduser().resolve()
 
     if not source.exists() or not source.is_file():
         print(f"ERROR: source HLD not found: {source}", file=sys.stderr)
@@ -462,9 +967,11 @@ def command_start(args: argparse.Namespace) -> int:
     manifest = {
         "schema_version": SESSION_SCHEMA_VERSION,
         "created_or_updated_at": timestamp,
-        "agent": args.agent,
+        "agent": effective_agent,
+        "requested_runtime": requested_runtime,
         "mode": mode,
-        "comment": args.comment or "",
+        "workflow_trigger": detect_workflow_trigger(comment),
+        "comment": comment,
         "source": {
             "path": str(source),
             "sha256": source_hash,
@@ -482,15 +989,20 @@ def command_start(args: argparse.Namespace) -> int:
             "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
         },
         "speckit_workspace_init": speckit_init.metadata(),
-        "next_action": "Open prompts/agent/START_HLDSPEC_AGENT.md in an agent session.",
+        "next_action": {
+            "check_hld": "Run hldspec continue to execute the HLD readiness check and stop after the readiness verdict.",
+            "build_loop_prereqs": "Run hldspec continue to execute the Build Loop prerequisite checkpoint and stop after the prerequisite report.",
+            "build_loop_init": "Run hldspec continue to execute the Build Loop init checkpoint and stop after real init validation.",
+            "build_loop_ready": "Run hldspec continue to drive the target to READY_FOR_SPECIFY or the first blocking Build Loop checkpoint.",
+        }.get(detect_workflow_trigger(comment), "Open prompts/agent/START_HLDSPEC_AGENT.md in an agent session."),
     }
     interview_answers = build_interview_answers(
         source=source,
         source_hash=source_hash,
         target=target,
         mode=mode,
-        agent=args.agent,
-        comment=args.comment or "",
+        agent=effective_agent,
+        comment=comment,
         timestamp=timestamp,
     )
     json_write(target / ".hldspec" / "agent_session.json", manifest)
@@ -581,6 +1093,7 @@ def command_status(args: argparse.Namespace) -> int:
     validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
     promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
     open_questions = collect_open_questions(target)
+    workflow_blockers, workflow_next_action = active_workflow_blockers(target, session)
     blockers: list[str] = []
     conflicts: list[str] = []
     for label, status, path in [
@@ -591,11 +1104,13 @@ def command_status(args: argparse.Namespace) -> int:
             conflicts.append(f"{label}: {status} ({path})")
         elif status == "ACTION":
             blockers.append(f"{label}: {status} ({path})")
+    blockers.extend(workflow_blockers)
 
     source = session.get("source", {}).get("path", "UNKNOWN") if isinstance(session.get("source"), dict) else "UNKNOWN"
     print("## HLDspec Status")
     print(f"Target: {target}")
     print(f"Mode: {session.get('mode', 'UNKNOWN')}")
+    print(f"Workflow trigger: {session.get('workflow_trigger') or 'default'}")
     print(f"Source: {source}")
     print(f"Current state: {current_state(target, session)}")
     print("")
@@ -610,13 +1125,15 @@ def command_status(args: argparse.Namespace) -> int:
     print_bullet_list(open_questions)
     print("")
     print("## Next Safe Action")
-    print(next_safe_action(session, conflicts + blockers, open_questions))
+    print(workflow_next_action or next_safe_action(session, conflicts + blockers, open_questions))
     return 0
 
 
 def command_review(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+    session = json_read(target / ".hldspec" / "agent_session.json")
+    workflow_trigger = session.get("workflow_trigger") if isinstance(session, dict) else None
     blocking_paths = [
         target / ".hldspec" / "constitution_update_plan.md",
         target / ".hldspec" / "feature_dependency_graph.md",
@@ -631,6 +1148,24 @@ def command_review(args: argparse.Namespace) -> int:
         target / ".hldspec" / "validation" / "context_prompt_validation.md",
         target / ".hldspec" / "validation" / "promotion_gate.md",
     ]
+    if workflow_trigger == "check_hld":
+        blocking_paths = [
+            adapter.sync_dir / "hld_cross_examination.md",
+            adapter.sync_dir / "hld_readiness_check.md",
+        ]
+        optional_paths = [
+            adapter.sync_dir / "hld_cross_examination.json",
+            adapter.sync_dir / "hld_readiness_check.json",
+        ]
+    elif workflow_trigger == "build_loop_prereqs":
+        blocking_paths = [adapter.sync_dir / "build_loop_prereqs_report.md"]
+        optional_paths = [adapter.sync_dir / "build_loop_prereqs_report.json"]
+    elif workflow_trigger == "build_loop_init":
+        blocking_paths = [adapter.sync_dir / "build_loop_init_report.md"]
+        optional_paths = [adapter.sync_dir / "build_loop_init_report.json"]
+    elif workflow_trigger == "build_loop_ready":
+        blocking_paths = [adapter.sync_dir / "build_loop_ready_report.md"]
+        optional_paths = [adapter.sync_dir / "build_loop_ready_report.json"]
     print("## HLDspec Review")
     print("")
     print("## Blocking Review Files")
@@ -655,11 +1190,13 @@ def command_review(args: argparse.Namespace) -> int:
 
 def command_continue(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
+    session = json_read(target / ".hldspec" / "agent_session.json")
+    workflow_trigger = session.get("workflow_trigger") if isinstance(session, dict) else None
 
     # Control-plane gate: when a session plan exists, the gate validator decides
     # continuation. No plan -> legacy behaviour (run ProjectMachine unchanged).
     preflight = sc.session_continue_preflight(target)
-    if preflight.gated and not preflight.allowed:
+    if workflow_trigger not in {"check_hld", "build_loop_prereqs", "build_loop_init", "build_loop_ready"} and preflight.gated and not preflight.allowed:
         print("## Continuation BLOCKED by the control plane")
         print(f"Gate: {preflight.gate}")
         print("Blockers:")
@@ -671,20 +1208,28 @@ def command_continue(args: argparse.Namespace) -> int:
         )
         return ExitCode.GATE_BLOCKED.value
 
-    session = json_read(target / ".hldspec" / "agent_session.json")
     source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
     if not source:
         print(f"ERROR: no source recorded in {target / '.hldspec' / 'agent_session.json'}", file=sys.stderr)
         return 2
+    workflow_result = run_workflow_trigger(target, session)
+    if workflow_result is not None:
+        update_session_after_result(target, workflow_result)
+        print(render_machine_result(workflow_result), end="")
+        return int(workflow_result.exit_code())
+    metadata = {"workspace_layout": "new"}
+    if workflow_trigger == "check_hld":
+        metadata["trigger"] = "check_hld"
 
     result = ProjectMachine().run(
         MachineContext(
             repo_root=str(ROOT),
             source_hld=str(Path(source).expanduser()),
             workspace=str(target),
-            metadata={"workspace_layout": "new"},
+            metadata=metadata,
         )
     )
+    update_session_after_result(target, result)
     print(render_machine_result(result), end="")
     return int(result.exit_code())
 
@@ -776,6 +1321,20 @@ def command_doctor(args: argparse.Namespace) -> int:
             ok = ok and exists
             if not exists:
                 action_items.append(f"Missing session file: {path}")
+
+        print("")
+        print("## Source Freshness")
+        freshness = source_freshness(target)
+        freshness_path = target / ".hldspec" / "source_freshness.json"
+        print(f"{'OK' if freshness_path.exists() else 'MISSING'}: {freshness_path}")
+        print(f"Working HLD differs from source: {str(bool(freshness.get('working_hld_differs_from_source', False))).lower()}")
+        freshness_warnings = source_freshness_warnings(target)
+        print("Warnings:")
+        print_bullet_list(freshness_warnings)
+        if not freshness_path.exists():
+            action_items.append(f"Missing source freshness metadata: {freshness_path}")
+        for warning in freshness_warnings:
+            action_items.append(f"Source freshness: {warning}")
 
         print("")
         print("## Interview Checks")
@@ -892,8 +1451,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("start", help="Prepare or resume an HLDspec agent session.")
-    p.add_argument("--source", required=True, help="Source HLD path.")
-    p.add_argument("--target", required=True, help="Target product workspace path.")
+    p.add_argument("--source", help="Source HLD path.")
+    p.add_argument("--target", help="Target product workspace path.")
+    p.add_argument("--request", help="Minimal agent request string, for example 'HLDspec HLD: /path/HLD.md create /path/target'.")
     p.add_argument("--agent", default="manual", choices=["manual", "devin", "claude", "codex"], help="Target agent.")
     p.add_argument("--mode", default="auto", choices=["auto", "create", "update", "upgrade", "adopt", "resume"], help="Intent override.")
     p.add_argument("--comment", default="", help="User intent/comment.")
