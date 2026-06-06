@@ -202,6 +202,26 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertEqual("BLOCKED", report["state"])
         self.assertTrue(any("CONVERSION_READY_TO_APPLY" in item for item in report["blockers"]))
 
+    def test_hld_ready_check_hld_state_is_not_full_speckit_readiness(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True)
+        (sync / "hldspec_state.json").write_text(
+            json.dumps({"schema_version": 1, "current_stage": "HLD_READY", "current_checkpoint": ""}),
+            encoding="utf-8",
+        )
+
+        report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("BLOCKED", report["state"])
+        self.assertTrue(any("not full SpecKit Preparation approval" in item for item in report["blockers"]))
+        self.assertIn("SpecKit Preparation", report["next_safe_action"])
+
     def test_managed_workspace_with_stale_source_freshness_blocks_operator_state(self) -> None:
         target = self.root / "target"
         (target / ".specify" / "memory").mkdir(parents=True)

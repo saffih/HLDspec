@@ -35,7 +35,10 @@ STATE_BLOCKED = "BLOCKED"
 
 PROJECT_BLOCKING_STAGES = {
     "NO_WORKSPACE",
+    "HLD_READY",
+    "HLD_READY_WITH_ACTIONS",
     "HLD_BLOCKED",
+    "HLD_READINESS_HLD_MISSING",
     "SOURCE_FRESHNESS_BLOCKED",
     "INIT_PREREQS_BLOCKED",
     "BUILD_LOOP_INIT_BLOCKED",
@@ -118,6 +121,16 @@ def _project_checkpoint_gate(target: Path) -> dict[str, Any] | None:
         return None
     stage_upper = stage.upper()
     has_blocking_details = bool(state.get("blocking_questions") or state.get("stale_artifact_warnings"))
+    if stage_upper in {"HLD_READY", "HLD_READY_WITH_ACTIONS"}:
+        return {
+            "path": str(state_path),
+            "stage": stage,
+            "checkpoint": checkpoint,
+            "blockers": [
+                f"check HLD completed with {stage}; this is only an HLD readiness review, not full SpecKit Preparation approval."
+            ],
+            "next_safe_action": "Continue HLDspec SpecKit Preparation or Build Loop prework before starting SpecKit.",
+        }
     if stage_upper in PROJECT_NON_BLOCKING_STAGES and not has_blocking_details:
         return None
     if stage_upper not in PROJECT_BLOCKING_STAGES and not has_blocking_details:
