@@ -241,6 +241,24 @@ class ExternalizationCrashSafetyTests(unittest.TestCase):
             self.assertTrue((controller / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").is_file())
             self.assertEqual({".hldspec", "prompts"}, {item["rel"] for item in copied})
 
+    def test_copy_removes_stale_controller_files_without_deleting_target_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            controller = Path(tmp) / "controller"
+            (target / ".hldspec").mkdir(parents=True)
+            (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
+            (controller / ".hldspec").mkdir(parents=True)
+            (controller / ".hldspec" / "stale_checkpoint.json").write_text(
+                json.dumps({"human_checkpoint": {"decision": "TBD"}}),
+                encoding="utf-8",
+            )
+
+            run_state.copy_target_control_artifacts(target, controller_root=controller)
+
+            self.assertTrue((target / ".hldspec" / "agent_session.json").is_file())
+            self.assertTrue((controller / ".hldspec" / "agent_session.json").is_file())
+            self.assertFalse((controller / ".hldspec" / "stale_checkpoint.json").exists())
+
     def test_target_deletion_happens_only_after_pointer_resolves_to_complete_controller(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "target"

@@ -118,6 +118,32 @@ def controller_root_from_pointer(target: Path) -> Path | None:
     return Path(str(controller)).expanduser()
 
 
+def _remove_path(path: Path) -> None:
+    if path.is_dir():
+        shutil.rmtree(path)
+    else:
+        path.unlink()
+
+
+def _mirror_path(src: Path, dst: Path) -> None:
+    if src.is_dir():
+        if dst.exists() and not dst.is_dir():
+            _remove_path(dst)
+        dst.mkdir(parents=True, exist_ok=True)
+        src_names = {child.name for child in src.iterdir()}
+        for child in src.iterdir():
+            _mirror_path(child, dst / child.name)
+        for child in list(dst.iterdir()):
+            if child.name not in src_names:
+                _remove_path(child)
+        return
+
+    if dst.exists() and dst.is_dir():
+        _remove_path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+
+
 def copy_target_control_artifacts(
     target: Path,
     *,
@@ -136,11 +162,7 @@ def copy_target_control_artifacts(
         if not src.exists():
             continue
         dst = controller_root / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if src.is_dir():
-            shutil.copytree(src, dst, dirs_exist_ok=True)
-        else:
-            shutil.copy2(src, dst)
+        _mirror_path(src, dst)
         copied.append({"rel": rel, "from": str(src), "to": str(dst)})
     return copied
 
@@ -155,10 +177,7 @@ def delete_target_control_artifacts(target: Path, copied: list[dict[str, str]]) 
         src = target / rel
         if not src.exists():
             continue
-        if src.is_dir():
-            shutil.rmtree(src)
-        else:
-            src.unlink()
+        _remove_path(src)
         removed.append(item)
     return removed
 
