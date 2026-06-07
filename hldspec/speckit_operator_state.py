@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from . import run_state
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
 from .source_freshness import load_source_freshness
@@ -21,7 +22,10 @@ STATE_NO_TARGET = "NO_TARGET"
 STATE_TARGET_MISSING = "TARGET_MISSING"
 STATE_TARGET_NOT_GIT = "TARGET_NOT_GIT"
 STATE_TARGET_DIRTY = "TARGET_DIRTY"
+STATE_TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL = "TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL"
+STATE_TARGET_DIRTY_UNEXPECTED = "TARGET_DIRTY_UNEXPECTED"
 STATE_SOURCE_PACKAGE_MISSING = "SOURCE_PACKAGE_MISSING"
+STATE_SOURCE_PACKAGE_INVALID = "SOURCE_PACKAGE_INVALID"
 STATE_SPECKIT_NOT_INITIALIZED = "SPECKIT_NOT_INITIALIZED"
 STATE_BRANCH_POLICY_MISSING = "BRANCH_POLICY_MISSING"
 STATE_SOURCE_FRESHNESS_BLOCKED = "SOURCE_FRESHNESS_BLOCKED"
@@ -107,8 +111,94 @@ def _source_freshness_gate(target: Path) -> dict[str, Any]:
     return load_source_freshness(target)
 
 
+def _porcelain_dirty_paths(
+    target: Path,
+    git_root: str | None,
+    run: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> list[str]:
+    if not git_root:
+        return []
+    run = run or subprocess.run
+    try:
+        completed = run(
+            ["git", "-C", str(target), "status", "--porcelain"],
+            cwd=target,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except Exception:
+        return []
+    if completed.returncode != 0:
+        return []
+    paths: list[str] = []
+    for line in completed.stdout.splitlines():
+        if not line.strip():
+            continue
+        # Porcelain v1: XY PATH, with rename lines represented as A -> B.
+        raw = line[3:] if len(line) > 3 else line.strip()
+        path = raw.split(" -> ")[-1].strip()
+        if path:
+            paths.append(path)
+    return paths
+
+
+def _is_expected_hldspec_path(path: str) -> bool:
+    return (
+        path == run_state.POINTER_FILE
+        or path.startswith(".hldspec/")
+        or path.startswith("prompts/")
+    )
+
+
+def _dirty_target_classification(
+    target: Path,
+    git_root: str | None,
+    run: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    dirty_paths = _porcelain_dirty_paths(target, git_root, run=run)
+    expected = [path for path in dirty_paths if _is_expected_hldspec_path(path)]
+    unexpected = [path for path in dirty_paths if path not in expected]
+    if not dirty_paths:
+        status = "clean"
+    elif unexpected:
+        status = "unexpected"
+    else:
+        status = "expected_hldspec_control"
+    return {
+        "status": status,
+        "dirty_paths": dirty_paths,
+        "expected_hldspec_control_paths": expected,
+        "unexpected_paths": unexpected,
+    }
+
+
+def _controller_source_package_dir(target: Path) -> tuple[Path, dict[str, Any]]:
+    pointer = run_state.load_pointer(target)
+    controller = run_state.controller_root_from_pointer(target)
+    if controller is not None:
+        return controller / ".hldspec" / "source_package", pointer
+    return target / ".hldspec" / "source_package", pointer
+
+
+def _source_package_anchor_count(source_package_dir: Path) -> int | None:
+    ref_map = source_package_dir / "hld_reference_map.json"
+    if not ref_map.is_file():
+        return None
+    try:
+        data = json.loads(ref_map.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    anchors = data.get("anchors") if isinstance(data, dict) else None
+    if isinstance(anchors, dict):
+        return len(anchors)
+    return None
+
+
 def _project_checkpoint_gate(target: Path) -> dict[str, Any] | None:
-    state_path = target / ".hldspec" / "sync" / "hldspec_state.json"
+    _ctrl = run_state.controller_root_from_pointer(target)
+    _hldspec_dir = (_ctrl / ".hldspec") if _ctrl is not None else (target / ".hldspec")
+    state_path = _hldspec_dir / "sync" / "hldspec_state.json"
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except Exception:
@@ -295,11 +385,13 @@ def build_speckit_operator_state_report(
     branch_hook = readiness.get("branch_hook_status") if isinstance(readiness.get("branch_hook_status"), dict) else {}
     selected_init_command = readiness.get("selected_init_command")
     available_init_commands = readiness.get("available_init_commands") or []
-    source_package_dir = target_path / ".hldspec" / "source_package"
+    source_package_dir, pointer = _controller_source_package_dir(target_path)
     source_package_exists = source_package_dir.is_dir()
+    source_package_anchor_count = _source_package_anchor_count(source_package_dir) if source_package_exists else None
     git_root = readiness.get("git_root")
     git_branch = readiness.get("git_branch")
     dirty_tree = readiness.get("dirty_tree")
+    dirty_classification = _dirty_target_classification(target_path, str(git_root) if git_root else None, run=run)
     freshness = _source_freshness_gate(target_path)
     project_checkpoint = _project_checkpoint_gate(target_path)
 
@@ -308,7 +400,13 @@ def build_speckit_operator_state_report(
         {"fact": "git_root", "value": git_root},
         {"fact": "git_branch", "value": git_branch},
         {"fact": "dirty_tree", "value": dirty_tree},
+        {"fact": "dirty_target_classification", "value": dirty_classification.get("status")},
+        {"fact": "dirty_paths", "value": dirty_classification.get("dirty_paths")},
+        {"fact": "hldspec_run_pointer", "value": pointer.get("path") if pointer else None},
+        {"fact": "hldspec_controller_root", "value": pointer.get("controller_root") if pointer else None},
         {"fact": "source_package_exists", "value": source_package_exists},
+        {"fact": "source_package_dir", "value": str(source_package_dir)},
+        {"fact": "source_package_anchor_count", "value": source_package_anchor_count},
         {"fact": "specify_dir_exists", "value": workspace.get("specify_dir_exists")},
         {"fact": "memory_dir_exists", "value": workspace.get("memory_dir_exists")},
         {"fact": "source_mirror_exists", "value": workspace.get("source_mirror_exists")},
@@ -348,10 +446,24 @@ def build_speckit_operator_state_report(
         state = STATE_TARGET_NOT_GIT
         blockers.append("No git repository was detected for the target.")
         next_safe_action = "Initialize or point HLDspec at a git workspace before rerunning operator-state."
+    elif source_package_exists and source_package_anchor_count == 0:
+        status = "ACTION"
+        state = STATE_SOURCE_PACKAGE_INVALID
+        blockers.append("HLDspec source package has 0 recognized HLD anchors.")
+        next_safe_action = "Rerun hldspec start with a valid anchored HLD source or convert the proposal into an anchored workspace HLD before Build Loop work."
+    elif dirty_tree is True and dirty_classification.get("status") == "expected_hldspec_control":
+        status = "ACTION"
+        state = STATE_TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL
+        blockers.append("Git tree has only expected HLDspec controller/pointer changes.")
+        next_safe_action = "Continue HLDspec setup, externalize the controller state, or remove the pointer/control artifacts; no product branch work has started."
     elif dirty_tree is True:
         status = "ACTION"
-        state = STATE_TARGET_DIRTY
-        blockers.append("Git tree has uncommitted changes.")
+        state = STATE_TARGET_DIRTY_UNEXPECTED
+        unexpected = dirty_classification.get("unexpected_paths") or []
+        if unexpected:
+            blockers.append("Git tree has unexpected target changes: " + ", ".join(str(path) for path in unexpected[:8]))
+        else:
+            blockers.append("Git tree has uncommitted changes.")
         next_safe_action = "Clean, commit, or stash the target tree before rerunning operator-state."
     elif dirty_tree is None:
         status = "ACTION"
@@ -426,7 +538,10 @@ def build_speckit_operator_state_report(
             "git_root": git_root,
             "git_branch": git_branch,
             "dirty_tree": dirty_tree,
+            "dirty_target_classification": dirty_classification,
             "source_package_exists": source_package_exists,
+            "source_package_dir": str(source_package_dir),
+            "source_package_anchor_count": source_package_anchor_count,
             "source_freshness": freshness,
         },
         "doctor_note": doctor_note,

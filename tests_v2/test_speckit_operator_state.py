@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from hldspec import run_state
 from hldspec import speckit_operator_state as sos
 
 
@@ -15,10 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class _RunStub:
-    def __init__(self, *, git_root: Path | None = None, branch: str = "main", dirty: bool = False):
+    def __init__(self, *, git_root: Path | None = None, branch: str = "main", dirty: bool = False, dirty_paths: list[str] | None = None):
         self.git_root = git_root
         self.branch = branch
         self.dirty = dirty
+        self.dirty_paths = dirty_paths
         self.calls: list[list[str]] = []
 
     def __call__(self, argv, cwd, text, capture_output, check):
@@ -36,6 +38,8 @@ class _RunStub:
             if "status" in argv:
                 if self.git_root is None:
                     return SimpleNamespace(returncode=1, stdout="", stderr="")
+                if self.dirty_paths is not None:
+                    return SimpleNamespace(returncode=0, stdout="".join(f"?? {path}\n" for path in self.dirty_paths), stderr="")
                 return SimpleNamespace(returncode=0, stdout=(" M file.txt\n" if self.dirty else ""), stderr="")
         if argv[:3] in (["specify", "init", "--help"], ["spec-kit", "init", "--help"]):
             return SimpleNamespace(returncode=0, stdout="ok\n--force\n", stderr="")
@@ -102,8 +106,73 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target, dirty=True))
         self.assertEqual("ACTION", report["status"])
-        self.assertEqual("TARGET_DIRTY", report["state"])
+        self.assertEqual("TARGET_DIRTY_UNEXPECTED", report["state"])
         self.assertIn("Clean, commit, or stash the target tree", report["next_safe_action"])
+
+    def test_hldspec_pointer_only_dirty_tree_is_classified_as_expected_control(self) -> None:
+        target = self.root / "target"
+        controller = self.root / "external-run"
+        (controller / ".hldspec" / "source_package").mkdir(parents=True)
+        (controller / ".hldspec" / "source_package" / "hld_reference_map.json").write_text(
+            json.dumps({"anchors": {"HLD-001": {}}}),
+            encoding="utf-8",
+        )
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        run_state.write_pointer(
+            target,
+            controller_root=controller,
+            source=self.root / "HLD.md",
+            source_hash="a" * 64,
+            mode="update",
+            agent="codex",
+            workflow_trigger="build_loop_ready",
+            created_or_updated_at="2026-06-06T00:00:00+00:00",
+        )
+
+        report = self._report(
+            target,
+            which=_which_only("specify"),
+            run=_RunStub(git_root=target, dirty=True, dirty_paths=[run_state.POINTER_FILE]),
+        )
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL", report["state"])
+        facts = report["source_facts_used"]
+        self.assertEqual("expected_hldspec_control", facts["dirty_target_classification"]["status"])
+        self.assertEqual(str((controller / ".hldspec" / "source_package").resolve()), facts["source_package_dir"])
+
+    def test_zero_anchor_external_source_package_reports_invalid_before_dirty_pointer(self) -> None:
+        target = self.root / "target-invalid-source"
+        controller = self.root / "external-run-invalid-source"
+        source_package = controller / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {}}), encoding="utf-8")
+        (target / ".specify" / "memory").mkdir(parents=True)
+        (target / ".specify" / "source").mkdir(parents=True)
+        (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
+        run_state.write_pointer(
+            target,
+            controller_root=controller,
+            source=self.root / "proposal.md",
+            source_hash="b" * 64,
+            mode="update",
+            agent="codex",
+            workflow_trigger="build_loop_ready",
+            created_or_updated_at="2026-06-06T00:00:00+00:00",
+        )
+
+        report = self._report(
+            target,
+            which=_which_only("specify"),
+            run=_RunStub(git_root=target, dirty=True, dirty_paths=[run_state.POINTER_FILE]),
+        )
+
+        self.assertEqual("ACTION", report["status"])
+        self.assertEqual("SOURCE_PACKAGE_INVALID", report["state"])
+        self.assertIn("0 recognized HLD anchors", " ".join(report["blockers"]))
+        self.assertEqual(0, report["source_facts_used"]["source_package_anchor_count"])
 
     def test_source_package_missing_reports_action(self) -> None:
         target = self.root / "target"

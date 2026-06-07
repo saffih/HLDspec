@@ -107,9 +107,16 @@ SOURCE_PACKAGE_READY
 
 Operational meaning:
 
-- Build `target/.hldspec/source_package/` first.
+- Build HLDspec controller state first. Target-local `.hldspec/` remains the
+  compatibility default for the full facade; clean-target runs may use the
+  external run store, leaving only `.hldspec-run.json` (pointer) and `targetHLD/`
+  (product artifact, committed) in the target. `.hldspec/` and `prompts/` are
+  always gitignored; only human decisions and product design artifacts are committed.
 - Check SpecKit install/init command, command smoke, git root, branch, dirty-tree
   state, and branch policy before real SpecKit execution.
+- Treat pointer-only or HLDspec-control-only target dirt as
+  `TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL`; unexpected product/spec/code dirt
+  remains blocking before SpecKit work.
 - Run or validate real SpecKit init before treating `.specify/` as a workspace.
 - Mirror into `target/.specify/source/` only after `.specify/memory/` validates.
 - Start `/speckit.specify` only at `READY_FOR_SPECIFY`.

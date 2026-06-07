@@ -93,5 +93,30 @@ class TestFactory(unittest.TestCase):
             TargetWorkspaceAdapter(target_root=Path("/tmp"), layout="bogus")
 
 
+class TestExternalLayout(unittest.TestCase):
+    def setUp(self) -> None:
+        self.root = Path("/projects/myapp/target")
+        self.run_root = Path("/tmp/hldspec/runs/myapp-abc123")
+        self.a = TargetWorkspaceAdapter(target_root=self.root, layout="new", controller_root=self.run_root)
+
+    def test_hldspec_dir_uses_controller_root(self) -> None:
+        self.assertEqual(self.a.hldspec_dir, self.run_root / ".hldspec")
+
+    def test_sync_dir_uses_controller_root(self) -> None:
+        self.assertEqual(self.a.sync_dir, self.run_root / ".hldspec" / "sync")
+
+    def test_events_path_uses_controller_root(self) -> None:
+        self.assertEqual(self.a.events_path, self.run_root / ".hldspec" / "events.jsonl")
+
+    def test_source_package_uses_controller_root(self) -> None:
+        self.assertEqual(self.a.source_package_dir, self.run_root / ".hldspec" / "source_package")
+
+    def test_working_hld_stays_in_target(self) -> None:
+        self.assertEqual(self.a.working_hld, self.root / "targetHLD" / "HLD.md")
+
+    def test_specify_dir_stays_in_target(self) -> None:
+        self.assertEqual(self.a.specify_dir, self.root / ".specify")
+
+
 if __name__ == "__main__":
     unittest.main()

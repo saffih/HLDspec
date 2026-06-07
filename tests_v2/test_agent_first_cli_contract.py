@@ -249,6 +249,48 @@ class AgentFirstCliContractTests(unittest.TestCase):
         for entry in created_entries:
             self.assertEqual("target", entry.parts[0], f"start created durable artifact outside target: {entry}")
 
+    def test_start_external_state_leaves_target_pointer_only(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-external-state"
+        runs = self.tmp_path / "runs"
+        source.write_text("# HLD\n\n## HLD-001 - Purpose\n\nHLD-ID: HLD-001\n", encoding="utf-8")
+        env = os.environ.copy()
+        env["HLDSPEC_RUNS_DIR"] = str(runs)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                "start",
+                "--source",
+                str(source),
+                "--target",
+                str(target),
+                "--state-location",
+                "external",
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        pointer_path = target / ".hldspec-run.json"
+        self.assertTrue(pointer_path.is_file())
+        self.assertFalse((target / ".hldspec").exists())
+        self.assertTrue((target / "targetHLD").exists())   # product artifact — stays in target
+        self.assertFalse((target / "prompts").exists())
+        self.assertTrue((target / ".gitignore").exists())
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+        controller = Path(pointer["controller_root"])
+        self.assertTrue((controller / ".hldspec" / "agent_session.json").is_file())
+        self.assertTrue((controller / ".hldspec" / "source_package" / "source_package.json").is_file())
+        self.assertTrue((target / "targetHLD" / "HLD.md").is_file())  # stays in target, not controller
+        self.assertFalse((controller / "targetHLD").exists())           # not moved to controller
+        self.assertIn("HLDspec controller state externalized", result.stdout)
+
     def test_doctor_checks_interview_artifacts_when_target_is_provided(self) -> None:
         source = self.tmp_path / "HLD.md"
         target = self.tmp_path / "target"

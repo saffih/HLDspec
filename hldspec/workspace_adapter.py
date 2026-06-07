@@ -34,6 +34,7 @@ from pathlib import Path
 class TargetWorkspaceAdapter:
     target_root: Path
     layout: str = "legacy"  # "legacy" | "new"
+    controller_root: Path | None = None
 
     def __post_init__(self) -> None:
         if self.layout not in {"legacy", "new"}:
@@ -57,7 +58,7 @@ class TargetWorkspaceAdapter:
 
     @property
     def hldspec_dir(self) -> Path:
-        return self.target_root / ".hldspec"
+        return self.controller_root / ".hldspec" if self.controller_root else (self.target_root / ".hldspec")
 
     @property
     def specify_dir(self) -> Path:

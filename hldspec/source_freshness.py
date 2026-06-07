@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import run_state
+
 SCHEMA_VERSION = 1
 
 
@@ -17,13 +19,17 @@ def sha256_file(path: Path) -> str:
 
 
 def managed_target(target: Path) -> bool:
-    return (target / ".hldspec" / "agent_session.json").is_file() or (
-        target / ".hldspec" / "source_package" / "session_plan.json"
+    root = run_state.controller_root_from_pointer(target)
+    hldspec_dir = root / ".hldspec" if root is not None else target / ".hldspec"
+    return (hldspec_dir / "agent_session.json").is_file() or (
+        hldspec_dir / "source_package" / "session_plan.json"
     ).is_file()
 
 
 def recorded_source_path(target: Path) -> Path | None:
-    session_path = target / ".hldspec" / "agent_session.json"
+    root = run_state.controller_root_from_pointer(target)
+    hldspec_dir = root / ".hldspec" if root is not None else target / ".hldspec"
+    session_path = hldspec_dir / "agent_session.json"
     try:
         session = json.loads(session_path.read_text(encoding="utf-8"))
     except Exception:
@@ -38,8 +44,10 @@ def recorded_source_path(target: Path) -> Path | None:
 def build_source_freshness(target: Path, source: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
     source = Path(source).expanduser().resolve()
-    default_raw = target / "targetHLD" / "raw" / "HLD.raw.md"
-    default_working = target / "targetHLD" / "HLD.md"
+    root = run_state.controller_root_from_pointer(target)
+    state_root = root if root is not None else target
+    default_raw = state_root / "targetHLD" / "raw" / "HLD.raw.md"
+    default_working = state_root / "targetHLD" / "HLD.md"
     legacy_working = target / "HLD.md"
     working = default_working if default_working.is_file() or not legacy_working.is_file() else legacy_working
     raw = default_raw if default_raw.is_file() or working != legacy_working else legacy_working
@@ -84,7 +92,10 @@ def build_source_freshness(target: Path, source: Path) -> dict[str, Any]:
 
 def write_source_freshness(target: Path, source: Path) -> dict[str, Any]:
     report = build_source_freshness(target, source)
-    path = Path(target) / ".hldspec" / "source_freshness.json"
+    target = Path(target).expanduser().resolve()
+    root = run_state.controller_root_from_pointer(target)
+    hldspec_dir = root / ".hldspec" if root is not None else target / ".hldspec"
+    path = hldspec_dir / "source_freshness.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
@@ -92,7 +103,9 @@ def write_source_freshness(target: Path, source: Path) -> dict[str, Any]:
 
 def load_source_freshness(target: Path, *, recompute: bool = True) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
-    path = target / ".hldspec" / "source_freshness.json"
+    root = run_state.controller_root_from_pointer(target)
+    hldspec_dir = root / ".hldspec" if root is not None else target / ".hldspec"
+    path = hldspec_dir / "source_freshness.json"
     if not path.exists():
         if recompute:
             source = recorded_source_path(target)

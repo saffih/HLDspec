@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
 from hldspec.minimal_agent_request import _workflow_trigger_candidates, detect_workflow_trigger, parse_minimal_agent_request
+from hldspec import run_state
 from hldspec.source_freshness import load_source_freshness, write_source_freshness
 from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
@@ -187,7 +188,7 @@ def active_workflow_blockers(target: Path, session: dict[str, Any]) -> tuple[lis
             next_action = str(report["next_safe_action"])
         elif isinstance(report.get("next_actions"), list) and report["next_actions"]:
             next_action = str(report["next_actions"][0])
-    state_data = json_read(target / ".hldspec" / "sync" / "hldspec_state.json")
+    state_data = json_read(_resolve_hldspec_dir(target) / "sync" / "hldspec_state.json")
     if state_data:
         for warning in state_data.get("stale_artifact_warnings") or []:
             if str(warning).strip():
@@ -196,6 +197,22 @@ def active_workflow_blockers(target: Path, session: dict[str, Any]) -> tuple[lis
         if not next_action and isinstance(allowed, list) and allowed:
             next_action = str(allowed[0])
     return sorted(dict.fromkeys(blockers)), next_action
+
+
+def _resolve_hldspec_dir(target: Path) -> Path:
+    controller = run_state.controller_root_from_pointer(target)
+    return (controller / ".hldspec") if controller is not None else (target / ".hldspec")
+
+
+def _ensure_target_gitignore(target: Path) -> None:
+    gitignore = target / ".gitignore"
+    entries = [".hldspec/", "prompts/", run_state.POINTER_FILE]
+    existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+    lines = existing.splitlines()
+    new_lines = [e for e in entries if e not in lines]
+    if new_lines:
+        text = (existing.rstrip("\n") + "\n" + "\n".join(new_lines) + "\n").lstrip("\n")
+        gitignore.write_text(text, encoding="utf-8")
 
 
 def continuation_gate_blockers(target: Path) -> tuple[list[str], str | None]:
@@ -212,7 +229,7 @@ def continuation_gate_blockers(target: Path) -> tuple[list[str], str | None]:
 
 
 def update_session_after_result(target: Path, result: MachineResult) -> None:
-    session_path = target / ".hldspec" / "agent_session.json"
+    session_path = _resolve_hldspec_dir(target) / "agent_session.json"
     session = json_read(session_path)
     if not session:
         return
@@ -236,7 +253,7 @@ def _write_workflow_state(
     controlling_artifacts: list[Path],
     notes: list[str],
 ) -> None:
-    sync = target / ".hldspec" / "sync"
+    sync = _resolve_hldspec_dir(target) / "sync"
     freshness = source_freshness(target)
     stale_warnings = source_freshness_warnings(target)
     state = {
@@ -312,9 +329,9 @@ def run_workflow_trigger(target: Path, session: dict[str, Any]) -> MachineResult
     if workflow_trigger not in {"build_loop_prereqs", "build_loop_init", "build_loop_ready"}:
         return None
 
-    sync = target / ".hldspec" / "sync"
+    sync = _resolve_hldspec_dir(target) / "sync"
     sync.mkdir(parents=True, exist_ok=True)
-    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=run_state.controller_root_from_pointer(target))
     source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
 
     if source_freshness_blocks_build_loop(target):
@@ -584,7 +601,8 @@ def detect_mode(target: Path, source_hash: str | None, requested_mode: str) -> s
     if not target.exists():
         return "create"
 
-    session = json_read(target / ".hldspec" / "agent_session.json")
+    hldspec_dir = _resolve_hldspec_dir(target)
+    session = json_read(hldspec_dir / "agent_session.json")
     if not session:
         return "adopt"
 
@@ -596,7 +614,7 @@ def detect_mode(target: Path, source_hash: str | None, requested_mode: str) -> s
     if source_hash and previous_hash and source_hash != previous_hash:
         return "update"
 
-    conflicts = target / ".hldspec" / "conflicts.json"
+    conflicts = hldspec_dir / "conflicts.json"
     if conflicts.exists():
         return "blocked"
 
@@ -940,19 +958,31 @@ def command_start(args: argparse.Namespace) -> int:
 
     source_hash = sha256_file(source)
     mode = detect_mode(target, source_hash, args.mode)
+    workflow_trigger = detect_workflow_trigger(comment)
+    state_location = args.state_location
+    external_controller_root = (
+        run_state.external_run_root(target, source_hash)
+        if state_location == "external"
+        else None
+    )
+    session_controller_root = external_controller_root or (target / ".hldspec")
 
     ensure_target_dirs(target)
     copy_source(source, target)
+    _ensure_target_gitignore(target)
     speckit_init = sw.plan_or_init_workspace(target, execute=bool(args.execute))
 
     timestamp = utc_now()
+    _start_adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=external_controller_root)
     manifest = {
         "schema_version": SESSION_SCHEMA_VERSION,
         "created_or_updated_at": timestamp,
         "agent": effective_agent,
         "requested_runtime": requested_runtime,
         "mode": mode,
-        "workflow_trigger": detect_workflow_trigger(comment),
+        "workflow_trigger": workflow_trigger,
+        "state_location": state_location,
+        "controller_root": str(session_controller_root),
         "comment": comment,
         "source": {
             "path": str(source),
@@ -960,15 +990,16 @@ def command_start(args: argparse.Namespace) -> int:
         },
         "target": str(target),
         "paths": {
-            "working_hld": str(TargetWorkspaceAdapter(target_root=target, layout="new").working_hld),
-            "raw_hld": str(TargetWorkspaceAdapter(target_root=target, layout="new").raw_hld),
-            "hldspec_sync": str(TargetWorkspaceAdapter(target_root=target, layout="new").sync_dir),
-            "events": str(TargetWorkspaceAdapter(target_root=target, layout="new").events_path),
-            "specify_dir": str(TargetWorkspaceAdapter(target_root=target, layout="new").specify_dir),
-            "interview_answers_json": str(target / ".hldspec" / "interview_answers.json"),
-            "interview_answers_md": str(target / ".hldspec" / "interview_answers.md"),
+            "working_hld": str(_start_adapter.working_hld),
+            "raw_hld": str(_start_adapter.raw_hld),
+            "hldspec_sync": str(_start_adapter.sync_dir),
+            "events": str(_start_adapter.events_path),
+            "specify_dir": str(_start_adapter.specify_dir),
+            "interview_answers_json": str(_start_adapter.hldspec_dir / "interview_answers.json"),
+            "interview_answers_md": str(_start_adapter.hldspec_dir / "interview_answers.md"),
             "start_prompt": str(target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"),
-            "tool_manifest": str(target / ".hldspec" / "agent_tool_manifest.md"),
+            "tool_manifest": str(_start_adapter.hldspec_dir / "agent_tool_manifest.md"),
+            "target_pointer": str(target / run_state.POINTER_FILE),
         },
         "speckit_workspace_init": speckit_init.metadata(),
         "next_action": {
@@ -1046,7 +1077,25 @@ def command_start(args: argparse.Namespace) -> int:
         print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
         if source_build.unsupported_claims:
             print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
-    mediator_packet = target / ".hldspec" / "mediator" / "mediator_packet.json"
+    if state_location == "external" and external_controller_root is not None:
+        moved = run_state.externalize_target_control_artifacts(target, controller_root=external_controller_root)
+        pointer = run_state.write_pointer(
+            target,
+            controller_root=external_controller_root,
+            source=source,
+            source_hash=source_hash,
+            mode=mode,
+            agent=effective_agent,
+            workflow_trigger=workflow_trigger,
+            created_or_updated_at=timestamp,
+        )
+        print(f"HLDspec controller state externalized: {external_controller_root}")
+        print(f"Target pointer: {pointer}")
+        if moved:
+            print("Moved controller artifacts:")
+            for item in moved:
+                print(f"  {item['from']} -> {item['to']}")
+    mediator_packet = _resolve_hldspec_dir(target) / "mediator" / "mediator_packet.json"
     mediator_start = target / "prompts" / "mediator" / "START_MEDIATOR.md"
     mediator_devin = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
     mediator_direct = target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"
@@ -1066,14 +1115,15 @@ def command_start(args: argparse.Namespace) -> int:
 
 def command_status(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
-    session_path = target / ".hldspec" / "agent_session.json"
+    hldspec_dir = _resolve_hldspec_dir(target)
+    session_path = hldspec_dir / "agent_session.json"
     session = json_read(session_path)
     if not session:
         print(f"NO_SESSION: {session_path}")
         return 2
 
-    validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
-    promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
+    validation_status, validation_path = report_status(hldspec_dir / "validation" / "context_prompt_validation.json")
+    promotion_status, promotion_path = report_status(hldspec_dir / "validation" / "promotion_gate.json")
     operator_report = sos.build_speckit_operator_state_report(target)
     open_questions = collect_open_questions(target)
     workflow_blockers, workflow_next_action = active_workflow_blockers(target, session)
@@ -1133,22 +1183,23 @@ def command_status(args: argparse.Namespace) -> int:
 
 def command_review(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
-    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
-    session = json_read(target / ".hldspec" / "agent_session.json")
+    _ctrl = run_state.controller_root_from_pointer(target)
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=_ctrl)
+    session = json_read(_resolve_hldspec_dir(target) / "agent_session.json")
     workflow_trigger = session.get("workflow_trigger") if isinstance(session, dict) else None
     blocking_paths = [
-        target / ".hldspec" / "constitution_update_plan.md",
-        target / ".hldspec" / "feature_dependency_graph.md",
-        target / ".hldspec" / "speckit_invocation_queue.md",
+        adapter.hldspec_dir / "constitution_update_plan.md",
+        adapter.hldspec_dir / "feature_dependency_graph.md",
+        adapter.hldspec_dir / "speckit_invocation_queue.md",
         adapter.sync_dir / "spec_build_plan_review.md",
         adapter.sync_dir / "speckit_prework_quality_review.md",
     ]
     optional_paths = [
-        target / ".hldspec" / "backend_technology_recommendation.md",
-        target / ".hldspec" / "design_principles_selection.md",
-        target / ".hldspec" / "spec_packages.md",
-        target / ".hldspec" / "validation" / "context_prompt_validation.md",
-        target / ".hldspec" / "validation" / "promotion_gate.md",
+        adapter.hldspec_dir / "backend_technology_recommendation.md",
+        adapter.hldspec_dir / "design_principles_selection.md",
+        adapter.hldspec_dir / "spec_packages.md",
+        adapter.hldspec_dir / "validation" / "context_prompt_validation.md",
+        adapter.hldspec_dir / "validation" / "promotion_gate.md",
     ]
     if workflow_trigger == "check_hld":
         blocking_paths = [
@@ -1192,7 +1243,7 @@ def command_review(args: argparse.Namespace) -> int:
 
 def command_continue(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
-    session = json_read(target / ".hldspec" / "agent_session.json")
+    session = json_read(_resolve_hldspec_dir(target) / "agent_session.json")
     workflow_trigger = session.get("workflow_trigger") if isinstance(session, dict) else None
 
     # Control-plane gate: when a session plan exists, the gate validator decides
@@ -1212,7 +1263,7 @@ def command_continue(args: argparse.Namespace) -> int:
 
     source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
     if not source:
-        print(f"ERROR: no source recorded in {target / '.hldspec' / 'agent_session.json'}", file=sys.stderr)
+        print(f"ERROR: no source recorded in {_resolve_hldspec_dir(target) / 'agent_session.json'}", file=sys.stderr)
         return 2
     workflow_result = run_workflow_trigger(target, session)
     if workflow_result is not None:
@@ -1239,7 +1290,7 @@ def command_continue(args: argparse.Namespace) -> int:
 def command_diff(args: argparse.Namespace) -> int:
     source = Path(args.source).expanduser().resolve()
     target = Path(args.target).expanduser().resolve()
-    session = json_read(target / ".hldspec" / "agent_session.json")
+    session = json_read(_resolve_hldspec_dir(target) / "agent_session.json")
 
     if not source.exists():
         print(f"ERROR: source not found: {source}", file=sys.stderr)
@@ -1296,17 +1347,19 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"{'OK' if exists else 'MISSING'}: {path}")
 
     if target:
+        _hldspec_dir = _resolve_hldspec_dir(target)
+        _ctrl_root = _hldspec_dir.parent
         print("")
         print("## Target Layout Checks")
-        for rel in [
-            "targetHLD/HLD.md",
-            "targetHLD/raw/HLD.raw.md",
-            ".hldspec",
-            ".hldspec/sync",
-            "prompts/agent",
-            "prompts/speckit",
-        ]:
-            path = target / rel
+        _layout_paths = [
+            target / "targetHLD/HLD.md",
+            target / "targetHLD/raw/HLD.raw.md",
+            _hldspec_dir,
+            _hldspec_dir / "sync",
+            _ctrl_root / "prompts/agent",
+            _ctrl_root / "prompts/speckit",
+        ]
+        for path in _layout_paths:
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")
             ok = ok and exists
@@ -1316,7 +1369,7 @@ def command_doctor(args: argparse.Namespace) -> int:
         print("")
         print("## SpecKit Workspace Checks")
         speckit_dir = target / ".specify"
-        session = json_read(target / ".hldspec" / "agent_session.json")
+        session = json_read(_hldspec_dir / "agent_session.json")
         init_meta = session.get("speckit_workspace_init", {}) if isinstance(session, dict) else {}
         print(f"{'OK' if speckit_dir.exists() else 'PLANNED'}: {speckit_dir}")
         if isinstance(init_meta, dict):
@@ -1329,11 +1382,7 @@ def command_doctor(args: argparse.Namespace) -> int:
 
         print("")
         print("## Session Checks")
-        for rel in [
-            ".hldspec/agent_session.json",
-            "prompts/agent/START_HLDSPEC_AGENT.md",
-        ]:
-            path = target / rel
+        for path in [_hldspec_dir / "agent_session.json", _ctrl_root / "prompts/agent/START_HLDSPEC_AGENT.md"]:
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")
             ok = ok and exists
@@ -1343,7 +1392,7 @@ def command_doctor(args: argparse.Namespace) -> int:
         print("")
         print("## Source Freshness")
         freshness = source_freshness(target)
-        freshness_path = target / ".hldspec" / "source_freshness.json"
+        freshness_path = _hldspec_dir / "source_freshness.json"
         print(f"{'OK' if freshness_path.exists() else 'MISSING'}: {freshness_path}")
         print(f"Working HLD differs from source: {str(bool(freshness.get('working_hld_differs_from_source', False))).lower()}")
         freshness_warnings = source_freshness_warnings(target)
@@ -1356,11 +1405,7 @@ def command_doctor(args: argparse.Namespace) -> int:
 
         print("")
         print("## Interview Checks")
-        for rel in [
-            ".hldspec/interview_answers.json",
-            ".hldspec/interview_answers.md",
-        ]:
-            path = target / rel
+        for path in [_hldspec_dir / "interview_answers.json", _hldspec_dir / "interview_answers.md"]:
             exists = path.exists()
             print(f"{'OK' if exists else 'MISSING'}: {path}")
             ok = ok and exists
@@ -1498,6 +1543,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", default="auto", choices=["auto", "create", "update", "upgrade", "adopt", "resume"], help="Intent override.")
     p.add_argument("--comment", default="", help="User intent/comment.")
     p.add_argument("--execute", action="store_true", help="Run the detected SpecKit init command instead of dry-run planning only.")
+    p.add_argument(
+        "--state-location",
+        default="target",
+        choices=["external", "target"],
+        help="Store HLDspec controller/process artifacts in the target by default; use external to leave only .hldspec-run.json in the target.",
+    )
     p.set_defaults(func=command_start)
 
     p = sub.add_parser("status", help="Show current HLDspec agent session status.")

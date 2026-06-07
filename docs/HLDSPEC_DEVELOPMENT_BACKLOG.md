@@ -48,7 +48,7 @@ Scale:
 | Target workspace clarity | 7 | New-layout paths are stabilized: `target/.hldspec/sync/`, `target/.hldspec/events.jsonl`, `target/targetHLD/HLD.md`, `target/targetHLD/raw/HLD.raw.md`, and SpecKit-owned `target/.specify/`; broader migration coverage remains. |
 | TargetWorkspaceAdapter | 7 | Adapter supports legacy/new modes and `hldspec continue` uses ProjectMachine with new-layout metadata; remaining machines still need migration coverage. |
 | Use-case/API definition | 6 | Use-case catalog and command matrix exist; implementation and journey tests do not yet cover every use case. |
-| Stateless external IO | 5 | `start` and self-dogfood smoke prove target-only durable writes for key flows; enforcement across every write path remains incomplete. |
+| Stateless external IO | 7 | `start --state-location external` externalizes `.hldspec/` and `prompts/` into a run store; `targetHLD/` stays in target as a product artifact; `.hldspec-run.json` (pointer) is written and gitignored. All facade read sites resolve via pointer. External mode is single-machine only — not supported for cross-machine handoff. |
 | Context economy | 6 | Context packs, allowed evidence, forbidden reads, bounded SpecKit prompts, and context validators exist; guarded product-flow integration remains. |
 | SpecKit delegation prompts | 6 | Seven bounded SpecKit phase prompts are generated per package; package discovery/invocation wiring and deeper semantic validators remain. |
 | Validators and regression gates | 6 | Context prompt validator, promotion gate, command/path tests, self-dogfood smoke, and matrix tests exist; domain validators remain open. |
