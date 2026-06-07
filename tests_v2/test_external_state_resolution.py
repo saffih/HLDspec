@@ -6,11 +6,14 @@ keeps only the pointer in the target, so any code reading target/.hldspec direct
 silently misses the real state.
 """
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "scripts") not in sys.path:
@@ -117,6 +120,95 @@ class SourceFreshnessExternalTests(unittest.TestCase):
             result = sf.build_source_freshness(target, source)
             # Pre-fix: looked under controller/targetHLD (absent) -> "missing" -> stale.
             self.assertEqual(result["state"], "fresh", result.get("warnings"))
+
+
+class RemainingExternalReadSweepTests(unittest.TestCase):
+    def test_current_state_resolves_hldspec_state_from_controller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            sync = controller / ".hldspec" / "sync"
+            sync.mkdir(parents=True)
+            (sync / "hldspec_state.json").write_text(
+                json.dumps({"current_stage": "READY_FOR_SPECIFY", "current_checkpoint": "BUILD_LOOP_READY"}),
+                encoding="utf-8",
+            )
+
+            state = facade.current_state(target, {"schema_version": 1})
+
+            self.assertEqual(state, "READY_FOR_SPECIFY / BUILD_LOOP_READY")
+
+    def test_active_workflow_report_resolves_from_controller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            sync = controller / ".hldspec" / "sync"
+            sync.mkdir(parents=True)
+            (sync / "build_loop_prereqs_report.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ACTION",
+                        "state": "NEEDS_INIT",
+                        "blockers": ["controller blocker"],
+                        "next_safe_action": "fix controller blocker",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            blockers, next_action = facade.active_workflow_blockers(
+                target, {"workflow_trigger": "build_loop_prereqs"}
+            )
+
+            self.assertIn("Workflow report: ACTION (NEEDS_INIT)", blockers)
+            self.assertIn("controller blocker", blockers)
+            self.assertEqual(next_action, "fix controller blocker")
+
+    def test_doctor_validation_reports_resolve_from_controller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            (target / "targetHLD" / "raw").mkdir(parents=True)
+            (target / "targetHLD" / "HLD.md").write_text("# HLD\n", encoding="utf-8")
+            (target / "targetHLD" / "raw" / "HLD.raw.md").write_text("# HLD\n", encoding="utf-8")
+            (controller / "prompts" / "agent").mkdir(parents=True)
+            (controller / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").write_text("start\n", encoding="utf-8")
+            validation = controller / ".hldspec" / "validation"
+            validation.mkdir(parents=True)
+            (validation / "context_prompt_validation.json").write_text(
+                json.dumps({"status": "ACTION"}), encoding="utf-8"
+            )
+            (validation / "promotion_gate.json").write_text(
+                json.dumps({"status": "PASS"}), encoding="utf-8"
+            )
+            (controller / ".hldspec" / "agent_session.json").write_text(
+                json.dumps({"speckit_workspace_init": {}}), encoding="utf-8"
+            )
+
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                facade.command_doctor(SimpleNamespace(target=str(target)))
+
+            text = out.getvalue()
+            self.assertIn(str(validation / "context_prompt_validation.json"), text)
+            self.assertIn(str(validation / "promotion_gate.json"), text)
+
+    def test_start_prompt_and_tool_manifest_use_controller_paths_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            controller = Path(tmp) / "controller"
+            target.mkdir()
+            session = {
+                "source": {"path": str(Path(tmp) / "HLD.md")},
+                "mode": "create",
+                "agent": "codex",
+                "comment": "",
+                "workflow_trigger": "default",
+                "speckit_workspace_init": {"selected_command": ["specify", "init", ".", "--force"]},
+            }
+
+            prompt = facade.write_start_prompt(target, session, controller_root=controller)
+            manifest = facade.write_tool_manifest(target, controller_root=controller)
+
+            self.assertIn(str(controller / ".hldspec" / "source_package" / "session_plan.json"), prompt.read_text(encoding="utf-8"))
+            self.assertIn(str(controller / ".hldspec" / "sync"), manifest.read_text(encoding="utf-8"))
 
 
 class ExternalizationCrashSafetyTests(unittest.TestCase):

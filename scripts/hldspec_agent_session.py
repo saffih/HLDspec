@@ -105,9 +105,10 @@ def collect_open_questions(target: Path) -> list[str]:
 
 
 def current_state(target: Path, session: dict[str, Any]) -> str:
+    hldspec_dir = _resolve_hldspec_dir(target)
     for path in [
-        target / ".hldspec" / "sync" / "hldspec_state.json",
-        target / ".hldspec" / "hldspec_state.json",
+        hldspec_dir / "sync" / "hldspec_state.json",
+        hldspec_dir / "hldspec_state.json",
     ]:
         state = json_read(path)
         if state:
@@ -157,11 +158,12 @@ def source_freshness_blocks_build_loop(target: Path) -> bool:
 
 def active_workflow_report_path(target: Path, session: dict[str, Any]) -> Path | None:
     trigger = str(session.get("workflow_trigger") or "")
+    hldspec_dir = _resolve_hldspec_dir(target)
     mapping = {
-        "check_hld": target / ".hldspec" / "sync" / "hld_readiness_check.json",
-        "build_loop_prereqs": target / ".hldspec" / "sync" / "build_loop_prereqs_report.json",
-        "build_loop_init": target / ".hldspec" / "sync" / "build_loop_init_report.json",
-        "build_loop_ready": target / ".hldspec" / "sync" / "build_loop_ready_report.json",
+        "check_hld": hldspec_dir / "sync" / "hld_readiness_check.json",
+        "build_loop_prereqs": hldspec_dir / "sync" / "build_loop_prereqs_report.json",
+        "build_loop_init": hldspec_dir / "sync" / "build_loop_init_report.json",
+        "build_loop_ready": hldspec_dir / "sync" / "build_loop_ready_report.json",
     }
     return mapping.get(trigger)
 
@@ -730,9 +732,11 @@ def write_interview_answers(target: Path, answers: dict[str, Any]) -> tuple[Path
     return json_path, md_path
 
 
-def write_start_prompt(target: Path, session: dict[str, Any]) -> Path:
-    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+def write_start_prompt(target: Path, session: dict[str, Any], *, controller_root: Path | None = None) -> Path:
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=controller_root)
+    prompt_root = controller_root or target
     prompt = target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md"
+    prompt.parent.mkdir(parents=True, exist_ok=True)
     source = session["source"]["path"]
     mode = session["mode"]
     agent = session["agent"]
@@ -825,16 +829,16 @@ Then inspect:
 Generate or refresh target-specific artifacts:
 
 ```text
-target/.hldspec/source_package/source_package.json
-target/.hldspec/source_package/session_plan.json
-target/.hldspec/source_package/source_manifest.json
-target/.hldspec/mediator/mediator_packet.json
-target/prompts/mediator/START_MEDIATOR.md
-target/prompts/mediator/DEVIN_MEDIATOR_SKILL.md
-target/prompts/mediator/CODEX_CLAUDE_MEDIATOR.md
+{adapter.source_package_dir / 'source_package.json'}
+{adapter.source_package_dir / 'session_plan.json'}
+{adapter.source_package_dir / 'source_manifest.json'}
+{adapter.hldspec_dir / 'mediator' / 'mediator_packet.json'}
+{prompt_root / 'prompts' / 'mediator' / 'START_MEDIATOR.md'}
+{prompt_root / 'prompts' / 'mediator' / 'DEVIN_MEDIATOR_SKILL.md'}
+{prompt_root / 'prompts' / 'mediator' / 'CODEX_CLAUDE_MEDIATOR.md'}
 target/.specify/                 (from real SpecKit init only; not hand-authored)
 target/.specify/source/          (generated mirror only)
-target/prompts/
+{prompt_root / 'prompts'}
 ```
 
 ## Journey 3 mediator guidance
@@ -844,10 +848,10 @@ HLDspec generates mediator guidance only; it does not create live Devin/tmux ses
 Mediator artifacts:
 
 ```text
-target/.hldspec/mediator/mediator_packet.json
-target/prompts/mediator/START_MEDIATOR.md
-target/prompts/mediator/DEVIN_MEDIATOR_SKILL.md
-target/prompts/mediator/CODEX_CLAUDE_MEDIATOR.md
+{adapter.hldspec_dir / 'mediator' / 'mediator_packet.json'}
+{prompt_root / 'prompts' / 'mediator' / 'START_MEDIATOR.md'}
+{prompt_root / 'prompts' / 'mediator' / 'DEVIN_MEDIATOR_SKILL.md'}
+{prompt_root / 'prompts' / 'mediator' / 'CODEX_CLAUDE_MEDIATOR.md'}
 ```
 
 Devin activation sentence:
@@ -875,9 +879,10 @@ create agent on {{path}} as {{session-name}} using model {{model}} [permission-m
     return prompt
 
 
-def write_tool_manifest(target: Path) -> Path:
-    adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+def write_tool_manifest(target: Path, *, controller_root: Path | None = None) -> Path:
+    adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=controller_root)
     manifest = target / ".hldspec" / "agent_tool_manifest.md"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(
         f"""# HLDspec Agent Tool Manifest
 
@@ -1036,8 +1041,8 @@ def command_start(args: argparse.Namespace) -> int:
             ],
         },
     )
-    prompt = write_start_prompt(target, manifest)
-    tool_manifest = write_tool_manifest(target)
+    prompt = write_start_prompt(target, manifest, controller_root=external_controller_root)
+    tool_manifest = write_tool_manifest(target, controller_root=external_controller_root)
 
     # Scaffold the session-plan control plane (dry-run): session_plan.json +
     # bounded subagent packets + runner/consultant prompts + runbook. Written
@@ -1488,8 +1493,8 @@ def command_doctor(args: argparse.Namespace) -> int:
 
         print("")
         print("## Validation Reports")
-        validation_status, validation_path = report_status(target / ".hldspec" / "validation" / "context_prompt_validation.json")
-        promotion_status, promotion_path = report_status(target / ".hldspec" / "validation" / "promotion_gate.json")
+        validation_status, validation_path = report_status(_hldspec_dir / "validation" / "context_prompt_validation.json")
+        promotion_status, promotion_path = report_status(_hldspec_dir / "validation" / "promotion_gate.json")
         print(f"Validation status: {validation_status} ({validation_path})")
         print(f"Promotion gate status: {promotion_status} ({promotion_path})")
         for label, status, path in [
@@ -1500,7 +1505,7 @@ def command_doctor(args: argparse.Namespace) -> int:
                 conflict_items.append(f"{label}: {status} ({path})")
             elif status == "ACTION":
                 action_items.append(f"{label}: {status} ({path})")
-        promotion_gate = target / ".hldspec" / "validation" / "promotion_gate.json"
+        promotion_gate = _hldspec_dir / "validation" / "promotion_gate.json"
         if promotion_gate.exists():
             try:
                 gate = read_promotion_json(promotion_gate)
