@@ -17,6 +17,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 POINTER_FILE = ".hldspec-run.json"
 RUNS_ENV = "HLDSPEC_RUNS_DIR"
+CONTROL_ARTIFACTS = (".hldspec", "prompts")
 
 
 def _slug(value: str) -> str:
@@ -78,7 +79,10 @@ def write_pointer(
         },
     }
     path = pointer_path(target)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
     return path
 
 
@@ -114,28 +118,64 @@ def controller_root_from_pointer(target: Path) -> Path | None:
     return Path(str(controller)).expanduser()
 
 
+def copy_target_control_artifacts(
+    target: Path,
+    *,
+    controller_root: Path,
+) -> list[dict[str, str]]:
+    """Copy HLDspec controller artifacts out of the target repository.
+
+    This is intentionally copy-only. The target copy must remain present until
+    the target pointer has been written, so an interrupted externalization never
+    leaves the target with neither local control state nor a resolvable pointer.
+    """
+    copied: list[dict[str, str]] = []
+    controller_root.mkdir(parents=True, exist_ok=True)
+    for rel in CONTROL_ARTIFACTS:
+        src = target / rel
+        if not src.exists():
+            continue
+        dst = controller_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if src.is_dir():
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        else:
+            shutil.copy2(src, dst)
+        copied.append({"rel": rel, "from": str(src), "to": str(dst)})
+    return copied
+
+
+def delete_target_control_artifacts(target: Path, copied: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Delete target-local control artifacts after copy + pointer are durable."""
+    removed: list[dict[str, str]] = []
+    for item in copied:
+        rel = str(item.get("rel") or "")
+        if rel not in CONTROL_ARTIFACTS:
+            continue
+        src = target / rel
+        if not src.exists():
+            continue
+        if src.is_dir():
+            shutil.rmtree(src)
+        else:
+            src.unlink()
+        removed.append(item)
+    return removed
+
+
 def externalize_target_control_artifacts(
     target: Path,
     *,
     controller_root: Path,
 ) -> list[dict[str, str]]:
-    """Move HLDspec controller artifacts out of the target repository."""
-    moved: list[dict[str, str]] = []
-    controller_root.mkdir(parents=True, exist_ok=True)
-    for rel in (".hldspec", "prompts"):
-        src = target / rel
-        if not src.exists():
-            continue
-        dst = controller_root / rel
-        if dst.exists():
-            if dst.is_dir():
-                shutil.rmtree(dst)
-            else:
-                dst.unlink()
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(src), str(dst))
-        moved.append({"from": str(src), "to": str(dst)})
-    return moved
+    """Copy then delete HLDspec controller artifacts.
+
+    Callers that need crash-safe externalization must write the target pointer
+    between ``copy_target_control_artifacts`` and ``delete_target_control_artifacts``.
+    This wrapper is kept for internal/debug compatibility only.
+    """
+    copied = copy_target_control_artifacts(target, controller_root=controller_root)
+    return delete_target_control_artifacts(target, copied)
 
 
 def expected_hldspec_target_paths() -> tuple[str, ...]:

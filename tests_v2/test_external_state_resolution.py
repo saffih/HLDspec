@@ -119,5 +119,57 @@ class SourceFreshnessExternalTests(unittest.TestCase):
             self.assertEqual(result["state"], "fresh", result.get("warnings"))
 
 
+class ExternalizationCrashSafetyTests(unittest.TestCase):
+    def test_copy_happens_before_pointer_and_target_deletion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            controller = Path(tmp) / "controller"
+            (target / ".hldspec").mkdir(parents=True)
+            (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
+            (target / "prompts" / "agent").mkdir(parents=True)
+            (target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").write_text("start\n", encoding="utf-8")
+
+            copied = run_state.copy_target_control_artifacts(target, controller_root=controller)
+
+            self.assertFalse((target / run_state.POINTER_FILE).exists())
+            self.assertTrue((target / ".hldspec" / "agent_session.json").is_file())
+            self.assertTrue((target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").is_file())
+            self.assertTrue((controller / ".hldspec" / "agent_session.json").is_file())
+            self.assertTrue((controller / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").is_file())
+            self.assertEqual({".hldspec", "prompts"}, {item["rel"] for item in copied})
+
+    def test_target_deletion_happens_only_after_pointer_resolves_to_complete_controller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            controller = Path(tmp) / "controller"
+            source = Path(tmp) / "HLD.md"
+            source.write_text("# HLD\n", encoding="utf-8")
+            (target / ".hldspec").mkdir(parents=True)
+            (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
+            (target / "prompts" / "agent").mkdir(parents=True)
+            (target / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").write_text("start\n", encoding="utf-8")
+
+            copied = run_state.copy_target_control_artifacts(target, controller_root=controller)
+            run_state.write_pointer(
+                target,
+                controller_root=controller,
+                source=source,
+                source_hash="beadfeed",
+                mode="create",
+                agent="test",
+                workflow_trigger="default",
+                created_or_updated_at="2026-06-07T00:00:00+00:00",
+            )
+            removed = run_state.delete_target_control_artifacts(target, copied)
+
+            self.assertTrue((target / run_state.POINTER_FILE).is_file())
+            self.assertEqual(facade._resolve_hldspec_dir(target).resolve(), (controller / ".hldspec").resolve())
+            self.assertTrue((controller / ".hldspec" / "agent_session.json").is_file())
+            self.assertTrue((controller / "prompts" / "agent" / "START_HLDSPEC_AGENT.md").is_file())
+            self.assertFalse((target / ".hldspec").exists())
+            self.assertFalse((target / "prompts").exists())
+            self.assertEqual({".hldspec", "prompts"}, {item["rel"] for item in removed})
+
+
 if __name__ == "__main__":
     unittest.main()

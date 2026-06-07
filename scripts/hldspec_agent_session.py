@@ -1081,7 +1081,7 @@ def command_start(args: argparse.Namespace) -> int:
         if source_build.unsupported_claims:
             print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
     if state_location == "external" and external_controller_root is not None:
-        moved = run_state.externalize_target_control_artifacts(target, controller_root=external_controller_root)
+        copied = run_state.copy_target_control_artifacts(target, controller_root=external_controller_root)
         pointer = run_state.write_pointer(
             target,
             controller_root=external_controller_root,
@@ -1092,6 +1092,7 @@ def command_start(args: argparse.Namespace) -> int:
             workflow_trigger=workflow_trigger,
             created_or_updated_at=timestamp,
         )
+        moved = run_state.delete_target_control_artifacts(target, copied)
         print(f"HLDspec controller state externalized: {external_controller_root}")
         print(f"Target pointer: {pointer}")
         if moved:
