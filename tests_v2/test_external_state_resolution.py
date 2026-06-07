@@ -25,6 +25,7 @@ import hldspec_agent_session as facade  # noqa: E402
 from hldspec import run_state  # noqa: E402
 from hldspec import session_control as sc  # noqa: E402
 from hldspec import source_freshness as sf  # noqa: E402
+from hldspec import speckit_readiness as sr  # noqa: E402
 
 
 def _make_external(tmp: str) -> tuple[Path, Path]:
@@ -209,6 +210,16 @@ class RemainingExternalReadSweepTests(unittest.TestCase):
 
             self.assertIn(str(controller / ".hldspec" / "source_package" / "session_plan.json"), prompt.read_text(encoding="utf-8"))
             self.assertIn(str(controller / ".hldspec" / "sync"), manifest.read_text(encoding="utf-8"))
+
+    def test_speckit_readiness_source_package_check_resolves_from_controller(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            (controller / ".hldspec" / "source_package").mkdir(parents=True)
+
+            report = sr.build_speckit_readiness_report(target, which=lambda _: None)
+
+            checks = {item["name"]: item for item in report["checks"]}
+            self.assertEqual("PASS", checks[".hldspec/source_package/ exists"]["status"])
 
 
 class ExternalizationCrashSafetyTests(unittest.TestCase):

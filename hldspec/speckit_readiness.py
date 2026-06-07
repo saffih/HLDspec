@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import speckit_workspace as sw
+from . import run_state
 
 SCHEMA_VERSION = 1
 
@@ -270,7 +271,9 @@ def build_speckit_readiness_report(
         ".specify/source/ exists." if workspace_status.source_mirror_exists else "HLDspec mirror is missing.",
         None if workspace_status.source_mirror_exists else "Run HLDspec source-package generation so the read-only mirror is materialized.",
     )
-    source_package_dir = target / ".hldspec" / "source_package"
+    controller_root = run_state.controller_root_from_pointer(target)
+    hldspec_dir = (controller_root / ".hldspec") if controller_root is not None else (target / ".hldspec")
+    source_package_dir = hldspec_dir / "source_package"
     add_check(
         ".hldspec/source_package/ exists",
         "PASS" if source_package_dir.is_dir() else "ACTION",

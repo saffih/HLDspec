@@ -584,6 +584,8 @@ def summary_status(blockers: list[str], conflicts: list[str] | None = None) -> s
 
 def ensure_target_dirs(target: Path) -> None:
     adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+    # External mode still stages control artifacts locally during start; they are
+    # copied to the controller and removed only after the pointer is durable.
     for rel in [
         "targetHLD/raw",
         "targetHLD/sections",
@@ -725,6 +727,8 @@ def render_interview_answers_md(answers: dict[str, Any]) -> str:
 
 
 def write_interview_answers(target: Path, answers: dict[str, Any]) -> tuple[Path, Path]:
+    # Start-time staging path: external mode copies this into the controller
+    # before deleting target-local control state.
     json_path = target / ".hldspec" / "interview_answers.json"
     md_path = target / ".hldspec" / "interview_answers.md"
     json_write(json_path, answers)
@@ -1054,6 +1058,8 @@ def command_start(args: argparse.Namespace) -> int:
     # Generate the source-package content from the working HLD (real content flow):
     # HLD.md, HLD.marked.md, hld_reference_map.json, speckit_single_spec_input.md,
     # manifest + metadata, and the derived .specify/source/ mirror.
+    # The working HLD is target-owned, so this adapter intentionally has no
+    # controller_root even when control state is external.
     working_hld = TargetWorkspaceAdapter(target_root=target, layout="new").working_hld
     source_build = None
     if working_hld.is_file():
