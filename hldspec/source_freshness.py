@@ -44,10 +44,10 @@ def recorded_source_path(target: Path) -> Path | None:
 def build_source_freshness(target: Path, source: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
     source = Path(source).expanduser().resolve()
-    root = run_state.controller_root_from_pointer(target)
-    state_root = root if root is not None else target
-    default_raw = state_root / "targetHLD" / "raw" / "HLD.raw.md"
-    default_working = state_root / "targetHLD" / "HLD.md"
+    # targetHLD is a product artifact and stays in the target even in external
+    # mode (only control state — .hldspec — moves to the controller root). P1a.
+    default_raw = target / "targetHLD" / "raw" / "HLD.raw.md"
+    default_working = target / "targetHLD" / "HLD.md"
     legacy_working = target / "HLD.md"
     working = default_working if default_working.is_file() or not legacy_working.is_file() else legacy_working
     raw = default_raw if default_raw.is_file() or working != legacy_working else legacy_working

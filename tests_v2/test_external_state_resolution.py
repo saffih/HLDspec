@@ -21,6 +21,7 @@ if str(ROOT) not in sys.path:
 import hldspec_agent_session as facade  # noqa: E402
 from hldspec import run_state  # noqa: E402
 from hldspec import session_control as sc  # noqa: E402
+from hldspec import source_freshness as sf  # noqa: E402
 
 
 def _make_external(tmp: str) -> tuple[Path, Path]:
@@ -99,6 +100,23 @@ class PreflightGateExternalTests(unittest.TestCase):
             preflight = sc.session_continue_preflight(target, check_dirty=False)
             self.assertFalse(preflight.gated)
             self.assertTrue(preflight.allowed)
+
+
+class SourceFreshnessExternalTests(unittest.TestCase):
+    def test_targethld_resolved_from_target_in_external_mode(self):
+        # P1a: targetHLD is a product artifact and stays in the target even in
+        # external mode; freshness must not look for it under the controller root.
+        with tempfile.TemporaryDirectory() as tmp:
+            target, _controller = _make_external(tmp)
+            body = "# Working HLD\n\nbody\n"
+            (target / "targetHLD" / "raw").mkdir(parents=True)
+            (target / "targetHLD" / "HLD.md").write_text(body, encoding="utf-8")
+            (target / "targetHLD" / "raw" / "HLD.raw.md").write_text(body, encoding="utf-8")
+            source = Path(tmp) / "source_HLD.md"
+            source.write_text(body, encoding="utf-8")
+            result = sf.build_source_freshness(target, source)
+            # Pre-fix: looked under controller/targetHLD (absent) -> "missing" -> stale.
+            self.assertEqual(result["state"], "fresh", result.get("warnings"))
 
 
 if __name__ == "__main__":
