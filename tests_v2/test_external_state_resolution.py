@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 import hldspec_agent_session as facade  # noqa: E402
 from hldspec import run_state  # noqa: E402
+from hldspec import session_control as sc  # noqa: E402
 
 
 def _make_external(tmp: str) -> tuple[Path, Path]:
@@ -74,6 +75,30 @@ class ExternalStateResolutionTests(unittest.TestCase):
                 json.dumps({"open_questions": ["Q-LOCAL"]}), encoding="utf-8"
             )
             self.assertIn("Q-LOCAL", facade.collect_open_questions(target))
+
+
+class PreflightGateExternalTests(unittest.TestCase):
+    def test_preflight_is_gated_from_controller_plan(self):
+        # P0: in external mode the continuation gate must NOT be bypassed — the
+        # session plan lives under the controller root, and preflight must find it.
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            pkg = controller / ".hldspec" / "source_package"
+            pkg.mkdir(parents=True)
+            (pkg / sc.SESSION_PLAN_FILE).write_text(
+                json.dumps({"current_gate": "PREWORK"}), encoding="utf-8"
+            )
+            preflight = sc.session_continue_preflight(target, check_dirty=False)
+            # Pre-fix: adapter used target/.hldspec, no plan found -> gated=False (BYPASS).
+            self.assertTrue(preflight.gated, "external-mode continuation gate was bypassed")
+
+    def test_preflight_off_without_any_plan(self):
+        # Backward compatible: no plan anywhere -> gating OFF (allowed).
+        with tempfile.TemporaryDirectory() as tmp:
+            target, _controller = _make_external(tmp)
+            preflight = sc.session_continue_preflight(target, check_dirty=False)
+            self.assertFalse(preflight.gated)
+            self.assertTrue(preflight.allowed)
 
 
 if __name__ == "__main__":

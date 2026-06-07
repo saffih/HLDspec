@@ -28,6 +28,7 @@ from pathlib import Path
 
 from . import gate_validator as gv
 from . import model_routing as mr
+from . import run_state
 from .script_io import load_json_dict, write_json_dict
 from .workspace_adapter import TargetWorkspaceAdapter
 
@@ -643,7 +644,13 @@ def session_continue_preflight(
     continuation proceeds as before. When a plan exists, the gate validator
     decides continuation from the machine-readable Context Receipt + Phase Report.
     """
-    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
+    # External mode keeps the control state (session plan, phase report) under the
+    # controller root; resolve it so the continuation gate is not bypassed (P0).
+    adapter = TargetWorkspaceAdapter(
+        target_root=target_root,
+        layout=layout,
+        controller_root=run_state.controller_root_from_pointer(target_root),
+    )
     source_dir = adapter.source_package_dir
     plan_path = source_dir / SESSION_PLAN_FILE
     if not plan_path.is_file():
