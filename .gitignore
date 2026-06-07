@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+# macOS metadata
+.DS_Store
+
 # HLDspec workspace artifacts (these live in workspaces, not in this repo)
 .hldspec-first-run/
 .hldspec-v2-run/
