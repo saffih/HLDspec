@@ -72,12 +72,15 @@ def status_is_blocking(status: str) -> bool:
 
 def collect_open_questions(target: Path) -> list[str]:
     questions: list[str] = []
-    interview = json_read(target / ".hldspec" / "interview_answers.json")
+    # Resolve the controller root in external mode; falls back to target/.hldspec
+    # otherwise, so non-external behavior is unchanged (hldspec_dir.parent == target).
+    hldspec_dir = _resolve_hldspec_dir(target)
+    rel_base = hldspec_dir.parent
+    interview = json_read(hldspec_dir / "interview_answers.json")
     raw_open = interview.get("open_questions")
     if isinstance(raw_open, list):
         questions.extend(str(item) for item in raw_open if str(item).strip())
 
-    hldspec_dir = target / ".hldspec"
     if hldspec_dir.exists():
         for path in sorted(hldspec_dir.rglob("*.json")):
             if "/validation/" in str(path):
@@ -90,13 +93,13 @@ def collect_open_questions(target: Path) -> list[str]:
             if isinstance(checkpoint, dict):
                 decision = str(checkpoint.get("human_decision", checkpoint.get("decision", "TBD"))).strip().upper()
                 if decision in {"", "TBD", "UNKNOWN", "PENDING", "UNRESOLVED"}:
-                    label = checkpoint.get("question") or path.relative_to(target)
+                    label = checkpoint.get("question") or path.relative_to(rel_base)
                     questions.append(str(label))
             checkpoint = data.get("checkpoint")
             if isinstance(checkpoint, dict):
                 open_count = checkpoint.get("open_question_count")
                 if isinstance(open_count, int) and open_count > 0:
-                    checkpoint_id = checkpoint.get("checkpoint_id", path.relative_to(target))
+                    checkpoint_id = checkpoint.get("checkpoint_id", path.relative_to(rel_base))
                     questions.append(f"{checkpoint_id}: {open_count} open question(s)")
     return sorted(dict.fromkeys(questions))
 
@@ -1451,7 +1454,11 @@ def command_doctor(args: argparse.Namespace) -> int:
 
         print("")
         print("## Control Plane Checks")
-        adapter = TargetWorkspaceAdapter(target_root=target, layout="new")
+        adapter = TargetWorkspaceAdapter(
+            target_root=target,
+            layout="new",
+            controller_root=run_state.controller_root_from_pointer(target),
+        )
         plan_path = adapter.source_package_dir / sc.SESSION_PLAN_FILE
         if plan_path.exists():
             print(f"OK: {plan_path}")
