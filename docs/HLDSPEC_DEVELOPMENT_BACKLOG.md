@@ -485,6 +485,67 @@ build or improve target/targetHLD/HLD.md from sources and interview answers
 
 Avoid using `build` ambiguously for both HLD preparation and product implementation.
 
+### P1-009 Tiered re-sync: iterate on the HLD without wiping the workspace
+
+Problem (recurring real scenario, 2026-06-11):
+
+```text
+The HLD was wrong. The user edits the source HLD and re-runs.
+The freshness gate is binary (whole-file sha256), so any edit makes the whole
+workspace "stale" and the only offered remedies are full wipe
+(HLDSPEC_FRESH=1) or rm -rf. The wipe destroys answered decision queues,
+plan decisions, and approvals — the most expensive artifacts in the workspace —
+and disconnects the run from already-generated specs.
+For an early iterating project this punishes the normal loop, not the
+exception.
+```
+
+Root cause: artifacts with very different replacement costs share one
+lifecycle. Tier them:
+
+```text
+Tier 0 — human answers (decision queues, approvals).
+         Never auto-deleted. Carried forward and revalidated.
+Tier 1 — extracted packs and plans (PM pack, architect pack, spec build plan).
+         Model-time cost. Regenerate only for dirty sections/features.
+Tier 2 — rendered derivations (bundle prompts, handoff docs, queue md).
+         Deterministic and cheap. Safe to regenerate every time
+         (the existing `regenerate prompts` action is the model).
+```
+
+Status 2026-06-11: slices A, C, and E implemented (`hldspec/hld_sync.py`,
+`scripts/hldspec_sync.py`, `tests_v2/test_hld_sync.py`, trigger `HLDspec sync`
+in the canonical doc). B and D remain open.
+
+Implementation slices, cost-ordered (build A+C+E first; B+D only after A
+proves deltas are usually small):
+
+- A. Section fingerprints (small): extend `source_freshness.json` with a
+  per-section sha256 (conversion already chunks the HLD into sections).
+  On change, report `changed_sections: [...]` instead of binary stale.
+- B. Dirty-feature mapping (small-medium): join changed sections against the
+  `source_hld_sections` already recorded per feature in the spec build plan
+  to get the dirty feature set; untouched features keep their status.
+- C. Done ledger (small): `speckit_execution_state.assess_spec` already
+  verifies spec.md/plan.md/tasks.md per spec. Record the section-hash
+  snapshot when a spec completes, yielding per-feature status
+  `DONE | DONE_STALE | PENDING`. Evidence-based done-checking, consistent
+  with the anti-hollow-completion gate.
+- D. Decision carry-forward (medium): on re-run, revalidate each answered
+  decision — section unchanged: carry forward silently; section changed:
+  re-open only that question. Mark superseded answers; never delete them.
+- E. `HLDspec sync` trigger (small once A+C exist): one cheap idempotent
+  action, safe to run every time. Refresh fingerprints -> report changed
+  sections, dirty features, and the DONE/DONE_STALE/PENDING table ->
+  regenerate Tier-2 artifacts -> propose the minimal next action.
+  Never deletes anything. `HLDSPEC_FRESH=1` remains the explicit
+  nuclear option only.
+
+Out of scope here: diffing against hand-written external code (full
+brownfield gap analysis, TASKS.md "Gap analysis (desired vs. actual)").
+This entry covers the cheaper, more frequent case: HLDspec's own previous
+outputs plus an edited HLD.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation

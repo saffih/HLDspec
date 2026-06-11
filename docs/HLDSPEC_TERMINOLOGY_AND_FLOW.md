@@ -839,6 +839,15 @@ Use these user-facing trigger phrases:
   after an HLDspec infrastructure change (e.g. to `spec_bundle_prompts.py` or
   `handoff_policy_blocks.py`) when the source HLD itself has not changed, so
   already-generated bundle prompts pick up the new checkpoint/RunSkeptic text.
+- `HLDspec sync`
+  Means: run `scripts/hldspec_sync.py <workspace>` — the cheap idempotent
+  re-sync after an HLD edit. Refreshes per-section fingerprints, reports
+  which `HLD-NNN` sections changed, marks each spec `DONE`, `DONE_STALE`
+  (done but its source sections changed), or pending via the done ledger,
+  regenerates the deterministic Tier-2 artifacts (bundle prompts), and
+  proposes the next action. It never deletes workspace state — answered
+  decisions and plans are untouched; `HLDSPEC_FRESH=1` remains the explicit
+  full-rebuild option.
 
 Rules:
 
@@ -878,6 +887,10 @@ Default behavior:
   dependency graph, or the invocation queue's bundle grouping, and does not
   require `READY_FOR_SPECIFY`. It stops after reporting the regenerated
   bundle count and prompt paths, or any error from the build script.
+- `HLDspec sync` is likewise a maintenance action: safe to run every time,
+  read-only toward human answers and plans, and it stops after the sync
+  report (`IN_SYNC`, `IN_SYNC_PENDING`, or `STALE_SPECS` with the stale spec
+  list and the suggested next action).
 
 ### Help trigger contract
 
@@ -894,6 +907,7 @@ HLDspec should support task-shaped help based on the same trigger vocabulary.
 - `HLDspec help SpecKit specify`
 - `HLDspec help SpecKit drive`
 - `HLDspec help regenerate prompts`
+- `HLDspec help sync`
 
 Every help response should explain the trigger with the same bounded shape:
 
