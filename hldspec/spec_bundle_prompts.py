@@ -123,14 +123,43 @@ def _orchestrator_directive(runtime: str, tier: str) -> str:
     raise ValueError(f"unsupported runtime: {runtime}")
 
 
-def _user_checkpoint(prompt_text: str, options: str) -> list[str]:
+def _user_checkpoint(prompt_text: str, options: str, *, auto_continue_if: str) -> list[str]:
+    """A checkpoint the agent evaluates itself before deciding to stop.
+
+    `auto_continue_if` is the self-check condition. If it holds, the agent
+    proceeds on its own (recording why); if not, this is a real stop — either
+    a present user is asked, or (unattended) a Reassessment Request is filed.
+    Either way the agent must record a reason, never stop silently.
+    """
     return [
         "",
-        f"> **USER CHECKPOINT** — {prompt_text}",
-        f"> Reply required: `{options}`. Do not proceed until the user replies.",
+        f"> **CHECKPOINT** — {prompt_text}",
+        f"> Self-check: {auto_continue_if}",
+        "> - If true: record `AGENT_CONTINUE: <one-line reason>` and proceed to the next phase without waiting.",
+        f"> - If false: this needs a human decision. If a user is present, present this checkpoint and wait for a reply (`{options}`). If running unattended, stop here and file the Reassessment Request (see the Reassessment Request section) — do not guess and do not proceed silently.",
         "",
     ]
 
+
+
+# How many times a single RunSkeptic gate may fix-and-reverify an in-scope
+# ACTION finding before treating it as a real stop.
+RUNSKEPTIC_FIX_MAX_ATTEMPTS = 3
+
+# A fix is "simple" (safe to apply without escalation) only if it does not
+# touch any of these. Mirrors the escalation boundary in
+# clarification_policy_block() so the two policies don't diverge.
+RUNSKEPTIC_FIX_OUT_OF_SCOPE = (
+    "architecture",
+    "source of truth",
+    "security/privacy",
+    "data ownership",
+    "dependency order",
+    "feature scope",
+    "constitution rules",
+    "user-visible behavior",
+    "implementation approval",
+)
 
 
 # Phase-specific RunSkeptic scan content (what to actually inspect).
@@ -168,7 +197,23 @@ def _runskeptic_block(runtime: str, phase: str, spec_id_value: str, skeptic_path
         "- **DECIDE:** Record one status for this phase.",
         "",
         f"Report: `RunSkeptic {spec_id_value} ({phase}): PASS | ACTION | CONFLICT — <finding or clean>`.",
-        "Stop on ACTION or CONFLICT unless the user explicitly resolves it.",
+        "",
+        "**Fix-and-reverify loop (ACTION only):**",
+        "",
+        f"If the status is `ACTION` and the fix stays in scope — i.e. it does not touch "
+        f"{', '.join(RUNSKEPTIC_FIX_OUT_OF_SCOPE)}:",
+        "",
+        "1. Apply the fix.",
+        "2. Re-run this RunSkeptic gate.",
+        f"3. Repeat from step 1 if still `ACTION`, up to {RUNSKEPTIC_FIX_MAX_ATTEMPTS} attempts total.",
+        "",
+        "Record every attempt: finding, fix applied, re-run result. If a later attempt surfaces a "
+        "different finding, it gets its own attempt count from 1.",
+        "",
+        f"Treat the gate as `PASS` once a re-run reports `PASS`. If `ACTION` remains after "
+        f"{RUNSKEPTIC_FIX_MAX_ATTEMPTS} attempts, the fix would cross one of the boundaries above, or the "
+        "status is `CONFLICT`, do not fix further — that is the status for the checkpoint below.",
+        "Stop on a remaining ACTION or CONFLICT unless the user explicitly resolves it.",
         "",
     ]
 
@@ -272,7 +317,11 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
         "- Confirm `.specify/memory/constitution.md` exists and matches `constitution_update_plan.json`.",
         "- If missing or stale, run `/speckit.constitution` from the update plan before any specify call.",
         "- Constitution rules govern every phase below; treat a violation as a CONFLICT.",
-        *_user_checkpoint("Constitution confirmed for this bundle.", "continue / fix / stop"),
+        *_user_checkpoint(
+            "Constitution confirmed for this bundle.",
+            "continue / fix / stop",
+            auto_continue_if="`.specify/memory/constitution.md` already exists, matches `constitution_update_plan.json`, and required CONTRACT-*/DATA-* rules are present (no `/speckit.constitution` run was needed)",
+        ),
         "## SpecKit lifecycle",
         "",
         "For each spec, execute in dependency order. Do not skip forward.",
@@ -298,27 +347,47 @@ def render_bundle_prompt(bundle: dict[str, Any], *, workspace: Path, sync: Path,
             "```text",
             specify_input,
             "```",
-            *_user_checkpoint(f"Specify done for `{fid}` - review spec.md.", "continue / fix / stop"),
+            *_user_checkpoint(
+                f"Specify done for `{fid}` - review spec.md.",
+                "continue / fix / stop",
+                auto_continue_if=f"spec.md for `{fid}` was produced from allowed evidence with no questions requiring escalation",
+            ),
             "#### Phase 2 - Clarify (only if open questions remain)",
             _spawn_directive(runtime, "MODEL_DEFAULT", "SpecKit Clarify Proxy"),
             "- Answer only questions resolvable from allowed evidence; escalate the rest to the user.",
-            *_user_checkpoint(f"Clarify done for `{fid}`.", "continue / fix / stop"),
+            *_user_checkpoint(
+                f"Clarify done for `{fid}`.",
+                "continue / fix / stop",
+                auto_continue_if="no clarify questions were escalated to the user (all answered from allowed evidence or pre-approved defaults)",
+            ),
             *_runskeptic_block(runtime, "specify", fid, skeptic_path),
             "#### Phase 3 - Plan",
             f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')} Plan sets architecture, data, dependency, and contract boundaries, so do not delegate it.",
             "- Run `/speckit.plan`.",
             "- Produce Research/data/contracts artifacts only if the plan requires them.",
             *_runskeptic_block(runtime, "plan", fid, skeptic_path),
-            *_user_checkpoint(f"Plan + contracts done for `{fid}` - review boundaries.", "approve / fix / stop"),
+            *_user_checkpoint(
+                f"Plan + contracts done for `{fid}` - review boundaries.",
+                "approve / fix / stop",
+                auto_continue_if=f"the RunSkeptic plan gate for `{fid}` reported PASS",
+            ),
             "#### Phase 4 - Analyze",
             f"{_orchestrator_directive(runtime, 'MODEL_CRITICAL')} Analyze judges cross-artifact consistency (spec vs plan vs constitution).",
             "- Run `/speckit.analyze`; resolve inconsistencies before tasks.",
-            *_user_checkpoint(f"Analyze done for `{fid}`.", "continue / fix / stop"),
+            *_user_checkpoint(
+                f"Analyze done for `{fid}`.",
+                "continue / fix / stop",
+                auto_continue_if=f"`/speckit.analyze` for `{fid}` found no unresolved inconsistencies",
+            ),
             "#### Phase 5 - Tasks",
             _spawn_directive(runtime, "MODEL_STRONG", "SpecKit Tasks Proxy"),
             "- Run `/speckit.tasks`; decompose the approved plan into bounded, testable tasks without changing architecture.",
             *_runskeptic_block(runtime, "tasks", fid, skeptic_path),
-            *_user_checkpoint(f"Tasks done for `{fid}` - review task list.", "approve / fix / stop"),
+            *_user_checkpoint(
+                f"Tasks done for `{fid}` - review task list.",
+                "approve / fix / stop",
+                auto_continue_if=f"the RunSkeptic tasks gate for `{fid}` reported PASS",
+            ),
             "#### Phase 6 - Implementation",
             "- Blocked. Run `/speckit.implement` only if implementation_allowed=true AND explicit user approval exists for this spec.",
             "",

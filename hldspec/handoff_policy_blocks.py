@@ -99,7 +99,11 @@ def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") 
         "",
         "`GATE -> FUNDAMENTAL SCAN -> MAP -> CONFIDENCE -> STABILIZE -> EVIDENCE -> DECIDE -> ACT -> VERIFY -> LEARN`",
         "",
-        "RunSkeptic is normally read-only unless this handoff explicitly authorizes a fix.",
+        "RunSkeptic is normally read-only, except for one bounded fix-and-reverify loop: a "
+        "simple, in-scope `ACTION` finding (does not touch architecture, source of truth, "
+        "security/privacy, data ownership, dependency order, feature scope, constitution rules, "
+        "user-visible behavior, or implementation approval) may be fixed and the gate re-run, up "
+        "to 3 attempts, before falling back to ACTION/CONFLICT.",
         "",
         "Use only these result statuses:",
         "",
@@ -116,7 +120,10 @@ def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") 
         "5. Stabilize: merge related findings and identify root cause.",
         "6. Evidence: mark each finding as `OBSERVED`, `REPRODUCED`, `HISTORICAL`, or `INFERRED RISK`.",
         "7. Decide: choose `PASS`, `ACTION`, or `CONFLICT`; do not promote if any ACTION or CONFLICT remains.",
-        "8. Verify: if a fix was explicitly authorized, report the exact tests or checks run; otherwise report what verification would be required.",
+        "8. Fix-and-reverify: if the decision is `ACTION` and the fix is simple and in scope (see above), apply "
+        "it and return to step 1, up to 3 attempts total. Record each attempt's finding, fix, and re-run result.",
+        "9. Verify: if a fix was applied, report the exact tests or checks run; otherwise report what "
+        "verification would be required.",
         "",
         "Required RunSkeptic output:",
         "",
@@ -129,7 +136,9 @@ def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") 
         "- `Verification performed:`",
         "- `Next safe action:`",
         "",
-        "Stop immediately if RunSkeptic returns ACTION or CONFLICT, required evidence is missing, a human-owned decision appears, or the step would require reading outside approved evidence.",
+        "Stop immediately if RunSkeptic returns CONFLICT, returns ACTION that is out of scope or unresolved "
+        "after the fix-and-reverify loop, required evidence is missing, a human-owned decision appears, or "
+        "the step would require reading outside approved evidence.",
         "",
         "If the framework file is unavailable, do not claim full RunSkeptic compliance. Use this embedded fallback and report: `RunSkeptic source: embedded fallback`; `Confidence: lower than full framework review`; `Missing evidence: actual skeptic.md was unavailable`.",
         "",

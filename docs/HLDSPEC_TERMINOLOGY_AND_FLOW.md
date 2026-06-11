@@ -826,6 +826,19 @@ Use these user-facing trigger phrases:
 - `SpecKit specify`
   Means: start the first real SpecKit phase only when approval and
   `READY_FOR_SPECIFY` are already satisfied.
+- `SpecKit drive`
+  Means: run `scripts/speckit_drive_loop.py` to drive all remaining
+  bundles/features in dependency order, non-stop, auto-continuing on
+  RunSkeptic `PASS` with verified progress and stopping at the first
+  `ACTION`/`CONFLICT`, Reassessment request, hollow/no-progress result, or the
+  implementation-approval gate.
+- `regenerate prompts`
+  Means: run `scripts/build_speckit_bundle_prompts.py <workspace>` to
+  re-render `.specify/sync/speckit_bundle_prompts/*` from the current
+  `speckit_bundle_queue.json` and the current prompt-rendering code. Use this
+  after an HLDspec infrastructure change (e.g. to `spec_bundle_prompts.py` or
+  `handoff_policy_blocks.py`) when the source HLD itself has not changed, so
+  already-generated bundle prompts pick up the new checkpoint/RunSkeptic text.
 
 Rules:
 
@@ -837,6 +850,12 @@ Rules:
   aliases for `/speckit.specify`.
 - Do not infer `SpecKit specify` from `HLDspec`, `Build Loop prereqs`, or
   `Build Loop init`.
+- Do not infer `SpecKit drive` from `SpecKit specify`, `HLDspec`, or any
+  `Build Loop ...` trigger. `SpecKit drive` is the strongest trigger and must
+  be said explicitly.
+- `SpecKit drive` requires `READY_FOR_SPECIFY` and the SpecKit prework
+  approval gate to already be satisfied; it does not perform or substitute for
+  either.
 
 Default behavior:
 
@@ -849,6 +868,16 @@ Default behavior:
 - `Build Loop ready` stops at `READY_FOR_SPECIFY`.
 - Starting `/speckit.specify` requires the explicit stronger trigger
   `SpecKit specify`.
+- `SpecKit drive` stops at the first bundle that reports RunSkeptic
+  `ACTION`/`CONFLICT`, files a Reassessment request, makes no verified
+  progress, or reaches `ALL_TASKS_DONE` (implementation approval gate). It
+  never auto-approves implementation, overrides RunSkeptic, or skips
+  dependency order.
+- `regenerate prompts` is a maintenance action, not a workflow-state trigger:
+  it does not advance any gate, does not change `ordered_features`, the
+  dependency graph, or the invocation queue's bundle grouping, and does not
+  require `READY_FOR_SPECIFY`. It stops after reporting the regenerated
+  bundle count and prompt paths, or any error from the build script.
 
 ### Help trigger contract
 
@@ -863,6 +892,8 @@ HLDspec should support task-shaped help based on the same trigger vocabulary.
 - `HLDspec help Build Loop init`
 - `HLDspec help Build Loop ready`
 - `HLDspec help SpecKit specify`
+- `HLDspec help SpecKit drive`
+- `HLDspec help regenerate prompts`
 
 Every help response should explain the trigger with the same bounded shape:
 
@@ -882,8 +913,9 @@ Driving implementation to completion was approached three ways, in order:
 1. **The Judge continues the process.** Rejected: too complex to make a single
    orchestrator reliably own every post-handoff step.
 2. **One button / one large prompt does it all.** This is the auto-drive-all-phases
-   path (the live `SpecKitInvoker`, opt-in). Kept as a capability, but rejected as
-   the default — it removes the human from the loop and hides drift.
+   path (the live `SpecKitInvoker`, and the multi-bundle `SpecKit drive` loop in
+   `scripts/speckit_drive_loop.py`, both opt-in). Kept as a capability, but rejected
+   as the default — it removes the human from the loop and hides drift.
 3. **A mediator working with the human and HLDspec.** Chosen: the human keeps
    control and visibility, HLDspec knowledge stays at hand, and prompts stay bounded.
 

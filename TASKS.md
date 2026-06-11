@@ -88,6 +88,7 @@ This closes the core "it runs but produces no implementation" failure.
 - **Gap analysis (desired vs. actual)** — NEW capability: when the HLD changes or a feature is added, derive specs THEN diff against the current implementation to surface the delta (what to add/change) and guide the feature work, before writing code. Needed for existing/evolving projects, not just greenfield.
 - **Verify the real mechanism**: one true headless run end-to-end on a *code* feature (not 027, which is governance/scope); confirm `claude --model haiku` alias is accepted.
 - **Prove minimal chain before relying on all 8 phases.**
+- **`SpecKit drive` live proof**: `hldspec/speckit_drive_loop.py` + `scripts/speckit_drive_loop.py` (non-stop multi-bundle loop, opt-in trigger documented in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §"User trigger vocabulary") are built and unit-tested with an injected runner. Running it live still depends on the unproven real headless `claude --print` invocation above — prove one real bundle run before relying on the loop for non-stop driving.
 
 ---
 

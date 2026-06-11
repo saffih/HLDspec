@@ -15,11 +15,12 @@ class CommandResult:
 
 
 class CommandRunner:
-    def run(self, command: Sequence[str], *, cwd: Path | None = None, capture: bool = False) -> CommandResult:
+    def run(self, command: Sequence[str], *, cwd: Path | None = None, capture: bool = False, input_text: str | None = None) -> CommandResult:
         proc = subprocess.run(
             list(command),
             cwd=cwd,
             text=True,
+            input=input_text,
             stdout=subprocess.PIPE if capture else None,
             stderr=subprocess.PIPE if capture else None,
             check=False,
