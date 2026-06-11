@@ -848,6 +848,19 @@ Use these user-facing trigger phrases:
   proposes the next action. It never deletes workspace state — answered
   decisions and plans are untouched; `HLDSPEC_FRESH=1` remains the explicit
   full-rebuild option.
+- `audit project` (alias: `scan for gaps`)
+  Means: run the stepped read-only audit protocol from `templates/audit/`.
+  Step 1 pastes `AUDIT_PLAN_PROMPT.md` into a read-only agent session
+  (a Devin Explore session — one credit, reports back only — or a Claude
+  Explore subagent): it derives every evidence-backed finding it can in one
+  pass and emits ready-to-paste prompts for the remaining scoped scans.
+  Each scan runs in its own read-only session; `AUDIT_CONSOLIDATE_PROMPT.md`
+  merges the step outputs. The single outcome is the **Audit Report**,
+  printed in-session (never written to the audited repo): State (verified
+  inventory), Findings (gaps, defects, unverified claims — each with an
+  evidence level), Action Items (ordered, high-level), and Work Orders
+  (detailed action items — exact files, concrete change, acceptance check —
+  bounded so a routine-tier model can execute them).
 
 Rules:
 
@@ -891,6 +904,11 @@ Default behavior:
   read-only toward human answers and plans, and it stops after the sync
   report (`IN_SYNC`, `IN_SYNC_PENDING`, or `STALE_SPECS` with the stale spec
   list and the suggested next action).
+- `audit project` never modifies the audited project, never advances a gate,
+  and never auto-executes its own Work Orders — executing them is a separate,
+  explicitly triggered task. Auditors must tag every claim OBSERVED,
+  REPRODUCED, HISTORICAL, or INFERRED, and must list what they did not
+  examine. An unverified "done" claim outranks every other finding class.
 
 ### Help trigger contract
 
@@ -908,6 +926,7 @@ HLDspec should support task-shaped help based on the same trigger vocabulary.
 - `HLDspec help SpecKit drive`
 - `HLDspec help regenerate prompts`
 - `HLDspec help sync`
+- `HLDspec help audit project`
 
 Every help response should explain the trigger with the same bounded shape:
 
