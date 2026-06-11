@@ -32,6 +32,12 @@ def _write_prompt(workspace: Path, slug: str) -> None:
     path.write_text(f"# Bundle prompt {slug}\n", encoding="utf-8")
 
 
+def _write_approval(workspace: Path) -> None:
+    sync = workspace / ".specify" / "sync"
+    sync.mkdir(parents=True, exist_ok=True)
+    (sync / "speckit_prework_approval.json").write_text(json.dumps({"status": "APPROVED"}), encoding="utf-8")
+
+
 def _touch(root: Path, short_name: str, *files: str) -> None:
     spec_dir = root / short_name
     spec_dir.mkdir(parents=True, exist_ok=True)
@@ -80,8 +86,33 @@ class ParseBundleReportTests(unittest.TestCase):
         report = parse_bundle_report("RunSkeptic status: PASS\n\nReassessment request\nBlocker type: ...")
         self.assertTrue(report["has_reassessment_request"])
 
+    def test_echoed_template_line_cannot_produce_false_pass(self):
+        # Every bundle prompt contains this literal spec line; an agent echoing
+        # it after a real ACTION must not flip the last status to PASS.
+        text = "RunSkeptic status: ACTION\n...\n- `RunSkeptic status: PASS | ACTION | CONFLICT`\n"
+        report = parse_bundle_report(text)
+        self.assertNotEqual("PASS", report["runskeptic_status"])
+
+    def test_status_with_trailing_commentary_still_parses(self):
+        report = parse_bundle_report("RunSkeptic status: PASS — all gates clean\n")
+        self.assertEqual("PASS", report["runskeptic_status"])
+
 
 class RunDriveLoopTests(unittest.TestCase):
+    def test_refuses_to_run_without_prework_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_queue(workspace, [_bundle("G01", "g01", [("027", "027-scope")])])
+            _write_prompt(workspace, "g01")
+            speckit_root.mkdir(parents=True)
+
+            runner = FakeRunner(speckit_root, [])
+            summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
+
+            self.assertEqual("NOT_APPROVED", summary["stop_reason"])
+            self.assertEqual([], runner.calls)
+
     def test_auto_continues_across_bundles_on_pass_with_progress(self):
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp) / "ws"
@@ -97,6 +128,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_prompt(workspace, "g02")
             speckit_root.mkdir(parents=True)
 
+            _write_approval(workspace)
             runner = FakeRunner(
                 speckit_root,
                 [
@@ -119,6 +151,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_prompt(workspace, "g01")
             speckit_root.mkdir(parents=True)
 
+            _write_approval(workspace)
             runner = FakeRunner(speckit_root, [{"stdout": "RunSkeptic status: ACTION\n"}])
 
             summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
@@ -135,6 +168,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_prompt(workspace, "g01")
             speckit_root.mkdir(parents=True)
 
+            _write_approval(workspace)
             runner = FakeRunner(
                 speckit_root,
                 [
@@ -159,6 +193,7 @@ class RunDriveLoopTests(unittest.TestCase):
             speckit_root.mkdir(parents=True)
 
             # PASS, but no artifacts changed -> resume pointer unchanged.
+            _write_approval(workspace)
             runner = FakeRunner(speckit_root, [{"stdout": "RunSkeptic status: PASS\n"}])
 
             summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
@@ -174,6 +209,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_prompt(workspace, "g01")
             _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
 
+            _write_approval(workspace)
             runner = FakeRunner(speckit_root, [])
 
             summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
@@ -189,6 +225,7 @@ class RunDriveLoopTests(unittest.TestCase):
             workspace.mkdir(parents=True)
             speckit_root.mkdir(parents=True)
 
+            _write_approval(workspace)
             runner = FakeRunner(speckit_root, [])
 
             summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
@@ -202,6 +239,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_queue(workspace, [_bundle("G01", "g01", [("027", "027-scope")])])
             _write_prompt(workspace, "g01")
 
+            _write_approval(workspace)
             runner = FakeRunner(speckit_root, [])
 
             summary = run_drive_loop(workspace, speckit_root, runner=runner, agent_cmd="claude")
@@ -216,6 +254,7 @@ class RunDriveLoopTests(unittest.TestCase):
             _write_queue(workspace, [_bundle("G01", "g01", [("027", "027-scope")])])
             _write_prompt(workspace, "g01")
             _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
+            _write_approval(workspace)
 
             run_drive_loop(workspace, speckit_root, runner=FakeRunner(speckit_root, []), agent_cmd="claude")
 

@@ -76,12 +76,15 @@ def _ledger_status(
     spec_sections: list[str],
     fingerprints: dict[str, str],
     artifacts_mtime: float,
+    hld_mtime: float,
 ) -> tuple[str, dict[str, Any]]:
     """Decide DONE vs DONE_STALE for a spec observed DONE on disk, and the
     ledger entry to keep. Re-records when artifacts were rebuilt after the
-    snapshot (the rebuild is presumed to target the current HLD)."""
+    snapshot AND after the last HLD edit — a rebuild older than the HLD edit
+    was built against the pre-edit HLD and must not clear staleness."""
     current = {anchor: fingerprints.get(anchor, "") for anchor in spec_sections}
-    if entry is None or artifacts_mtime > float(entry.get("artifacts_mtime", 0.0)):
+    rebuilt = entry is not None and artifacts_mtime > float(entry.get("artifacts_mtime", 0.0))
+    if entry is None or (rebuilt and artifacts_mtime >= hld_mtime):
         return "DONE", {"sections": current, "recorded_at": utc_now(), "artifacts_mtime": artifacts_mtime}
     recorded = as_dict(entry.get("sections"))
     stale = sorted(
@@ -137,7 +140,7 @@ def run_sync(workspace: Path, speckit_root: Path) -> dict[str, Any]:
         if status == "DONE" and fingerprints:
             entry = ledger.get(short_name) if isinstance(ledger.get(short_name), dict) else None
             row["status"], new_ledger[short_name] = _ledger_status(
-                entry, sections, fingerprints, _artifacts_mtime(speckit_root, short_name)
+                entry, sections, fingerprints, _artifacts_mtime(speckit_root, short_name), hld_path.stat().st_mtime
             )
             if row["status"] == "DONE_STALE":
                 row["stale_sections"] = new_ledger[short_name].get("stale_sections", [])

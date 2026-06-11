@@ -121,7 +121,8 @@ def runskeptic_operating_block(skeptic_path: str = "~/code/skeptic/skeptic.md") 
         "6. Evidence: mark each finding as `OBSERVED`, `REPRODUCED`, `HISTORICAL`, or `INFERRED RISK`.",
         "7. Decide: choose `PASS`, `ACTION`, or `CONFLICT`; do not promote if any ACTION or CONFLICT remains.",
         "8. Fix-and-reverify: if the decision is `ACTION` and the fix is simple and in scope (see above), apply "
-        "it and return to step 1, up to 3 attempts total. Record each attempt's finding, fix, and re-run result.",
+        "it and return to step 1, up to 3 attempts per finding and 6 in total per gate. Rewording a finding "
+        "does not reset the count. Record each attempt's finding, fix, and re-run result.",
         "9. Verify: if a fix was applied, report the exact tests or checks run; otherwise report what "
         "verification would be required.",
         "",

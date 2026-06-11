@@ -14,6 +14,7 @@ back to the human.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -29,12 +30,35 @@ from hldspec.speckit_execution_state import (
 REPORT_JSON = "speckit_drive_loop_report.json"
 REPORT_MD = "speckit_drive_loop_report.md"
 
-_RUNSKEPTIC_RE = re.compile(r"RunSkeptic status:\s*(PASS|ACTION|CONFLICT)", re.IGNORECASE)
+# The bundle prompts themselves contain the literal spec line
+# "RunSkeptic status: PASS | ACTION | CONFLICT". The lookahead rejects a
+# status followed by "|" so an agent echoing that line can never produce a
+# false PASS. (An echoed line still matches CONFLICT at its tail, which only
+# stops the loop — fail-safe.)
+_RUNSKEPTIC_RE = re.compile(r"RunSkeptic status:\s*(PASS|ACTION|CONFLICT)\b(?!\s*\|)", re.IGNORECASE)
 
 # Stop reasons that mean "a human needs to look at this" vs. "nothing more to
 # automate right now". Used only for exit-code mapping in the CLI.
-ATTENTION_REASONS = frozenset({"NEEDS_ATTENTION", "IMPLEMENT_GATE"})
+ATTENTION_REASONS = frozenset({"NEEDS_ATTENTION", "IMPLEMENT_GATE", "NOT_APPROVED"})
 CLEAN_STOP_REASONS = frozenset({"MAX_BUNDLES"})
+
+
+def prework_approved(workspace: Path) -> bool:
+    """Invariant guard: SpecKit may not be invoked before the human approval
+    gate is passed (CLAUDE.md invariant #2). Checks every known sync layout."""
+    for sync in (
+        workspace / ".hldspec" / "sync",
+        workspace / ".specify" / "sync",
+        workspace / "firstrun" / ".specify" / "sync",
+    ):
+        path = sync / "speckit_prework_approval.json"
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(record, dict) and record.get("status") == "APPROVED":
+            return True
+    return False
 
 
 def parse_bundle_report(stdout: str) -> dict[str, Any]:
@@ -77,6 +101,17 @@ def run_drive_loop(
     stop_reason = "NO_BUNDLES"
     last_report: dict[str, Any] = {}
     state: dict[str, Any] = {}
+
+    if not prework_approved(workspace):
+        summary = {
+            "bundles_run": bundles_run,
+            "stop_reason": "NOT_APPROVED",
+            "last_report": {"reason": "speckit_prework_approval.json with status APPROVED not found"},
+            "final_state": state,
+        }
+        write_json_dict(sync / REPORT_JSON, summary)
+        (sync / REPORT_MD).write_text(render_drive_loop_report(summary), encoding="utf-8")
+        return summary
 
     while True:
         state = write_execution_state(workspace, speckit_root)

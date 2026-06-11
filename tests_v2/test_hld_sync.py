@@ -142,6 +142,26 @@ class RunSyncTests(unittest.TestCase):
             self.assertEqual("DONE", recovered["specs"][0]["status"])
             self.assertEqual("IN_SYNC", recovered["status"])
 
+    def test_rebuild_older_than_hld_edit_stays_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_workspace(workspace, {"HLD-001": "alpha"}, [SPEC_001])
+            _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+
+            run_sync(workspace, speckit_root)
+
+            # Artifacts rebuilt at t+60, but the HLD edited later at t+120:
+            # the rebuild targeted the pre-edit HLD and must stay stale.
+            now = time.time()
+            os.utime(speckit_root / "001-core" / "spec.md", (now + 60, now + 60))
+            (workspace / "HLD.md").write_text(_hld({"HLD-001": "alpha CHANGED"}), encoding="utf-8")
+            os.utime(workspace / "HLD.md", (now + 120, now + 120))
+
+            second = run_sync(workspace, speckit_root)
+            self.assertEqual("DONE_STALE", second["specs"][0]["status"])
+            self.assertEqual("STALE_SPECS", second["status"])
+
     def test_removed_section_marks_spec_stale(self):
         with tempfile.TemporaryDirectory() as tmp:
             workspace = Path(tmp) / "ws"

@@ -146,6 +146,10 @@ def _user_checkpoint(prompt_text: str, options: str, *, auto_continue_if: str) -
 # ACTION finding before treating it as a real stop.
 RUNSKEPTIC_FIX_MAX_ATTEMPTS = 3
 
+# Hard ceiling across *all* findings at one gate, so rewording a finding can
+# never reset the loop indefinitely.
+RUNSKEPTIC_FIX_TOTAL_MAX_ATTEMPTS = 6
+
 # A fix is "simple" (safe to apply without escalation) only if it does not
 # touch any of these. Mirrors the escalation boundary in
 # clarification_policy_block() so the two policies don't diverge.
@@ -208,7 +212,9 @@ def _runskeptic_block(runtime: str, phase: str, spec_id_value: str, skeptic_path
         f"3. Repeat from step 1 if still `ACTION`, up to {RUNSKEPTIC_FIX_MAX_ATTEMPTS} attempts total.",
         "",
         "Record every attempt: finding, fix applied, re-run result. If a later attempt surfaces a "
-        "different finding, it gets its own attempt count from 1.",
+        "different finding, it gets its own attempt count from 1 — but a reworded or relocated "
+        "version of the same finding does not reset the count, and no gate may exceed "
+        f"{RUNSKEPTIC_FIX_TOTAL_MAX_ATTEMPTS} fix attempts in total across all findings.",
         "",
         f"Treat the gate as `PASS` once a re-run reports `PASS`. If `ACTION` remains after "
         f"{RUNSKEPTIC_FIX_MAX_ATTEMPTS} attempts, the fix would cross one of the boundaries above, or the "
