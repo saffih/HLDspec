@@ -81,6 +81,20 @@ class AgentFirstCliContractTests(unittest.TestCase):
             env=merged_env,
         )
 
+    def run_help(self, *topic: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                "help",
+                *topic,
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
     def write_fake_build_loop_bin(self) -> dict[str, str]:
         bin_dir = self.tmp_path / "bin"
         bin_dir.mkdir()
@@ -357,6 +371,42 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         self.assertIn("## Next Safe Action", result.stdout)
         self.assertIn("Initialize or point HLDspec at a git workspace", result.stdout)
+
+    def test_help_tells_user_to_use_status_for_next_safe_action(self) -> None:
+        result = self.run_help()
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("Use `status` first when you are unsure", result.stdout)
+        self.assertIn("HLDspec status target: /path/to/target", result.stdout)
+        self.assertIn("current state, blockers, open questions, next safe action", result.stdout)
+        self.assertIn("HLDspec doctor target: /path/to/target", result.stdout)
+        self.assertIn("HLDspec operator-state target: /path/to/target", result.stdout)
+
+    def test_help_status_topic_has_bounded_shape(self) -> None:
+        result = self.run_help("status")
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("# HLDspec Help: status", result.stdout)
+        self.assertIn("Purpose:", result.stdout)
+        self.assertIn("Does:", result.stdout)
+        self.assertIn("Stops at:", result.stdout)
+        self.assertIn("Will not:", result.stdout)
+        self.assertIn("Example: `HLDspec status target: /path/to/target`", result.stdout)
+
+    def test_help_what_next_alias_routes_to_status(self) -> None:
+        result = self.run_help("what", "next")
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("# HLDspec Help: status", result.stdout)
+        self.assertIn("next safe action", result.stdout)
+
+    def test_help_target_prompts_explains_target_agent_prompt(self) -> None:
+        result = self.run_help("target", "prompts")
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertIn("# HLDspec Help: target prompts", result.stdout)
+        self.assertIn("prompts/agent/START_HLDSPEC_AGENT.md", result.stdout)
+        self.assertIn("Report blockers, evidence, and next safe action", result.stdout)
 
     def test_status_reports_validation_status_when_validation_report_exists(self) -> None:
         source = self.tmp_path / "HLD.md"

@@ -11,6 +11,9 @@ The agent must expand the short request into the public HLDspec facade and repor
 Accepted user requests include:
 
 ```text
+HLDspec help
+HLDspec help status
+HLDspec help what next
 HLDspec HLD: /path/to/HLD.md create /path/to/target
 HLDspec create /path/to/target from /path/to/HLD.md
 HLDspec HLD: /path/to/HLD.md target: /path/to/target runtime: claude
@@ -54,12 +57,39 @@ When a minimal request is detected, the agent must:
 4. Keep the source HLD read-only.
 5. Write generated state only under the target workspace.
 6. Stop on ACTION or CONFLICT.
-7. Return a short status with:
+7. When the user asks for help, explain the safest status/next-action path first:
+   `HLDspec status target: <path>`, then `doctor`, then `operator-state` when readiness/build-loop safety is the question.
+8. Return a short status with:
    - target
    - mode
    - runtime
    - blockers
    - next safe action
+
+## Help behavior
+
+Help is part of the public UX. A user should be able to ask:
+
+```text
+HLDspec help
+HLDspec help status
+HLDspec help what next
+HLDspec help target prompts
+```
+
+The default answer must tell the user that `status` is the safest first
+question when they are unsure, because it reports current state, blockers, open
+questions, evidence, and the next safe action without advancing the workflow.
+
+Every topic help response should use the bounded shape:
+
+```text
+Purpose
+Does
+Stops at
+Will not
+Example
+```
 
 ## Flow example expansion
 

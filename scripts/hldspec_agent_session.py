@@ -1623,9 +1623,141 @@ def command_operator_state(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "PASS" else 2
 
 
+HELP_TOPICS: dict[str, dict[str, str]] = {
+    "status": {
+        "purpose": "Show where the target is now and what HLDspec thinks the next safe action is.",
+        "does": "Reads target discovery, workflow reports, validation/promotion gates, Operator State, blockers, and open questions.",
+        "stops_at": "A short summary with Current state, Summary, Blockers, Open questions, and Next safe action.",
+        "will_not": "Run SpecKit, edit product code, resolve human decisions, or advance a checkpoint.",
+        "example": "HLDspec status target: /path/to/target",
+    },
+    "doctor": {
+        "purpose": "Diagnose why the target is not ready or why status reports ACTION/CONFLICT.",
+        "does": "Checks repo docs, target session files, discovery, readiness, Operator State, validation gates, and continuation blockers.",
+        "stops_at": "PASS when no action/conflict is visible, otherwise the list of blockers to resolve before continuing.",
+        "will_not": "Repair the target automatically, invoke SpecKit, or treat warnings as approval.",
+        "example": "HLDspec doctor target: /path/to/target",
+    },
+    "operator-state": {
+        "purpose": "Ask the strongest current readiness/lifecycle question: is this target safe for the next SpecKit/build-loop step?",
+        "does": "Combines readiness facts, source freshness, target discovery, phase evidence, and SpecKit lifecycle evidence.",
+        "stops_at": "PASS/ACTION/CONFLICT with state, blockers, evidence, and next safe action.",
+        "will_not": "Create branches, run SpecKit phases, approve implementation, commit, merge, or adopt unknown brownfield code.",
+        "example": "HLDspec operator-state target: /path/to/target",
+    },
+    "review": {
+        "purpose": "Show the human-facing checkpoint/review artifacts for the target.",
+        "does": "Lists blocking and optional files the user or judge should inspect.",
+        "stops_at": "The available review files and any immediate blockers.",
+        "will_not": "Answer checkpoint questions silently or promote artifacts.",
+        "example": "HLDspec review target: /path/to/target",
+    },
+    "continue": {
+        "purpose": "Advance only to the next safe HLDspec checkpoint when gates permit.",
+        "does": "Runs the ProjectMachine continuation path and stops at blockers or human checkpoints.",
+        "stops_at": "The next safe checkpoint, blocker, or completed preparation step.",
+        "will_not": "Bypass ACTION/CONFLICT, run implementation, auto-merge, or skip human-owned decisions.",
+        "example": "HLDspec continue target: /path/to/target",
+    },
+    "check hld": {
+        "purpose": "Cross-examine the HLD for readiness before investing in SpecKit groundwork.",
+        "does": "Reviews HLD readiness, reason trail, grouped clarification questions, and evidence gaps.",
+        "stops_at": "Readiness verdict, auxiliary reason trail, grouped clarification questions, and next safe action.",
+        "will_not": "Mutate the source HLD, run SpecKit, initialize the Build Loop, or ask repetitive line-by-line questions.",
+        "example": "HLDspec review-hld HLD: /path/to/HLD.md target: /path/to/target",
+    },
+    "build loop": {
+        "purpose": "Prepare or supervise the SpecKit Build Loop only through approved boundaries.",
+        "does": "Uses Build Loop prereqs/init/ready/status triggers to check prerequisites, init readiness, and next safe SpecKit action.",
+        "stops_at": "Prereq report, init report, READY_FOR_SPECIFY, or a blocker that must be resolved first.",
+        "will_not": "Run product implementation, create a competing git workflow, or continue past unverified/stale/blocked evidence.",
+        "example": "HLDspec build-status target: /path/to/target",
+    },
+    "target prompts": {
+        "purpose": "Explain which generated prompts can be used from inside the target repo.",
+        "does": "Points to target-side agent, mediator, slice, and bundle prompts after HLDspec has produced them.",
+        "stops_at": "A list of prompt paths and the safe sentence to paste into a target-side agent.",
+        "will_not": "Treat missing prompts as approval to improvise or execute product work without handoff.",
+        "example": "Read prompts/agent/START_HLDSPEC_AGENT.md and follow it exactly. Report blockers, evidence, and next safe action.",
+    },
+}
+
+
+def _normalise_help_topic(topic: str) -> str:
+    text = " ".join(topic.lower().replace("-", " ").split())
+    aliases = {
+        "": "",
+        "what next": "status",
+        "next": "status",
+        "state": "status",
+        "build status": "status",
+        "speckit state": "operator-state",
+        "operator": "operator-state",
+        "operator state": "operator-state",
+        "check-hld": "check hld",
+        "review hld": "check hld",
+        "review-hld": "check hld",
+        "build-loop": "build loop",
+        "build loop status": "build loop",
+        "prompts": "target prompts",
+        "target prompt": "target prompts",
+        "target prompts": "target prompts",
+    }
+    return aliases.get(text, text)
+
+
+def _render_help_topic(name: str, item: dict[str, str]) -> str:
+    return "\n".join(
+        [
+            f"# HLDspec Help: {name}",
+            "",
+            f"Purpose: {item['purpose']}",
+            f"Does: {item['does']}",
+            f"Stops at: {item['stops_at']}",
+            f"Will not: {item['will_not']}",
+            f"Example: `{item['example']}`",
+            "",
+        ]
+    )
+
+
+def command_help(args: argparse.Namespace) -> int:
+    topic = _normalise_help_topic(" ".join(args.topic or []))
+    if topic and topic in HELP_TOPICS:
+        print(_render_help_topic(topic, HELP_TOPICS[topic]), end="")
+        return 0
+    if topic:
+        print(f"Unknown HLDspec help topic: {topic}")
+        print("")
+    print("# HLDspec Help")
+    print("")
+    print("Use `status` first when you are unsure. It is the safest way to ask what should happen next.")
+    print("")
+    print("Most useful questions:")
+    print("- `HLDspec status target: /path/to/target` — current state, blockers, open questions, next safe action.")
+    print("- `HLDspec doctor target: /path/to/target` — why the target is not ready and what to fix.")
+    print("- `HLDspec operator-state target: /path/to/target` — readiness/lifecycle safety for Build Loop or SpecKit work.")
+    print("- `HLDspec review target: /path/to/target` — human-facing review files and checkpoint evidence.")
+    print("- `HLDspec continue target: /path/to/target` — advance only if gates say it is safe.")
+    print("")
+    print("Start/resume examples:")
+    print("- `HLDspec use HLD: /path/to/HLD.md target: /path/to/target`")
+    print("- `HLDspec HLD: /path/to/HLD.md create /path/to/target runtime: claude`")
+    print("")
+    print("Help topics:")
+    for name in sorted(HELP_TOPICS):
+        print(f"- `HLDspec help {name}`")
+    print("")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Agent-first HLDspec session facade.")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("help", help="Show user-facing trigger help and status/next-action guidance.")
+    p.add_argument("topic", nargs="*", help="Optional topic, e.g. status, doctor, check HLD, build loop, target prompts.")
+    p.set_defaults(func=command_help)
 
     p = sub.add_parser("start", help="Prepare or resume an HLDspec agent session.")
     p.add_argument("--source", help="Source HLD path.")
