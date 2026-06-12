@@ -121,6 +121,8 @@ class ProductRunabilityTests(unittest.TestCase):
         controller_sync = controller / ".hldspec" / "sync"
         self.assertTrue((controller_sync / pr.REPORT_JSON).is_file())
         self.assertFalse((target / ".hldspec" / "sync").exists())
+        self.assertFalse((target / ".hldspec").exists())
+        self.assertFalse((target / ".specify").exists())
         self.assertEqual(str(controller_sync / pr.REPORT_JSON), report["report_paths"]["report_json"])
 
     def test_unknown_brownfield_never_gets_runnable_pass(self) -> None:
