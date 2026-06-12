@@ -247,5 +247,43 @@ class RunSyncTests(unittest.TestCase):
             self.assertNotIn("001-core", ledger["specs"])
 
 
+class ExternalControllerSyncTests(unittest.TestCase):
+    """Invariant C: external mode must not split state into target-local sync."""
+
+    def test_run_sync_writes_reports_to_controller_sync_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            controller = Path(tmp) / "controller"
+            speckit_root = Path(tmp) / "specs"
+            workspace.mkdir(parents=True)
+            (workspace / "HLD.md").write_text(_hld({"HLD-001": "alpha"}), encoding="utf-8")
+            (workspace / ".hldspec-run.json").write_text(
+                json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+            )
+            controller_sync = controller / ".hldspec" / "sync"
+            controller_sync.mkdir(parents=True)
+            bundles = [
+                {
+                    "bundle_id": SPEC_001["feature_id"],
+                    "bundle_slug": SPEC_001["short_name"],
+                    "prompt_paths": {},
+                    "included_specs": [SPEC_001],
+                }
+            ]
+            (controller_sync / "speckit_bundle_queue.json").write_text(
+                json.dumps({"bundles": bundles}), encoding="utf-8"
+            )
+            _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
+
+            report = run_sync(workspace, speckit_root)
+
+            self.assertEqual("IN_SYNC", report["status"], report)
+            for name in (SYNC_REPORT_JSON, SYNC_REPORT_MD, FINGERPRINTS_JSON, DONE_LEDGER_JSON):
+                self.assertTrue((controller_sync / name).is_file(), name)
+            self.assertFalse((workspace / ".hldspec").exists())
+            self.assertFalse((workspace / ".specify").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

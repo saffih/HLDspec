@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import select_sync_dir
+
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -21,14 +29,7 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    if (direct / "hldspec_architecture_analysis.json").exists() or (direct / "hldspec_state.json").exists():
-        return direct
-    if (nested / "hldspec_architecture_analysis.json").exists() or (nested / "hldspec_state.json").exists():
-        return nested
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    return select_sync_dir(workspace, ("hldspec_architecture_analysis.json", "hldspec_state.json"))
 
 
 def build_context(workspace: Path) -> dict[str, Any]:

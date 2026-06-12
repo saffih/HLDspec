@@ -45,12 +45,11 @@ CLEAN_STOP_REASONS = frozenset({"MAX_BUNDLES"})
 
 def prework_approved(workspace: Path) -> bool:
     """Invariant guard: SpecKit may not be invoked before the human approval
-    gate is passed (CLAUDE.md invariant #2). Checks every known sync layout."""
-    for sync in (
-        workspace / ".hldspec" / "sync",
-        workspace / ".specify" / "sync",
-        workspace / "firstrun" / ".specify" / "sync",
-    ):
+    gate is passed (CLAUDE.md invariant #2). Checks the pointer-resolved
+    canonical sync dir first, then every known legacy layout."""
+    from hldspec import control_paths
+
+    for sync in control_paths.candidate_control_sync_dirs(workspace, legacy_fallback=True):
         path = sync / "speckit_prework_approval.json"
         try:
             record = json.loads(path.read_text(encoding="utf-8"))

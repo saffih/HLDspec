@@ -385,7 +385,11 @@ class HldspecSpeckitReadyTest(unittest.TestCase):
             stderr=subprocess.PIPE,
         )
 
-        sync = workspace / ".specify" / "sync"
+        # The wrapper writes through the canonical pointer-aware resolver; a
+        # fresh workspace without legacy markers resolves to .hldspec/sync.
+        from hldspec.control_paths import resolve_control_sync_dir
+
+        sync = resolve_control_sync_dir(workspace)
         self.assertTrue((sync / "hldspec_architecture_analysis.json").exists())
         self.assertTrue((sync / "speckit_constitution_context.json").exists())
         self.assertTrue((sync / "hldspec_speckit_spec_list.json").exists())

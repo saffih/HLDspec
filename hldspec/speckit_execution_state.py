@@ -31,16 +31,13 @@ PHASE_ORDER: tuple[str, ...] = ("specify", "plan", "tasks")
 
 
 def select_execution_sync_dir(workspace: Path, *, create: bool = False) -> Path:
-    """Prefer the canonical HLDspec control dir while preserving legacy reads."""
-    canonical = workspace / ".hldspec" / "sync"
-    legacy = workspace / ".specify" / "sync"
+    """Prefer the pointer-resolved canonical control dir while preserving legacy reads."""
+    from hldspec import control_paths
+
     markers = ("speckit_bundle_queue.json", "speckit_invocation_queue.json")
-    for sync in (canonical, legacy):
-        if any((sync / marker).exists() for marker in markers):
-            return sync
-    if create:
-        canonical.mkdir(parents=True, exist_ok=True)
-    return canonical
+    return control_paths.resolve_control_sync_dir(
+        workspace, create=create, legacy_fallback=True, markers=markers
+    )
 
 
 def _bundles_from_queue(queue: dict[str, Any]) -> list[dict[str, Any]]:

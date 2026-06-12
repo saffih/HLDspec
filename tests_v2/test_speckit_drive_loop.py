@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from hldspec.command_runner import CommandResult
-from hldspec.speckit_drive_loop import parse_bundle_report, run_drive_loop
+from hldspec.speckit_drive_loop import parse_bundle_report, prework_approved, run_drive_loop
 
 
 def _bundle(bundle_id: str, slug: str, specs: list[tuple[str, str]]) -> dict:
@@ -264,6 +264,53 @@ class RunDriveLoopTests(unittest.TestCase):
             sync = workspace / ".specify" / "sync"
             self.assertTrue((sync / "speckit_drive_loop_report.json").exists())
             self.assertTrue((sync / "speckit_drive_loop_report.md").exists())
+
+
+class ExternalControllerApprovalTests(unittest.TestCase):
+    """Invariant C: approval and reports must resolve through the controller."""
+
+    def _external_target(self, tmp: Path) -> tuple[Path, Path]:
+        workspace = tmp / "ws"
+        controller = tmp / "controller"
+        workspace.mkdir(parents=True)
+        (workspace / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        return workspace, controller
+
+    def test_prework_approved_reads_controller_sync_in_external_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace, controller = self._external_target(Path(tmp))
+            controller_sync = controller / ".hldspec" / "sync"
+            controller_sync.mkdir(parents=True)
+            (controller_sync / "speckit_prework_approval.json").write_text(
+                json.dumps({"status": "APPROVED"}), encoding="utf-8"
+            )
+
+            self.assertTrue(prework_approved(workspace))
+            self.assertFalse((workspace / ".hldspec").exists())
+
+    def test_prework_not_approved_when_controller_lacks_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace, controller = self._external_target(Path(tmp))
+            (controller / ".hldspec" / "sync").mkdir(parents=True)
+
+            self.assertFalse(prework_approved(workspace))
+
+    def test_drive_loop_report_lands_in_controller_sync(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace, controller = self._external_target(Path(tmp))
+            speckit_root = Path(tmp) / "specs"
+
+            summary = run_drive_loop(
+                workspace, speckit_root, runner=FakeRunner(speckit_root, []), agent_cmd="claude"
+            )
+
+            self.assertEqual("NOT_APPROVED", summary["stop_reason"])
+            controller_sync = controller / ".hldspec" / "sync"
+            self.assertTrue((controller_sync / "speckit_drive_loop_report.json").exists())
+            self.assertFalse((workspace / ".hldspec").exists())
+            self.assertFalse((workspace / ".specify").exists())
 
 
 if __name__ == "__main__":

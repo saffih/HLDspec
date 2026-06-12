@@ -19,11 +19,14 @@ def write_json_dict(path: Path, data: dict[str, Any]) -> None:
 
 
 def select_sync_dir(workspace: Path, markers: tuple[str, ...]) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    for sync in (direct, nested):
-        for marker in markers:
-            if (sync / marker).exists():
-                return sync
-    direct.mkdir(parents=True, exist_ok=True)
-    return direct
+    """Marker-based control sync selection through the canonical resolver.
+
+    Existing legacy `.specify/sync` / `firstrun/.specify/sync` state keeps
+    winning via markers (explicit legacy_fallback); fresh state lands in the
+    pointer-resolved canonical `.hldspec/sync`.
+    """
+    from hldspec import control_paths
+
+    return control_paths.resolve_control_sync_dir(
+        workspace, create=True, legacy_fallback=True, markers=markers
+    )

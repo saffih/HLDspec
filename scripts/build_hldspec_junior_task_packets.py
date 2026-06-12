@@ -3,18 +3,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import select_sync_dir
+
+
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    if direct.exists():
-        return direct
-    if nested.exists():
-        return nested
-    return direct
+    return select_sync_dir(workspace, ("hldspec_junior_task_packets.json", "hldspec_state.json"))
 
 
 def task(

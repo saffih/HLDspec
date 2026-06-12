@@ -1,0 +1,71 @@
+"""Canonical pointer-aware control-path resolution (invariant C).
+
+Every HLDspec control read/write must resolve its sync dir through this module
+so external-controller mode can never split state between the controller root
+and target-local `.hldspec/sync` / `.specify/sync`.
+
+Resolution:
+- normal mode (no valid `.hldspec-run.json` pointer): `target/.hldspec[/sync]`
+- external mode (pointer naming a controller root): `<controller>/.hldspec[/sync]`
+- legacy `.specify/sync` / `firstrun/.specify/sync` are reachable only when the
+  caller passes `legacy_fallback=True` AND a marker file proves state already
+  lives there; no code path falls back to legacy silently.
+
+Invalid pointer: `run_state.controller_root_from_pointer` returns None for a
+missing or malformed pointer, so resolution falls back to target-local paths.
+This deliberately preserves the pre-resolver semantics of
+`target_discovery._hldspec_dir`: a broken pointer looks like a target with
+no/foreign control state, which discovery already fails closed on (untrusted
+lineage), rather than guessing at a controller location.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from . import run_state
+
+LEGACY_SYNC_RELPATHS: tuple[str, ...] = (".specify/sync", "firstrun/.specify/sync")
+
+
+def resolve_controller_root(target: Path) -> Path | None:
+    return run_state.controller_root_from_pointer(Path(target))
+
+
+def resolve_hldspec_dir(target: Path) -> Path:
+    target = Path(target)
+    controller = resolve_controller_root(target)
+    return (controller / ".hldspec") if controller is not None else (target / ".hldspec")
+
+
+def candidate_control_sync_dirs(target: Path, *, legacy_fallback: bool = False) -> tuple[Path, ...]:
+    """Pointer-resolved canonical sync dir first; legacy read locations only on request."""
+    target = Path(target)
+    candidates = [resolve_hldspec_dir(target) / "sync"]
+    if legacy_fallback:
+        candidates.extend(target / rel for rel in LEGACY_SYNC_RELPATHS)
+    return tuple(candidates)
+
+
+def resolve_control_sync_dir(
+    target: Path,
+    create: bool = False,
+    legacy_fallback: bool = False,
+    markers: tuple[str, ...] = (),
+) -> Path:
+    """Resolve the one control sync dir for this target.
+
+    With `markers`, the first candidate already containing a marker wins, so
+    existing state keeps being read where it lives — legacy dirs participate
+    only when `legacy_fallback=True`. Without a marker hit the canonical dir
+    is returned; `create=True` creates only that canonical dir, never a
+    target-local dir in external mode and never a legacy dir.
+    """
+    candidates = candidate_control_sync_dirs(target, legacy_fallback=legacy_fallback)
+    if markers:
+        for sync in candidates:
+            if any((sync / marker).exists() for marker in markers):
+                return sync
+    canonical = candidates[0]
+    if create:
+        canonical.mkdir(parents=True, exist_ok=True)
+    return canonical

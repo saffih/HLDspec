@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import select_sync_dir
+
 
 ARTIFACTS: dict[str, dict[str, str]] = {
     "hldspec_junior_task_packets": {"role": "Judge", "assigned_agent_name": "HLDspec Judge Orchestrator", "model_tier": "MODEL_CRITICAL", "path": "hldspec_junior_task_packets.json", "kind": "junior_task_packets"},
@@ -33,12 +41,7 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    for sync in (direct, nested):
-        if any((sync / meta["path"]).exists() for meta in ARTIFACTS.values()):
-            return sync
-    return direct
+    return select_sync_dir(workspace, tuple(meta["path"] for meta in ARTIFACTS.values()))
 
 
 def load_ledger(sync: Path) -> dict[str, Any]:

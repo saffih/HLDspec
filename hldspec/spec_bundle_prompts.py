@@ -533,7 +533,12 @@ def write_bundle_prompts(workspace: Path, *, runtimes: tuple[str, ...] = RUNTIME
             prompt_path = prompt_root / runtime / slug / "prompt.md"
             prompt_path.parent.mkdir(parents=True, exist_ok=True)
             prompt_path.write_text(render_bundle_prompt(bundle, workspace=workspace, sync=sync, runtime=runtime, skeptic_path=skeptic_path), encoding="utf-8")
-            prompt_paths[runtime] = str(prompt_path.relative_to(workspace))
+            try:
+                prompt_paths[runtime] = str(prompt_path.relative_to(workspace))
+            except ValueError:
+                # External-controller sync lives outside the workspace; record
+                # the absolute path (drive-loop/next-action handle both forms).
+                prompt_paths[runtime] = str(prompt_path)
         bundle["prompt_paths"] = prompt_paths
 
     queue["generated_at"] = utc_now()

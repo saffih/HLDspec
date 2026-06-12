@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from . import control_paths
 from . import run_state
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
@@ -182,10 +183,7 @@ def _dirty_target_classification(
 
 def _controller_source_package_dir(target: Path) -> tuple[Path, dict[str, Any]]:
     pointer = run_state.load_pointer(target)
-    controller = run_state.controller_root_from_pointer(target)
-    if controller is not None:
-        return controller / ".hldspec" / "source_package", pointer
-    return target / ".hldspec" / "source_package", pointer
+    return control_paths.resolve_hldspec_dir(target) / "source_package", pointer
 
 
 def _source_package_anchor_count(source_package_dir: Path) -> int | None:
@@ -203,9 +201,7 @@ def _source_package_anchor_count(source_package_dir: Path) -> int | None:
 
 
 def _project_checkpoint_gate(target: Path) -> dict[str, Any] | None:
-    _ctrl = run_state.controller_root_from_pointer(target)
-    _hldspec_dir = (_ctrl / ".hldspec") if _ctrl is not None else (target / ".hldspec")
-    state_path = _hldspec_dir / "sync" / "hldspec_state.json"
+    state_path = control_paths.resolve_control_sync_dir(target) / "hldspec_state.json"
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except Exception:

@@ -3,8 +3,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import select_sync_dir
+
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -22,13 +30,7 @@ def as_list(value: Any) -> list[Any]:
 
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    if (direct / "speckit_product_manager_pack.json").exists() or (direct / "speckit_architect_pack.json").exists():
-        return direct
-    if (nested / "speckit_product_manager_pack.json").exists() or (nested / "speckit_architect_pack.json").exists():
-        return nested
-    return direct
+    return select_sync_dir(workspace, ("speckit_product_manager_pack.json", "speckit_architect_pack.json"))
 
 
 def answered(question: dict[str, Any]) -> bool:

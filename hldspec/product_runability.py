@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from hldspec import control_paths
 from hldspec import target_discovery as td
 from hldspec.spec_bundles import utc_now
 
@@ -229,7 +230,7 @@ def build_product_runability(target: Path) -> dict[str, Any]:
     if str(discovery.get("phase_ledger_safety")) == td.SAFETY_ACTION and status != STATUS_BLOCKED:
         warnings.append("Phase ledger safety is ACTION: some SpecKit artifacts lack passing validation evidence.")
 
-    sync = td._sync_dir(target)
+    sync = control_paths.resolve_control_sync_dir(target)
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": utc_now(),
@@ -294,8 +295,7 @@ def write_product_runability_report(target: Path) -> dict[str, Any]:
     if not target.is_dir():
         report["reports_written"] = False
         return report
-    sync = td._sync_dir(target)
-    sync.mkdir(parents=True, exist_ok=True)
+    sync = control_paths.resolve_control_sync_dir(target, create=True)
     (sync / REPORT_JSON).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (sync / REPORT_MD).write_text(render_product_runability_md(report), encoding="utf-8")
     report["reports_written"] = True

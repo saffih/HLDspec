@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import control_paths
 from . import hld_source_package as hsp
 from . import phase_evidence as pe
 from . import run_state
@@ -124,16 +125,15 @@ def _target_is_empty_or_control_only(target: Path) -> bool:
 
 
 def _controller_root(target: Path) -> Path | None:
-    return run_state.controller_root_from_pointer(target)
+    return control_paths.resolve_controller_root(target)
 
 
 def _hldspec_dir(target: Path) -> Path:
-    controller = _controller_root(target)
-    return (controller / ".hldspec") if controller is not None else (target / ".hldspec")
+    return control_paths.resolve_hldspec_dir(target)
 
 
 def _sync_dir(target: Path) -> Path:
-    return _hldspec_dir(target) / "sync"
+    return control_paths.resolve_control_sync_dir(target)
 
 
 def _source_package_dir(target: Path) -> Path:

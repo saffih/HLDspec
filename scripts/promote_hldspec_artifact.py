@@ -8,6 +8,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from hldspec.script_io import select_sync_dir
+
+
 ALLOWED_DECISIONS = {"ACCEPTED", "REJECTED", "NEEDS_REWORK", "NEEDS_HUMAN_ANSWERS", "SUPERSEDED"}
 ARTIFACT_PATHS = {"speckit_product_manager_pack": "speckit_product_manager_pack.json", "speckit_architect_pack": "speckit_architect_pack.json", "speckit_answer_pack": "speckit_answer_pack.json", "speckit_proxy_dry_run": "speckit_proxy_dry_run.json"}
 
@@ -28,12 +35,7 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 
 def sync_dir(workspace: Path) -> Path:
-    direct = workspace / ".specify" / "sync"
-    nested = workspace / "firstrun" / ".specify" / "sync"
-    for sync in (direct, nested):
-        if any((sync / rel).exists() for rel in ARTIFACT_PATHS.values()):
-            return sync
-    return direct
+    return select_sync_dir(workspace, tuple(ARTIFACT_PATHS.values()))
 
 
 def ledger(sync: Path) -> dict[str, Any]:
