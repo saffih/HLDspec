@@ -546,6 +546,46 @@ brownfield gap analysis, TASKS.md "Gap analysis (desired vs. actual)").
 This entry covers the cheaper, more frequent case: HLDspec's own previous
 outputs plus an edited HLD.
 
+### P1-010 Unify "done" evidence semantics across the two assessors
+
+Reproduced seam (2026-06-12): for the same spec with `spec.md` and no
+validation evidence —
+
+```text
+discovery phase ledger (target_discovery.py)   : UNVERIFIED, safety ACTION
+execution assessment (speckit_execution_state) : specify DONE, resume -> plan
+```
+
+The preparation plane (status/doctor/continue/operator-state) blocks on
+missing passing evidence; the execution plane (drive loop, resume
+instructions, "skip phases already marked DONE") trusts artifact presence.
+A hollow artifact from a crashed run is skipped past validation by the
+execution plane while the control plane blocks. Mitigations today: the
+prework approval gate before any drive, the per-phase RunSkeptic gates in
+bundle prompts, and the drive loop's no-progress stop.
+
+Decision needed: one DONE vocabulary. Either execution assessment consults
+the same passing-evidence rule (strict, may stall resumes on legacy
+artifacts), or it stays presence-based but `next_action` must instruct
+re-validation of presence-only phases instead of skipping them.
+
+Related smaller items:
+
+- `hld_sync` resolves its sync dir via `select_execution_sync_dir` and does
+  not follow `.hldspec-run.json` controller pointers; fine for legacy
+  workspaces, wrong if pointed at an external-mode target.
+- `speckit_drive_loop.prework_approved` checks target-local dirs only; on an
+  external-mode target it misses controller approval and blocks (fail-safe,
+  but should resolve the pointer once drive supports external mode).
+
+### P1-011 Bind the source package to its target
+
+A wholesale-copied `.hldspec/` tree with a valid manifest plus anchor map is
+still trusted lineage (agent_session is target-bound since 2026-06-12, the
+source package is not). Record the target path and source hash inside
+`source_package.json` at build time and verify both at discovery. Natural
+precondition for managed greenfield evolution.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
