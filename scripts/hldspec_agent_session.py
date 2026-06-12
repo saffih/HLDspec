@@ -131,12 +131,14 @@ def print_bullet_list(items: list[str], empty: str = "none") -> None:
 
 
 def print_discovery_summary(discovery: dict[str, Any]) -> None:
+    paths = discovery.get("report_paths") if isinstance(discovery.get("report_paths"), dict) else {}
     print("## Target Discovery")
     print(f"Classification: {discovery.get('classification', 'UNKNOWN')}")
     print(f"Trusted HLDspec lineage: {str(discovery.get('trusted_hldspec_lineage', False)).lower()}")
     print(f"Phase ledger status: {discovery.get('phase_ledger_status', 'UNKNOWN')}")
-    print(f"Discovery report: {Path(str(discovery.get('target', ''))) / '.hldspec' / 'sync' / td.DISCOVERY_JSON}")
-    print(f"Phase ledger: {Path(str(discovery.get('target', ''))) / '.hldspec' / 'sync' / td.LEDGER_JSON}")
+    print(f"Phase ledger safety: {discovery.get('phase_ledger_safety', 'UNKNOWN')}")
+    print(f"Discovery report: {paths.get('discovery_json', 'UNKNOWN')}")
+    print(f"Phase ledger: {paths.get('ledger_json', 'UNKNOWN')}")
     print("")
 
 
@@ -1112,12 +1114,6 @@ def command_start(args: argparse.Namespace) -> int:
         print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
         if source_build.unsupported_claims:
             print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
-    discovery = td.write_discovery_reports(target)
-    print("Target discovery:")
-    print(f"  Classification: {discovery.get('classification')}")
-    print(f"  Phase ledger status: {discovery.get('phase_ledger_status')}")
-    print(f"  Discovery report: {target / '.hldspec' / 'sync' / td.DISCOVERY_JSON}")
-    print(f"  Phase ledger: {target / '.hldspec' / 'sync' / td.LEDGER_JSON}")
     if state_location == "external" and external_controller_root is not None:
         copied = run_state.copy_target_control_artifacts(target, controller_root=external_controller_root)
         pointer = run_state.write_pointer(
@@ -1137,6 +1133,17 @@ def command_start(args: argparse.Namespace) -> int:
             print("Moved controller artifacts:")
             for item in moved:
                 print(f"  {item['from']} -> {item['to']}")
+    # After externalization the pointer exists, so discovery reports and the
+    # printed paths resolve to the controller sync dir, not deleted
+    # target-local copies.
+    discovery = td.write_discovery_reports(target)
+    discovery_paths = discovery.get("report_paths") if isinstance(discovery.get("report_paths"), dict) else {}
+    print("Target discovery:")
+    print(f"  Classification: {discovery.get('classification')}")
+    print(f"  Phase ledger status: {discovery.get('phase_ledger_status')}")
+    print(f"  Phase ledger safety: {discovery.get('phase_ledger_safety')}")
+    print(f"  Discovery report: {discovery_paths.get('discovery_json', 'UNKNOWN')}")
+    print(f"  Phase ledger: {discovery_paths.get('ledger_json', 'UNKNOWN')}")
     mediator_packet = _resolve_hldspec_dir(target) / "mediator" / "mediator_packet.json"
     mediator_start = target / "prompts" / "mediator" / "START_MEDIATOR.md"
     mediator_devin = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
@@ -1305,7 +1312,9 @@ def command_continue(args: argparse.Namespace) -> int:
     unsafe_discovery = (
         discovery.get("classification") == td.CLASS_UNKNOWN_BROWNFIELD
         or bool(discovery.get("blockers"))
-        or discovery.get("phase_ledger_status") in {td.PHASE_STALE, td.PHASE_BLOCKED}
+        # Safety, not lifecycle: any UNVERIFIED, STALE, or BLOCKED phase
+        # artifact makes safety non-PASS and must block continuation.
+        or discovery.get("phase_ledger_safety") != td.SAFETY_PASS
     )
     if unsafe_discovery:
         print("## Continuation BLOCKED by target discovery")

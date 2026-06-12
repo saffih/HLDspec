@@ -136,16 +136,31 @@ Every use case below is part of the product contract. Current commands may not i
 - Human decision: none unless target already contains conflicting state.
 - Tests expected: target layout matches `TargetWorkspaceAdapter(layout="new")`; source remains unchanged; no durable product artifacts are written outside target.
 
-### UC-004 adopt existing target without HLDspec state
+### UC-004 existing target without trusted HLDspec lineage
 
-- Trigger: target exists but lacks `target/.hldspec/agent_session.json`.
-- Preconditions: target is a directory; source is known.
-- Command/API: current `hldspec start` auto-detects adopt mode.
-- Artifacts read: existing target tree, source HLD/resources.
-- Artifacts written: target session manifest and prompts only after safety checks.
-- Stop condition: adoption checkpoint or prepared session.
-- Human decision: required if existing target contains ambiguous or conflicting SpecKit/HLDspec artifacts.
-- Tests expected: existing target files are not overwritten silently.
+- Trigger: target exists and contains product files but lacks trusted HLDspec
+  lineage (valid source-package manifest plus anchor map, valid agent session,
+  or a `.hldspec-run.json` pointer to a controller with valid HLDspec state).
+- Preconditions: target is a directory containing files HLDspec did not create.
+- Command/API: current `hldspec start`/`hldspec continue` (both block).
+- Current behavior: `hldspec start` runs read-only target discovery, classifies
+  the target as `UNKNOWN_BROWNFIELD`, and **blocks**. Nothing is adopted, no
+  session is created, and no product file is touched. Arbitrary adoption is
+  not current behavior.
+- Future behavior: an explicit brownfield adoption flow (see UC-019) with a
+  drift report, an adoption plan, and human approval. Until that exists,
+  unknown brownfield stays blocked.
+- Managed greenfield continuation is supported only when trusted HLDspec
+  lineage exists (see the target discovery classifications); `hldspec start`
+  never silently adopts an arbitrary existing repo.
+- Artifacts read: existing target tree (read-only discovery).
+- Artifacts written: discovery report and phase ledger under the resolved
+  HLDspec control sync dir only.
+- Stop condition: blocked with `UNKNOWN_BROWNFIELD` and a next safe action.
+- Human decision: choose a different target, or wait for the explicit
+  brownfield adoption flow.
+- Tests expected: existing code without lineage blocks `start`/`continue`;
+  no wipe is recommended; no target product file is modified.
 
 ### UC-005 resume existing HLDspec target
 
@@ -978,7 +993,10 @@ Classifications:
 
 ```text
 NEW_GREENFIELD          empty or missing target; use target-prep path
-PREPARED_GREENFIELD     trusted HLDspec source-package/session lineage exists
+PREPARED_GREENFIELD     trusted HLDspec lineage: valid source-package manifest
+                        plus anchor map, valid agent session, or pointer to a
+                        controller holding that state (a bare directory is not
+                        lineage)
 INITIALIZED_GREENFIELD  real .specify/memory exists with HLDspec lineage
 PHASED_GREENFIELD       specs/* phase artifacts exist with HLDspec lineage
 EVOLVING_GREENFIELD     implementation-slice or implementation lineage exists
@@ -998,6 +1016,17 @@ UNVERIFIED artifact exists without trusted evidence
 STALE      source HLD hash or artifact hash changed
 BLOCKED    unsafe to continue
 ```
+
+The ledger separates two dimensions:
+
+```text
+overall_status  lifecycle/progress only: NOT_STARTED, ACTIVE, DONE
+safety_status   PASS, ACTION (any UNVERIFIED entry), BLOCKED (any STALE or
+                BLOCKED entry); blockers list the reasons
+```
+
+`continue` must never proceed while any phase artifact is UNVERIFIED, STALE,
+or BLOCKED — i.e. while `safety_status` is not PASS.
 
 File existence alone must not mean DONE. `continue` may use discovery as a
 blocker/reporting input only; it must not run SpecKit or product implementation

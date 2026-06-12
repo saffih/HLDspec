@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -33,13 +34,16 @@ class TargetDiscoveryTests(unittest.TestCase):
         (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
         (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
 
-    def _run_facade(self, *args: str) -> subprocess.CompletedProcess[str]:
+    def _run_facade(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+        import os
+
         return subprocess.run(
             [sys.executable, str(FACADE), *args],
             cwd=ROOT,
             text=True,
             capture_output=True,
             check=False,
+            env={**os.environ, **env} if env else None,
         )
 
     def test_empty_target_is_new_greenfield_and_writes_reports(self) -> None:
@@ -107,6 +111,221 @@ class TargetDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
         self.assertTrue(report["blockers"])
+
+    def test_empty_source_package_dir_with_existing_code_is_unknown_brownfield(self) -> None:
+        target = self.root / "target"
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertFalse(report["trusted_hldspec_lineage"])
+
+    def test_empty_source_package_dir_without_code_is_not_prepared(self) -> None:
+        target = self.root / "target"
+        (target / ".hldspec" / "source_package").mkdir(parents=True)
+
+        report = td.write_discovery_reports(target)
+
+        self.assertNotEqual(td.CLASS_PREPARED_GREENFIELD, report["classification"])
+        self.assertFalse(report["trusted_hldspec_lineage"])
+
+    def test_specify_dir_alone_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        (target / ".specify" / "memory").mkdir(parents=True)
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertFalse(report["trusted_hldspec_lineage"])
+
+    def test_specs_dir_alone_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertFalse(report["trusted_hldspec_lineage"])
+
+    def test_manifest_without_anchor_map_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        source_package = target / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+
+    def test_pointer_to_controller_with_valid_source_package_is_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        source_package = controller / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+
+        report = td.write_discovery_reports(target)
+
+        self.assertTrue(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_PREPARED_GREENFIELD, report["classification"])
+        self.assertTrue(any(item["kind"] == "hldspec_run_pointer" for item in report["lineage_evidence"]))
+
+    def test_pointer_to_controller_without_valid_state_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        (controller / ".hldspec" / "source_package").mkdir(parents=True)
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+
+    def test_external_mode_writes_reports_to_controller_sync(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        source_package = controller / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+
+        report = td.write_discovery_reports(target)
+
+        controller_sync = controller / ".hldspec" / "sync"
+        self.assertTrue((controller_sync / td.DISCOVERY_JSON).is_file())
+        self.assertTrue((controller_sync / td.LEDGER_JSON).is_file())
+        self.assertFalse((target / ".hldspec" / "sync").exists())
+        self.assertEqual(str(controller_sync / td.DISCOVERY_JSON), report["report_paths"]["discovery_json"])
+
+    def test_external_mode_status_prints_controller_report_path(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        source_package = controller / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+
+        status = self._run_facade("status", "--target", str(target))
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn(str(controller / ".hldspec" / "sync" / td.DISCOVERY_JSON), status.stdout)
+        self.assertNotIn(str(target / ".hldspec" / "sync"), status.stdout)
+
+    def test_external_start_prints_controller_paths_not_deleted_target_paths(self) -> None:
+        source = self._source()
+        target = self.root / "target"
+        runs = self.root / "runs"
+
+        result = self._run_facade(
+            "start",
+            "--source",
+            str(source),
+            "--target",
+            str(target),
+            "--state-location",
+            "external",
+            env={"HLDSPEC_RUNS_DIR": str(runs)},
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        match = re.search(r"Discovery report: (.+)", result.stdout)
+        self.assertIsNotNone(match, result.stdout)
+        printed = Path(match.group(1).strip()).resolve()
+        self.assertTrue(printed.is_file(), printed)
+        self.assertIn(str(runs.resolve()), str(printed))
+        self.assertNotIn(str(target / ".hldspec" / "sync"), result.stdout)
+        self.assertFalse((target / ".hldspec" / "sync").exists())
+
+    def test_unverified_artifact_sets_safety_action_with_active_lifecycle(self) -> None:
+        target = self.root / "target"
+        self._lineage(target)
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+        ledger = report["phase_ledger"]
+
+        self.assertEqual(td.PHASE_ACTIVE, ledger["overall_status"])
+        self.assertEqual(td.SAFETY_ACTION, ledger["safety_status"])
+        self.assertEqual(td.SAFETY_ACTION, report["phase_ledger_safety"])
+        self.assertTrue(any("safety blocks continuation" in item for item in report["blockers"]))
+
+    def test_stale_artifact_sets_safety_blocked(self) -> None:
+        target = self.root / "target"
+        self._lineage(target)
+        (target / ".hldspec" / "source_freshness.json").write_text(json.dumps({"blocking": True}), encoding="utf-8")
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.SAFETY_BLOCKED, report["phase_ledger"]["safety_status"])
+
+    def test_verified_artifacts_have_safety_pass(self) -> None:
+        target = self.root / "target"
+        self._lineage(target)
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        (spec_dir / "specify_validation.json").write_text(json.dumps({"status": "PASS"}), encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.SAFETY_PASS, report["phase_ledger"]["safety_status"])
+        self.assertEqual(td.PHASE_DONE, report["phase_ledger"]["overall_status"])
+
+    def test_failing_validation_evidence_blocks_instead_of_done(self) -> None:
+        target = self.root / "target"
+        self._lineage(target)
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        (spec_dir / "specify_validation.json").write_text(json.dumps({"status": "FAIL"}), encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+        ledger = report["phase_ledger"]
+
+        self.assertEqual(td.SAFETY_BLOCKED, ledger["safety_status"])
+        self.assertTrue(any(entry["phase"] == "specify" and entry["status"] == td.PHASE_BLOCKED for entry in ledger["entries"]))
+        self.assertFalse(any(entry["phase"] == "specify" and entry["status"] == td.PHASE_DONE for entry in ledger["entries"]))
+        self.assertTrue(any("failing status" in item for item in ledger["blockers"]))
+
+    def test_continue_blocks_on_unverified_phase_artifact(self) -> None:
+        target = self.root / "unverified"
+        self._lineage(target)
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+
+        result = self._run_facade("continue", "--target", str(target))
+
+        self.assertEqual(3, result.returncode, result.stderr + result.stdout)
+        self.assertIn("BLOCKED by target discovery", result.stdout)
+        self.assertIn("UNVERIFIED", result.stdout + result.stderr)
 
     def test_start_blocks_unknown_brownfield_without_wipe_recommendation(self) -> None:
         source = self._source()

@@ -25,7 +25,12 @@ PHASE_UNVERIFIED = "UNVERIFIED"
 PHASE_STALE = "STALE"
 PHASE_BLOCKED = "BLOCKED"
 
-SYNC_REL = Path(".hldspec") / "sync"
+# Ledger safety dimension, orthogonal to lifecycle overall_status.
+SAFETY_PASS = "PASS"
+SAFETY_ACTION = "ACTION"
+SAFETY_BLOCKED = "BLOCKED"
+UNSAFE_SAFETY = frozenset({SAFETY_ACTION, SAFETY_BLOCKED})
+
 DISCOVERY_JSON = "target_discovery_report.json"
 DISCOVERY_MD = "target_discovery_report.md"
 LEDGER_JSON = "phase_ledger.json"
@@ -39,12 +44,13 @@ CONTROL_NAMES = {
     ".hldspec",
     "prompts",
 }
-SOURCE_PACKAGE_MARKERS = (
+# A manifest must be one of these (a loadable, non-empty JSON object) for the
+# source package to count as trusted lineage. A bare directory, a stray
+# markdown file, or an unreadable JSON must never be trusted.
+SOURCE_PACKAGE_MANIFESTS = (
     "source_package.json",
     "session_plan.json",
     "source_manifest.json",
-    "hld_reference_map.json",
-    "engineering_guidelines.md",
 )
 IMPLEMENTATION_LINEAGE_MARKERS = (
     ".hldspec/sync/implementation_lineage.json",
@@ -122,27 +128,58 @@ def _source_package_dir(target: Path) -> Path:
 
 
 def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]:
+    """Strict trusted-lineage check.
+
+    Trusted only on real evidence, never on a bare directory:
+    - a valid source-package manifest AND an hld_reference_map.json with at
+      least one anchor; or
+    - a valid agent_session.json carrying both source and target fields.
+
+    A `.hldspec-run.json` pointer is not evidence by itself: `_hldspec_dir`
+    resolves through the pointer, so a pointer counts exactly when the
+    controller root it names contains the valid state above.
+    """
     evidence: list[dict[str, Any]] = []
+    trusted = False
+
     source_package = _source_package_dir(target)
     if source_package.is_dir():
-        evidence.append({"kind": "source_package_dir", "path": str(source_package)})
-        for marker in SOURCE_PACKAGE_MARKERS:
-            path = source_package / marker
-            if path.exists():
-                evidence.append({"kind": "source_package_marker", "path": str(path)})
+        manifests = [
+            source_package / name
+            for name in SOURCE_PACKAGE_MANIFESTS
+            if _load_json(source_package / name)
+        ]
         ref_map = _load_json(source_package / "hld_reference_map.json")
         anchors = ref_map.get("anchors") if isinstance(ref_map.get("anchors"), dict) else None
-        if anchors:
-            evidence.append({"kind": "hld_anchor_map", "path": str(source_package / "hld_reference_map.json"), "anchor_count": len(anchors)})
+        if manifests and anchors:
+            trusted = True
+            for path in manifests:
+                evidence.append({"kind": "source_package_manifest", "path": str(path)})
+            evidence.append(
+                {
+                    "kind": "hld_anchor_map",
+                    "path": str(source_package / "hld_reference_map.json"),
+                    "anchor_count": len(anchors),
+                }
+            )
+
     session_path = _hldspec_dir(target) / "agent_session.json"
-    if session_path.is_file():
-        session = _load_json(session_path)
-        if session.get("source") or session.get("target"):
-            evidence.append({"kind": "agent_session", "path": str(session_path)})
-    pointer = run_state.load_pointer(target)
-    if pointer.get("controller_root") and not pointer.get("invalid"):
-        evidence.append({"kind": "hldspec_run_pointer", "path": str(target / run_state.POINTER_FILE), "controller_root": pointer.get("controller_root")})
-    return bool(evidence), evidence
+    session = _load_json(session_path)
+    if session.get("source") and session.get("target"):
+        trusted = True
+        evidence.append({"kind": "agent_session", "path": str(session_path)})
+
+    if trusted:
+        controller = _controller_root(target)
+        if controller is not None:
+            evidence.append(
+                {
+                    "kind": "hldspec_run_pointer",
+                    "path": str(target / run_state.POINTER_FILE),
+                    "controller_root": str(controller),
+                }
+            )
+    return trusted, evidence
 
 
 def _has_real_speckit_memory(target: Path) -> bool:
@@ -176,9 +213,22 @@ def _validation_candidates(target: Path, spec_dir: Path, phase: str, artifact_na
     ]
 
 
-def _phase_has_evidence(target: Path, spec_dir: Path, phase: str, artifact_name: str) -> tuple[bool, list[str]]:
+FAILING_EVIDENCE_STATUSES = {"FAIL", "FAILED", "ACTION", "CONFLICT", "BLOCKED", "REWORK_REQUIRED"}
+
+
+def _phase_has_evidence(target: Path, spec_dir: Path, phase: str, artifact_name: str) -> tuple[bool, list[str], list[str]]:
+    """Return (evidence_ok, evidence_paths, failing_paths).
+
+    Evidence presence alone is not enough: a JSON evidence file that records a
+    failing status marks the phase failing, never DONE.
+    """
     paths = [path for path in _validation_candidates(target, spec_dir, phase, artifact_name) if path.is_file()]
-    return bool(paths), [str(path) for path in paths]
+    failing = [
+        str(path)
+        for path in paths
+        if path.suffix == ".json" and str(_load_json(path).get("status", "")).upper() in FAILING_EVIDENCE_STATUSES
+    ]
+    return bool(paths), [str(path) for path in paths], failing
 
 
 def _artifact_is_stale(target: Path, artifact: Path) -> bool:
@@ -210,13 +260,18 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
         for phase, artifact_name in PHASES:
             artifact = spec_dir / artifact_name
             exists = _is_nonempty(artifact)
-            evidence_ok, evidence_paths = _phase_has_evidence(target, spec_dir, phase, artifact_name) if exists else (False, [])
+            evidence_ok, evidence_paths, failing_paths = (
+                _phase_has_evidence(target, spec_dir, phase, artifact_name) if exists else (False, [], [])
+            )
             stale = _artifact_is_stale(target, artifact) if exists else False
             if not exists:
                 status = PHASE_NOT_STARTED
             elif stale:
                 status = PHASE_STALE
                 blockers.append(f"Stale phase artifact: {artifact}")
+            elif failing_paths:
+                status = PHASE_BLOCKED
+                blockers.append(f"Phase validation evidence reports a failing status: {failing_paths[0]}")
             elif evidence_ok:
                 status = PHASE_DONE
             else:
@@ -234,20 +289,31 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
                 }
             )
 
-    if any(entry["status"] in {PHASE_UNVERIFIED, PHASE_STALE, PHASE_BLOCKED} for entry in entries):
-        overall = PHASE_BLOCKED if any(entry["status"] == PHASE_BLOCKED for entry in entries) else PHASE_ACTIVE
-    elif any(entry["status"] == PHASE_DONE for entry in entries):
-        overall = PHASE_DONE
-    elif entries:
-        overall = PHASE_ACTIVE
-    else:
+    # overall_status is lifecycle/progress only. Safety lives in
+    # safety_status so an UNVERIFIED/STALE artifact can never hide behind an
+    # "ACTIVE"-looking ledger.
+    existing = [entry for entry in entries if entry["artifact_exists"]]
+    if not existing:
         overall = PHASE_NOT_STARTED
+    elif all(entry["status"] == PHASE_DONE for entry in existing):
+        overall = PHASE_DONE
+    else:
+        overall = PHASE_ACTIVE
+
+    statuses = {entry["status"] for entry in entries}
+    if statuses & {PHASE_STALE, PHASE_BLOCKED}:
+        safety = SAFETY_BLOCKED
+    elif PHASE_UNVERIFIED in statuses:
+        safety = SAFETY_ACTION
+    else:
+        safety = SAFETY_PASS
 
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": utc_now(),
         "target": str(target),
         "overall_status": overall,
+        "safety_status": safety,
         "summary": summary,
         "entries": entries,
         "blockers": sorted(dict.fromkeys(blockers)),
@@ -295,9 +361,10 @@ def build_target_discovery(target: Path) -> dict[str, Any]:
 
     if phase_ledger["blockers"]:
         blockers.extend(phase_ledger["blockers"])
-    if phase_ledger["overall_status"] in {PHASE_STALE, PHASE_BLOCKED}:
-        blockers.append(f"Phase ledger status blocks continuation: {phase_ledger['overall_status']}")
+    if phase_ledger["safety_status"] in UNSAFE_SAFETY:
+        blockers.append(f"Phase ledger safety blocks continuation: {phase_ledger['safety_status']}")
 
+    sync = _sync_dir(target)
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": utc_now(),
@@ -309,9 +376,16 @@ def build_target_discovery(target: Path) -> dict[str, Any]:
         "specify_memory_exists": has_memory,
         "spec_phase_artifacts_exist": has_specs,
         "phase_ledger_status": phase_ledger["overall_status"],
+        "phase_ledger_safety": phase_ledger["safety_status"],
         "blockers": sorted(dict.fromkeys(blockers)),
         "next_safe_action": next_safe_action,
         "phase_ledger": phase_ledger,
+        "report_paths": {
+            "discovery_json": str(sync / DISCOVERY_JSON),
+            "discovery_md": str(sync / DISCOVERY_MD),
+            "ledger_json": str(sync / LEDGER_JSON),
+            "ledger_md": str(sync / LEDGER_MD),
+        },
     }
 
 
@@ -320,6 +394,7 @@ def render_phase_ledger_md(ledger: dict[str, Any]) -> str:
         "# HLDspec Phase Wake Ledger",
         "",
         f"STATUS: {ledger.get('overall_status', PHASE_NOT_STARTED)}",
+        f"SAFETY: {ledger.get('safety_status', SAFETY_PASS)}",
         f"Target: {ledger.get('target', '')}",
         "",
         "## Summary",
@@ -349,6 +424,7 @@ def render_target_discovery_md(report: dict[str, Any]) -> str:
         f"Classification: `{report.get('classification', CLASS_UNKNOWN_BROWNFIELD)}`",
         f"Trusted HLDspec lineage: `{str(report.get('trusted_hldspec_lineage', False)).lower()}`",
         f"Phase ledger status: `{report.get('phase_ledger_status', PHASE_NOT_STARTED)}`",
+        f"Phase ledger safety: `{report.get('phase_ledger_safety', SAFETY_PASS)}`",
         f"Next safe action: {report.get('next_safe_action', '')}",
         "",
         "## Existing-Sensitive Rule",
@@ -375,7 +451,9 @@ def render_target_discovery_md(report: dict[str, Any]) -> str:
 
 def write_discovery_reports(target: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
-    sync = target / SYNC_REL
+    # Resolve through the controller pointer: in external mode reports belong
+    # next to the rest of the HLDspec control state, never target-local.
+    sync = _sync_dir(target)
     sync.mkdir(parents=True, exist_ok=True)
     report = build_target_discovery(target)
     ledger = report["phase_ledger"]

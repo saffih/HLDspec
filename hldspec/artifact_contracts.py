@@ -151,6 +151,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "blockers",
             "next_safe_action",
             "phase_ledger_status",
+            "phase_ledger_safety",
             "phase_ledger",
         ],
         optional_fields=[
@@ -158,6 +159,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "existing_payload_paths",
             "specify_memory_exists",
             "spec_phase_artifacts_exist",
+            "report_paths",
         ],
         output_artifacts=["phase_ledger.json"],
         notes="Read-only existing-sensitive greenfield discovery; must not run SpecKit, implement product code, or wipe target state.",
@@ -171,6 +173,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "schema_version",
             "target",
             "overall_status",
+            "safety_status",
             "summary",
             "entries",
             "blockers",
@@ -178,7 +181,10 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         optional_fields=[],
         input_artifacts=["target_discovery_report.json"],
         output_artifacts=[],
-        notes="Read-only phase wake ledger; file existence alone must not mean DONE.",
+        notes=(
+            "Read-only phase wake ledger; file existence alone must not mean DONE. "
+            "overall_status is lifecycle only; safety_status (PASS/ACTION/BLOCKED) gates continuation."
+        ),
     ),
 }
 

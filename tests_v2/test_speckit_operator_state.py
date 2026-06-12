@@ -54,6 +54,14 @@ class _RunStub:
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
 
+def _write_lineage(base: Path) -> None:
+    """Real trusted lineage: manifest plus anchor map (a bare dir is no longer trusted)."""
+    source_package = base / ".hldspec" / "source_package"
+    source_package.mkdir(parents=True, exist_ok=True)
+    (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+    (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+
+
 def _which_only(*names: str):
     allowed = set(names)
 
@@ -93,7 +101,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
     def test_no_git_repo_reports_action(self) -> None:
         target = self.root / "target"
         target.mkdir()
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         report = self._report(target, which=_which_only("specify"), run=_RunStub())
         self.assertEqual("ACTION", report["status"])
         self.assertEqual("TARGET_NOT_GIT", report["state"])
@@ -101,7 +109,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
 
     def test_dirty_tree_reports_action(self) -> None:
         target = self.root / "target"
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
@@ -113,11 +121,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
     def test_hldspec_pointer_only_dirty_tree_is_classified_as_expected_control(self) -> None:
         target = self.root / "target"
         controller = self.root / "external-run"
-        (controller / ".hldspec" / "source_package").mkdir(parents=True)
-        (controller / ".hldspec" / "source_package" / "hld_reference_map.json").write_text(
-            json.dumps({"anchors": {"HLD-001": {}}}),
-            encoding="utf-8",
-        )
+        _write_lineage(controller)
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
@@ -188,7 +192,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
     def test_specify_source_only_reports_not_initialized(self) -> None:
         target = self.root / "target"
         (target / ".specify" / "source").mkdir(parents=True)
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
         self.assertEqual("ACTION", report["status"])
@@ -200,7 +204,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
         self.assertEqual("PASS", report["status"])
         self.assertEqual("READY_FOR_SPECIFY", report["state"])
@@ -215,7 +219,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "hldspec_state.json").write_text(
@@ -233,7 +237,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "hldspec_state.json").write_text(
@@ -252,7 +256,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "hldspec_state.json").write_text(
@@ -278,7 +282,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "hldspec_state.json").write_text(
@@ -298,7 +302,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
         (target / ".hldspec" / "source_freshness.json").write_text(
             json.dumps(
@@ -323,7 +327,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         (target / ".hldspec" / "agent_session.json").write_text("{}\n", encoding="utf-8")
 
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
@@ -337,7 +341,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
 
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
 
@@ -355,7 +359,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "speckit_bundle_queue.json").write_text(
@@ -380,7 +384,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True)
         (sync / "speckit_invocation_queue.json").write_text(
@@ -407,7 +411,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         spec_dir = target / "specs" / "001-flow"
         spec_dir.mkdir(parents=True)
         (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
@@ -424,7 +428,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
-        (target / ".hldspec" / "source_package").mkdir(parents=True)
+        _write_lineage(target)
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
         text = sos.summarize_speckit_operator_state(report)
         self.assertIn("STATUS: PASS", text)

@@ -366,10 +366,12 @@ def build_speckit_operator_state_report(
         discovery = td.write_discovery_reports(target_path)
         discovery_classification = str(discovery.get("classification") or STATE_TARGET_MISSING)
         blockers = [f"Target path does not exist before target preparation: {target_path}"]
+        discovery_paths = discovery.get("report_paths") if isinstance(discovery.get("report_paths"), dict) else {}
         evidence = [
             {"fact": "target_path_exists_before_discovery", "value": False},
             {"fact": "target_discovery_classification", "value": discovery.get("classification")},
             {"fact": "phase_ledger_status", "value": discovery.get("phase_ledger_status")},
+            {"fact": "phase_ledger_safety", "value": discovery.get("phase_ledger_safety")},
         ]
         return {
             "schema_version": SCHEMA_VERSION,
@@ -387,8 +389,9 @@ def build_speckit_operator_state_report(
                     "classification": discovery.get("classification"),
                     "trusted_hldspec_lineage": discovery.get("trusted_hldspec_lineage"),
                     "phase_ledger_status": discovery.get("phase_ledger_status"),
-                    "report_path": str(target_path / ".hldspec" / "sync" / td.DISCOVERY_JSON),
-                    "ledger_path": str(target_path / ".hldspec" / "sync" / td.LEDGER_JSON),
+                    "phase_ledger_safety": discovery.get("phase_ledger_safety"),
+                    "report_path": discovery_paths.get("discovery_json"),
+                    "ledger_path": discovery_paths.get("ledger_json"),
                 },
             },
             "doctor_note": doctor_note,
@@ -437,6 +440,7 @@ def build_speckit_operator_state_report(
         {"fact": "project_checkpoint_path", "value": project_checkpoint.get("path") if project_checkpoint else None},
         {"fact": "target_discovery_classification", "value": discovery.get("classification")},
         {"fact": "phase_ledger_status", "value": discovery.get("phase_ledger_status")},
+        {"fact": "phase_ledger_safety", "value": discovery.get("phase_ledger_safety")},
     ]
 
     blockers: list[str] = []
@@ -445,11 +449,15 @@ def build_speckit_operator_state_report(
     next_safe_action = _next_action_or_default(readiness)
 
     discovery_classification = str(discovery.get("classification") or "")
-    discovery_phase_status = str(discovery.get("phase_ledger_status") or "")
+    discovery_safety = str(discovery.get("phase_ledger_safety") or td.SAFETY_PASS)
+    # A pointer or source-package dir marks a known-origin (if broken) run;
+    # the readiness chain below then gives the precise diagnosis
+    # (SOURCE_PACKAGE_INVALID/MISSING) instead of the generic brownfield stop.
+    # Both paths block; only the message differs.
+    known_origin_trace = bool(pointer) or source_package_exists
     discovery_blocks = (
-        discovery_classification == td.CLASS_UNKNOWN_BROWNFIELD
-        or discovery_phase_status in {td.PHASE_UNVERIFIED, td.PHASE_STALE, td.PHASE_BLOCKED}
-        or bool(discovery.get("blockers"))
+        (discovery_classification == td.CLASS_UNKNOWN_BROWNFIELD and not known_origin_trace)
+        or discovery_safety in td.UNSAFE_SAFETY
     )
 
     if discovery_blocks:
@@ -457,7 +465,7 @@ def build_speckit_operator_state_report(
         state = discovery_classification or STATE_REASSESSMENT_REQUIRED
         blockers.extend(str(item) for item in discovery.get("blockers", []) if str(item).strip())
         if not blockers:
-            blockers.append(f"Target discovery blocks continuation: {discovery_classification} / {discovery_phase_status}")
+            blockers.append(f"Target discovery blocks continuation: {discovery_classification} / safety {discovery_safety}")
         next_safe_action = str(discovery.get("next_safe_action") or "Resolve target discovery blockers before rerunning operator-state.")
     elif readiness.get("status") == "CONFLICT":
         status = "CONFLICT"
@@ -580,8 +588,9 @@ def build_speckit_operator_state_report(
                 "classification": discovery.get("classification"),
                 "trusted_hldspec_lineage": discovery.get("trusted_hldspec_lineage"),
                 "phase_ledger_status": discovery.get("phase_ledger_status"),
-                "report_path": str(target_path / ".hldspec" / "sync" / td.DISCOVERY_JSON),
-                "ledger_path": str(target_path / ".hldspec" / "sync" / td.LEDGER_JSON),
+                "phase_ledger_safety": discovery.get("phase_ledger_safety"),
+                "report_path": (discovery.get("report_paths") or {}).get("discovery_json"),
+                "ledger_path": (discovery.get("report_paths") or {}).get("ledger_json"),
             },
         },
         "doctor_note": doctor_note,
@@ -648,6 +657,7 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
                 f"- classification: {discovery.get('classification', 'UNKNOWN')}",
                 f"- trusted lineage: {discovery.get('trusted_hldspec_lineage', False)}",
                 f"- phase ledger status: {discovery.get('phase_ledger_status', 'UNKNOWN')}",
+                f"- phase ledger safety: {discovery.get('phase_ledger_safety', 'UNKNOWN')}",
             ]
         )
     if lifecycle_state:
