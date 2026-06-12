@@ -317,6 +317,7 @@ class StartIntegrationTests(unittest.TestCase):
 
     def test_start_on_existing_initialized_workspace_records_initialized_true(self):
         (self.target / ".specify" / "memory").mkdir(parents=True)
+        (self.target / ".hldspec" / "source_package").mkdir(parents=True)
         with mock.patch.object(facade.sw, "detect_init_commands", return_value=()):
             rc = facade.main(
                 [

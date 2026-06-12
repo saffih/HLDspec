@@ -962,6 +962,48 @@ TASKS_ACTIVE
 ANALYZE_READY
 ```
 
+## Existing-sensitive greenfield discovery
+
+Before HLDspec treats a target as new, it inspects existing target state and
+writes read-only control reports:
+
+```text
+target/.hldspec/sync/target_discovery_report.json
+target/.hldspec/sync/target_discovery_report.md
+target/.hldspec/sync/phase_ledger.json
+target/.hldspec/sync/phase_ledger.md
+```
+
+Classifications:
+
+```text
+NEW_GREENFIELD          empty or missing target; use target-prep path
+PREPARED_GREENFIELD     trusted HLDspec source-package/session lineage exists
+INITIALIZED_GREENFIELD  real .specify/memory exists with HLDspec lineage
+PHASED_GREENFIELD       specs/* phase artifacts exist with HLDspec lineage
+EVOLVING_GREENFIELD     implementation-slice or implementation lineage exists
+UNKNOWN_BROWNFIELD      existing code/artifacts without trusted HLDspec lineage
+```
+
+`UNKNOWN_BROWNFIELD` blocks this slice: arbitrary brownfield adoption is not
+implemented. Known-origin HLDspec/SpecKit continuation is managed greenfield
+evolution and must not recommend wipe/rebuild by default.
+
+Phase wake rules:
+
+```text
+DONE       artifact exists and HLDspec validation/report evidence exists
+ACTIVE     partial phase artifact exists
+UNVERIFIED artifact exists without trusted evidence
+STALE      source HLD hash or artifact hash changed
+BLOCKED    unsafe to continue
+```
+
+File existence alone must not mean DONE. `continue` may use discovery as a
+blocker/reporting input only; it must not run SpecKit or product implementation
+from discovery alone. HLDspec orchestration runs from the HLDspec repo, while
+later product work runs from the target repo only after an approved handoff.
+
 ## Feature classification rules
 
 ### Buildable feature

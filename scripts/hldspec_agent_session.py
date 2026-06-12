@@ -22,6 +22,7 @@ from hldspec import run_state
 from hldspec.source_freshness import load_source_freshness, write_source_freshness
 from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
+from hldspec import target_discovery as td
 from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
@@ -127,6 +128,16 @@ def print_bullet_list(items: list[str], empty: str = "none") -> None:
         return
     for item in items:
         print(f"- {item}")
+
+
+def print_discovery_summary(discovery: dict[str, Any]) -> None:
+    print("## Target Discovery")
+    print(f"Classification: {discovery.get('classification', 'UNKNOWN')}")
+    print(f"Trusted HLDspec lineage: {str(discovery.get('trusted_hldspec_lineage', False)).lower()}")
+    print(f"Phase ledger status: {discovery.get('phase_ledger_status', 'UNKNOWN')}")
+    print(f"Discovery report: {Path(str(discovery.get('target', ''))) / '.hldspec' / 'sync' / td.DISCOVERY_JSON}")
+    print(f"Phase ledger: {Path(str(discovery.get('target', ''))) / '.hldspec' / 'sync' / td.LEDGER_JSON}")
+    print("")
 
 
 def next_safe_action(session: dict[str, Any], blockers: list[str], open_questions: list[str]) -> str:
@@ -972,6 +983,16 @@ def command_start(args: argparse.Namespace) -> int:
     mode = detect_mode(target, source_hash, args.mode)
     workflow_trigger = detect_workflow_trigger(comment)
     state_location = args.state_location
+    initial_discovery = td.write_discovery_reports(target)
+    if initial_discovery.get("classification") == td.CLASS_UNKNOWN_BROWNFIELD:
+        print("## HLDspec Start Blocked")
+        print_discovery_summary(initial_discovery)
+        print("## Blockers")
+        print_bullet_list([str(item) for item in initial_discovery.get("blockers", []) if str(item).strip()])
+        print("")
+        print("## Next Safe Action")
+        print(initial_discovery.get("next_safe_action"))
+        return ExitCode.GATE_BLOCKED.value
     external_controller_root = (
         run_state.external_run_root(target, source_hash)
         if state_location == "external"
@@ -1091,6 +1112,12 @@ def command_start(args: argparse.Namespace) -> int:
         print(f"Source package: {source_build.source_dir} ({source_build.anchor_count} HLD anchors)")
         if source_build.unsupported_claims:
             print(f"Unsupported claims: {len(source_build.unsupported_claims)} (review before approval)")
+    discovery = td.write_discovery_reports(target)
+    print("Target discovery:")
+    print(f"  Classification: {discovery.get('classification')}")
+    print(f"  Phase ledger status: {discovery.get('phase_ledger_status')}")
+    print(f"  Discovery report: {target / '.hldspec' / 'sync' / td.DISCOVERY_JSON}")
+    print(f"  Phase ledger: {target / '.hldspec' / 'sync' / td.LEDGER_JSON}")
     if state_location == "external" and external_controller_root is not None:
         copied = run_state.copy_target_control_artifacts(target, controller_root=external_controller_root)
         pointer = run_state.write_pointer(
@@ -1131,11 +1158,24 @@ def command_start(args: argparse.Namespace) -> int:
 def command_status(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     hldspec_dir = _resolve_hldspec_dir(target)
+    discovery = td.write_discovery_reports(target)
     session_path = hldspec_dir / "agent_session.json"
     session = json_read(session_path)
     if not session:
-        print(f"NO_SESSION: {session_path}")
-        return 2
+        print("## HLDspec Status")
+        print(f"Target: {target}")
+        print("Mode: UNKNOWN")
+        print("Workflow trigger: default")
+        print("Source: UNKNOWN")
+        print("Current state: no session")
+        print("")
+        print_discovery_summary(discovery)
+        print("## Blockers")
+        print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
+        print("")
+        print("## Next Safe Action")
+        print(discovery.get("next_safe_action"))
+        return 0
 
     validation_status, validation_path = report_status(hldspec_dir / "validation" / "context_prompt_validation.json")
     promotion_status, promotion_path = report_status(hldspec_dir / "validation" / "promotion_gate.json")
@@ -1171,6 +1211,7 @@ def command_status(args: argparse.Namespace) -> int:
     print(f"Source: {source}")
     print(f"Current state: {current_state(target, session)}")
     print("")
+    print_discovery_summary(discovery)
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
     print(f"Promotion gate status: {promotion_status} ({promotion_path})")
@@ -1260,6 +1301,20 @@ def command_continue(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     session = json_read(_resolve_hldspec_dir(target) / "agent_session.json")
     workflow_trigger = session.get("workflow_trigger") if isinstance(session, dict) else None
+    discovery = td.write_discovery_reports(target)
+    unsafe_discovery = (
+        discovery.get("classification") == td.CLASS_UNKNOWN_BROWNFIELD
+        or bool(discovery.get("blockers"))
+        or discovery.get("phase_ledger_status") in {td.PHASE_STALE, td.PHASE_BLOCKED}
+    )
+    if unsafe_discovery:
+        print("## Continuation BLOCKED by target discovery")
+        print_discovery_summary(discovery)
+        print("Blockers:")
+        print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
+        print("Next safe action:")
+        print(discovery.get("next_safe_action"))
+        return ExitCode.GATE_BLOCKED.value
 
     # Control-plane gate: when a session plan exists, the gate validator decides
     # continuation. No plan -> legacy behaviour (run ProjectMachine unchanged).
@@ -1362,8 +1417,14 @@ def command_doctor(args: argparse.Namespace) -> int:
         print(f"{'OK' if exists else 'MISSING'}: {path}")
 
     if target:
+        discovery = td.write_discovery_reports(target)
         _hldspec_dir = _resolve_hldspec_dir(target)
         _ctrl_root = _hldspec_dir.parent
+        print("")
+        print_discovery_summary(discovery)
+        for item in discovery.get("blockers", []) or []:
+            if str(item).strip():
+                action_items.append(f"Target discovery: {item}")
         print("")
         print("## Target Layout Checks")
         _layout_paths = [

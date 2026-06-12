@@ -103,6 +103,18 @@ Hard rules:
   machine transitions. Must not silently own human decisions or become a hidden
   product state machine.
 - **Target Workspace** — the one `target/` directory HLDspec creates or resumes.
+- **Existing-sensitive greenfield** — a target may already contain HLDspec or
+  SpecKit artifacts from a known HLDspec-origin run. HLDspec must inspect and
+  classify the target before treating it as new; it must not wipe or rebuild by
+  default when trusted HLDspec lineage exists.
+- **Managed greenfield evolution** — continuation of a known-origin
+  HLDspec/SpecKit target after preparation, init, phase artifacts, or
+  implementation-slice evidence already exists. It is greenfield because the
+  origin is controlled; it is evolving because HLDspec must wake the current
+  phase from evidence instead of restarting.
+- **Arbitrary brownfield adoption** — adopting an existing codebase or SpecKit
+  workspace that lacks trusted HLDspec lineage. This remains unsupported unless a
+  future explicit brownfield adoption flow is added.
 - **HLDspec Control Plane** — `target/.hldspec/`: state, gates, validation, sync.
 - **SpecKit Workspace** — `target/.specify/` + `target/specs/`: SpecKit-owned.
 - **Execution Handoff** — the act and artifact of passing a bounded Run Card to the
@@ -215,27 +227,35 @@ Scripts        = deterministic tools
  2. HLDspec Product Facade     start / status / review / continue / diff / doctor
  3. HLDspec Agent Session      interprets intent; invokes ProjectMachine/tools safely
  4. Judge Agent                owns orchestration, gates, delegation, next safe action
- 5. Target workspace creation  creates/resumes target/
- 6. Raw evidence capture       copies originals to target/targetHLD/raw/
- 7. Working HLD creation       target/targetHLD/HLD.md
- 8. HLD slice/dice             chunks, sections, inventory, groups, spec package map
- 9. Scout Agent                scans chunks; flags which specialist reviewers needed
-10. Role review pipeline       Architecture, Product, Governance, optional specialists
-11. Role review summary        combines findings, blockers, conflicts, next safe action
-12. SpecKit workspace init     detect and plan a real `specify/spec-kit/uvx` init
-13. Spec package planning      bite-size SpecKit-ready package(s) when needed
-14. Legacy graph/queue         only for explicitly approved multi-package flows
-15. SpecKit prework package    evidence/prework bundle
-16. RunSkeptic gate            PASS / ACTION / CONFLICT
-17. Human approval gate        stops for human-owned approvals
-18. SpecKit Readiness Judge    confirms readiness only if all gates pass
-19. SpecKit Run Card           RUN_CARD.md + RUN_CARD.json per active package
-20. Execution handoff          external build/SpecKit agent receives the run card
-21. SpecKit-owned phases       constitution → specify → clarify → plan → tasks →
+ 5. Target discovery           classify new/prepared/initialized/phased/evolving/unknown
+ 6. Target workspace creation  creates/resumes target/
+ 7. Raw evidence capture       copies originals to target/targetHLD/raw/
+ 8. Working HLD creation       target/targetHLD/HLD.md
+ 9. HLD slice/dice             chunks, sections, inventory, groups, spec package map
+10. Scout Agent                scans chunks; flags which specialist reviewers needed
+11. Role review pipeline       Architecture, Product, Governance, optional specialists
+12. Role review summary        combines findings, blockers, conflicts, next safe action
+13. SpecKit workspace init     detect and plan a real `specify/spec-kit/uvx` init
+14. Spec package planning      bite-size SpecKit-ready package(s) when needed
+15. Legacy graph/queue         only for explicitly approved multi-package flows
+16. SpecKit prework package    evidence/prework bundle
+17. RunSkeptic gate            PASS / ACTION / CONFLICT
+18. Human approval gate        stops for human-owned approvals
+19. SpecKit Readiness Judge    confirms readiness only if all gates pass
+20. SpecKit Run Card           RUN_CARD.md + RUN_CARD.json per active package
+21. Execution handoff          external build/SpecKit agent receives the run card
+22. SpecKit-owned phases       constitution → specify → clarify → plan → tasks →
                                analyze → implement (only after approval)
-22. Report back                files changed, questions, tests, RunSkeptic, triggers
-23. HLDspec reassessment       re-evaluate; produce next safe action / next run card
+23. Report back                files changed, questions, tests, RunSkeptic, triggers
+24. HLDspec reassessment       re-evaluate; produce next safe action / next run card
 ```
+
+Target discovery is read-only with respect to product code and SpecKit execution.
+It may write HLDspec control reports under `target/.hldspec/sync/`, but it must
+not wipe target state, run SpecKit, or implement product code. HLDspec
+orchestration runs from the HLDspec repository; later product work runs from the
+target repository only after a bounded Run Card or approved implementation-slice
+handoff exists.
 
 ---
 

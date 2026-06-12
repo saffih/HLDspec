@@ -71,6 +71,22 @@ class TestRegisteredArtifacts(unittest.TestCase):
         self.assertIn("hld_cross_examination.json", readiness.input_artifacts)
         self.assertIn("stop before full SpecKit Preparation", readiness.notes)
 
+    def test_registers_target_discovery_and_phase_ledger_artifacts(self):
+        self.assertIn("target_discovery_report.json", registered_artifacts())
+        self.assertIn("phase_ledger.json", registered_artifacts())
+
+        discovery = ARTIFACT_CONTRACTS["target_discovery_report.json"]
+        self.assertIn("classification", discovery.required_fields)
+        self.assertIn("phase_ledger_status", discovery.required_fields)
+        self.assertIn("phase_ledger.json", discovery.output_artifacts)
+        self.assertIn("must not run SpecKit", discovery.notes)
+
+        ledger = ARTIFACT_CONTRACTS["phase_ledger.json"]
+        self.assertIn("overall_status", ledger.required_fields)
+        self.assertIn("entries", ledger.required_fields)
+        self.assertIn("target_discovery_report.json", ledger.input_artifacts)
+        self.assertIn("file existence alone must not mean DONE", ledger.notes)
+
     def test_returns_list(self):
         self.assertIsInstance(registered_artifacts(), list)
 

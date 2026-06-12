@@ -14,6 +14,7 @@ from typing import Any, Callable
 from . import run_state
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
+from . import target_discovery as td
 from .source_freshness import load_source_freshness
 
 SCHEMA_VERSION = 1
@@ -362,25 +363,40 @@ def build_speckit_operator_state_report(
 
     target_path = Path(target).expanduser().resolve()
     if not target_path.exists():
-        blockers = [f"Target path does not exist: {target_path}"]
-        evidence = [{"fact": "target_path_exists", "value": False}]
+        discovery = td.write_discovery_reports(target_path)
+        discovery_classification = str(discovery.get("classification") or STATE_TARGET_MISSING)
+        blockers = [f"Target path does not exist before target preparation: {target_path}"]
+        evidence = [
+            {"fact": "target_path_exists_before_discovery", "value": False},
+            {"fact": "target_discovery_classification", "value": discovery.get("classification")},
+            {"fact": "phase_ledger_status", "value": discovery.get("phase_ledger_status")},
+        ]
         return {
             "schema_version": SCHEMA_VERSION,
             "target": str(target_path),
             "status": "ACTION",
-            "state": STATE_TARGET_MISSING,
-            "next_safe_action": "Create or choose the target workspace path, then rerun operator-state.",
+            "state": discovery_classification,
+            "next_safe_action": str(discovery.get("next_safe_action") or "Prepare the target through HLDspec start."),
             "blockers": blockers,
             "evidence": evidence,
             "source_facts_used": {
                 "target_path": str(target_path),
-                "target_exists": False,
+                "target_exists_before_discovery": False,
                 "readiness_report": None,
+                "target_discovery": {
+                    "classification": discovery.get("classification"),
+                    "trusted_hldspec_lineage": discovery.get("trusted_hldspec_lineage"),
+                    "phase_ledger_status": discovery.get("phase_ledger_status"),
+                    "report_path": str(target_path / ".hldspec" / "sync" / td.DISCOVERY_JSON),
+                    "ledger_path": str(target_path / ".hldspec" / "sync" / td.LEDGER_JSON),
+                },
             },
             "doctor_note": doctor_note,
+            "target_discovery_report": discovery,
         }
 
     readiness = readiness_report or sr.build_speckit_readiness_report(target_path, which=which, run=run)
+    discovery = td.write_discovery_reports(target_path)
     workspace = readiness.get("workspace_status") if isinstance(readiness.get("workspace_status"), dict) else {}
     branch_hook = readiness.get("branch_hook_status") if isinstance(readiness.get("branch_hook_status"), dict) else {}
     selected_init_command = readiness.get("selected_init_command")
@@ -419,6 +435,8 @@ def build_speckit_operator_state_report(
         {"fact": "source_freshness_path", "value": freshness.get("path")},
         {"fact": "project_checkpoint_stage", "value": project_checkpoint.get("stage") if project_checkpoint else None},
         {"fact": "project_checkpoint_path", "value": project_checkpoint.get("path") if project_checkpoint else None},
+        {"fact": "target_discovery_classification", "value": discovery.get("classification")},
+        {"fact": "phase_ledger_status", "value": discovery.get("phase_ledger_status")},
     ]
 
     blockers: list[str] = []
@@ -426,7 +444,22 @@ def build_speckit_operator_state_report(
     state = STATE_READY_FOR_SPECIFY
     next_safe_action = _next_action_or_default(readiness)
 
-    if readiness.get("status") == "CONFLICT":
+    discovery_classification = str(discovery.get("classification") or "")
+    discovery_phase_status = str(discovery.get("phase_ledger_status") or "")
+    discovery_blocks = (
+        discovery_classification == td.CLASS_UNKNOWN_BROWNFIELD
+        or discovery_phase_status in {td.PHASE_UNVERIFIED, td.PHASE_STALE, td.PHASE_BLOCKED}
+        or bool(discovery.get("blockers"))
+    )
+
+    if discovery_blocks:
+        status = "ACTION"
+        state = discovery_classification or STATE_REASSESSMENT_REQUIRED
+        blockers.extend(str(item) for item in discovery.get("blockers", []) if str(item).strip())
+        if not blockers:
+            blockers.append(f"Target discovery blocks continuation: {discovery_classification} / {discovery_phase_status}")
+        next_safe_action = str(discovery.get("next_safe_action") or "Resolve target discovery blockers before rerunning operator-state.")
+    elif readiness.get("status") == "CONFLICT":
         status = "CONFLICT"
         state = STATE_BLOCKED
         blockers.append("SpecKit readiness reported CONFLICT.")
@@ -543,9 +576,17 @@ def build_speckit_operator_state_report(
             "source_package_dir": str(source_package_dir),
             "source_package_anchor_count": source_package_anchor_count,
             "source_freshness": freshness,
+            "target_discovery": {
+                "classification": discovery.get("classification"),
+                "trusted_hldspec_lineage": discovery.get("trusted_hldspec_lineage"),
+                "phase_ledger_status": discovery.get("phase_ledger_status"),
+                "report_path": str(target_path / ".hldspec" / "sync" / td.DISCOVERY_JSON),
+                "ledger_path": str(target_path / ".hldspec" / "sync" / td.LEDGER_JSON),
+            },
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,
+        "target_discovery_report": discovery,
         "speckit_execution_state": lifecycle.get("execution_state") if isinstance(lifecycle, dict) else None,
         "speckit_next_action": lifecycle.get("next_action") if isinstance(lifecycle, dict) else None,
     }
@@ -598,6 +639,17 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
     else:
         lines.append("- none")
     lifecycle_state = report.get("lifecycle_state")
+    discovery = report.get("target_discovery_report") if isinstance(report.get("target_discovery_report"), dict) else {}
+    if discovery:
+        lines.extend(
+            [
+                "",
+                "Target discovery:",
+                f"- classification: {discovery.get('classification', 'UNKNOWN')}",
+                f"- trusted lineage: {discovery.get('trusted_hldspec_lineage', False)}",
+                f"- phase ledger status: {discovery.get('phase_ledger_status', 'UNKNOWN')}",
+            ]
+        )
     if lifecycle_state:
         lines.extend(
             [

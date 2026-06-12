@@ -138,6 +138,48 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         input_artifacts=["spec_build_plan.json", "speckit_prework_quality_review.json"],
         output_artifacts=[],
     ),
+    "target_discovery_report.json": ArtifactContract(
+        artifact_name="target_discovery_report.json",
+        schema_version=1,
+        producer="target_discovery.py",
+        consumers=["status", "doctor", "operator-state", "continue"],
+        required_fields=[
+            "schema_version",
+            "target",
+            "classification",
+            "trusted_hldspec_lineage",
+            "blockers",
+            "next_safe_action",
+            "phase_ledger_status",
+            "phase_ledger",
+        ],
+        optional_fields=[
+            "lineage_evidence",
+            "existing_payload_paths",
+            "specify_memory_exists",
+            "spec_phase_artifacts_exist",
+        ],
+        output_artifacts=["phase_ledger.json"],
+        notes="Read-only existing-sensitive greenfield discovery; must not run SpecKit, implement product code, or wipe target state.",
+    ),
+    "phase_ledger.json": ArtifactContract(
+        artifact_name="phase_ledger.json",
+        schema_version=1,
+        producer="target_discovery.py",
+        consumers=["target_discovery_report.json", "operator-state", "continue"],
+        required_fields=[
+            "schema_version",
+            "target",
+            "overall_status",
+            "summary",
+            "entries",
+            "blockers",
+        ],
+        optional_fields=[],
+        input_artifacts=["target_discovery_report.json"],
+        output_artifacts=[],
+        notes="Read-only phase wake ledger; file existence alone must not mean DONE.",
+    ),
 }
 
 

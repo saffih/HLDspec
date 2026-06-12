@@ -86,8 +86,9 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         target = self.root / "missing-target"
         report = self._report(target)
         self.assertEqual("ACTION", report["status"])
-        self.assertEqual("TARGET_MISSING", report["state"])
-        self.assertIn("Create or choose the target workspace path", report["next_safe_action"])
+        self.assertEqual("NEW_GREENFIELD", report["state"])
+        self.assertIn("HLDspec start", report["next_safe_action"])
+        self.assertEqual("NEW_GREENFIELD", report["target_discovery_report"]["classification"])
 
     def test_no_git_repo_reports_action(self) -> None:
         target = self.root / "target"
@@ -180,8 +181,9 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
         self.assertEqual("ACTION", report["status"])
-        self.assertEqual("SOURCE_PACKAGE_MISSING", report["state"])
-        self.assertIn("source-package generation", report["next_safe_action"])
+        self.assertEqual("UNKNOWN_BROWNFIELD", report["state"])
+        self.assertIn("brownfield adoption is unsupported", " ".join(report["blockers"]))
+        self.assertNotIn("wipe", report["next_safe_action"].lower())
 
     def test_specify_source_only_reports_not_initialized(self) -> None:
         target = self.root / "target"
@@ -330,7 +332,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         self.assertEqual("SOURCE_FRESHNESS_BLOCKED", report["state"])
         self.assertTrue(any("source_freshness.json" in item for item in report["blockers"]))
 
-    def test_operator_state_read_does_not_create_sync_dir(self) -> None:
+    def test_operator_state_read_writes_only_discovery_sync_reports(self) -> None:
         target = self.root / "target"
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
@@ -341,7 +343,12 @@ class SpeckitOperatorStateTests(unittest.TestCase):
 
         self.assertEqual("PASS", report["status"])
         self.assertEqual("READY_FOR_SPECIFY", report["state"])
-        self.assertFalse((target / ".hldspec" / "sync").exists())
+        sync = target / ".hldspec" / "sync"
+        self.assertTrue((sync / "target_discovery_report.json").is_file())
+        self.assertTrue((sync / "target_discovery_report.md").is_file())
+        self.assertTrue((sync / "phase_ledger.json").is_file())
+        self.assertTrue((sync / "phase_ledger.md").is_file())
+        self.assertFalse((target / "specs").exists())
 
     def test_ready_workspace_with_partial_speckit_artifacts_reports_plan_active(self) -> None:
         target = self.root / "target"
@@ -358,6 +365,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         spec_dir = target / "specs" / "001-flow"
         spec_dir.mkdir(parents=True)
         (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        (spec_dir / "specify_validation.json").write_text('{"status":"PASS"}\n', encoding="utf-8")
 
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
 
@@ -383,6 +391,8 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         spec_dir.mkdir(parents=True)
         for name in ("spec.md", "plan.md", "tasks.md"):
             (spec_dir / name).write_text("content\n", encoding="utf-8")
+        for name in ("specify_validation.json", "plan_validation.json", "tasks_validation.json"):
+            (spec_dir / name).write_text('{"status":"PASS"}\n', encoding="utf-8")
 
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
 
@@ -405,9 +415,9 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target))
 
         self.assertEqual("ACTION", report["status"])
-        self.assertEqual("REASSESSMENT_REQUIRED", report["state"])
-        self.assertIn("no bundle or invocation queue", report["next_safe_action"])
-        self.assertTrue(report["blockers"])
+        self.assertEqual("PHASED_GREENFIELD", report["state"])
+        self.assertIn("UNVERIFIED", report["next_safe_action"])
+        self.assertTrue(any("Unverified phase artifact" in item for item in report["blockers"]))
 
     def test_summary_is_boundary_safe_and_devin_free(self) -> None:
         target = self.root / "target"
@@ -444,7 +454,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         )
         self.assertNotEqual(0, result.returncode)
         self.assertIn("STATUS: ACTION", result.stdout)
-        self.assertIn("State: TARGET_MISSING", result.stdout)
+        self.assertIn("State: NEW_GREENFIELD", result.stdout)
         self.assertIn("Next safe action:", result.stdout)
 
 
