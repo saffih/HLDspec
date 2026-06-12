@@ -43,6 +43,9 @@ def _touch(root: Path, short_name: str, *files: str) -> None:
     spec_dir.mkdir(parents=True, exist_ok=True)
     for name in files:
         (spec_dir / name).write_text("content", encoding="utf-8")
+        phase = {"spec.md": "specify", "plan.md": "plan", "tasks.md": "tasks"}.get(name)
+        if phase:
+            (spec_dir / f"{phase}_validation.json").write_text(json.dumps({"status": "PASS"}), encoding="utf-8")
 
 
 class FakeRunner:

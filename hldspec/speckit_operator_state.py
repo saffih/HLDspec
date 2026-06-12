@@ -96,7 +96,13 @@ def _has_any_spec_artifact(execution: dict[str, Any]) -> bool:
         for spec in bundle.get("specs") or []:
             if not isinstance(spec, dict):
                 continue
-            if any(value == "DONE" for value in (spec.get("phases") or {}).values()):
+            details = spec.get("phase_details") or {}
+            if isinstance(details, dict) and any(
+                isinstance(value, dict) and value.get("artifact_state") == "PRESENT"
+                for value in details.values()
+            ):
+                return True
+            if any(value in {"PRESENT_UNVERIFIED", "DONE_VERIFIED", "BLOCKED", "STALE"} for value in (spec.get("phases") or {}).values()):
                 return True
     return False
 

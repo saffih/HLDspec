@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from hldspec import phase_evidence as pe
 from hldspec.script_io import load_json_dict, write_json_dict
 from hldspec.spec_bundles import as_dict, as_list, utc_now
 
@@ -21,7 +22,6 @@ SCHEMA_VERSION = 1
 ASSESSMENT_JSON = "speckit_execution_assessment.json"
 ASSESSMENT_MD = "speckit_execution_assessment.md"
 
-# A phase is considered DONE when its signature artifact exists and is non-empty.
 PHASE_ARTIFACTS: dict[str, tuple[str, ...]] = {
     "specify": ("spec.md",),
     "plan": ("plan.md",),
@@ -71,9 +71,19 @@ def _nonempty(path: Path) -> bool:
         return False
 
 
+def _validation_candidates(spec_dir: Path, phase: str) -> list[Path]:
+    return [
+        spec_dir / f"{phase}_validation.json",
+        spec_dir / f"{phase}_validation.md",
+        spec_dir / f"{phase}_report.json",
+        spec_dir / f"{phase}_report.md",
+        spec_dir / ".hldspec_validation.json",
+    ]
+
+
 def first_pending_phase(phases: dict[str, str]) -> str | None:
     for phase in PHASE_ORDER:
-        if phases.get(phase) != "DONE":
+        if phases.get(phase) != "DONE_VERIFIED":
             return phase
     return None
 
@@ -82,25 +92,59 @@ def assess_spec(speckit_root: Path, short_name: str) -> dict[str, Any]:
     """Derive per-phase status for one spec from on-disk SpecKit artifacts."""
     spec_dir = speckit_root / short_name
     phases: dict[str, str] = {}
+    phase_details: dict[str, dict[str, Any]] = {}
     if not spec_dir.exists():
         for phase in PHASE_ORDER:
             phases[phase] = "NOT_STARTED"
+            phase_details[phase] = {
+                "artifact_state": pe.ARTIFACT_MISSING,
+                "evidence_state": pe.EVIDENCE_NONE,
+                "phase_state": pe.PHASE_NOT_STARTED,
+                "safety_status": pe.SAFETY_PASS,
+            }
         return {
             "short_name": short_name,
             "spec_dir": str(spec_dir),
             "exists": False,
             "phases": phases,
+            "phase_details": phase_details,
             "status": "NOT_STARTED",
         }
     for phase, files in PHASE_ARTIFACTS.items():
-        phases[phase] = "DONE" if any(_nonempty(spec_dir / f) for f in files) else "PENDING"
+        artifact = next((spec_dir / f for f in files if _nonempty(spec_dir / f)), spec_dir / files[0])
+        evidence = pe.assess_phase_artifact(artifact, _validation_candidates(spec_dir, phase))
+        if evidence.phase_state == pe.PHASE_NOT_STARTED:
+            phase_status = "PENDING"
+        elif evidence.phase_state == pe.PHASE_DONE_VERIFIED:
+            phase_status = "DONE_VERIFIED"
+        elif evidence.phase_state == pe.PHASE_BLOCKED:
+            phase_status = "BLOCKED"
+        elif evidence.phase_state == pe.PHASE_STALE:
+            phase_status = "STALE"
+        else:
+            phase_status = "PRESENT_UNVERIFIED"
+        phases[phase] = phase_status
+        phase_details[phase] = {
+            "artifact_state": evidence.artifact_state,
+            "evidence_state": evidence.evidence_state,
+            "phase_state": evidence.phase_state,
+            "safety_status": evidence.safety_status,
+            "artifact_path": evidence.artifact_path,
+            "evidence_paths": list(evidence.evidence_paths),
+        }
     pending = first_pending_phase(phases)
-    status = "DONE" if pending is None else f"PENDING_{pending.upper()}"
+    if any(state in {"BLOCKED", "STALE"} for state in phases.values()):
+        status = "BLOCKED"
+    elif any(state == "PRESENT_UNVERIFIED" for state in phases.values()):
+        status = "ACTION"
+    else:
+        status = "DONE_VERIFIED" if pending is None else f"PENDING_{pending.upper()}"
     return {
         "short_name": short_name,
         "spec_dir": str(spec_dir),
         "exists": True,
         "phases": phases,
+        "phase_details": phase_details,
         "status": status,
     }
 
@@ -116,7 +160,7 @@ def build_execution_state(workspace: Path, speckit_root: Path) -> dict[str, Any]
 
     for bundle in bundles:
         specs_out: list[dict[str, Any]] = []
-        bundle_status = "DONE"
+        bundle_status = "DONE_VERIFIED"
         for spec in as_list(bundle.get("included_specs")):
             if not isinstance(spec, dict):
                 continue
@@ -134,9 +178,9 @@ def build_execution_state(workspace: Path, speckit_root: Path) -> dict[str, Any]
             entry = {"feature_id": str(spec.get("feature_id", "")), **assessment}
             specs_out.append(entry)
 
-            if entry["status"] != "DONE" and bundle_status == "DONE":
+            if entry["status"] != "DONE_VERIFIED" and bundle_status == "DONE_VERIFIED":
                 bundle_status = entry["status"]
-            if assessable and entry["status"] not in {"DONE"} and resume is None:
+            if assessable and entry["status"] not in {"DONE_VERIFIED"} and resume is None:
                 resume = {
                     "bundle_id": str(bundle.get("bundle_id", "")),
                     "bundle_slug": str(bundle.get("bundle_slug", "")),
@@ -250,7 +294,7 @@ def next_action(payload: dict[str, Any], runtime: str = "claude") -> dict[str, A
         "resume": resume,
         "instruction": (
             f"Open the bundle prompt above and resume at spec `{resume.get('feature_id', '')}` "
-            f"phase `{resume.get('phase', '')}`. Skip phases already marked DONE in the state report; "
+            f"phase `{resume.get('phase', '')}`. Skip only phases marked DONE_VERIFIED in the state report; "
             "re-run the RunSkeptic gate for the resumed phase before continuing."
         ),
         "ordered_prompts": ordered,

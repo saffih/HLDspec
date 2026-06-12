@@ -47,6 +47,13 @@ def _touch(root: Path, short_name: str, *files: str) -> None:
         (spec_dir / name).write_text("content", encoding="utf-8")
 
 
+def _verify(root: Path, short_name: str, *phases: str, status: str = "PASS") -> None:
+    spec_dir = root / short_name
+    spec_dir.mkdir(parents=True, exist_ok=True)
+    for phase in phases:
+        (spec_dir / f"{phase}_validation.json").write_text(json.dumps({"status": status}), encoding="utf-8")
+
+
 class AssessSpecTests(unittest.TestCase):
     def test_not_started_when_dir_absent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -59,16 +66,26 @@ class AssessSpecTests(unittest.TestCase):
             root = Path(tmp)
             _touch(root, "027-scope", "spec.md")
             result = assess_spec(root, "027-scope")
-            self.assertEqual("DONE", result["phases"]["specify"])
+            self.assertEqual("PRESENT_UNVERIFIED", result["phases"]["specify"])
             self.assertEqual("PENDING", result["phases"]["plan"])
-            self.assertEqual("PENDING_PLAN", result["status"])
+            self.assertEqual("ACTION", result["status"])
 
-    def test_done_when_all_artifacts_present(self) -> None:
+    def test_done_verified_when_all_artifacts_have_passing_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             _touch(root, "027-scope", "spec.md", "plan.md", "tasks.md")
+            _verify(root, "027-scope", "specify", "plan", "tasks")
             result = assess_spec(root, "027-scope")
-            self.assertEqual("DONE", result["status"])
+            self.assertEqual("DONE_VERIFIED", result["status"])
+
+    def test_fail_json_blocks_phase(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _touch(root, "027-scope", "spec.md")
+            _verify(root, "027-scope", "specify", status="FAIL")
+            result = assess_spec(root, "027-scope")
+            self.assertEqual("BLOCKED", result["phases"]["specify"])
+            self.assertEqual("BLOCKED", result["status"])
 
     def test_empty_file_is_not_done(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -81,8 +98,8 @@ class AssessSpecTests(unittest.TestCase):
 
     def test_first_pending_phase(self) -> None:
         self.assertEqual("specify", first_pending_phase({"specify": "PENDING", "plan": "PENDING", "tasks": "PENDING"}))
-        self.assertEqual("tasks", first_pending_phase({"specify": "DONE", "plan": "DONE", "tasks": "PENDING"}))
-        self.assertIsNone(first_pending_phase({"specify": "DONE", "plan": "DONE", "tasks": "DONE"}))
+        self.assertEqual("tasks", first_pending_phase({"specify": "DONE_VERIFIED", "plan": "DONE_VERIFIED", "tasks": "PENDING"}))
+        self.assertIsNone(first_pending_phase({"specify": "DONE_VERIFIED", "plan": "DONE_VERIFIED", "tasks": "DONE_VERIFIED"}))
 
 
 class BuildExecutionStateTests(unittest.TestCase):
@@ -107,11 +124,12 @@ class BuildExecutionStateTests(unittest.TestCase):
             )
             # 027 fully done; 029 has specify only -> resume at 029/plan
             _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
+            _verify(speckit_root, "027-scope", "specify", "plan", "tasks")
             _touch(speckit_root, "029-integration", "spec.md")
             state = build_execution_state(workspace, speckit_root)
             self.assertEqual("IN_PROGRESS", state["status"])
             self.assertEqual("029", state["resume"]["feature_id"])
-            self.assertEqual("plan", state["resume"]["phase"])
+            self.assertEqual("specify", state["resume"]["phase"])
 
     def test_canonical_invocation_queue_is_assessable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -127,7 +145,7 @@ class BuildExecutionStateTests(unittest.TestCase):
 
             self.assertEqual("IN_PROGRESS", state["status"])
             self.assertEqual("F01", state["resume"]["feature_id"])
-            self.assertEqual("plan", state["resume"]["phase"])
+            self.assertEqual("specify", state["resume"]["phase"])
             self.assertEqual("prompt.md", state["resume"]["prompt_paths"]["codex"])
 
     def test_all_tasks_done(self) -> None:
@@ -136,8 +154,19 @@ class BuildExecutionStateTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_queue(workspace, [_bundle("G01", "g01", [("027", "027-scope")])])
             _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
+            _verify(speckit_root, "027-scope", "specify", "plan", "tasks")
             state = build_execution_state(workspace, speckit_root)
             self.assertEqual("ALL_TASKS_DONE", state["status"])
+
+    def test_presence_only_all_artifacts_is_not_all_tasks_done(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_queue(workspace, [_bundle("G01", "g01", [("027", "027-scope")])])
+            _touch(speckit_root, "027-scope", "spec.md", "plan.md", "tasks.md")
+            state = build_execution_state(workspace, speckit_root)
+            self.assertEqual("IN_PROGRESS", state["status"])
+            self.assertEqual("specify", state["resume"]["phase"])
 
     def test_write_execution_state_does_not_overwrite_machine_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

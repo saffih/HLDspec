@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import phase_evidence as pe
 from . import run_state
 from .spec_bundles import utc_now
 
@@ -224,31 +225,6 @@ def _validation_candidates(target: Path, spec_dir: Path, phase: str, artifact_na
     ]
 
 
-FAILING_EVIDENCE_STATUSES = {"FAIL", "FAILED", "ACTION", "CONFLICT", "BLOCKED", "REWORK_REQUIRED"}
-PASSING_EVIDENCE_STATUSES = {"PASS", "PASSED", "OK", "DONE", "APPROVED"}
-
-
-def _phase_has_evidence(target: Path, spec_dir: Path, phase: str, artifact_name: str) -> tuple[bool, list[str], list[str]]:
-    """Return (evidence_ok, evidence_paths, failing_paths).
-
-    DONE requires machine-readable *passing* evidence: a JSON file whose
-    `status` is an explicit pass. Markdown-only, empty, malformed, or
-    status-less evidence is UNVERIFIED; a failing status blocks the phase.
-    """
-    paths = [path for path in _validation_candidates(target, spec_dir, phase, artifact_name) if path.is_file()]
-    passing: list[str] = []
-    failing: list[str] = []
-    for path in paths:
-        if path.suffix != ".json":
-            continue
-        status = str(_load_json(path).get("status", "")).upper()
-        if status in FAILING_EVIDENCE_STATUSES:
-            failing.append(str(path))
-        elif status in PASSING_EVIDENCE_STATUSES:
-            passing.append(str(path))
-    return bool(passing), [str(path) for path in paths], failing
-
-
 def _artifact_is_stale(target: Path, artifact: Path) -> bool:
     freshness = _load_json(_hldspec_dir(target) / "source_freshness.json")
     if freshness.get("blocking") or freshness.get("working_hld_differs_from_source"):
@@ -277,20 +253,22 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
     for spec_dir in _spec_dirs(target):
         for phase, artifact_name in PHASES:
             artifact = spec_dir / artifact_name
-            exists = _is_nonempty(artifact)
-            evidence_ok, evidence_paths, failing_paths = (
-                _phase_has_evidence(target, spec_dir, phase, artifact_name) if exists else (False, [], [])
+            phase_evidence = pe.assess_phase_artifact(
+                artifact,
+                _validation_candidates(target, spec_dir, phase, artifact_name),
+                stale=_artifact_is_stale(target, artifact) if _is_nonempty(artifact) else False,
             )
-            stale = _artifact_is_stale(target, artifact) if exists else False
-            if not exists:
+            exists = phase_evidence.artifact_state == pe.ARTIFACT_PRESENT
+            if phase_evidence.phase_state == pe.PHASE_NOT_STARTED:
                 status = PHASE_NOT_STARTED
-            elif stale:
+            elif phase_evidence.phase_state == pe.PHASE_STALE:
                 status = PHASE_STALE
                 blockers.append(f"Stale phase artifact: {artifact}")
-            elif failing_paths:
+            elif phase_evidence.phase_state == pe.PHASE_BLOCKED:
                 status = PHASE_BLOCKED
-                blockers.append(f"Phase validation evidence reports a failing status: {failing_paths[0]}")
-            elif evidence_ok:
+                failing = phase_evidence.failing_evidence_paths[0] if phase_evidence.failing_evidence_paths else str(artifact)
+                blockers.append(f"Phase validation evidence reports a failing status: {failing}")
+            elif phase_evidence.phase_state == pe.PHASE_DONE_VERIFIED:
                 status = PHASE_DONE
             else:
                 status = PHASE_UNVERIFIED
@@ -302,8 +280,12 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
                     "phase": phase,
                     "artifact": str(artifact),
                     "artifact_exists": exists,
+                    "artifact_state": phase_evidence.artifact_state,
+                    "evidence_state": phase_evidence.evidence_state,
+                    "phase_state": phase_evidence.phase_state,
+                    "safety_status": phase_evidence.safety_status,
                     "status": status,
-                    "trusted_evidence": evidence_paths,
+                    "trusted_evidence": list(phase_evidence.evidence_paths),
                 }
             )
 

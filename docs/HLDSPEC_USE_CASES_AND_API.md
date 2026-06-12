@@ -98,6 +98,53 @@ These names and direct scripts are not the normal product workflow:
 
 Rule: use cases are canonical; command names are an interface mapping. A command must be marked current, future, or legacy/debug before docs can advertise it as product behavior.
 
+### Canonical journey and trigger map
+
+HLDspec has three canonical journeys:
+
+| Journey | Former wording | Purpose |
+|---|---|---|
+| Journey 1 — HLD Shaping | HLD Authoring | Inspect, shape, repair, normalize, clarify, and review a human-owned HLD without silently owning product decisions. |
+| Journey 2 — SpecKit Groundwork | SpecKit Preparation | Prepare source package, context, constitution proposal, readiness gates, engineering guidance, and Run Card without replacing SpecKit. |
+| Journey 3 — SpecKit Build Loop Supervision | formerly Implementation Guidance | Drive/watch the SpecKit build loop by the book; SpecKit owns specs/plans/tasks, implementation artifacts, and branch/commit/merge mechanics. |
+
+Canonical public triggers are task-shaped phrases, not necessarily same-named
+CLI subcommands. Current implemented triggers map to the facade above; planned
+triggers are reserved product vocabulary and must not be documented as complete
+behavior until code and tests support them.
+
+| Journey | Trigger | Status |
+|---|---|---|
+| HLD Shaping | `HLDspec inspect HLD: <path>` | planned |
+| HLD Shaping | `HLDspec shape HLD: <path>` | planned |
+| HLD Shaping | `HLDspec repair HLD: <path>` | planned |
+| HLD Shaping | `HLDspec clarify HLD: <path>` | planned |
+| HLD Shaping | `HLDspec normalize HLD: <path> target: <path>` | planned |
+| HLD Shaping | `HLDspec review-hld HLD: <path> target: <path>` | current/read-only via readiness review trigger |
+| SpecKit Groundwork | `HLDspec prepare HLD: <path> target: <path>` | current via `start` |
+| SpecKit Groundwork | `HLDspec source-package HLD: <path> target: <path>` | current inside `start`; direct scripts are maintainer/debug |
+| SpecKit Groundwork | `HLDspec constitution HLD: <path> target: <path>` | planned |
+| SpecKit Groundwork | `HLDspec run-card target: <path>` | planned |
+| SpecKit Groundwork | `HLDspec prework-review target: <path>` | current/read-only via `review`/`operator-state` |
+| SpecKit Groundwork | `HLDspec approve-prework target: <path>` | planned human-owned approval |
+| SpecKit Groundwork | `HLDspec doctor target: <path>` | current/read-only |
+| SpecKit Build Loop Supervision | `HLDspec build-loop target: <path>` | current gate vocabulary; no automatic SpecKit phase execution |
+| SpecKit Build Loop Supervision | `HLDspec watch target: <path>` | planned |
+| SpecKit Build Loop Supervision | `HLDspec build-status target: <path>` | current/read-only via `status`/`operator-state` |
+| SpecKit Build Loop Supervision | `HLDspec reassess target: <path>` | current/read-only via `review`/`status` |
+| SpecKit Build Loop Supervision | `HLDspec runskeptic target: <path>` | planned facade |
+| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | planned read-only gate |
+| SpecKit Build Loop Supervision | `HLDspec branch-gate target: <path>` | planned gate-only |
+| SpecKit Build Loop Supervision | `HLDspec commit-gate target: <path>` | planned gate-only |
+| SpecKit Build Loop Supervision | `HLDspec merge-gate target: <path>` | planned gate-only; no auto-merge |
+| SpecKit Build Loop Supervision | `HLDspec approve-slice target: <path> slice: <slice-id>` | planned human-owned approval |
+| Cross-journey | `HLDspec use HLD: <path> target: <path>` | current discovery / partial resume: discover -> classify -> start/resume/wake/sync/evolve/block |
+
+Boundary: HLDspec must not silently adopt arbitrary brownfield code, replace
+SpecKit, manually create final SpecKit specs/plans/tasks, implement target
+product code, auto-merge, bypass human-owned decisions, mark file existence as
+DONE, trust copied `.hldspec` state, or create a competing git workflow.
+
 
 ## Complete use-case catalog target
 

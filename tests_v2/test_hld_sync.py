@@ -50,6 +50,13 @@ def _touch_spec(speckit_root: Path, short_name: str, *files: str) -> None:
         (spec_dir / name).write_text("content", encoding="utf-8")
 
 
+def _verify_spec(speckit_root: Path, short_name: str, *phases: str) -> None:
+    spec_dir = speckit_root / short_name
+    spec_dir.mkdir(parents=True, exist_ok=True)
+    for phase in phases:
+        (spec_dir / f"{phase}_validation.json").write_text(json.dumps({"status": "PASS"}), encoding="utf-8")
+
+
 SPEC_001 = {"feature_id": "001", "short_name": "001-core", "source_hld_sections": ["HLD-001"]}
 SPEC_002 = {"feature_id": "002", "short_name": "002-edge", "source_hld_sections": ["HLD-002"]}
 
@@ -91,10 +98,11 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha", "HLD-002": "beta"}, [SPEC_001, SPEC_002])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             first = run_sync(workspace, speckit_root)
             rows = {row["short_name"]: row for row in first["specs"]}
-            self.assertEqual("DONE", rows["001-core"]["status"])
+            self.assertEqual("DONE_VERIFIED", rows["001-core"]["status"])
             self.assertEqual("NOT_STARTED", rows["002-edge"]["status"])
             self.assertEqual("IN_SYNC_PENDING", first["status"])
 
@@ -114,13 +122,14 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha", "HLD-002": "beta"}, [SPEC_001])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             run_sync(workspace, speckit_root)
             (workspace / "HLD.md").write_text(
                 _hld({"HLD-001": "alpha", "HLD-002": "beta CHANGED"}), encoding="utf-8"
             )
             second = run_sync(workspace, speckit_root)
-            self.assertEqual("DONE", second["specs"][0]["status"])
+            self.assertEqual("DONE_VERIFIED", second["specs"][0]["status"])
             self.assertEqual("IN_SYNC", second["status"])
 
     def test_rebuilt_artifacts_clear_staleness(self):
@@ -129,6 +138,7 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha"}, [SPEC_001])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             run_sync(workspace, speckit_root)
             (workspace / "HLD.md").write_text(_hld({"HLD-001": "alpha CHANGED"}), encoding="utf-8")
@@ -139,7 +149,7 @@ class RunSyncTests(unittest.TestCase):
             future = time.time() + 60
             os.utime(speckit_root / "001-core" / "spec.md", (future, future))
             recovered = run_sync(workspace, speckit_root)
-            self.assertEqual("DONE", recovered["specs"][0]["status"])
+            self.assertEqual("DONE_VERIFIED", recovered["specs"][0]["status"])
             self.assertEqual("IN_SYNC", recovered["status"])
 
     def test_rebuild_older_than_hld_edit_stays_stale(self):
@@ -148,6 +158,7 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha"}, [SPEC_001])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             run_sync(workspace, speckit_root)
 
@@ -168,6 +179,7 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha", "HLD-002": "beta"}, [SPEC_001])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             run_sync(workspace, speckit_root)
             (workspace / "HLD.md").write_text(_hld({"HLD-002": "beta"}), encoding="utf-8")
@@ -206,6 +218,7 @@ class RunSyncTests(unittest.TestCase):
             speckit_root = Path(tmp) / "specs"
             _write_workspace(workspace, {"HLD-001": "alpha"}, [SPEC_001])
             _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
 
             run_sync(workspace, speckit_root)
 
@@ -217,6 +230,21 @@ class RunSyncTests(unittest.TestCase):
             ledger = json.loads((sync / DONE_LEDGER_JSON).read_text(encoding="utf-8"))
             self.assertIn("001-core", ledger["specs"])
             self.assertIn("HLD-001", ledger["specs"]["001-core"]["sections"])
+
+    def test_presence_only_spec_is_not_recorded_done(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            speckit_root = Path(tmp) / "specs"
+            _write_workspace(workspace, {"HLD-001": "alpha"}, [SPEC_001])
+            _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+
+            report = run_sync(workspace, speckit_root)
+
+            self.assertEqual("IN_SYNC_PENDING", report["status"])
+            self.assertEqual("ACTION", report["specs"][0]["status"])
+            sync = workspace / ".specify" / "sync"
+            ledger = json.loads((sync / DONE_LEDGER_JSON).read_text(encoding="utf-8"))
+            self.assertNotIn("001-core", ledger["specs"])
 
 
 if __name__ == "__main__":

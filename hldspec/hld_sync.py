@@ -11,7 +11,7 @@ decisions. This module makes re-sync incremental and non-destructive:
   `DONE_STALE` instead of invalidating everything. If the spec's artifacts are
   rebuilt after the snapshot, the ledger re-records and the spec is DONE again.
 - Slice E — `run_sync`: one cheap idempotent pass — refresh fingerprints,
-  report changed sections and per-spec DONE/DONE_STALE/PENDING status,
+  report changed sections and per-spec DONE_VERIFIED/DONE_STALE/PENDING status,
   regenerate Tier-2 prompts, and propose the next action. Never deletes
   human answers or derived plans; `HLDSPEC_FRESH=1` stays the explicit
   nuclear option elsewhere.
@@ -78,14 +78,14 @@ def _ledger_status(
     artifacts_mtime: float,
     hld_mtime: float,
 ) -> tuple[str, dict[str, Any]]:
-    """Decide DONE vs DONE_STALE for a spec observed DONE on disk, and the
+    """Decide DONE_VERIFIED vs DONE_STALE for a spec observed DONE_VERIFIED on disk, and the
     ledger entry to keep. Re-records when artifacts were rebuilt after the
     snapshot AND after the last HLD edit — a rebuild older than the HLD edit
     was built against the pre-edit HLD and must not clear staleness."""
     current = {anchor: fingerprints.get(anchor, "") for anchor in spec_sections}
     rebuilt = entry is not None and artifacts_mtime > float(entry.get("artifacts_mtime", 0.0))
     if entry is None or (rebuilt and artifacts_mtime >= hld_mtime):
-        return "DONE", {"sections": current, "recorded_at": utc_now(), "artifacts_mtime": artifacts_mtime}
+        return "DONE_VERIFIED", {"sections": current, "recorded_at": utc_now(), "artifacts_mtime": artifacts_mtime}
     recorded = as_dict(entry.get("sections"))
     stale = sorted(
         anchor
@@ -96,7 +96,7 @@ def _ledger_status(
         kept = dict(entry)
         kept["stale_sections"] = stale
         return "DONE_STALE", kept
-    return "DONE", dict(entry)
+    return "DONE_VERIFIED", dict(entry)
 
 
 def run_sync(workspace: Path, speckit_root: Path) -> dict[str, Any]:
@@ -137,14 +137,14 @@ def run_sync(workspace: Path, speckit_root: Path) -> dict[str, Any]:
             "source_hld_sections": sections,
             "status": status,
         }
-        if status == "DONE" and fingerprints:
+        if status == "DONE_VERIFIED" and fingerprints:
             entry = ledger.get(short_name) if isinstance(ledger.get(short_name), dict) else None
             row["status"], new_ledger[short_name] = _ledger_status(
                 entry, sections, fingerprints, _artifacts_mtime(speckit_root, short_name), hld_path.stat().st_mtime
             )
             if row["status"] == "DONE_STALE":
                 row["stale_sections"] = new_ledger[short_name].get("stale_sections", [])
-        elif status == "DONE" and isinstance(ledger.get(short_name), dict):
+        elif status == "DONE_VERIFIED" and isinstance(ledger.get(short_name), dict):
             new_ledger[short_name] = ledger[short_name]
         spec_rows.append(row)
 
@@ -159,7 +159,7 @@ def run_sync(workspace: Path, speckit_root: Path) -> dict[str, Any]:
         prompts_regenerated = True
 
     stale_specs = [row["short_name"] for row in spec_rows if row["status"] == "DONE_STALE"]
-    pending_specs = [row["short_name"] for row in spec_rows if row["status"] not in {"DONE", "DONE_STALE"}]
+    pending_specs = [row["short_name"] for row in spec_rows if row["status"] not in {"DONE_VERIFIED", "DONE_STALE"}]
     if stale_specs:
         status = "STALE_SPECS"
         next_action = (

@@ -9,15 +9,17 @@
 HLDspec is an agent-first control layer around HLD-driven SpecKit work, serving three
 user journeys (full detail: `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §13):
 
-1. **HLD Authoring** *(precondition)* — interview/shape/repair/clarify until the HLD is
+1. **HLD Shaping** *(formerly HLD Authoring; precondition)* — interview/shape/repair/clarify until the HLD is
    a reliable source of truth.
-2. **SpecKit Preparation** *(the core)* — anchor the full HLD, build the source package,
+2. **SpecKit Groundwork** *(formerly SpecKit Preparation; the core)* — anchor the full HLD, build the source package,
    mirror read-only context into `.specify/source/`, init/validate a real SpecKit
    workspace, and prepare answers for one complete specify -> plan -> tasks -> analyze
    flow.
-3. **Implementation Guidance** *(extension)* — HLDspec does not implement; it provides
-   slice scope, prompts, clarification rules, test requirements, stop conditions, and
-   reassessment. Modes: manual, agent-assisted, mediator-assisted.
+3. **SpecKit Build Loop Supervision** *(formerly Implementation Guidance; extension)* —
+   HLDspec does not implement; it drives/watches the SpecKit build loop by the
+   book, providing slice scope, prompts, clarification rules, test requirements,
+   stop conditions, evidence recording, RunSkeptic, and reassessment. Modes:
+   manual, agent-assisted, mediator-assisted.
 
 Roles: **User** = decision owner; **HLDspec** = source-truth/process/gate system;
 **Agent Mediator** = user-side observer/prompt assistant; **Implementation Agent** =
