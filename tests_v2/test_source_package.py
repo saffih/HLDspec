@@ -118,6 +118,56 @@ class SourcePackageBuildTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn(sp.AUTHORITATIVE_FILES["hld"], result.hash_mismatches)
 
+    def test_write_source_package_round_trips_binding_fields(self):
+        import json
+
+        sp.write_source_package(
+            self.source_dir,
+            hld_source_ref="/src/HLD.md",
+            state="SOURCE_PACKAGE_IMPORTED",
+            target_root=self.root,
+            source_sha256="a" * 64,
+        )
+        meta = json.loads((self.source_dir / sp.SOURCE_PACKAGE_FILE).read_text(encoding="utf-8"))
+        self.assertEqual("HLDspec", meta["created_by"])
+        self.assertTrue(meta["created_at"])
+        self.assertEqual(sp.BINDING_SCHEMA_VERSION, meta["binding_schema_version"])
+        self.assertEqual(sp.normalized_target_path(self.root), meta["target_path"])
+        self.assertEqual(sp.path_sha256(meta["target_path"]), meta["target_path_sha256"])
+        self.assertEqual("/src/HLD.md", meta["source_ref"])
+        self.assertEqual("a" * 64, meta["source_sha256"])
+
+    def test_write_source_package_without_target_is_unbound(self):
+        import json
+
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+        meta = json.loads((self.source_dir / sp.SOURCE_PACKAGE_FILE).read_text(encoding="utf-8"))
+        for field in sp.BINDING_FIELDS:
+            self.assertNotIn(field, meta)
+
+    def test_build_content_stamps_binding_and_discovery_trusts_it(self):
+        import json
+
+        from hldspec import target_discovery as td
+
+        source_hld = self.root / "SourceHLD.md"
+        source_hld.write_text("# HLD\n\n## HLD-001 - Demo\n\nHLD-ID: HLD-001\n", encoding="utf-8")
+        build = sp.build_source_package_content(
+            self.root,
+            source_hld.read_text(encoding="utf-8"),
+            hld_source_ref=str(source_hld),
+            layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+        meta = json.loads((self.source_dir / sp.SOURCE_PACKAGE_FILE).read_text(encoding="utf-8"))
+        self.assertEqual(sp.normalized_target_path(self.root), meta["target_path"])
+        # Source content is available at the ref, so its hash is recorded.
+        self.assertEqual(sp._sha256(source_hld), meta["source_sha256"])
+
+        report = td.build_target_discovery(self.root)
+        self.assertTrue(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.BINDING_BOUND_MATCH, report["source_package_binding"]["state"])
+
     def test_build_generates_engineering_guidelines_and_mirrors_it(self):
         from hldspec import engineering_selection as es
 

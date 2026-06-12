@@ -354,6 +354,7 @@ def run_workflow_trigger(target: Path, session: dict[str, Any]) -> MachineResult
     sync.mkdir(parents=True, exist_ok=True)
     adapter = TargetWorkspaceAdapter(target_root=target, layout="new", controller_root=run_state.controller_root_from_pointer(target))
     source = session.get("source", {}).get("path") if isinstance(session.get("source"), dict) else None
+    session_source_sha = session.get("source", {}).get("sha256") if isinstance(session.get("source"), dict) else None
 
     if source_freshness_blocks_build_loop(target):
         warnings = source_freshness_warnings(target)
@@ -472,6 +473,7 @@ def run_workflow_trigger(target: Path, session: dict[str, Any]) -> MachineResult
                 adapter.working_hld.read_text(encoding="utf-8"),
                 hld_source_ref=str(source or adapter.working_hld),
                 materialize_mirror=True,
+                source_sha256=str(session_source_sha) if session_source_sha else None,
             )
         report = sr.build_speckit_readiness_report(target)
         payload = {
@@ -551,6 +553,7 @@ def run_workflow_trigger(target: Path, session: dict[str, Any]) -> MachineResult
             adapter.working_hld.read_text(encoding="utf-8"),
             hld_source_ref=str(source or adapter.working_hld),
             materialize_mirror=True,
+            source_sha256=str(session_source_sha) if session_source_sha else None,
         )
     report = sos.build_speckit_operator_state_report(target)
     preflight = sc.session_continue_preflight(target)
@@ -1094,6 +1097,7 @@ def command_start(args: argparse.Namespace) -> int:
             working_hld.read_text(encoding="utf-8"),
             hld_source_ref=str(source),
             materialize_mirror=speckit_init.initialized,
+            source_sha256=source_hash,
         )
 
     print(f"HLDspec agent session prepared.")

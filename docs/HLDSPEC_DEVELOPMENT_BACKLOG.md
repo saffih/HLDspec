@@ -578,13 +578,25 @@ Related smaller items:
   external-mode target it misses controller approval and blocks (fail-safe,
   but should resolve the pointer once drive supports external mode).
 
-### P1-011 Bind the source package to its target
+### P1-011 Bind the source package to its target — RESOLVED 2026-06-12
 
 A wholesale-copied `.hldspec/` tree with a valid manifest plus anchor map is
 still trusted lineage (agent_session is target-bound since 2026-06-12, the
 source package is not). Record the target path and source hash inside
 `source_package.json` at build time and verify both at discovery. Natural
 precondition for managed greenfield evolution.
+
+Resolved by Slice 1 of `docs/reviews/runskeptic_landscape_20260612-114242_UTC.md`:
+`source_package.json` now carries `created_by`/`created_at`/`binding_schema_version`/
+`target_path`/`target_path_sha256`/`source_ref`/`source_sha256`, and
+`target_discovery` classifies the binding as `BOUND_MATCH` / `BOUND_MISMATCH` /
+`UNBOUND_LEGACY` / `MISSING_BINDING` / `INVALID_BINDING`. Only `BOUND_MATCH`
+packages count as trusted lineage; mismatched or invalid bindings distrust the
+target fail-closed (even over a valid agent session); legacy/unbound packages
+warn and are never fully trusted. Source-hash mismatch is checked against the
+`.hldspec-run.json` pointer when both hashes exist. Tests:
+`tests_v2/test_target_discovery.py::SourcePackageBindingTests`,
+`tests_v2/test_source_package.py` binding round-trip cases.
 
 ## P2 backlog
 

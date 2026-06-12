@@ -5,16 +5,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hldspec import hld_source_package as hsp
 from hldspec import product_runability as pr
 from hldspec import target_discovery as td
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _lineage(base: Path) -> None:
+def _lineage(base: Path, *, bound_to: Path | None = None) -> None:
     source_package = base / ".hldspec" / "source_package"
     source_package.mkdir(parents=True, exist_ok=True)
-    (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+    metadata = {"schema_version": 1, **hsp.build_binding_fields(bound_to or base, source_ref="/src/HLD.md")}
+    (source_package / "source_package.json").write_text(json.dumps(metadata), encoding="utf-8")
     (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
 
 
@@ -108,7 +110,7 @@ class ProductRunabilityTests(unittest.TestCase):
         target = self.root / "target"
         target.mkdir()
         controller = self.root / "controller"
-        _lineage(controller)
+        _lineage(controller, bound_to=target)
         (target / ".hldspec-run.json").write_text(
             json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
         )

@@ -8,11 +8,31 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from hldspec import hld_source_package as hsp
 from hldspec import target_discovery as td
 
 
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "hldspec_agent_session.py"
+
+
+def _write_package(
+    package_dir: Path,
+    *,
+    bound_to: Path | None,
+    source_ref: str = "/src/HLD.md",
+    source_sha256: str | None = None,
+    extra: dict | None = None,
+) -> None:
+    """Manifest + anchor map; bound to a target unless bound_to is None (legacy)."""
+    package_dir.mkdir(parents=True, exist_ok=True)
+    metadata: dict = {"schema_version": 1}
+    if bound_to is not None:
+        metadata.update(hsp.build_binding_fields(bound_to, source_ref=source_ref, source_sha256=source_sha256))
+    if extra:
+        metadata.update(extra)
+    (package_dir / "source_package.json").write_text(json.dumps(metadata), encoding="utf-8")
+    (package_dir / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
 
 
 class TargetDiscoveryTests(unittest.TestCase):
@@ -29,10 +49,7 @@ class TargetDiscoveryTests(unittest.TestCase):
         return source
 
     def _lineage(self, target: Path) -> None:
-        source_package = target / ".hldspec" / "source_package"
-        source_package.mkdir(parents=True, exist_ok=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        _write_package(target / ".hldspec" / "source_package", bound_to=target)
 
     def _run_facade(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         import os
@@ -209,10 +226,7 @@ class TargetDiscoveryTests(unittest.TestCase):
         target = self.root / "target"
         target.mkdir()
         controller = self.root / "controller"
-        source_package = controller / ".hldspec" / "source_package"
-        source_package.mkdir(parents=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target)
         (controller / ".hldspec" / "sync").mkdir(parents=True)
         (controller / ".hldspec" / "sync" / "implementation_lineage.json").write_text("{}", encoding="utf-8")
         (target / ".hldspec-run.json").write_text(
@@ -270,10 +284,7 @@ class TargetDiscoveryTests(unittest.TestCase):
         target = self.root / "target"
         target.mkdir()
         controller = self.root / "controller"
-        source_package = controller / ".hldspec" / "source_package"
-        source_package.mkdir(parents=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target)
         (target / ".hldspec-run.json").write_text(
             json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
         )
@@ -303,10 +314,7 @@ class TargetDiscoveryTests(unittest.TestCase):
         target = self.root / "target"
         target.mkdir()
         controller = self.root / "controller"
-        source_package = controller / ".hldspec" / "source_package"
-        source_package.mkdir(parents=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target)
         (target / ".hldspec-run.json").write_text(
             json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
         )
@@ -323,10 +331,7 @@ class TargetDiscoveryTests(unittest.TestCase):
         target = self.root / "target"
         target.mkdir()
         controller = self.root / "controller"
-        source_package = controller / ".hldspec" / "source_package"
-        source_package.mkdir(parents=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
-        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target)
         (target / ".hldspec-run.json").write_text(
             json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
         )
@@ -469,6 +474,158 @@ class TargetDiscoveryTests(unittest.TestCase):
         self.assertIn(td.CLASS_PREPARED_GREENFIELD, status.stdout)
         self.assertIn(td.CLASS_PREPARED_GREENFIELD, doctor.stdout)
         self.assertIn(td.CLASS_PREPARED_GREENFIELD, operator.stdout)
+
+
+class SourcePackageBindingTests(unittest.TestCase):
+    """Invariant B: a copied .hldspec/source_package must not transfer trust."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-binding-")
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _payload(self, target: Path) -> None:
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+
+    def test_in_place_bound_package_is_trusted_with_bound_match(self) -> None:
+        target = self.root / "target"
+        _write_package(target / ".hldspec" / "source_package", bound_to=target)
+
+        report = td.build_target_discovery(target)
+
+        self.assertTrue(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_PREPARED_GREENFIELD, report["classification"])
+        self.assertEqual(td.BINDING_BOUND_MATCH, report["source_package_binding"]["state"])
+        self.assertTrue(any(item.get("kind") == "source_package_binding" for item in report["lineage_evidence"]))
+
+    def test_package_copied_to_another_target_is_not_trusted(self) -> None:
+        import shutil
+
+        original = self.root / "original"
+        _write_package(original / ".hldspec" / "source_package", bound_to=original)
+        victim = self.root / "victim"
+        self._payload(victim)
+        shutil.copytree(original / ".hldspec", victim / ".hldspec")
+
+        report = td.build_target_discovery(victim)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertEqual(td.BINDING_BOUND_MISMATCH, report["source_package_binding"]["state"])
+        self.assertTrue(any("must not transfer trust" in item for item in report["blockers"]))
+
+    def test_target_path_mismatch_blocks_trust(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        _write_package(target / ".hldspec" / "source_package", bound_to=self.root / "elsewhere")
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertEqual(td.BINDING_BOUND_MISMATCH, report["source_package_binding"]["state"])
+        self.assertIn("different target", report["source_package_binding"]["mismatch_reason"])
+
+    def test_source_hash_mismatch_with_pointer_evidence_blocks_trust(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        controller = self.root / "controller"
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target, source_sha256="a" * 64)
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller), "source_sha256": "b" * 64}),
+            encoding="utf-8",
+        )
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertEqual(td.BINDING_BOUND_MISMATCH, report["source_package_binding"]["state"])
+        self.assertIn("source_sha256", report["source_package_binding"]["mismatch_reason"])
+
+    def test_matching_source_hash_with_pointer_evidence_stays_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        _write_package(controller / ".hldspec" / "source_package", bound_to=target, source_sha256="a" * 64)
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller), "source_sha256": "a" * 64}),
+            encoding="utf-8",
+        )
+
+        report = td.build_target_discovery(target)
+
+        self.assertTrue(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.BINDING_BOUND_MATCH, report["source_package_binding"]["state"])
+
+    def test_malformed_binding_is_invalid_and_untrusted(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        _write_package(
+            target / ".hldspec" / "source_package",
+            bound_to=target,
+            extra={"target_path_sha256": "deadbeef"},
+        )
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertEqual(td.BINDING_INVALID, report["source_package_binding"]["state"])
+
+    def test_partial_binding_is_invalid_and_untrusted(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        _write_package(
+            target / ".hldspec" / "source_package",
+            bound_to=None,
+            extra={"target_path": str(target)},
+        )
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.BINDING_INVALID, report["source_package_binding"]["state"])
+
+    def test_legacy_unbound_package_warns_and_is_not_fully_trusted(self) -> None:
+        target = self.root / "target"
+        _write_package(target / ".hldspec" / "source_package", bound_to=None)
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertNotEqual(td.CLASS_PREPARED_GREENFIELD, report["classification"])
+        self.assertEqual(td.BINDING_UNBOUND_LEGACY, report["source_package_binding"]["state"])
+        self.assertTrue(any("legacy/unbound" in item for item in report["warnings"]))
+        self.assertIn("bind it to this target", report["next_safe_action"])
+
+    def test_legacy_unbound_package_with_product_files_is_unknown_brownfield(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        _write_package(target / ".hldspec" / "source_package", bound_to=None)
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+        self.assertEqual(td.BINDING_UNBOUND_LEGACY, report["source_package_binding"]["state"])
+
+    def test_mismatched_package_overrides_valid_agent_session(self) -> None:
+        target = self.root / "target"
+        self._payload(target)
+        _write_package(target / ".hldspec" / "source_package", bound_to=self.root / "elsewhere")
+        (target / ".hldspec" / "agent_session.json").write_text(
+            json.dumps({"source": {"path": str(self.root / "HLD.md")}, "target": str(target)}),
+            encoding="utf-8",
+        )
+
+        report = td.build_target_discovery(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
 
 
 if __name__ == "__main__":

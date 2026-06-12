@@ -317,9 +317,12 @@ class StartIntegrationTests(unittest.TestCase):
 
     def test_start_on_existing_initialized_workspace_records_initialized_true(self):
         (self.target / ".specify" / "memory").mkdir(parents=True)
+        from hldspec import hld_source_package as hsp
+
         source_package = self.target / ".hldspec" / "source_package"
         source_package.mkdir(parents=True)
-        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        metadata = {"schema_version": 1, **hsp.build_binding_fields(self.target, source_ref="/src/HLD.md")}
+        (source_package / "source_package.json").write_text(json.dumps(metadata), encoding="utf-8")
         (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
         with mock.patch.object(facade.sw, "detect_init_commands", return_value=()):
             rc = facade.main(

@@ -25,9 +25,17 @@ from pathlib import Path
 
 from . import mediator_guidance
 from .script_io import load_json_dict, write_json_dict
+from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
 
 SCHEMA_VERSION = 1
+
+# Target/source binding (invariant B): a source package generated for one
+# target/source must not transfer trust when copied elsewhere. The binding is
+# stamped into source_package.json at build time and verified by discovery.
+BINDING_SCHEMA_VERSION = 1
+BINDING_CREATED_BY = "HLDspec"
+BINDING_FIELDS: tuple[str, ...] = ("binding_schema_version", "target_path", "target_path_sha256")
 
 # Generated-file banner stamped on every mirrored file so a reader (or a human
 # inspecting .specify/source/) can tell it is derived and must not be edited.
@@ -96,6 +104,50 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def normalized_target_path(target_root: Path) -> str:
+    """The exact target-path string the binding records and hashes."""
+    return str(Path(target_root).expanduser().resolve())
+
+
+def path_sha256(path_str: str) -> str:
+    return hashlib.sha256(path_str.encode("utf-8")).hexdigest()
+
+
+def build_binding_fields(
+    target_root: Path,
+    *,
+    source_ref: str,
+    source_sha256: str | None = None,
+) -> dict:
+    """Binding metadata for source_package.json.
+
+    `target_path_sha256` hashes the recorded `target_path` string itself so a
+    hand-edited or truncated binding is detectable as malformed, independent of
+    whether the recorded path happens to resolve.
+    """
+    target_path = normalized_target_path(target_root)
+    return {
+        "created_by": BINDING_CREATED_BY,
+        "created_at": utc_now(),
+        "binding_schema_version": BINDING_SCHEMA_VERSION,
+        "target_path": target_path,
+        "target_path_sha256": path_sha256(target_path),
+        "source_ref": source_ref,
+        "source_sha256": source_sha256,
+    }
+
+
+def _source_file_sha256(ref: str) -> str | None:
+    """Hash the source HLD file content when the ref is an existing file."""
+    try:
+        path = Path(ref).expanduser()
+        if path.is_file():
+            return _sha256(path)
+    except OSError:
+        return None
+    return None
+
+
 @dataclass(frozen=True)
 class ManifestEntry:
     name: str
@@ -145,8 +197,9 @@ def build_source_package_metadata(
     hld_source_ref: str,
     state: str,
     manifest: dict[str, dict],
+    binding: dict | None = None,
 ) -> dict:
-    return {
+    metadata = {
         "schema_version": SCHEMA_VERSION,
         "hld_source_ref": hld_source_ref,
         "state": state,
@@ -155,6 +208,9 @@ def build_source_package_metadata(
         "required_files": list(REQUIRED_FILES),
         "file_count": len(manifest),
     }
+    if binding:
+        metadata.update(binding)
+    return metadata
 
 
 def write_source_package(
@@ -162,11 +218,24 @@ def write_source_package(
     *,
     hld_source_ref: str,
     state: str,
+    target_root: Path | None = None,
+    source_sha256: str | None = None,
 ) -> dict:
-    """Write source_manifest.json then source_package.json. Returns the metadata."""
+    """Write source_manifest.json then source_package.json. Returns the metadata.
+
+    When `target_root` is given the metadata carries target/source binding
+    fields; discovery only trusts a bound package whose binding matches. A
+    call without `target_root` writes an unbound (legacy-shaped) package that
+    discovery reports as UNBOUND_LEGACY and never fully trusts.
+    """
     manifest = write_source_manifest(source_dir)
+    binding = (
+        build_binding_fields(target_root, source_ref=hld_source_ref, source_sha256=source_sha256)
+        if target_root is not None
+        else None
+    )
     metadata = build_source_package_metadata(
-        hld_source_ref=hld_source_ref, state=state, manifest=manifest
+        hld_source_ref=hld_source_ref, state=state, manifest=manifest, binding=binding
     )
     write_json_dict(source_dir / SOURCE_PACKAGE_FILE, metadata)
     return metadata
@@ -255,6 +324,7 @@ def build_source_package_content(
     project_name: str = "",
     layout: str = "new",
     materialize_mirror: bool = True,
+    source_sha256: str | None = None,
 ) -> SourcePackageBuild:
     """Real content flow: turn an HLD into the full source-package content.
 
@@ -293,7 +363,13 @@ def build_source_package_content(
     unsupported = single_spec_input.find_unsupported_claims(spec_input, valid_anchors)
     marking_errors = hld_marking.anchor_integrity_errors(hld_text)
 
-    write_source_package(source_dir, hld_source_ref=hld_source_ref, state=state)
+    write_source_package(
+        source_dir,
+        hld_source_ref=hld_source_ref,
+        state=state,
+        target_root=target_root,
+        source_sha256=source_sha256 or _source_file_sha256(hld_source_ref),
+    )
     validation = validate_source_package(source_dir)
     mirrored: list[str] = []
     if materialize_mirror:

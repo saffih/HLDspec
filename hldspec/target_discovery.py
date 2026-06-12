@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import hld_source_package as hsp
 from . import phase_evidence as pe
 from . import run_state
 from .spec_bundles import utc_now
@@ -31,6 +32,16 @@ SAFETY_PASS = "PASS"
 SAFETY_ACTION = "ACTION"
 SAFETY_BLOCKED = "BLOCKED"
 UNSAFE_SAFETY = frozenset({SAFETY_ACTION, SAFETY_BLOCKED})
+
+# Source-package target/source binding states (invariant B). Only BOUND_MATCH
+# lets the package itself count as trusted lineage; a positively wrong binding
+# (mismatch/invalid) distrusts the whole target's control state, fail closed.
+BINDING_BOUND_MATCH = "BOUND_MATCH"
+BINDING_BOUND_MISMATCH = "BOUND_MISMATCH"
+BINDING_UNBOUND_LEGACY = "UNBOUND_LEGACY"
+BINDING_MISSING = "MISSING_BINDING"
+BINDING_INVALID = "INVALID_BINDING"
+SUSPECT_BINDING_STATES = frozenset({BINDING_BOUND_MISMATCH, BINDING_INVALID})
 
 DISCOVERY_JSON = "target_discovery_report.json"
 DISCOVERY_MD = "target_discovery_report.md"
@@ -129,23 +140,100 @@ def _source_package_dir(target: Path) -> Path:
     return _hldspec_dir(target) / "source_package"
 
 
-def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]:
+def _source_package_binding(target: Path, source_package_dir: Path) -> dict[str, Any]:
+    """Classify the package's target/source binding against this target.
+
+    States: BOUND_MATCH (binding present and matches), BOUND_MISMATCH (names a
+    different target, or a different source than the run pointer records),
+    INVALID_BINDING (unreadable metadata, partial or type-broken binding, or a
+    target_path_sha256 that does not hash the recorded target_path),
+    UNBOUND_LEGACY (metadata present, binding fields absent), MISSING_BINDING
+    (no source_package.json at all).
+    """
+    path = source_package_dir / hsp.SOURCE_PACKAGE_FILE
+    result: dict[str, Any] = {
+        "state": BINDING_MISSING,
+        "path": str(path),
+        "mismatch_reason": None,
+        "recorded_target_path": None,
+        "warnings": [],
+    }
+
+    def invalid(reason: str) -> dict[str, Any]:
+        result["state"] = BINDING_INVALID
+        result["mismatch_reason"] = reason
+        return result
+
+    if not path.is_file():
+        result["warnings"].append(f"Source package has no {hsp.SOURCE_PACKAGE_FILE}; it cannot prove target/source binding.")
+        return result
+
+    metadata = _load_json(path)
+    if not metadata:
+        return invalid(f"{hsp.SOURCE_PACKAGE_FILE} is not a readable non-empty JSON object")
+
+    present = [name for name in hsp.BINDING_FIELDS if metadata.get(name) not in (None, "")]
+    if not present:
+        result["state"] = BINDING_UNBOUND_LEGACY
+        result["warnings"].append(
+            "Source package is legacy/unbound (no target/source binding fields); rebuild it with hldspec start to bind it. Unbound packages are not trusted lineage."
+        )
+        return result
+    if len(present) != len(hsp.BINDING_FIELDS):
+        missing = sorted(set(hsp.BINDING_FIELDS) - set(present))
+        return invalid(f"binding fields are incomplete (missing: {', '.join(missing)})")
+
+    recorded_target = metadata.get("target_path")
+    recorded_hash = metadata.get("target_path_sha256")
+    if not isinstance(recorded_target, str) or not isinstance(recorded_hash, str):
+        return invalid("binding fields have wrong types")
+    result["recorded_target_path"] = recorded_target
+    if hsp.path_sha256(recorded_target) != recorded_hash:
+        return invalid("target_path_sha256 does not match the recorded target_path")
+
+    try:
+        resolved_recorded = Path(recorded_target).expanduser().resolve()
+    except OSError:
+        return invalid(f"recorded target_path cannot be resolved: {recorded_target}")
+    if resolved_recorded != target:
+        result["state"] = BINDING_BOUND_MISMATCH
+        result["mismatch_reason"] = f"package is bound to a different target: {recorded_target}"
+        return result
+
+    binding_source = metadata.get("source_sha256")
+    pointer_source = run_state.load_pointer(target).get("source_sha256")
+    if binding_source and pointer_source and str(binding_source) != str(pointer_source):
+        result["state"] = BINDING_BOUND_MISMATCH
+        result["mismatch_reason"] = "package source_sha256 does not match the run pointer's source HLD"
+        return result
+
+    result["state"] = BINDING_BOUND_MATCH
+    return result
+
+
+def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]], dict[str, Any] | None]:
     """Strict trusted-lineage check.
 
     Trusted only on real evidence, never on a bare directory:
     - a valid source-package manifest AND an hld_reference_map.json with at
-      least one anchor; or
+      least one anchor AND a target/source binding that matches this target; or
     - a valid agent_session.json carrying both source and target fields.
 
     A `.hldspec-run.json` pointer is not evidence by itself: `_hldspec_dir`
     resolves through the pointer, so a pointer counts exactly when the
     controller root it names contains the valid state above.
+
+    A package whose binding is BOUND_MISMATCH or INVALID_BINDING is positively
+    foreign/tampered state: it distrusts the target even if an agent session
+    would otherwise match (fail closed).
     """
     evidence: list[dict[str, Any]] = []
     trusted = False
+    binding: dict[str, Any] | None = None
 
     source_package = _source_package_dir(target)
     if source_package.is_dir():
+        binding = _source_package_binding(target, source_package)
         manifests = [
             source_package / name
             for name in SOURCE_PACKAGE_MANIFESTS
@@ -153,7 +241,7 @@ def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]
         ]
         ref_map = _load_json(source_package / "hld_reference_map.json")
         anchors = ref_map.get("anchors") if isinstance(ref_map.get("anchors"), dict) else None
-        if manifests and anchors:
+        if manifests and anchors and binding["state"] == BINDING_BOUND_MATCH:
             trusted = True
             for path in manifests:
                 evidence.append({"kind": "source_package_manifest", "path": str(path)})
@@ -162,6 +250,13 @@ def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]
                     "kind": "hld_anchor_map",
                     "path": str(source_package / "hld_reference_map.json"),
                     "anchor_count": len(anchors),
+                }
+            )
+            evidence.append(
+                {
+                    "kind": "source_package_binding",
+                    "path": binding["path"],
+                    "state": binding["state"],
                 }
             )
 
@@ -181,6 +276,9 @@ def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]
             trusted = True
             evidence.append({"kind": "agent_session", "path": str(session_path)})
 
+    if binding is not None and binding["state"] in SUSPECT_BINDING_STATES:
+        trusted = False
+
     if trusted:
         controller = _controller_root(target)
         if controller is not None:
@@ -191,7 +289,7 @@ def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]
                     "controller_root": str(controller),
                 }
             )
-    return trusted, evidence
+    return trusted, evidence, binding
 
 
 def _has_real_speckit_memory(target: Path) -> bool:
@@ -334,21 +432,41 @@ def _has_implementation_lineage(target: Path) -> tuple[bool, list[dict[str, Any]
 
 def build_target_discovery(target: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
-    lineage_ok, lineage_evidence = _has_valid_source_package(target)
+    lineage_ok, lineage_evidence, package_binding = _has_valid_source_package(target)
     implementation_ok, implementation_evidence = _has_implementation_lineage(target)
     phase_ledger = build_phase_ledger(target)
     has_specs = bool(_spec_dirs(target))
     has_memory = _has_real_speckit_memory(target)
     existing_payload = _target_payload_paths(target)
     blockers: list[str] = []
+    warnings: list[str] = []
+
+    binding_state = package_binding["state"] if package_binding else None
+    if package_binding:
+        warnings.extend(str(item) for item in package_binding.get("warnings", []))
+    if binding_state in SUSPECT_BINDING_STATES:
+        blockers.append(
+            f"Source package binding is {binding_state}: {package_binding.get('mismatch_reason')}. "
+            "A copied or tampered source package must not transfer trust."
+        )
 
     if (not target.exists() or _target_is_empty_or_control_only(target)) and not lineage_ok:
         classification = CLASS_NEW_GREENFIELD
-        next_safe_action = "Prepare the target through HLDspec start; no existing product state was detected."
+        if binding_state in SUSPECT_BINDING_STATES:
+            next_safe_action = "Stop. Remove or rebuild the mismatched source package with hldspec start for this target; copied packages are not trusted."
+        elif binding_state in {BINDING_UNBOUND_LEGACY, BINDING_MISSING}:
+            next_safe_action = "Rebuild the source package with hldspec start to bind it to this target; legacy/unbound packages are not trusted lineage."
+        else:
+            next_safe_action = "Prepare the target through HLDspec start; no existing product state was detected."
     elif not lineage_ok:
         classification = CLASS_UNKNOWN_BROWNFIELD
         blockers.append("Existing target content has no trusted HLDspec lineage; arbitrary brownfield adoption is unsupported in this slice.")
-        next_safe_action = "Stop. Do not adopt automatically; use a future explicit brownfield adoption flow."
+        if binding_state in SUSPECT_BINDING_STATES:
+            next_safe_action = "Stop. The source package is bound to a different target/source (copied or tampered); rebuild it in place with hldspec start for this target."
+        elif binding_state in {BINDING_UNBOUND_LEGACY, BINDING_MISSING}:
+            next_safe_action = "Stop. Rebuild the source package with hldspec start to bind it to this target; legacy/unbound packages are not trusted lineage."
+        else:
+            next_safe_action = "Stop. Do not adopt automatically; use a future explicit brownfield adoption flow."
     elif implementation_ok:
         classification = CLASS_EVOLVING_GREENFIELD
         next_safe_action = "Reassess managed greenfield evolution from existing HLDspec lineage before issuing the next implementation-slice handoff."
@@ -374,8 +492,10 @@ def build_target_discovery(target: Path) -> dict[str, Any]:
         "target": str(target),
         "classification": classification,
         "trusted_hldspec_lineage": lineage_ok,
+        "source_package_binding": package_binding,
         "lineage_evidence": lineage_evidence + implementation_evidence,
         "existing_payload_paths": [str(path) for path in existing_payload],
+        "warnings": warnings,
         "specify_memory_exists": has_memory,
         "spec_phase_artifacts_exist": has_specs,
         "phase_ledger_status": phase_ledger["overall_status"],
@@ -421,11 +541,14 @@ def render_phase_ledger_md(ledger: dict[str, Any]) -> str:
 
 
 def render_target_discovery_md(report: dict[str, Any]) -> str:
+    binding = report.get("source_package_binding") if isinstance(report.get("source_package_binding"), dict) else None
+    binding_line = f"Source package binding: `{binding.get('state', BINDING_MISSING)}`" if binding else "Source package binding: `none`"
     lines = [
         "# HLDspec Target Discovery Report",
         "",
         f"Classification: `{report.get('classification', CLASS_UNKNOWN_BROWNFIELD)}`",
         f"Trusted HLDspec lineage: `{str(report.get('trusted_hldspec_lineage', False)).lower()}`",
+        binding_line,
         f"Phase ledger status: `{report.get('phase_ledger_status', PHASE_NOT_STARTED)}`",
         f"Phase ledger safety: `{report.get('phase_ledger_safety', SAFETY_PASS)}`",
         f"Next safe action: {report.get('next_safe_action', '')}",
@@ -445,6 +568,18 @@ def render_target_discovery_md(report: dict[str, Any]) -> str:
             lines.append(f"- `{item.get('kind', 'evidence')}` {item.get('path', '')}")
     else:
         lines.append("- none")
+    if binding and (binding.get("mismatch_reason") or binding.get("recorded_target_path")):
+        lines.extend(["", "## Source Package Binding", ""])
+        lines.append(f"- state: `{binding.get('state', BINDING_MISSING)}`")
+        lines.append(f"- metadata: {binding.get('path', '')}")
+        if binding.get("recorded_target_path"):
+            lines.append(f"- recorded target: {binding.get('recorded_target_path')}")
+        if binding.get("mismatch_reason"):
+            lines.append(f"- reason: {binding.get('mismatch_reason')}")
+    warnings = report.get("warnings") if isinstance(report.get("warnings"), list) else []
+    if warnings:
+        lines.extend(["", "## Warnings", ""])
+        lines.extend(f"- {item}" for item in warnings)
     lines.extend(["", "## Blockers", ""])
     blockers = report.get("blockers") if isinstance(report.get("blockers"), list) else []
     lines.extend(f"- {item}" for item in blockers) if blockers else lines.append("- none")

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+from hldspec import hld_source_package as hsp
 from hldspec import run_state
 from hldspec import speckit_operator_state as sos
 
@@ -54,11 +55,12 @@ class _RunStub:
         return SimpleNamespace(returncode=1, stdout="", stderr="")
 
 
-def _write_lineage(base: Path) -> None:
-    """Real trusted lineage: manifest plus anchor map (a bare dir is no longer trusted)."""
+def _write_lineage(base: Path, *, bound_to: Path | None = None) -> None:
+    """Real trusted lineage: manifest, anchor map, and target binding (a bare dir is no longer trusted)."""
     source_package = base / ".hldspec" / "source_package"
     source_package.mkdir(parents=True, exist_ok=True)
-    (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+    metadata = {"schema_version": 1, **hsp.build_binding_fields(bound_to or base, source_ref="/src/HLD.md")}
+    (source_package / "source_package.json").write_text(json.dumps(metadata), encoding="utf-8")
     (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
 
 
@@ -121,7 +123,7 @@ class SpeckitOperatorStateTests(unittest.TestCase):
     def test_hldspec_pointer_only_dirty_tree_is_classified_as_expected_control(self) -> None:
         target = self.root / "target"
         controller = self.root / "external-run"
-        _write_lineage(controller)
+        _write_lineage(controller, bound_to=target)
         (target / ".specify" / "memory").mkdir(parents=True)
         (target / ".specify" / "source").mkdir(parents=True)
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
