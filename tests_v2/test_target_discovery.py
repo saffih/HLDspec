@@ -46,12 +46,23 @@ class TargetDiscoveryTests(unittest.TestCase):
             env={**os.environ, **env} if env else None,
         )
 
-    def test_empty_target_is_new_greenfield_and_writes_reports(self) -> None:
+    def test_missing_target_is_new_greenfield_and_creates_nothing(self) -> None:
         target = self.root / "target"
 
         report = td.write_discovery_reports(target)
 
         self.assertEqual(td.CLASS_NEW_GREENFIELD, report["classification"])
+        self.assertFalse(report["reports_written"])
+        self.assertFalse(target.exists(), "checking a missing target must not create it")
+
+    def test_empty_existing_target_is_new_greenfield_and_writes_reports(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_NEW_GREENFIELD, report["classification"])
+        self.assertTrue(report["reports_written"])
         self.assertTrue((target / ".hldspec" / "sync" / td.DISCOVERY_JSON).exists())
         self.assertTrue((target / ".hldspec" / "sync" / td.LEDGER_JSON).exists())
 
@@ -150,6 +161,99 @@ class TargetDiscoveryTests(unittest.TestCase):
 
         self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
         self.assertFalse(report["trusted_hldspec_lineage"])
+
+    def test_copied_agent_session_from_other_target_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+        (target / ".hldspec").mkdir()
+        (target / ".hldspec" / "agent_session.json").write_text(
+            json.dumps({"source": {"path": "/elsewhere/HLD.md"}, "target": "/some/other/target"}),
+            encoding="utf-8",
+        )
+
+        report = td.write_discovery_reports(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+
+    def test_agent_session_with_bare_string_source_is_not_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        (target / "app.py").write_text("print('existing')\n", encoding="utf-8")
+        (target / ".hldspec").mkdir()
+        (target / ".hldspec" / "agent_session.json").write_text(
+            json.dumps({"source": "x", "target": "y"}), encoding="utf-8"
+        )
+
+        report = td.write_discovery_reports(target)
+
+        self.assertFalse(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_UNKNOWN_BROWNFIELD, report["classification"])
+
+    def test_agent_session_belonging_to_this_target_is_trusted(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        (target / ".hldspec").mkdir()
+        (target / ".hldspec" / "agent_session.json").write_text(
+            json.dumps({"source": {"path": str(self.root / "HLD.md")}, "target": str(target)}),
+            encoding="utf-8",
+        )
+
+        report = td.write_discovery_reports(target)
+
+        self.assertTrue(report["trusted_hldspec_lineage"])
+        self.assertEqual(td.CLASS_PREPARED_GREENFIELD, report["classification"])
+
+    def test_external_implementation_lineage_classifies_evolving(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        controller = self.root / "controller"
+        source_package = controller / ".hldspec" / "source_package"
+        source_package.mkdir(parents=True)
+        (source_package / "source_package.json").write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+        (source_package / "hld_reference_map.json").write_text(json.dumps({"anchors": {"HLD-001": {}}}), encoding="utf-8")
+        (controller / ".hldspec" / "sync").mkdir(parents=True)
+        (controller / ".hldspec" / "sync" / "implementation_lineage.json").write_text("{}", encoding="utf-8")
+        (target / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+
+        report = td.write_discovery_reports(target)
+
+        self.assertEqual(td.CLASS_EVOLVING_GREENFIELD, report["classification"])
+
+    def test_markdown_only_validation_evidence_is_unverified(self) -> None:
+        target = self.root / "target"
+        self._lineage(target)
+        spec_dir = target / "specs" / "001-demo"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+        (spec_dir / "specify_validation.md").write_text("looks good\n", encoding="utf-8")
+
+        report = td.write_discovery_reports(target)
+        ledger = report["phase_ledger"]
+
+        self.assertTrue(any(e["phase"] == "specify" and e["status"] == td.PHASE_UNVERIFIED for e in ledger["entries"]))
+        self.assertEqual(td.SAFETY_ACTION, ledger["safety_status"])
+
+    def test_empty_and_malformed_json_evidence_is_unverified(self) -> None:
+        for payload in ("{}", "{not json"):
+            with self.subTest(payload=payload):
+                target = self.root / f"target-{abs(hash(payload))}"
+                self._lineage(target)
+                spec_dir = target / "specs" / "001-demo"
+                spec_dir.mkdir(parents=True)
+                (spec_dir / "spec.md").write_text("# Spec\n", encoding="utf-8")
+                (spec_dir / "specify_validation.json").write_text(payload, encoding="utf-8")
+
+                report = td.write_discovery_reports(target)
+                ledger = report["phase_ledger"]
+
+                self.assertTrue(
+                    any(e["phase"] == "specify" and e["status"] == td.PHASE_UNVERIFIED for e in ledger["entries"])
+                )
+                self.assertEqual(td.SAFETY_ACTION, ledger["safety_status"])
 
     def test_manifest_without_anchor_map_is_not_trusted(self) -> None:
         target = self.root / "target"

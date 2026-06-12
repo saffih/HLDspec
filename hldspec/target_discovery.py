@@ -52,11 +52,12 @@ SOURCE_PACKAGE_MANIFESTS = (
     "session_plan.json",
     "source_manifest.json",
 )
+# Relative to the resolved .hldspec dir (controller root in external mode).
 IMPLEMENTATION_LINEAGE_MARKERS = (
-    ".hldspec/sync/implementation_lineage.json",
-    ".hldspec/sync/implementation_slice_report.json",
-    ".hldspec/sync/slice_completion_report.json",
-    ".hldspec/speckit_implementation_approval.json",
+    "sync/implementation_lineage.json",
+    "sync/implementation_slice_report.json",
+    "sync/slice_completion_report.json",
+    "speckit_implementation_approval.json",
 )
 PHASES: tuple[tuple[str, str], ...] = (
     ("specify", "spec.md"),
@@ -165,9 +166,19 @@ def _has_valid_source_package(target: Path) -> tuple[bool, list[dict[str, Any]]]
 
     session_path = _hldspec_dir(target) / "agent_session.json"
     session = _load_json(session_path)
-    if session.get("source") and session.get("target"):
-        trusted = True
-        evidence.append({"kind": "agent_session", "path": str(session_path)})
+    session_source = session.get("source")
+    session_target = session.get("target")
+    # The session must be structurally what HLDspec writes (source is a dict
+    # with a path) AND belong to this target — a session copied from another
+    # target must never transfer trust.
+    if isinstance(session_source, dict) and session_source.get("path") and session_target:
+        try:
+            belongs = Path(str(session_target)).expanduser().resolve() == target
+        except OSError:
+            belongs = False
+        if belongs:
+            trusted = True
+            evidence.append({"kind": "agent_session", "path": str(session_path)})
 
     if trusted:
         controller = _controller_root(target)
@@ -214,21 +225,28 @@ def _validation_candidates(target: Path, spec_dir: Path, phase: str, artifact_na
 
 
 FAILING_EVIDENCE_STATUSES = {"FAIL", "FAILED", "ACTION", "CONFLICT", "BLOCKED", "REWORK_REQUIRED"}
+PASSING_EVIDENCE_STATUSES = {"PASS", "PASSED", "OK", "DONE", "APPROVED"}
 
 
 def _phase_has_evidence(target: Path, spec_dir: Path, phase: str, artifact_name: str) -> tuple[bool, list[str], list[str]]:
     """Return (evidence_ok, evidence_paths, failing_paths).
 
-    Evidence presence alone is not enough: a JSON evidence file that records a
-    failing status marks the phase failing, never DONE.
+    DONE requires machine-readable *passing* evidence: a JSON file whose
+    `status` is an explicit pass. Markdown-only, empty, malformed, or
+    status-less evidence is UNVERIFIED; a failing status blocks the phase.
     """
     paths = [path for path in _validation_candidates(target, spec_dir, phase, artifact_name) if path.is_file()]
-    failing = [
-        str(path)
-        for path in paths
-        if path.suffix == ".json" and str(_load_json(path).get("status", "")).upper() in FAILING_EVIDENCE_STATUSES
-    ]
-    return bool(paths), [str(path) for path in paths], failing
+    passing: list[str] = []
+    failing: list[str] = []
+    for path in paths:
+        if path.suffix != ".json":
+            continue
+        status = str(_load_json(path).get("status", "")).upper()
+        if status in FAILING_EVIDENCE_STATUSES:
+            failing.append(str(path))
+        elif status in PASSING_EVIDENCE_STATUSES:
+            passing.append(str(path))
+    return bool(passing), [str(path) for path in paths], failing
 
 
 def _artifact_is_stale(target: Path, artifact: Path) -> bool:
@@ -276,7 +294,7 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
                 status = PHASE_DONE
             else:
                 status = PHASE_UNVERIFIED
-                blockers.append(f"Unverified phase artifact lacks HLDspec validation/report evidence: {artifact}")
+                blockers.append(f"Unverified phase artifact lacks passing HLDspec validation/report evidence: {artifact}")
             summary[status] += 1
             entries.append(
                 {
@@ -322,8 +340,11 @@ def build_phase_ledger(target: Path) -> dict[str, Any]:
 
 def _has_implementation_lineage(target: Path) -> tuple[bool, list[dict[str, Any]]]:
     evidence: list[dict[str, Any]] = []
+    # Resolve through the controller pointer so external-mode implementation
+    # lineage is found in the controller root, not only target-local .hldspec.
+    hldspec_dir = _hldspec_dir(target)
     for rel in IMPLEMENTATION_LINEAGE_MARKERS:
-        path = target / rel
+        path = hldspec_dir / rel
         if path.is_file():
             evidence.append({"kind": "implementation_lineage", "path": str(path)})
     return bool(evidence), evidence
@@ -431,7 +452,7 @@ def render_target_discovery_md(report: dict[str, Any]) -> str:
         "",
         "- Known-origin HLDspec/SpecKit continuation is managed greenfield evolution.",
         "- Arbitrary brownfield adoption remains unsupported.",
-        "- Discovery is read-only except for HLDspec control reports under `.hldspec/sync/`.",
+        "- Discovery is read-only except for HLDspec control reports under the resolved `.hldspec/sync/`; it never creates a missing target.",
         "",
         "## Lineage Evidence",
         "",
@@ -451,14 +472,20 @@ def render_target_discovery_md(report: dict[str, Any]) -> str:
 
 def write_discovery_reports(target: Path) -> dict[str, Any]:
     target = Path(target).expanduser().resolve()
+    report = build_target_discovery(target)
+    # Checking a missing target must stay read-only: never create the target
+    # as a side effect of inspecting it.
+    if not target.is_dir():
+        report["reports_written"] = False
+        return report
     # Resolve through the controller pointer: in external mode reports belong
     # next to the rest of the HLDspec control state, never target-local.
     sync = _sync_dir(target)
     sync.mkdir(parents=True, exist_ok=True)
-    report = build_target_discovery(target)
     ledger = report["phase_ledger"]
     (sync / DISCOVERY_JSON).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (sync / DISCOVERY_MD).write_text(render_target_discovery_md(report), encoding="utf-8")
     (sync / LEDGER_JSON).write_text(json.dumps(ledger, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (sync / LEDGER_MD).write_text(render_phase_ledger_md(ledger), encoding="utf-8")
+    report["reports_written"] = True
     return report

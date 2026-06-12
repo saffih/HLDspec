@@ -160,6 +160,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "specify_memory_exists",
             "spec_phase_artifacts_exist",
             "report_paths",
+            "reports_written",
         ],
         output_artifacts=["phase_ledger.json"],
         notes="Read-only existing-sensitive greenfield discovery; must not run SpecKit, implement product code, or wipe target state.",

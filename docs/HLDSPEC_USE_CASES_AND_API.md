@@ -1028,8 +1028,12 @@ safety_status   PASS, ACTION (any UNVERIFIED entry), BLOCKED (any STALE or
 `continue` must never proceed while any phase artifact is UNVERIFIED, STALE,
 or BLOCKED — i.e. while `safety_status` is not PASS.
 
-File existence alone must not mean DONE. `continue` may use discovery as a
-blocker/reporting input only; it must not run SpecKit or product implementation
+File existence alone must not mean DONE — DONE requires machine-readable
+passing validation evidence (JSON with an explicit passing status); markdown-only,
+empty, malformed, or status-less evidence stays UNVERIFIED, and failing evidence
+blocks. Discovery never creates a missing target; reports are written only when
+the target exists, under the resolved control sync dir. `continue` may use
+discovery as a blocker/reporting input only; it must not run SpecKit or product implementation
 from discovery alone. HLDspec orchestration runs from the HLDspec repo, while
 later product work runs from the target repo only after an approved handoff.
 

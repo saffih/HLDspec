@@ -137,8 +137,11 @@ def print_discovery_summary(discovery: dict[str, Any]) -> None:
     print(f"Trusted HLDspec lineage: {str(discovery.get('trusted_hldspec_lineage', False)).lower()}")
     print(f"Phase ledger status: {discovery.get('phase_ledger_status', 'UNKNOWN')}")
     print(f"Phase ledger safety: {discovery.get('phase_ledger_safety', 'UNKNOWN')}")
-    print(f"Discovery report: {paths.get('discovery_json', 'UNKNOWN')}")
-    print(f"Phase ledger: {paths.get('ledger_json', 'UNKNOWN')}")
+    if discovery.get("reports_written", True):
+        print(f"Discovery report: {paths.get('discovery_json', 'UNKNOWN')}")
+        print(f"Phase ledger: {paths.get('ledger_json', 'UNKNOWN')}")
+    else:
+        print("Discovery reports: not written (target does not exist yet)")
     print("")
 
 
