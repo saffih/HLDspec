@@ -47,7 +47,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 
 | Script / Module | Role |
 |---|---|
-| `scripts/hldspec_agent_session.py` | Current public facade implementation: start/status/review/continue/diff/doctor/speckit-doctor/operator-state (alias speckit-state). This is the only current product command surface listed here. |
+| `scripts/hldspec_agent_session.py` | Current public facade implementation: start/status/review/continue/diff/doctor/speckit-doctor/operator-state (alias speckit-state)/git-lifecycle. This is the only current product command surface listed here. |
 | `scripts/hldspec_smoke_slice_e2e.py` | Production smoke scenario for source package, mirror, anchors, slice artifacts, and optional tmux visibility. |
 | `scripts/hldspec_v2.py` | Compatibility/debug V2 CLI entry point. Do not advertise as the current user-facing product surface. |
 | `scripts/hldspec_run.sh` | Legacy/debug full-pipeline runner. It is not the canonical product entry point; use the public facade above for product behavior. |

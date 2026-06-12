@@ -52,7 +52,7 @@ Agent behavior:
 1. Extract source HLD, target workspace, mode, runtime, and comment.
 2. Default runtime to `claude` when omitted.
 3. Supported runtime values are `claude`, `codex`, and `devin`.
-4. Use the public HLDspec facade: `start`, `status`, `review`, `doctor`, `speckit-doctor`, `operator-state` (alias `speckit-state`), and later `continue` only when safe.
+4. Use the public HLDspec facade: `start`, `status`, `review`, `doctor`, `speckit-doctor`, `operator-state` (alias `speckit-state`), read-only `git-lifecycle`, and later `continue` only when safe.
 5. Do not expose low-level scripts to the user unless debugging a failure.
 6. Return only target, mode, runtime, blockers, and next safe action.
 

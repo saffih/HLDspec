@@ -113,6 +113,7 @@ Current public product commands:
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and next actions. |
 | `hldspec operator-state` | current | Show readiness-first Operator State, SpecKit lifecycle state when phase artifacts exist, and the next safe action. |
 | `hldspec speckit-state` | current | Alias of `operator-state`. |
+| `hldspec git-lifecycle` | current/read-only | Write/read Git lifecycle evidence and blockers without creating branches, commits, PRs, pushes, or merges. |
 
 Important distinction:
 
@@ -232,9 +233,10 @@ hldspec speckit --target ./target --next
 ```
 
 Future command. The current product facade is `start`, `status`, `review`,
-`continue`, `diff`, `doctor`, `speckit-doctor`, and `operator-state` (alias
-`speckit-state`). Today, `hldspec continue` advances the ProjectMachine to the
-next safe checkpoint and blocks before unapproved SpecKit work.
+`continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state` (alias
+`speckit-state`), and read-only `git-lifecycle`. Today, `hldspec continue`
+advances the ProjectMachine to the next safe checkpoint and blocks before
+unapproved SpecKit work.
 
 SpecKit owns:
 

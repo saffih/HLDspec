@@ -60,7 +60,8 @@ Hard rules:
   command/tool surface. This list is authoritative for the command surface;
   README and other docs defer to it. Current commands: `start`, `status`,
   `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`
-  (alias `speckit-state`). It is the internal/manual tool surface that agents run
+  (alias `speckit-state`), and read-only `git-lifecycle`. It is the
+  internal/manual tool surface that agents run
   on the user's behalf and that maintainers use for debug/fallback — it is
   **not the primary human UX**. Hides internal scripts behind one entry point;
   prints decision-oriented output.
@@ -851,7 +852,7 @@ full implementation should be implied.
 | SpecKit Build Loop Supervision | `HLDspec build-status target: <path>` | current/read-only | `status` / `operator-state`. |
 | SpecKit Build Loop Supervision | `HLDspec reassess target: <path>` | current/read-only | `review`, `status`, sync/reassessment artifacts where present. |
 | SpecKit Build Loop Supervision | `HLDspec runskeptic target: <path>` | planned | Reserved for explicit RunSkeptic facade; current gates consume RunSkeptic evidence. |
-| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | planned | Future read-only git lifecycle report; HLDspec must not replace SpecKit git mechanics. |
+| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | current/read-only | Writes/reads `git_lifecycle_report.json/md`; HLDspec records evidence and blockers but must not create branches, commit, push, open PRs, merge, or treat hook files as proof of enforcement. |
 | SpecKit Build Loop Supervision | `HLDspec branch-gate target: <path>` | planned | Future gate-only branch evidence check. |
 | SpecKit Build Loop Supervision | `HLDspec commit-gate target: <path>` | planned | Future gate-only commit evidence check. |
 | SpecKit Build Loop Supervision | `HLDspec merge-gate target: <path>` | planned | Future gate-only merge evidence check; no auto-merge. |

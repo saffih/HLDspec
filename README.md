@@ -318,6 +318,7 @@ The full internal command/tool surface the agent may run:
 | `doctor` | Check agent-first docs and target session/layout files. |
 | `speckit-doctor` | Readiness/preflight only: is the target ready for real SpecKit work? Does not decide the lifecycle. |
 | `operator-state` (alias `speckit-state`) | Report readiness first, then SpecKit lifecycle state and the evidence-backed next safe action when phase artifacts exist. Consumes `speckit-doctor` facts; it does **not** replace the doctor. |
+| `git-lifecycle` | Read-only branch/commit/merge lifecycle evidence report. Records blockers and next safe action; does not create branches, commit, push, open PRs, merge, run SpecKit, or edit product code. |
 
 `operator-state` / `speckit-state` remain readiness-first: they block before
 `READY_FOR_SPECIFY` when preflight facts fail, and after readiness passes they

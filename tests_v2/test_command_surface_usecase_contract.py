@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class CommandSurfaceUseCaseContractTests(unittest.TestCase):
     def test_usecase_doc_has_canonical_command_statuses(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
-        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor", "operator-state", "speckit-state"):
+        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor", "operator-state", "speckit-state", "git-lifecycle"):
             self.assertIn(f"`hldspec {command}` | current", text)
         for command in ("interview", "prework", "speckit", "pause"):
             self.assertIn(f"`hldspec {command}` | future", text)
@@ -47,7 +47,7 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         self.assertIn("Promoted capability RunSkeptic evidence", text)
         self.assertIn("Self-dogfood", text)
         self.assertIn("Decision: keep the current public surface small", text)
-        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`.", text)
+        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`, `speckit-state`, `git-lifecycle`.", text)
         self.assertIn("Future commands: `interview`, `prework`, `speckit`, `pause`.", text)
         self.assertIn("Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.", text)
 

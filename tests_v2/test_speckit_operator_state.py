@@ -117,8 +117,8 @@ class SpeckitOperatorStateTests(unittest.TestCase):
         (target / ".specify" / "extensions.yml").write_text("before_specify: true\n", encoding="utf-8")
         report = self._report(target, which=_which_only("specify"), run=_RunStub(git_root=target, dirty=True))
         self.assertEqual("ACTION", report["status"])
-        self.assertEqual("TARGET_DIRTY_UNEXPECTED", report["state"])
-        self.assertIn("Clean, commit, or stash the target tree", report["next_safe_action"])
+        self.assertEqual("DIRTY_BEFORE_PHASE", report["state"])
+        self.assertIn("Clean, commit, or stash product changes", report["next_safe_action"])
 
     def test_hldspec_pointer_only_dirty_tree_is_classified_as_expected_control(self) -> None:
         target = self.root / "target"
