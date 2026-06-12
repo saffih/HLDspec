@@ -146,13 +146,17 @@ def print_discovery_summary(discovery: dict[str, Any]) -> None:
     print("")
 
 
-def print_git_lifecycle_summary(report: dict[str, Any]) -> None:
+def print_git_lifecycle_summary(report: dict[str, Any], plan: dict[str, Any] | None = None) -> None:
     paths = report.get("report_paths") if isinstance(report.get("report_paths"), dict) else {}
+    plan_paths = plan.get("report_paths") if isinstance(plan, dict) else {}
     print("## Git Lifecycle")
     print(f"Status: {report.get('lifecycle_status', 'UNKNOWN')}")
     print(f"Safety: {report.get('safety_status', 'UNKNOWN')}")
     print(f"Current branch: {report.get('current_branch') or 'UNKNOWN'}")
     print(f"Report: {paths.get('json', 'UNKNOWN')}")
+    if isinstance(plan, dict) and plan:
+        print(f"Plan status: {plan.get('plan_status', 'UNKNOWN')}")
+        print(f"Plan: {plan_paths.get('json', 'UNKNOWN')}")
     print("")
 
 
@@ -1184,7 +1188,7 @@ def command_status(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     hldspec_dir = _resolve_hldspec_dir(target)
     discovery = td.write_discovery_reports(target)
-    git_lifecycle = gl.write_git_lifecycle_report(target) if target.exists() else {}
+    git_lifecycle, git_lifecycle_plan = gl.write_git_lifecycle_artifacts(target) if target.exists() else ({}, {})
     session_path = hldspec_dir / "agent_session.json"
     session = json_read(session_path)
     if not session:
@@ -1197,7 +1201,7 @@ def command_status(args: argparse.Namespace) -> int:
         print("")
         print_discovery_summary(discovery)
         if git_lifecycle:
-            print_git_lifecycle_summary(git_lifecycle)
+            print_git_lifecycle_summary(git_lifecycle, git_lifecycle_plan)
         print("## Blockers")
         print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
         print("")
@@ -1240,7 +1244,10 @@ def command_status(args: argparse.Namespace) -> int:
     print(f"Current state: {current_state(target, session)}")
     print("")
     print_discovery_summary(discovery)
-    print_git_lifecycle_summary(operator_report.get("git_lifecycle_report") if isinstance(operator_report.get("git_lifecycle_report"), dict) else git_lifecycle)
+    print_git_lifecycle_summary(
+        operator_report.get("git_lifecycle_report") if isinstance(operator_report.get("git_lifecycle_report"), dict) else git_lifecycle,
+        operator_report.get("git_lifecycle_plan") if isinstance(operator_report.get("git_lifecycle_plan"), dict) else git_lifecycle_plan,
+    )
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
     print(f"Promotion gate status: {promotion_status} ({promotion_path})")
@@ -1522,6 +1529,7 @@ def command_doctor(args: argparse.Namespace) -> int:
         readiness = sr.build_speckit_readiness_report(target)
         operator_report = sos.build_speckit_operator_state_report(target, readiness_report=readiness)
         git_lifecycle = operator_report.get("git_lifecycle_report") if isinstance(operator_report.get("git_lifecycle_report"), dict) else {}
+        git_lifecycle_plan = operator_report.get("git_lifecycle_plan") if isinstance(operator_report.get("git_lifecycle_plan"), dict) else {}
         print("")
         print("## SpecKit Readiness")
         print(f"Status: {readiness['status']}")
@@ -1558,10 +1566,13 @@ def command_doctor(args: argparse.Namespace) -> int:
             action_items.extend(str(item) for item in operator_report.get("blockers", []) if str(item).strip())
 
         print("")
-        print_git_lifecycle_summary(git_lifecycle)
+        print_git_lifecycle_summary(git_lifecycle, git_lifecycle_plan)
         if str(git_lifecycle.get("safety_status", "")).upper() in {"ACTION", "BLOCKED"}:
             action_items.append(f"Git lifecycle: {git_lifecycle.get('lifecycle_status')}")
             action_items.extend(str(item) for item in git_lifecycle.get("blockers", []) if str(item).strip())
+        if str(git_lifecycle_plan.get("plan_status", "")).upper() == "PLAN_BLOCKED":
+            action_items.append("Git lifecycle plan: PLAN_BLOCKED")
+            action_items.extend(str(item) for item in git_lifecycle_plan.get("blockers", []) if str(item).strip())
 
         print("")
         print("## Control Plane Checks")
@@ -1651,8 +1662,9 @@ def command_operator_state(args: argparse.Namespace) -> int:
 
 def command_git_lifecycle(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
-    report = gl.write_git_lifecycle_report(target)
+    report, plan = gl.write_git_lifecycle_artifacts(target)
     print(gl.render_git_lifecycle_report(report), end="")
+    print(gl.render_git_lifecycle_plan(plan), end="")
     return 0 if report.get("safety_status") == gl.SAFETY_PASS else ExitCode.GATE_BLOCKED.value
 
 
@@ -1708,8 +1720,8 @@ HELP_TOPICS: dict[str, dict[str, str]] = {
     },
     "git lifecycle": {
         "purpose": "Show read-only branch/commit/merge lifecycle evidence before Build Loop continuation.",
-        "does": "Writes git_lifecycle_report.json/md under the HLDspec control sync dir and reports blockers.",
-        "stops_at": "PASS/ACTION/BLOCKED lifecycle status with next safe action.",
+        "does": "Writes git_lifecycle_report.json/md plus git_lifecycle_plan.json/md under the HLDspec control sync dir and reports blockers plus proposed lifecycle steps.",
+        "stops_at": "PASS/ACTION/BLOCKED lifecycle status and a write-intent-only plan with next safe action.",
         "will_not": "Create branches, commit, push, open PRs, merge, run SpecKit, or edit product code.",
         "example": "HLDspec git-lifecycle target: /path/to/target",
     },
@@ -1852,7 +1864,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target", default=None)
     p.set_defaults(func=command_operator_state)
 
-    p = sub.add_parser("git-lifecycle", help="Write/read the read-only Git lifecycle gate report.")
+    p = sub.add_parser("git-lifecycle", help="Write/read the read-only Git lifecycle report and non-executing plan.")
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_git_lifecycle)
 

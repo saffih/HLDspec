@@ -852,7 +852,7 @@ full implementation should be implied.
 | SpecKit Build Loop Supervision | `HLDspec build-status target: <path>` | current/read-only | `status` / `operator-state`. |
 | SpecKit Build Loop Supervision | `HLDspec reassess target: <path>` | current/read-only | `review`, `status`, sync/reassessment artifacts where present. |
 | SpecKit Build Loop Supervision | `HLDspec runskeptic target: <path>` | planned | Reserved for explicit RunSkeptic facade; current gates consume RunSkeptic evidence. |
-| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | current/read-only | Writes/reads `git_lifecycle_report.json/md`; HLDspec records evidence and blockers but must not create branches, commit, push, open PRs, merge, or treat hook files as proof of enforcement. |
+| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | current/read-only | Writes/reads `git_lifecycle_report.json/md` plus write-intent-only `git_lifecycle_plan.json/md`; HLDspec records evidence, blockers, and proposed lifecycle steps but must not create branches, commit, push, open PRs, merge, or treat hook files as proof of enforcement. |
 | SpecKit Build Loop Supervision | `HLDspec branch-gate target: <path>` | planned | Future gate-only branch evidence check. |
 | SpecKit Build Loop Supervision | `HLDspec commit-gate target: <path>` | planned | Future gate-only commit evidence check. |
 | SpecKit Build Loop Supervision | `HLDspec merge-gate target: <path>` | planned | Future gate-only merge evidence check; no auto-merge. |

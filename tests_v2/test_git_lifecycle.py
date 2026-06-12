@@ -74,11 +74,13 @@ class GitLifecycleTests(unittest.TestCase):
 
     def test_missing_target_does_not_create_target_or_report_dirs(self) -> None:
         target = self.root / "missing"
-        report = gl.write_git_lifecycle_report(target, run=_RunStub(git_root=None))
+        report, plan = gl.write_git_lifecycle_artifacts(target, run=_RunStub(git_root=None))
 
         self.assertEqual(gl.STATUS_NO_GIT, report["lifecycle_status"])
+        self.assertEqual(gl.PLAN_BLOCKED, plan["plan_status"])
         self.assertFalse(target.exists())
         self.assertEqual({}, report["report_paths"])
+        self.assertEqual({}, plan["report_paths"])
 
     def test_clean_branch_with_hook_policy_is_branch_ready_but_not_enforced(self) -> None:
         target = self._target()
@@ -145,6 +147,75 @@ class GitLifecycleTests(unittest.TestCase):
 
         self.assertEqual(gl.STATUS_COMMIT_RECORDED, report["lifecycle_status"])
         self.assertEqual(gl.SAFETY_PASS, report["safety_status"])
+
+    def test_planner_keeps_git_commands_read_only(self) -> None:
+        target = self._target()
+        self._hook(target)
+        runner = _RunStub(git_root=target)
+
+        report, plan = gl.write_git_lifecycle_artifacts(target, run=runner)
+
+        self.assertEqual(gl.STATUS_BRANCH_READY, report["lifecycle_status"])
+        self.assertEqual(gl.PLAN_READY, plan["plan_status"])
+        self.assertEqual(
+            [
+                ["rev-parse", "--show-toplevel"],
+                ["branch", "--show-current"],
+                ["rev-parse", "HEAD"],
+                ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+                ["status", "--porcelain"],
+            ],
+            [call[3:] for call in runner.calls],
+        )
+        self.assertTrue(
+            all(
+                not any(token in call for token in ("checkout", "switch", "commit", "push", "merge", "rebase", "cherry-pick"))
+                for call in runner.calls
+            )
+        )
+
+    def test_dirty_worktree_blocks_plan(self) -> None:
+        target = self._target()
+        self._hook(target)
+
+        report, plan = gl.write_git_lifecycle_artifacts(target, run=_RunStub(git_root=target, porcelain=" M app.py\n"))
+
+        self.assertEqual(gl.STATUS_DIRTY_BEFORE_PHASE, report["lifecycle_status"])
+        self.assertEqual(gl.PLAN_BLOCKED, plan["plan_status"])
+        self.assertIn("app.py", "\n".join(plan["blockers"]))
+        steps = {step["step_id"]: step for step in plan["proposed_steps"]}
+        self.assertEqual(gl.STEP_BLOCKED, steps["commit"]["status"])
+        self.assertEqual(gl.STEP_BLOCKED, steps["push"]["status"])
+
+    def test_branch_conflict_is_reported_as_plan_blocker(self) -> None:
+        target = self._target()
+        self._hook(target)
+
+        report, plan = gl.write_git_lifecycle_artifacts(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(gl.STATUS_BRANCH_READY, report["lifecycle_status"])
+        self.assertEqual(gl.PLAN_BLOCKED, plan["plan_status"])
+        self.assertIn("matches detected base branch", "\n".join(plan["blockers"]))
+        steps = {step["step_id"]: step for step in plan["proposed_steps"]}
+        self.assertEqual(gl.STEP_BLOCKED, steps["branch"]["status"])
+        self.assertEqual(gl.STEP_BLOCKED, steps["push"]["status"])
+
+    def test_plan_files_are_persisted_with_path_metadata(self) -> None:
+        target = self._target()
+        self._hook(target)
+
+        report, plan = gl.write_git_lifecycle_artifacts(target, run=_RunStub(git_root=target))
+
+        report_path = (target / ".hldspec" / "sync" / gl.REPORT_JSON).resolve()
+        plan_path = (target / ".hldspec" / "sync" / gl.PLAN_JSON).resolve()
+        plan_md_path = (target / ".hldspec" / "sync" / gl.PLAN_MD).resolve()
+        self.assertEqual(str(report_path), report["report_paths"]["json"])
+        self.assertEqual(str(plan_path), plan["report_paths"]["json"])
+        self.assertEqual(str(plan_md_path), plan["report_paths"]["md"])
+        persisted = json.loads(plan_path.read_text(encoding="utf-8"))
+        self.assertEqual(str(plan_path), persisted["report_paths"]["json"])
+        self.assertEqual(str(plan_md_path), persisted["report_paths"]["md"])
+        self.assertEqual(str(report_path), persisted["report_paths"]["lifecycle_report_json"])
 
 
 if __name__ == "__main__":

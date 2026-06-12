@@ -74,7 +74,7 @@ These commands are current product behavior:
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and branch/manual workflow state. |
 | `hldspec operator-state` | current | Show readiness-first Operator State, SpecKit lifecycle state when phase artifacts exist, and the evidence-backed next safe action. |
 | `hldspec speckit-state` | current | Alias of `operator-state`. |
-| `hldspec git-lifecycle` | current/read-only | Write/read branch/commit/merge lifecycle evidence and blockers without performing git actions. |
+| `hldspec git-lifecycle` | current/read-only | Write/read branch/commit/merge lifecycle evidence plus a non-executing write-intent plan without performing git actions. |
 
 ### Future product commands
 

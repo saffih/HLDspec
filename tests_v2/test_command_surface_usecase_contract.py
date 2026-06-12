@@ -67,6 +67,13 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         self.assertIn("Trigger phrases such as `check HLD`, `Build Loop prereqs`, `Build Loop init`, `Build Loop ready`, and `HLDspec help ...` are user-facing workflow requests.", user)
         self.assertIn("They are not currently separate CLI commands in the product facade.", user)
 
+    def test_git_lifecycle_remains_current_read_only_surface(self) -> None:
+        terminology = (ROOT / "docs" / "HLDSPEC_TERMINOLOGY_AND_FLOW.md").read_text(encoding="utf-8")
+        use_cases = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
+        self.assertIn("`hldspec git-lifecycle` | current/read-only | Write/read branch/commit/merge lifecycle evidence plus a non-executing write-intent plan without performing git actions.", use_cases)
+        self.assertIn("write-intent-only `git_lifecycle_plan.json/md`", terminology)
+        self.assertIn("must not create branches, commit, push, open PRs, merge", terminology)
+
 
 if __name__ == "__main__":
     unittest.main()

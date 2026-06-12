@@ -372,6 +372,37 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertIn("## Next Safe Action", result.stdout)
         self.assertIn("Initialize or point HLDspec at a git workspace", result.stdout)
 
+    def test_status_and_doctor_surface_git_lifecycle_plan_summary(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        status = self.run_facade("status", target)
+        doctor = self.run_facade("doctor", target)
+
+        self.assertEqual(0, status.returncode, status.stderr + status.stdout)
+        self.assertIn("Plan status:", status.stdout)
+        self.assertIn("git_lifecycle_plan.json", status.stdout)
+        self.assertNotEqual(0, doctor.returncode)
+        self.assertIn("Plan status:", doctor.stdout)
+        self.assertIn("git_lifecycle_plan.json", doctor.stdout)
+
+    def test_git_lifecycle_command_prints_report_and_plan(self) -> None:
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target"
+        source.write_text("# HLD\n", encoding="utf-8")
+        start = self.run_start(source, target)
+        self.assertEqual(0, start.returncode, start.stderr + start.stdout)
+
+        result = self.run_facade("git-lifecycle", target)
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("# Git Lifecycle Report", result.stdout)
+        self.assertIn("# Git Lifecycle Plan", result.stdout)
+        self.assertIn("Planning only: no branch creation, no commit, no push, no PR, no merge, no SpecKit run, no product edit.", result.stdout)
+
     def test_help_tells_user_to_use_status_for_next_safe_action(self) -> None:
         result = self.run_help()
 

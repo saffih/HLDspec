@@ -403,7 +403,7 @@ def build_speckit_operator_state_report(
 
     readiness = readiness_report or sr.build_speckit_readiness_report(target_path, which=which, run=run)
     discovery = td.write_discovery_reports(target_path)
-    git_lifecycle = gl.write_git_lifecycle_report(target_path, run=run)
+    git_lifecycle, git_lifecycle_plan = gl.write_git_lifecycle_artifacts(target_path, run=run)
     workspace = readiness.get("workspace_status") if isinstance(readiness.get("workspace_status"), dict) else {}
     branch_hook = readiness.get("branch_hook_status") if isinstance(readiness.get("branch_hook_status"), dict) else {}
     selected_init_command = readiness.get("selected_init_command")
@@ -448,6 +448,7 @@ def build_speckit_operator_state_report(
         {"fact": "git_lifecycle_status", "value": git_lifecycle.get("lifecycle_status")},
         {"fact": "git_lifecycle_safety", "value": git_lifecycle.get("safety_status")},
         {"fact": "git_lifecycle_report", "value": (git_lifecycle.get("report_paths") or {}).get("json")},
+        {"fact": "git_lifecycle_plan", "value": (git_lifecycle_plan.get("report_paths") or {}).get("json")},
     ]
 
     blockers: list[str] = []
@@ -617,12 +618,15 @@ def build_speckit_operator_state_report(
                 "current_branch": git_lifecycle.get("current_branch"),
                 "dirty_tree": git_lifecycle.get("dirty_tree"),
                 "report_path": (git_lifecycle.get("report_paths") or {}).get("json"),
+                "plan_path": (git_lifecycle_plan.get("report_paths") or {}).get("json"),
+                "plan_status": git_lifecycle_plan.get("plan_status"),
             },
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,
         "target_discovery_report": discovery,
         "git_lifecycle_report": git_lifecycle,
+        "git_lifecycle_plan": git_lifecycle_plan,
         "speckit_execution_state": lifecycle.get("execution_state") if isinstance(lifecycle, dict) else None,
         "speckit_next_action": lifecycle.get("next_action") if isinstance(lifecycle, dict) else None,
     }
@@ -706,6 +710,14 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
                 f"- lifecycle status: {git_lifecycle.get('lifecycle_status', 'UNKNOWN')}",
                 f"- safety: {git_lifecycle.get('safety_status', 'UNKNOWN')}",
                 f"- report: {(git_lifecycle.get('report_paths') or {}).get('json', 'UNKNOWN')}",
+            ]
+        )
+    git_lifecycle_plan = report.get("git_lifecycle_plan") if isinstance(report.get("git_lifecycle_plan"), dict) else {}
+    if git_lifecycle_plan:
+        lines.extend(
+            [
+                f"- plan status: {git_lifecycle_plan.get('plan_status', 'UNKNOWN')}",
+                f"- plan: {(git_lifecycle_plan.get('report_paths') or {}).get('json', 'UNKNOWN')}",
             ]
         )
     doctor_note = report.get("doctor_note")

@@ -18,6 +18,8 @@ SCHEMA_VERSION = 1
 
 REPORT_JSON = "git_lifecycle_report.json"
 REPORT_MD = "git_lifecycle_report.md"
+PLAN_JSON = "git_lifecycle_plan.json"
+PLAN_MD = "git_lifecycle_plan.md"
 
 STATUS_NO_GIT = "NO_GIT"
 STATUS_NO_BRANCH = "NO_BRANCH"
@@ -36,6 +38,12 @@ STATUS_UNKNOWN = "UNKNOWN"
 SAFETY_PASS = "PASS"
 SAFETY_ACTION = "ACTION"
 SAFETY_BLOCKED = "BLOCKED"
+
+PLAN_READY = "PLAN_READY"
+PLAN_BLOCKED = "PLAN_BLOCKED"
+STEP_PROPOSED = "PROPOSED"
+STEP_BLOCKED = "BLOCKED"
+STEP_NOT_NEEDED = "NOT_NEEDED"
 
 BRANCH_POLICY_CANDIDATES = (
     ".specify/extensions.yml",
@@ -165,6 +173,25 @@ def _specs_exist(target: Path) -> bool:
         return any(path.is_file() for path in specs.rglob("*"))
     except OSError:
         return False
+
+
+def _base_branch_name(base_branch: str | None) -> str | None:
+    if not base_branch:
+        return None
+    return base_branch.split("/")[-1] or None
+
+
+def _branch_conflict_blockers(report: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    current_branch = str(report.get("current_branch") or "").strip()
+    base_branch = _base_branch_name(report.get("base_branch"))
+    if current_branch and base_branch and current_branch == base_branch:
+        blockers.append(f"Current branch `{current_branch}` matches detected base branch `{base_branch}`.")
+    manual = report.get("manual_branch_equivalent_evidence") or {}
+    manual_state = str(manual.get("state") or "")
+    if manual_state == "MISMATCH":
+        blockers.append(str(manual.get("reason") or "Manual branch-equivalent approval names a conflicting branch."))
+    return blockers
 
 
 def build_git_lifecycle_report(
@@ -299,6 +326,169 @@ def render_git_lifecycle_report(report: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def build_git_lifecycle_plan(report: dict[str, Any]) -> dict[str, Any]:
+    target = str(report.get("target") or "")
+    lifecycle_status = str(report.get("lifecycle_status") or STATUS_UNKNOWN)
+    safety_status = str(report.get("safety_status") or SAFETY_ACTION)
+    current_branch = str(report.get("current_branch") or "").strip() or None
+    base_branch = _base_branch_name(report.get("base_branch"))
+    blockers = [str(item) for item in report.get("blockers") or [] if str(item).strip()]
+    blockers.extend(_branch_conflict_blockers(report))
+    blockers = list(dict.fromkeys(blockers))
+
+    branch_step_status = STEP_PROPOSED
+    branch_step_note = "Stay on the approved working branch and keep base-branch work read-only."
+    if not current_branch:
+        branch_step_status = STEP_BLOCKED
+        branch_step_note = "No current branch is available, so no branch plan can be promoted."
+    elif blockers and any("branch" in item.lower() for item in blockers):
+        branch_step_status = STEP_BLOCKED
+        branch_step_note = "Resolve branch conflicts or approval mismatches before any branch lifecycle step."
+    elif base_branch and current_branch == base_branch:
+        branch_step_status = STEP_BLOCKED
+        branch_step_note = "Do not continue on the detected base branch; propose a separate working branch first."
+
+    commit_step_status = STEP_PROPOSED
+    commit_step_note = "If phase artifacts changed, commit them through the approved workflow after review."
+    if lifecycle_status == STATUS_DIRTY_BEFORE_PHASE:
+        commit_step_status = STEP_BLOCKED
+        commit_step_note = "Dirty non-phase product files must be cleaned before any commit planning can be promoted."
+    elif lifecycle_status == STATUS_COMMIT_RECORDED:
+        commit_step_status = STEP_NOT_NEEDED
+        commit_step_note = "SpecKit phase artifacts are already clean in git; no immediate commit is planned."
+
+    push_step_status = STEP_PROPOSED
+    push_step_note = "Push only after the branch and commit steps are satisfied and human policy allows it."
+    if branch_step_status == STEP_BLOCKED or commit_step_status == STEP_BLOCKED:
+        push_step_status = STEP_BLOCKED
+        push_step_note = "Push planning is blocked until branch and commit blockers are cleared."
+
+    merge_step_status = STEP_BLOCKED
+    merge_step_note = "Merge remains gate-only: require review, CI, explicit human approval, and separate merge evidence."
+
+    steps = [
+        {
+            "step_id": "branch",
+            "status": branch_step_status,
+            "intent": "Prepare or validate the approved working branch lifecycle step.",
+            "note": branch_step_note,
+            "evidence": {"current_branch": current_branch, "base_branch": base_branch},
+            "will_not_execute": True,
+        },
+        {
+            "step_id": "commit",
+            "status": commit_step_status,
+            "intent": "Plan the commit lifecycle step for approved SpecKit phase artifacts only.",
+            "note": commit_step_note,
+            "evidence": {
+                "lifecycle_status": lifecycle_status,
+                "phase_dirty_files": list(report.get("phase_dirty_files") or []),
+                "latest_commit_sha": report.get("latest_commit_sha"),
+            },
+            "will_not_execute": True,
+        },
+        {
+            "step_id": "push",
+            "status": push_step_status,
+            "intent": "Describe the push lifecycle step after branch and commit are in a safe state.",
+            "note": push_step_note,
+            "evidence": {"current_branch": current_branch, "latest_commit_sha": report.get("latest_commit_sha")},
+            "will_not_execute": True,
+        },
+        {
+            "step_id": "merge",
+            "status": merge_step_status,
+            "intent": "Describe the merge lifecycle step as a future gated action only.",
+            "note": merge_step_note,
+            "evidence": {"merge_allowed": bool(report.get("merge_allowed", False))},
+            "will_not_execute": True,
+        },
+    ]
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": utc_now(),
+        "target": target,
+        "plan_status": PLAN_BLOCKED if blockers else PLAN_READY,
+        "lifecycle_status": lifecycle_status,
+        "safety_status": safety_status,
+        "current_branch": current_branch,
+        "base_branch": base_branch,
+        "blockers": blockers,
+        "next_safe_action": (
+            "Resolve lifecycle blockers before promoting any branch/commit/push/merge step."
+            if blockers
+            else "Use this plan as write-intent guidance only; execute nothing automatically."
+        ),
+        "proposed_steps": steps,
+    }
+
+
+def render_git_lifecycle_plan(plan: dict[str, Any]) -> str:
+    lines = [
+        "# Git Lifecycle Plan",
+        "",
+        f"Status: `{plan.get('plan_status', PLAN_BLOCKED)}`",
+        f"Target: `{plan.get('target')}`",
+        f"Current branch: `{plan.get('current_branch')}`",
+        f"Base branch: `{plan.get('base_branch')}`",
+        "",
+        "## Blockers",
+        "",
+    ]
+    blockers = plan.get("blockers") or []
+    lines.extend(f"- {item}" for item in blockers)
+    if not blockers:
+        lines.append("- none")
+    lines.extend(["", "## Proposed steps", ""])
+    for step in plan.get("proposed_steps") or []:
+        if not isinstance(step, dict):
+            continue
+        lines.append(
+            f"- `{step.get('step_id', 'step')}` `{step.get('status', STEP_BLOCKED)}`: {step.get('intent', '')} {step.get('note', '')}".strip()
+        )
+    lines.extend(
+        [
+            "",
+            "## Boundary",
+            "",
+            "- Planning only: no branch creation, no commit, no push, no PR, no merge, no SpecKit run, no product edit.",
+            "",
+            "## Next safe action",
+            "",
+            str(plan.get("next_safe_action") or ""),
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_git_lifecycle_plan(
+    target: Path | str,
+    *,
+    report: dict[str, Any] | None = None,
+    run: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    target_path = Path(target).expanduser().resolve()
+    report = report or write_git_lifecycle_report(target_path, run=run)
+    plan = build_git_lifecycle_plan(report)
+    if not target_path.exists():
+        plan["report_paths"] = {}
+        return plan
+    sync = control_paths.resolve_control_sync_dir(target_path, create=True)
+    json_path = sync / PLAN_JSON
+    md_path = sync / PLAN_MD
+    plan["report_paths"] = {
+        "json": str(json_path),
+        "md": str(md_path),
+        "lifecycle_report_json": str((report.get("report_paths") or {}).get("json") or ""),
+        "lifecycle_report_md": str((report.get("report_paths") or {}).get("md") or ""),
+    }
+    json_path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    md_path.write_text(render_git_lifecycle_plan(plan), encoding="utf-8")
+    return plan
+
+
 def write_git_lifecycle_report(
     target: Path | str,
     *,
@@ -317,3 +507,13 @@ def write_git_lifecycle_report(
     json_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     md_path.write_text(render_git_lifecycle_report(report), encoding="utf-8")
     return report
+
+
+def write_git_lifecycle_artifacts(
+    target: Path | str,
+    *,
+    run: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    report = write_git_lifecycle_report(target, run=run)
+    plan = write_git_lifecycle_plan(target, report=report, run=run)
+    return report, plan
