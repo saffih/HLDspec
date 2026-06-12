@@ -904,6 +904,17 @@ Use these user-facing trigger phrases:
   proposes the next action. It never deletes workspace state — answered
   decisions and plans are untouched; `HLDSPEC_FRESH=1` remains the explicit
   full-rebuild option.
+- `HLDspec product-report`
+  Means: run `scripts/hldspec_product_report.py --target <path>` — the
+  read-only Product Runability / Demo Gate. It inspects a half-built target
+  and reports what was built, the likely install/test/start commands and UI
+  URLs discovered in README/quickstart/runbook docs, smoke-test candidates,
+  and the next safe action. It never runs commands, never installs, never
+  starts servers, and never modifies target files; it only writes
+  `product_runability_report.{json,md}` under the resolved control sync dir.
+  `PASS` means explicit run instructions were discovered — never that the
+  product was executed or smoke-tested. Unknown brownfield or a BLOCKED phase
+  ledger blocks the gate.
 - `audit project` (alias: `scan for gaps`)
   Means: run the stepped read-only audit protocol from `templates/audit/`.
   Step 1 pastes `AUDIT_PLAN_PROMPT.md` into a read-only agent session
@@ -982,6 +993,7 @@ HLDspec should support task-shaped help based on the same trigger vocabulary.
 - `HLDspec help SpecKit drive`
 - `HLDspec help regenerate prompts`
 - `HLDspec help sync`
+- `HLDspec help product-report`
 - `HLDspec help audit project`
 
 Every help response should explain the trigger with the same bounded shape:

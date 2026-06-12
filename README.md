@@ -309,6 +309,7 @@ The full internal command/tool surface the agent may run:
 
 | Command | What it does |
 |---|---|
+| `help` | Show user-facing trigger help and status/next-action guidance. |
 | `start` | Prepare or resume a session: copy the HLD into the target, build the source package, record SpecKit init readiness, and mirror read-only context only when a real SpecKit workspace already validates. |
 | `status` | Show session status, blockers, open questions, and the next safe action. |
 | `review` | List the human review files and which blocking ones are missing. |
