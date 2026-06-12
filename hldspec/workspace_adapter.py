@@ -29,6 +29,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+# Relative path suffixes that the adapter itself only ever produces as
+# *outputs* (firstrun/tool-run scratch dirs, sync dirs). If `target_root`
+# already ends in one of these, deriving firstrun_dir/sync_dir/etc from it
+# would nest a generated path inside itself (e.g. firstrun/firstrun,
+# .hldspec/tool-runs/firstrun/.hldspec/tool-runs/firstrun).
+RESERVED_WORKSPACE_ROOT_SUFFIXES: tuple[tuple[str, ...], ...] = (
+    ("firstrun",),
+    (".hldspec", "tool-runs", "firstrun"),
+    (".specify", "sync"),
+    (".hldspec", "sync"),
+)
+
+
+def reserved_workspace_root_suffix(target_root: Path) -> tuple[str, ...] | None:
+    """Return the matched reserved suffix if `target_root` is a generated path, else None."""
+    parts = target_root.parts
+    for suffix in sorted(RESERVED_WORKSPACE_ROOT_SUFFIXES, key=len, reverse=True):
+        if len(parts) >= len(suffix) and tuple(parts[-len(suffix):]) == suffix:
+            return suffix
+    return None
+
 
 @dataclass(frozen=True)
 class TargetWorkspaceAdapter:

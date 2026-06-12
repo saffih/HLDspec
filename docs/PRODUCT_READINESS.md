@@ -22,7 +22,7 @@ evidence-backed next safe action.
 |---|---|---|
 | Operator State implemented, bounded to readiness scope | YES | `hldspec/speckit_operator_state.py`; `tests_v2/test_speckit_operator_state.py` |
 | `next_safe_action` is evidence-backed | YES | report `evidence` + `source_facts_used`; operator-state tests |
-| CLI exposes current state + next safe action | YES | `operator-state` / `speckit-state` in `scripts/hldspec_agent_session.py` |
+| CLI exposes current state + next safe action | YES | `operator-state` / `speckit-state` / `git-lifecycle` in `scripts/hldspec_agent_session.py` |
 | Tests cover the command path | YES | `test_cli_operator_state_prints_summary` |
 | Docs are not misleading | YES | command surface + boundaries in `README.md`, terminology/anti-drift tests |
 | Full `tests_v2` passes | YES | `python3 -m unittest discover -s tests_v2 -v` passes |
@@ -47,7 +47,7 @@ not the standalone user path.
 | Agent one-liner is the primary user entry point | YES | README "Main user workflow" one-liner; `tests_v2/test_agent_first_user_interface.py` |
 | README quickstart for a new user | YES | README "Main user workflow" (agent one-liner) |
 | Public command surface documented as internal tool surface | YES | README command-surface table; `test_product_readiness_docs` binds it to `build_parser()` |
-| start/status/doctor/speckit-doctor/operator-state/speckit-state roles explained | YES | README command-surface table |
+| start/status/doctor/speckit-doctor/operator-state/speckit-state/git-lifecycle roles explained | YES | README command-surface table |
 | PASS/ACTION/CONFLICT explained | YES | README "Reading results" table |
 | Failure messages tell what to do next | YES | `next_safe_action` on every operator-state result |
 | Repo layout understandable | YES | `docs/REPO_LAYOUT.md` |

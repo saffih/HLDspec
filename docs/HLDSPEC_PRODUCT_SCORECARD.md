@@ -36,7 +36,7 @@ HLDspec is not fully product-ready.
 | Area | Mark | Evidence | Remaining blocker |
 |---|---:|---|---|
 | Development handoff discipline | 7 | Handoff/backlog docs and generator exist. | Generated handoff needs stronger open-action, conflict, and RunSkeptic status quality. |
-| Agent-first product model | 6 | Public commands are narrowed to `start`, `status`, `review`, `continue`, `diff`, and `doctor`; future and legacy/debug commands are classified. | Full end-to-end product journey coverage remains open. |
+| Agent-first product model | 6 | Public commands are narrowed and classified, including `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`/`speckit-state`, and read-only `git-lifecycle`; future and legacy/debug commands are classified. | Full end-to-end product journey coverage remains open. |
 | Target workspace clarity | 7 | New-layout paths are stabilized for `.hldspec`, events, target HLD, raw HLD, and SpecKit-owned areas. | Remaining machines and docs need migration coverage. |
 | TargetWorkspaceAdapter | 7 | `continue` calls ProjectMachine with new-layout metadata. | Not every machine path is proven through the adapter. |
 | Use-case/API definition | 6 | Use-case catalog and command matrix exist. | Implementation and tests do not cover every use case. |

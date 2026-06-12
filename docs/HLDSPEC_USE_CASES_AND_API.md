@@ -74,6 +74,7 @@ These commands are current product behavior:
 | `hldspec speckit-doctor` | current | Check target-level SpecKit readiness and branch/manual workflow state. |
 | `hldspec operator-state` | current | Show readiness-first Operator State, SpecKit lifecycle state when phase artifacts exist, and the evidence-backed next safe action. |
 | `hldspec speckit-state` | current | Alias of `operator-state`. |
+| `hldspec git-lifecycle` | current/read-only | Write/read branch/commit/merge lifecycle evidence plus a non-executing write-intent plan without performing git actions. |
 
 ### Future product commands
 
@@ -133,7 +134,7 @@ behavior until code and tests support them.
 | SpecKit Build Loop Supervision | `HLDspec build-status target: <path>` | current/read-only via `status`/`operator-state` |
 | SpecKit Build Loop Supervision | `HLDspec reassess target: <path>` | current/read-only via `review`/`status` |
 | SpecKit Build Loop Supervision | `HLDspec runskeptic target: <path>` | planned facade |
-| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | planned read-only gate |
+| SpecKit Build Loop Supervision | `HLDspec git-lifecycle target: <path>` | current/read-only report via `git-lifecycle`, `status`, `doctor`, and `operator-state` |
 | SpecKit Build Loop Supervision | `HLDspec branch-gate target: <path>` | planned gate-only |
 | SpecKit Build Loop Supervision | `HLDspec commit-gate target: <path>` | planned gate-only |
 | SpecKit Build Loop Supervision | `HLDspec merge-gate target: <path>` | planned gate-only; no auto-merge |
@@ -144,6 +145,11 @@ Boundary: HLDspec must not silently adopt arbitrary brownfield code, replace
 SpecKit, manually create final SpecKit specs/plans/tasks, implement target
 product code, auto-merge, bypass human-owned decisions, mark file existence as
 DONE, trust copied `.hldspec` state, or create a competing git workflow.
+
+Current Git lifecycle support is read-only. HLDspec records branch/commit/merge
+evidence and blockers in `git_lifecycle_report.json/md`; it does not create
+branches, commit, push, open PRs, merge, or treat hook-file presence as proof
+that a hook was invoked.
 
 
 ## Complete use-case catalog target

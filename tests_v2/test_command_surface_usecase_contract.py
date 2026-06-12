@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class CommandSurfaceUseCaseContractTests(unittest.TestCase):
     def test_usecase_doc_has_canonical_command_statuses(self) -> None:
         text = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
-        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor", "operator-state", "speckit-state"):
+        for command in ("start", "status", "review", "continue", "diff", "doctor", "speckit-doctor", "operator-state", "speckit-state", "git-lifecycle"):
             self.assertIn(f"`hldspec {command}` | current", text)
         for command in ("interview", "prework", "speckit", "pause"):
             self.assertIn(f"`hldspec {command}` | future", text)
@@ -47,7 +47,7 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         self.assertIn("Promoted capability RunSkeptic evidence", text)
         self.assertIn("Self-dogfood", text)
         self.assertIn("Decision: keep the current public surface small", text)
-        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`.", text)
+        self.assertIn("Current public commands: `start`, `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`, `speckit-state`, `git-lifecycle`.", text)
         self.assertIn("Future commands: `interview`, `prework`, `speckit`, `pause`.", text)
         self.assertIn("Legacy/debug: `run`, `speckit-proxy`, direct low-level scripts.", text)
 
@@ -66,6 +66,13 @@ class CommandSurfaceUseCaseContractTests(unittest.TestCase):
         user = (ROOT / "docs" / "USER_RUN_MODEL.md").read_text(encoding="utf-8")
         self.assertIn("Trigger phrases such as `check HLD`, `Build Loop prereqs`, `Build Loop init`, `Build Loop ready`, and `HLDspec help ...` are user-facing workflow requests.", user)
         self.assertIn("They are not currently separate CLI commands in the product facade.", user)
+
+    def test_git_lifecycle_remains_current_read_only_surface(self) -> None:
+        terminology = (ROOT / "docs" / "HLDSPEC_TERMINOLOGY_AND_FLOW.md").read_text(encoding="utf-8")
+        use_cases = (ROOT / "docs" / "HLDSPEC_USE_CASES_AND_API.md").read_text(encoding="utf-8")
+        self.assertIn("`hldspec git-lifecycle` | current/read-only | Write/read branch/commit/merge lifecycle evidence plus a non-executing write-intent plan without performing git actions.", use_cases)
+        self.assertIn("write-intent-only `git_lifecycle_plan.json/md`", terminology)
+        self.assertIn("must not create branches, commit, push, open PRs, merge", terminology)
 
 
 if __name__ == "__main__":

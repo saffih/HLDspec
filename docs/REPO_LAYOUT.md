@@ -12,7 +12,7 @@ start here. For the doc-by-doc index see [`DOCS_INDEX.md`](DOCS_INDEX.md).
 | Path | Role |
 |---|---|
 | `hldspec/` | Active V2 source: state machines, contracts, renderers, operator state, readiness. |
-| `scripts/hldspec_agent_session.py` | Public agent-first facade (`start`/`status`/`review`/`continue`/`diff`/`doctor`/`speckit-doctor`/`operator-state`/`speckit-state`). |
+| `scripts/hldspec_agent_session.py` | Public agent-first facade (`start`/`status`/`review`/`continue`/`diff`/`doctor`/`speckit-doctor`/`operator-state`/`speckit-state`/`git-lifecycle`). |
 | `scripts/hldspec_v2.py` | V2 CLI entry point. |
 | `scripts/hldspec_smoke_slice_e2e.py` | Deterministic source-package/mirror/anchor/slice smoke. |
 | `scripts/check_product_readiness.sh` | Reproducible local product-readiness check (focused tests + full `tests_v2` + smoke). |

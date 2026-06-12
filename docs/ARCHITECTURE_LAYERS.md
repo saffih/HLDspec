@@ -117,7 +117,8 @@ one-liner and frame the command surface as internal tooling.
 
 The commands an agent (or a maintainer) may run **internally**: `start`,
 `status`, `review`, `continue`, `diff`, `doctor`, `speckit-doctor`,
-`operator-state`, `speckit-state`. This is a **tool surface, not the human UX**.
+`operator-state`, `speckit-state`, `git-lifecycle`. This is a **tool surface,
+not the human UX**.
 These commands are **internal/manual/debug/fallback** tooling and are **not the
 normal human UX** — the agent one-liner in Layer 1 is. The canonical command list
 lives in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`.

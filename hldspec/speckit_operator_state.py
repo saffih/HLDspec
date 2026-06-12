@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import control_paths
+from . import git_lifecycle as gl
 from . import run_state
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
@@ -402,6 +403,7 @@ def build_speckit_operator_state_report(
 
     readiness = readiness_report or sr.build_speckit_readiness_report(target_path, which=which, run=run)
     discovery = td.write_discovery_reports(target_path)
+    git_lifecycle, git_lifecycle_plan = gl.write_git_lifecycle_artifacts(target_path, run=run)
     workspace = readiness.get("workspace_status") if isinstance(readiness.get("workspace_status"), dict) else {}
     branch_hook = readiness.get("branch_hook_status") if isinstance(readiness.get("branch_hook_status"), dict) else {}
     selected_init_command = readiness.get("selected_init_command")
@@ -443,6 +445,10 @@ def build_speckit_operator_state_report(
         {"fact": "target_discovery_classification", "value": discovery.get("classification")},
         {"fact": "phase_ledger_status", "value": discovery.get("phase_ledger_status")},
         {"fact": "phase_ledger_safety", "value": discovery.get("phase_ledger_safety")},
+        {"fact": "git_lifecycle_status", "value": git_lifecycle.get("lifecycle_status")},
+        {"fact": "git_lifecycle_safety", "value": git_lifecycle.get("safety_status")},
+        {"fact": "git_lifecycle_report", "value": (git_lifecycle.get("report_paths") or {}).get("json")},
+        {"fact": "git_lifecycle_plan", "value": (git_lifecycle_plan.get("report_paths") or {}).get("json")},
     ]
 
     blockers: list[str] = []
@@ -494,6 +500,11 @@ def build_speckit_operator_state_report(
         state = STATE_SOURCE_PACKAGE_INVALID
         blockers.append("HLDspec source package has 0 recognized HLD anchors.")
         next_safe_action = "Rerun hldspec start with a valid anchored HLD source or convert the proposal into an anchored workspace HLD before Build Loop work."
+    elif dirty_tree is True and str(git_lifecycle.get("lifecycle_status")) in {gl.STATUS_DIRTY_BEFORE_PHASE, gl.STATUS_COMMIT_REQUIRED}:
+        status = "ACTION"
+        state = str(git_lifecycle.get("lifecycle_status"))
+        blockers.extend(str(item) for item in git_lifecycle.get("blockers", []) if str(item).strip())
+        next_safe_action = str(git_lifecycle.get("next_safe_action") or "Resolve Git lifecycle blockers before Build Loop continuation.")
     elif dirty_tree is True and dirty_classification.get("status") == "expected_hldspec_control":
         status = "ACTION"
         state = STATE_TARGET_DIRTY_EXPECTED_HLDSPEC_CONTROL
@@ -530,6 +541,13 @@ def build_speckit_operator_state_report(
         details = str(branch_hook.get("details") or "Branch policy is not ready.")
         blockers.append(details)
         next_safe_action = str(branch_hook.get("next_action") or "Create or switch to the approved feature branch before rerunning operator-state.")
+    elif git_lifecycle.get("safety_status") in {gl.SAFETY_ACTION, gl.SAFETY_BLOCKED}:
+        status = "ACTION"
+        state = str(git_lifecycle.get("lifecycle_status") or STATE_BRANCH_POLICY_MISSING)
+        blockers.extend(str(item) for item in git_lifecycle.get("blockers", []) if str(item).strip())
+        if not blockers:
+            blockers.append(f"Git lifecycle gate is {git_lifecycle.get('lifecycle_status')}.")
+        next_safe_action = str(git_lifecycle.get("next_safe_action") or "Resolve Git lifecycle gate blockers before Build Loop continuation.")
     elif readiness.get("status") != "PASS":
         status = "ACTION"
         state = STATE_REASSESSMENT_REQUIRED
@@ -594,10 +612,21 @@ def build_speckit_operator_state_report(
                 "report_path": (discovery.get("report_paths") or {}).get("discovery_json"),
                 "ledger_path": (discovery.get("report_paths") or {}).get("ledger_json"),
             },
+            "git_lifecycle": {
+                "lifecycle_status": git_lifecycle.get("lifecycle_status"),
+                "safety_status": git_lifecycle.get("safety_status"),
+                "current_branch": git_lifecycle.get("current_branch"),
+                "dirty_tree": git_lifecycle.get("dirty_tree"),
+                "report_path": (git_lifecycle.get("report_paths") or {}).get("json"),
+                "plan_path": (git_lifecycle_plan.get("report_paths") or {}).get("json"),
+                "plan_status": git_lifecycle_plan.get("plan_status"),
+            },
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,
         "target_discovery_report": discovery,
+        "git_lifecycle_report": git_lifecycle,
+        "git_lifecycle_plan": git_lifecycle_plan,
         "speckit_execution_state": lifecycle.get("execution_state") if isinstance(lifecycle, dict) else None,
         "speckit_next_action": lifecycle.get("next_action") if isinstance(lifecycle, dict) else None,
     }
@@ -670,6 +699,25 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
                 f"- lifecycle status: {report.get('lifecycle_status', 'UNKNOWN')}",
                 f"- lifecycle state: {lifecycle_state}",
                 f"- lifecycle next safe action: {report.get('lifecycle_next_safe_action', 'none')}",
+            ]
+        )
+    git_lifecycle = report.get("git_lifecycle_report") if isinstance(report.get("git_lifecycle_report"), dict) else {}
+    if git_lifecycle:
+        lines.extend(
+            [
+                "",
+                "Git lifecycle:",
+                f"- lifecycle status: {git_lifecycle.get('lifecycle_status', 'UNKNOWN')}",
+                f"- safety: {git_lifecycle.get('safety_status', 'UNKNOWN')}",
+                f"- report: {(git_lifecycle.get('report_paths') or {}).get('json', 'UNKNOWN')}",
+            ]
+        )
+    git_lifecycle_plan = report.get("git_lifecycle_plan") if isinstance(report.get("git_lifecycle_plan"), dict) else {}
+    if git_lifecycle_plan:
+        lines.extend(
+            [
+                f"- plan status: {git_lifecycle_plan.get('plan_status', 'UNKNOWN')}",
+                f"- plan: {(git_lifecycle_plan.get('report_paths') or {}).get('json', 'UNKNOWN')}",
             ]
         )
     doctor_note = report.get("doctor_note")
