@@ -19,7 +19,7 @@ from hldspec.machines.speckit_execution import SpecKitExecutionMachine
 from hldspec.machines.speckit_prework import SpeckitPreworkMachine
 from hldspec.source_freshness import build_source_freshness, load_source_freshness, write_source_freshness
 from hldspec.state_machine import MachineContext, MachineResult, MachineStatus, error_result
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
+from hldspec.workspace_adapter import TargetWorkspaceAdapter, reserved_workspace_root_suffix
 
 
 class ProjectMachine:
@@ -42,6 +42,16 @@ class ProjectMachine:
         repo = Path(context.repo_root)
         adapter = self._adapter(context)
         workspace = adapter.target_root
+        reserved_suffix = reserved_workspace_root_suffix(workspace)
+        if reserved_suffix is not None:
+            return error_result(
+                machine=self.name,
+                state="WORKSPACE_ROOT_INVALID",
+                message=(
+                    f"workspace must be the target root, not a generated path ending in "
+                    f"'{'/'.join(reserved_suffix)}': {context.workspace}"
+                ),
+            )
         if workspace.exists() and not workspace.is_dir():
             return error_result(machine=self.name, state="WORKSPACE_NOT_A_DIRECTORY", message=f"workspace must be a directory, got a file: {context.workspace}")
         working_hld = adapter.working_hld
