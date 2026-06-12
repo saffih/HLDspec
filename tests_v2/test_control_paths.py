@@ -100,20 +100,41 @@ class ControlPathsTests(unittest.TestCase):
 
     def test_candidate_dirs_order_and_legacy_gate(self) -> None:
         target = self.root / "target"
-        controller = self.root / "controller"
-        _pointer(target, controller)
         self.assertEqual(
-            (controller / ".hldspec" / "sync",),
+            (target / ".hldspec" / "sync",),
             cp.candidate_control_sync_dirs(target),
         )
         self.assertEqual(
             (
-                controller / ".hldspec" / "sync",
+                target / ".hldspec" / "sync",
                 target / ".specify" / "sync",
                 target / "firstrun" / ".specify" / "sync",
             ),
             cp.candidate_control_sync_dirs(target, legacy_fallback=True),
         )
+
+    def test_external_mode_ignores_legacy_fallback_entirely(self) -> None:
+        target = self.root / "target"
+        controller = self.root / "controller"
+        _pointer(target, controller)
+        self.assertEqual(
+            (controller / ".hldspec" / "sync",),
+            cp.candidate_control_sync_dirs(target, legacy_fallback=True),
+        )
+
+    def test_external_mode_stale_legacy_marker_cannot_win(self) -> None:
+        target = self.root / "target"
+        controller = self.root / "controller"
+        _pointer(target, controller)
+        stale = target / ".specify" / "sync"
+        stale.mkdir(parents=True)
+        (stale / "speckit_bundle_queue.json").write_text("{}", encoding="utf-8")
+
+        resolved = cp.resolve_control_sync_dir(
+            target, legacy_fallback=True, markers=("speckit_bundle_queue.json",)
+        )
+
+        self.assertEqual(controller / ".hldspec" / "sync", resolved)
 
 
 class MigratedHelperTests(unittest.TestCase):
@@ -169,6 +190,33 @@ class MigratedHelperTests(unittest.TestCase):
         sync = select_execution_sync_dir(target)
         self.assertEqual(target / ".hldspec" / "sync", sync)
         self.assertFalse(sync.exists())
+
+    def test_select_execution_sync_dir_ignores_stale_legacy_in_external_mode(self) -> None:
+        from hldspec.speckit_execution_state import select_execution_sync_dir
+
+        target = self.root / "target"
+        controller = self.root / "controller"
+        _pointer(target, controller)
+        stale = target / ".specify" / "sync"
+        stale.mkdir(parents=True)
+        (stale / "speckit_bundle_queue.json").write_text("{}", encoding="utf-8")
+
+        self.assertEqual(controller / ".hldspec" / "sync", select_execution_sync_dir(target))
+
+    def test_select_sync_dir_ignores_stale_legacy_in_external_mode(self) -> None:
+        from hldspec.script_io import select_sync_dir
+
+        target = self.root / "target"
+        controller = self.root / "controller"
+        _pointer(target, controller)
+        stale = target / ".specify" / "sync"
+        stale.mkdir(parents=True)
+        (stale / "speckit_bundle_queue.json").write_text("{}", encoding="utf-8")
+
+        self.assertEqual(
+            controller / ".hldspec" / "sync",
+            select_sync_dir(target, ("speckit_bundle_queue.json",)),
+        )
 
 
 if __name__ == "__main__":

@@ -297,6 +297,23 @@ class ExternalControllerApprovalTests(unittest.TestCase):
 
             self.assertFalse(prework_approved(workspace))
 
+    def test_stale_target_local_approval_cannot_authorize_external_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace, controller = self._external_target(Path(tmp))
+            (controller / ".hldspec" / "sync").mkdir(parents=True)
+            stale = workspace / ".specify" / "sync"
+            stale.mkdir(parents=True)
+            (stale / "speckit_prework_approval.json").write_text(
+                json.dumps({"status": "APPROVED"}), encoding="utf-8"
+            )
+
+            self.assertFalse(prework_approved(workspace))
+
+            summary = run_drive_loop(
+                workspace, Path(tmp) / "specs", runner=FakeRunner(Path(tmp) / "specs", []), agent_cmd="claude"
+            )
+            self.assertEqual("NOT_APPROVED", summary["stop_reason"])
+
     def test_drive_loop_report_lands_in_controller_sync(self):
         with tempfile.TemporaryDirectory() as tmp:
             workspace, controller = self._external_target(Path(tmp))

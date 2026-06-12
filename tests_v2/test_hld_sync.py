@@ -284,6 +284,46 @@ class ExternalControllerSyncTests(unittest.TestCase):
             self.assertFalse((workspace / ".hldspec").exists())
             self.assertFalse((workspace / ".specify").exists())
 
+    def test_run_sync_ignores_stale_target_local_queue_in_external_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "ws"
+            controller = Path(tmp) / "controller"
+            speckit_root = Path(tmp) / "specs"
+            workspace.mkdir(parents=True)
+            (workspace / "HLD.md").write_text(_hld({"HLD-001": "alpha"}), encoding="utf-8")
+            (workspace / ".hldspec-run.json").write_text(
+                json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+            )
+            controller_sync = controller / ".hldspec" / "sync"
+            controller_sync.mkdir(parents=True)
+            bundles = [
+                {
+                    "bundle_id": SPEC_001["feature_id"],
+                    "bundle_slug": SPEC_001["short_name"],
+                    "prompt_paths": {},
+                    "included_specs": [SPEC_001],
+                }
+            ]
+            (controller_sync / "speckit_bundle_queue.json").write_text(
+                json.dumps({"bundles": bundles}), encoding="utf-8"
+            )
+            # Stale pre-externalization queue left behind in the target.
+            stale = workspace / ".specify" / "sync"
+            stale.mkdir(parents=True)
+            (stale / "speckit_bundle_queue.json").write_text(
+                json.dumps({"bundles": []}), encoding="utf-8"
+            )
+            _touch_spec(speckit_root, "001-core", "spec.md", "plan.md", "tasks.md")
+            _verify_spec(speckit_root, "001-core", "specify", "plan", "tasks")
+
+            report = run_sync(workspace, speckit_root)
+
+            # The controller queue (one spec) is used, not the stale empty one.
+            self.assertEqual(1, len(report["specs"]), report)
+            self.assertTrue((controller_sync / SYNC_REPORT_JSON).is_file())
+            self.assertFalse((workspace / ".hldspec").exists())
+            self.assertFalse((stale / SYNC_REPORT_JSON).exists())
+
 
 if __name__ == "__main__":
     unittest.main()

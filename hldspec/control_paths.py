@@ -10,6 +10,11 @@ Resolution:
 - legacy `.specify/sync` / `firstrun/.specify/sync` are reachable only when the
   caller passes `legacy_fallback=True` AND a marker file proves state already
   lives there; no code path falls back to legacy silently.
+- in external mode legacy fallback is ignored entirely: externalization copies
+  the control state to the controller root, so a target-local legacy marker is
+  by definition stale and must never split reads/writes away from the
+  controller. (If a legacy-migration flow ever needs the old locations, it
+  must add its own explicit opt-in rather than widening this default.)
 
 Invalid pointer: `run_state.controller_root_from_pointer` returns None for a
 missing or malformed pointer, so resolution falls back to target-local paths.
@@ -38,10 +43,17 @@ def resolve_hldspec_dir(target: Path) -> Path:
 
 
 def candidate_control_sync_dirs(target: Path, *, legacy_fallback: bool = False) -> tuple[Path, ...]:
-    """Pointer-resolved canonical sync dir first; legacy read locations only on request."""
+    """Pointer-resolved canonical sync dir first; legacy read locations only on request.
+
+    Legacy locations are offered only for non-external targets: with a valid
+    controller pointer the controller sync is the single source of truth and
+    stale target-local legacy markers must not win.
+    """
     target = Path(target)
-    candidates = [resolve_hldspec_dir(target) / "sync"]
-    if legacy_fallback:
+    controller = resolve_controller_root(target)
+    hldspec_dir = (controller / ".hldspec") if controller is not None else (target / ".hldspec")
+    candidates = [hldspec_dir / "sync"]
+    if legacy_fallback and controller is None:
         candidates.extend(target / rel for rel in LEGACY_SYNC_RELPATHS)
     return tuple(candidates)
 
