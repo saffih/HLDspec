@@ -63,19 +63,32 @@ sessions.
 Use this model when you start from an HLD and need many ordered features prepared
 and driven by the book.
 
-## Model 2 — Ad-hoc in-target (drive one named feature)
+## Model 2 — Ad-hoc in-target (drive one named feature) — Journey 3
 
-**Entry point:** standing in a target repo, "I want the next feature: X".
+**Entry point:** standing **in the target repo** (not the HLDspec repo), the
+user or agent asks "SpecKit run card for this repo" (or "what's next?", "read
+the target repo state and give me the SpecKit run card", "I want the next
+feature: X"). The user and agent communicate and operate in the target repo;
+the target repo's files and git state are the source of truth. HLDspec's role
+here is read-only navigator tooling/reporting.
 
 `next_feature_readiness.py` is **read-only**. It infers the current ritual phase
 from durable repo evidence (git branch, `specs/<branch>/` artifacts, constitution
 presence, dirty tree, recorded execution evidence) — never from chat history or
-session memory — and reports:
+session memory — and produces a **SpecKit run card** for the repo:
 
 - the current phase,
-- verified vs missing evidence,
-- the single next SpecKit command (`speckit_next_action`),
-- blockers, and the single next safe action.
+- verified evidence vs missing items,
+- blockers,
+- the single next safe action and the single next SpecKit command
+  (`speckit_next_action`),
+- why that action is next (`why_now`),
+- the recommended model tier (`recommended_model`),
+- what not to run yet (`do_not_run_yet`),
+- what to report back after running it (`report_back`).
+
+"speckit status" may be used as shorthand for this request, but the answer is
+always the full run card above, not a passive status line.
 
 It models the same ritual chain but with a richer state vocabulary
 (`READY_FOR_SPECKIT_SPECIFY`, `READY_FOR_PLAN`, `IMPLEMENTATION_REVIEW_REQUIRED`,
@@ -85,10 +98,22 @@ branch/spec binding conflicts. It is resumable by construction: rerunning after
 an interruption reproduces the same phase from the same repo state.
 
 This model **never** runs SpecKit, creates branches, commits, pushes, opens PRs,
-or merges; `merge_allowed` is always `False`.
+or merges; `merge_allowed` is always `False`. Driving one safe step at a time,
+re-running the readiness driver before each next suggestion, is Journey 3's
+current scope. A future, separately-gated build loop may one day execute steps
+on top of this run-card loop, but that executor does not exist yet and this
+model does not imply it does.
 
-Use this model when you are in a repo and want to drive one feature, layer by
-layer, on top of the current state.
+Use this model when you are in a target repo and want to drive one feature,
+layer by layer, on top of the current state, one safe step at a time.
+
+Note: §8 of `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` defines a separate,
+package-level **SpecKit Run Card** (`RUN_CARD.md`/`RUN_CARD.json` under
+`target/prompts/speckit/<package-id>/`) for Model 1's multi-feature execution
+handoff. The Model 2 run card above is the same naming convention applied to a
+single feature in the target repo via the lighter readiness-report shape; it is
+not the package-level artifact and does not carry its required fields
+(`package_id`, `subagents`, `runskeptic_checkpoints`, …).
 
 ---
 

@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from hldspec import model_routing as mr
 from hldspec import next_feature_readiness as nfr
 
 
@@ -156,6 +157,46 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertEqual(nfr.SAFETY_PASS, report["safety_status"])
         self.assertEqual("/speckit.specify", report["speckit_next_action"])
         self.assertFalse(report["merge_allowed"])
+
+    # ------------------------------------------------------------------
+    # SpecKit run card fields (recommended model, why now, do not run yet,
+    # report back)
+    # ------------------------------------------------------------------
+
+    def test_run_card_fields_are_present_for_every_phase(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertIn(report["recommended_model"], (mr.MODEL_ROUTINE, mr.MODEL_DEFAULT, mr.MODEL_STRONG, mr.MODEL_CRITICAL))
+        self.assertTrue(report["why_now"])
+        self.assertEqual(nfr.DO_NOT_RUN_YET, report["do_not_run_yet"])
+        self.assertIn(str(target.resolve()), report["report_back"])
+        self.assertIn("scripts/next_feature_readiness_report.py", report["report_back"])
+
+    def test_render_produces_speckit_run_card_with_required_sections(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+        rendered = nfr.render_next_feature_readiness_report(report)
+
+        self.assertTrue(rendered.startswith("# SpecKit Run Card"))
+        for section in (
+            "## Phase",
+            "## Evidence",
+            "## Missing",
+            "## Blockers",
+            "## Next safe action",
+            "## Command to run",
+            "## Recommended model",
+            "## Why now",
+            "## Do not run yet",
+            "## Report back",
+        ):
+            self.assertIn(section, rendered)
 
     # ------------------------------------------------------------------
     # Spec/branch binding

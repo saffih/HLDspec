@@ -696,6 +696,18 @@ HLDspec is one workflow with three entry points, weighted around a single core:
 
    Greenfield-first MVP: the supported path is `HLD -> HLDspec source package -> SpecKit preparation -> implementation slicing -> mediator guidance`. Existing-product change mode is future scope unless a later patch explicitly documents it. Future change-mode work may introduce Product Truth Set, Feature Derivation Package, and overlap classification, but those are not current MVP behavior.
 
+   **Current simplest realization:** the ad-hoc next-feature readiness driver
+   (`next_feature_readiness.py`, Model 2 in `docs/SPECKIT_DRIVING_MODELS.md`)
+   is the simplest useful, currently-implemented slice of this journey. It runs
+   **in the target repo**: the user/agent asks for a "SpecKit run card for this
+   repo," and the driver reads target-repo evidence (git state, `specs/<branch>/`
+   artifacts, constitution) and reports phase, evidence, missing items, blockers,
+   and the single next safe SpecKit step -- one step at a time, re-running before
+   each next suggestion. It is read-only from HLDspec's side: it never runs
+   SpecKit, creates branches, commits, pushes, opens PRs, or merges. A future,
+   separately-gated build loop may execute steps on top of this run-card loop;
+   that executor is not part of this journey's current scope.
+
 ### HLD readiness cross-examination
 
 `check HLD` is the user-facing trigger for a practical readiness review before

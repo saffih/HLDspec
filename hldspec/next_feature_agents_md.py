@@ -1,11 +1,14 @@
-"""Target-side agent-guidance bootstrap for the ad-hoc next-feature flow.
+"""Target-side agent-guidance bootstrap for Journey 3 (the ad-hoc next-feature flow).
 
-Dropped into (or pasted from) a target repo, this tells any agent how to guide a
-user through one feature end-to-end using the read-only next-feature readiness
-driver (`next_feature_readiness.py`): ask "what's next?", report what's done /
-missing / next, and drive one safe step at a time from `/speckit.specify`
-through `/speckit.implement` -- while never running SpecKit, committing,
-pushing, opening PRs, or merging on the user's behalf.
+Journey 3 happens **in the target repo**: the user and agent operate there, not
+in HLDspec. Dropped into (or pasted from) the target repo, this tells any agent
+how to guide a user through one feature end-to-end using the read-only
+next-feature readiness driver (`next_feature_readiness.py`): read the target
+repo's evidence-based "SpecKit run card" (phase, evidence, missing items,
+blockers, single next safe action), report it back, and drive one safe step at
+a time from `/speckit.specify` through `/speckit.implement` -- while never
+running SpecKit, creating branches, committing, pushing, opening PRs, or
+merging on the user's behalf.
 
 This module only *builds* the bootstrap text and writes it under the HLDspec
 control sync dir. It never runs SpecKit, edits product code, or performs git
@@ -46,13 +49,17 @@ def build_next_feature_agents_md(target: Path | str, report: dict[str, Any] | No
     lines = [
         _TITLE,
         "",
-        "You are guiding the user through **one feature**, end to end, in this repo.",
-        "HLDspec navigates (tells you where you are and the next safe step); SpecKit",
-        "generates (specs, plans, tasks, code). You never generate or merge.",
+        "**You are operating in this target repo.** The user and you communicate and",
+        "work here, not in the HLDspec repo -- this repo's files and git state are the",
+        "source of truth. HLDspec is a navigator: it tells you where you are and the",
+        "single next safe step. SpecKit generates (specs, plans, tasks, code). You",
+        "never generate, execute, or merge on the user's behalf.",
         "",
-        "## When the user asks \"what's next?\" / \"drive me through the feature\"",
+        "## When the user asks \"SpecKit run card for this repo\" / \"what's next?\"",
         "",
-        f"1. Run the read-only readiness driver as the source of truth for *where we are*:",
+        "1. Run the read-only readiness driver to read this target repo's state and",
+        "   produce the **SpecKit run card** -- the only source of truth for *where we",
+        "   are*:",
         "",
         f"   ```",
         f"   {command}",
@@ -60,11 +67,17 @@ def build_next_feature_agents_md(target: Path | str, report: dict[str, Any] | No
         "",
         "2. Read the actual `specs/<branch>/spec.md`, `plan.md`, `tasks.md`, and",
         "   relevant code to confirm what the artifacts contain.",
-        "3. Report back in this shape:",
-        "   - **Done:** what is verified present and coherent.",
+        "3. Answer the user with a **SpecKit run card** in this shape:",
+        "   - **Phase:** the driver's current phase.",
+        "   - **Evidence:** the repo/file/git facts behind that phase.",
         "   - **Missing:** what the current phase needs that isn't there yet.",
-        "   - **Next:** the single next command to run (the driver's `speckit_next_action`).",
         "   - **Blockers:** anything that stops progress.",
+        "   - **Next safe action:** the single next command to run (the driver's",
+        "     `speckit_next_action`), and why it is next.",
+        "   - **Recommended model:** the driver's `recommended_model`.",
+        "   - **Do not run yet:** the driver's `do_not_run_yet`.",
+        "   - **Report back:** the driver's `report_back` -- what to tell the agent",
+        "     after the user runs the next safe action.",
         "4. Drive **one step at a time.** After the user runs a step, re-run the driver",
         "   before suggesting the next one. Repeat until implementation is done.",
         "",
@@ -79,9 +92,13 @@ def build_next_feature_agents_md(target: Path | str, report: dict[str, Any] | No
         "",
         "## Hard rules (never break these)",
         "",
-        "- Infer phase **only** from repo artifacts + git state, never from chat history.",
-        "- Do **not** run SpecKit, commit, push, open a PR, or merge on the user's behalf —",
-        "  tell the user the command and wait.",
+        "- Infer phase **only** from this target repo's artifacts + git state, never",
+        "  from chat history or memory.",
+        "- Do **not** run SpecKit on the user's behalf -- tell the user the command and",
+        "  wait, unless a later explicit execution mode says otherwise. None exists today.",
+        "- Do **not** create branches yourself. SpecKit owns branch creation through",
+        "  `/speckit.specify`; you do not create or name branches manually.",
+        "- Do **not** commit, push, open a PR, or merge on the user's behalf.",
         "- Do **not** write specs, plans, tasks, or product code yourself. SpecKit does that.",
         "- **Never** claim merge is allowed (`merge_allowed` is always `false`).",
         "- **Stop** and tell the user on any blocker, unresolved `[NEEDS CLARIFICATION]`,",
