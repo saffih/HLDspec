@@ -23,6 +23,7 @@ from hldspec.source_freshness import load_source_freshness, write_source_freshne
 from hldspec import speckit_operator_state as sos
 from hldspec import speckit_readiness as sr
 from hldspec import git_lifecycle as gl
+from hldspec import speckit_branch_gate as bg
 from hldspec import target_discovery as td
 from hldspec import speckit_workspace as sw
 from hldspec.machines.project import ProjectMachine
@@ -157,6 +158,17 @@ def print_git_lifecycle_summary(report: dict[str, Any], plan: dict[str, Any] | N
     if isinstance(plan, dict) and plan:
         print(f"Plan status: {plan.get('plan_status', 'UNKNOWN')}")
         print(f"Plan: {plan_paths.get('json', 'UNKNOWN')}")
+    print("")
+
+
+def print_speckit_branch_gate_summary(report: dict[str, Any]) -> None:
+    paths = report.get("report_paths") if isinstance(report.get("report_paths"), dict) else {}
+    print("## SpecKit Branch Gate")
+    print(f"Status: {report.get('gate_status', 'UNKNOWN')}")
+    print(f"Safety: {report.get('safety_status', 'UNKNOWN')}")
+    print(f"Current branch: {report.get('current_branch') or 'UNKNOWN'}")
+    print(f"Current spec dir: {report.get('current_spec_dir') or 'UNKNOWN'}")
+    print(f"Report: {paths.get('json', 'UNKNOWN')}")
     print("")
 
 
@@ -1189,6 +1201,7 @@ def command_status(args: argparse.Namespace) -> int:
     hldspec_dir = _resolve_hldspec_dir(target)
     discovery = td.write_discovery_reports(target)
     git_lifecycle, git_lifecycle_plan = gl.write_git_lifecycle_artifacts(target) if target.exists() else ({}, {})
+    branch_gate = bg.write_speckit_branch_gate_report(target) if target.exists() else {}
     session_path = hldspec_dir / "agent_session.json"
     session = json_read(session_path)
     if not session:
@@ -1202,6 +1215,8 @@ def command_status(args: argparse.Namespace) -> int:
         print_discovery_summary(discovery)
         if git_lifecycle:
             print_git_lifecycle_summary(git_lifecycle, git_lifecycle_plan)
+        if branch_gate:
+            print_speckit_branch_gate_summary(branch_gate)
         print("## Blockers")
         print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
         print("")
@@ -1247,6 +1262,9 @@ def command_status(args: argparse.Namespace) -> int:
     print_git_lifecycle_summary(
         operator_report.get("git_lifecycle_report") if isinstance(operator_report.get("git_lifecycle_report"), dict) else git_lifecycle,
         operator_report.get("git_lifecycle_plan") if isinstance(operator_report.get("git_lifecycle_plan"), dict) else git_lifecycle_plan,
+    )
+    print_speckit_branch_gate_summary(
+        operator_report.get("speckit_branch_gate_report") if isinstance(operator_report.get("speckit_branch_gate_report"), dict) else branch_gate
     )
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
@@ -1530,6 +1548,7 @@ def command_doctor(args: argparse.Namespace) -> int:
         operator_report = sos.build_speckit_operator_state_report(target, readiness_report=readiness)
         git_lifecycle = operator_report.get("git_lifecycle_report") if isinstance(operator_report.get("git_lifecycle_report"), dict) else {}
         git_lifecycle_plan = operator_report.get("git_lifecycle_plan") if isinstance(operator_report.get("git_lifecycle_plan"), dict) else {}
+        branch_gate = operator_report.get("speckit_branch_gate_report") if isinstance(operator_report.get("speckit_branch_gate_report"), dict) else {}
         print("")
         print("## SpecKit Readiness")
         print(f"Status: {readiness['status']}")
@@ -1573,6 +1592,11 @@ def command_doctor(args: argparse.Namespace) -> int:
         if str(git_lifecycle_plan.get("plan_status", "")).upper() == "PLAN_BLOCKED":
             action_items.append("Git lifecycle plan: PLAN_BLOCKED")
             action_items.extend(str(item) for item in git_lifecycle_plan.get("blockers", []) if str(item).strip())
+
+        print_speckit_branch_gate_summary(branch_gate)
+        if str(branch_gate.get("safety_status", "")).upper() in {"ACTION", "BLOCKED"}:
+            action_items.append(f"SpecKit branch gate: {branch_gate.get('gate_status')}")
+            action_items.extend(str(item) for item in branch_gate.get("blockers", []) if str(item).strip())
 
         print("")
         print("## Control Plane Checks")

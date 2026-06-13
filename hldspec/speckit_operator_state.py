@@ -14,6 +14,7 @@ from typing import Any, Callable
 from . import control_paths
 from . import git_lifecycle as gl
 from . import run_state
+from . import speckit_branch_gate as bg
 from . import speckit_execution_state as ses
 from . import speckit_readiness as sr
 from . import target_discovery as td
@@ -404,6 +405,7 @@ def build_speckit_operator_state_report(
     readiness = readiness_report or sr.build_speckit_readiness_report(target_path, which=which, run=run)
     discovery = td.write_discovery_reports(target_path)
     git_lifecycle, git_lifecycle_plan = gl.write_git_lifecycle_artifacts(target_path, run=run)
+    branch_gate = bg.write_speckit_branch_gate_report(target_path, run=run)
     workspace = readiness.get("workspace_status") if isinstance(readiness.get("workspace_status"), dict) else {}
     branch_hook = readiness.get("branch_hook_status") if isinstance(readiness.get("branch_hook_status"), dict) else {}
     selected_init_command = readiness.get("selected_init_command")
@@ -449,6 +451,9 @@ def build_speckit_operator_state_report(
         {"fact": "git_lifecycle_safety", "value": git_lifecycle.get("safety_status")},
         {"fact": "git_lifecycle_report", "value": (git_lifecycle.get("report_paths") or {}).get("json")},
         {"fact": "git_lifecycle_plan", "value": (git_lifecycle_plan.get("report_paths") or {}).get("json")},
+        {"fact": "speckit_branch_gate_status", "value": branch_gate.get("gate_status")},
+        {"fact": "speckit_branch_gate_safety", "value": branch_gate.get("safety_status")},
+        {"fact": "speckit_branch_gate_report", "value": (branch_gate.get("report_paths") or {}).get("json")},
     ]
 
     blockers: list[str] = []
@@ -548,6 +553,13 @@ def build_speckit_operator_state_report(
         if not blockers:
             blockers.append(f"Git lifecycle gate is {git_lifecycle.get('lifecycle_status')}.")
         next_safe_action = str(git_lifecycle.get("next_safe_action") or "Resolve Git lifecycle gate blockers before Build Loop continuation.")
+    elif branch_gate.get("safety_status") in {bg.SAFETY_ACTION, bg.SAFETY_BLOCKED}:
+        status = "ACTION"
+        state = str(branch_gate.get("gate_status") or STATE_REASSESSMENT_REQUIRED)
+        blockers.extend(str(item) for item in branch_gate.get("blockers", []) if str(item).strip())
+        if not blockers:
+            blockers.append(f"SpecKit branch gate is {branch_gate.get('gate_status')}.")
+        next_safe_action = str(branch_gate.get("next_safe_action") or "Resolve SpecKit branch gate blockers before /speckit.specify or Build Loop continuation.")
     elif readiness.get("status") != "PASS":
         status = "ACTION"
         state = STATE_REASSESSMENT_REQUIRED
@@ -621,12 +633,20 @@ def build_speckit_operator_state_report(
                 "plan_path": (git_lifecycle_plan.get("report_paths") or {}).get("json"),
                 "plan_status": git_lifecycle_plan.get("plan_status"),
             },
+            "speckit_branch_gate": {
+                "gate_status": branch_gate.get("gate_status"),
+                "safety_status": branch_gate.get("safety_status"),
+                "current_branch": branch_gate.get("current_branch"),
+                "current_spec_dir": branch_gate.get("current_spec_dir"),
+                "report_path": (branch_gate.get("report_paths") or {}).get("json"),
+            },
         },
         "doctor_note": doctor_note,
         "readiness_report": readiness,
         "target_discovery_report": discovery,
         "git_lifecycle_report": git_lifecycle,
         "git_lifecycle_plan": git_lifecycle_plan,
+        "speckit_branch_gate_report": branch_gate,
         "speckit_execution_state": lifecycle.get("execution_state") if isinstance(lifecycle, dict) else None,
         "speckit_next_action": lifecycle.get("next_action") if isinstance(lifecycle, dict) else None,
     }
@@ -718,6 +738,18 @@ def summarize_speckit_operator_state(report: dict[str, Any]) -> str:
             [
                 f"- plan status: {git_lifecycle_plan.get('plan_status', 'UNKNOWN')}",
                 f"- plan: {(git_lifecycle_plan.get('report_paths') or {}).get('json', 'UNKNOWN')}",
+            ]
+        )
+    branch_gate = report.get("speckit_branch_gate_report") if isinstance(report.get("speckit_branch_gate_report"), dict) else {}
+    if branch_gate:
+        lines.extend(
+            [
+                "",
+                "SpecKit branch gate:",
+                f"- status: {branch_gate.get('gate_status', 'UNKNOWN')}",
+                f"- safety: {branch_gate.get('safety_status', 'UNKNOWN')}",
+                f"- current branch: {branch_gate.get('current_branch') or 'UNKNOWN'}",
+                f"- report: {(branch_gate.get('report_paths') or {}).get('json', 'UNKNOWN')}",
             ]
         )
     doctor_note = report.get("doctor_note")
