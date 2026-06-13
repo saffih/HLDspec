@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 from . import control_paths
 from . import git_lifecycle as gl
+from . import model_routing as mr
 from . import speckit_branch_gate as bg
 from . import speckit_workspace as sw
 from .spec_bundles import utc_now
@@ -84,6 +85,22 @@ EXECUTION_EVIDENCE_FILE = "next_feature_execution_evidence.json"
 EVIDENCE_TESTS_PASSED = "TESTS_PASSED"
 EVIDENCE_IMPLEMENTED_COMMITTED = "IMPLEMENTED_COMMITTED"
 EVIDENCE_PUSHED = "PUSHED"
+
+# Constant guidance for the "Do not run yet" / "Report back" sections of the
+# SpecKit run card. These hold for every phase: the report names exactly one
+# next safe action, and re-running the driver is how the loop continues.
+DO_NOT_RUN_YET = (
+    "Do not run any SpecKit command beyond the one named as `speckit_next_action` "
+    "above. Do not commit, push, open a PR, or merge -- those require their own "
+    "explicit human-approved gates, and `merge_allowed` is always `false`."
+)
+
+REPORT_BACK = (
+    "After taking the next safe action, re-run "
+    "`python3 scripts/next_feature_readiness_report.py --target <path>` and report "
+    "back: the new `phase`, any new `blockers`, whether `[NEEDS CLARIFICATION]` "
+    "markers remain, and the resulting `speckit_next_action`."
+)
 
 FUTURE_EXECUTION_PLAN: dict[str, Any] = {
     "one_step_executor": (
@@ -180,6 +197,10 @@ def build_next_feature_readiness_report(
         "speckit_next_action": None,
         "git_next_action": "No git operation is safe until the target state is known.",
         "next_safe_action": None,
+        "recommended_model": None,
+        "why_now": None,
+        "do_not_run_yet": DO_NOT_RUN_YET,
+        "report_back": REPORT_BACK.replace("<path>", str(target_path)),
         "merge_allowed": False,
         "branch_gate": None,
         "git_lifecycle": None,
@@ -195,6 +216,8 @@ def build_next_feature_readiness_report(
         speckit_next_action: str | None,
         git_next_action: str,
         next_safe_action: str,
+        recommended_model: str,
+        why_now: str,
         blockers: list[str] | None = None,
     ) -> dict[str, Any]:
         base["phase"] = phase
@@ -202,6 +225,8 @@ def build_next_feature_readiness_report(
         base["speckit_next_action"] = speckit_next_action
         base["git_next_action"] = git_next_action
         base["next_safe_action"] = next_safe_action
+        base["recommended_model"] = recommended_model
+        base["why_now"] = why_now
         base["blockers"] = blockers or []
         return base
 
@@ -213,6 +238,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="No git operation is safe; the target root itself is invalid.",
             next_safe_action="Point HLDspec at the authoritative target root, not a generated tool-run/sync path.",
+            recommended_model=mr.MODEL_CRITICAL,
+            why_now="The target root itself is invalid; a human must correct the target path before any other step is safe.",
             blockers=[
                 "Target points inside a generated path ending in "
                 f"'{'/'.join(reserved_suffix)}'; it must not be accepted as a workspace root."
@@ -226,6 +253,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="No git operation is safe until the target exists.",
             next_safe_action="Create or point HLDspec at an existing git workspace before SpecKit init.",
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="The target workspace does not exist yet, so no ritual phase can be inferred until it does.",
             blockers=[f"Target path does not exist: {target_path}"],
         )
 
@@ -248,6 +277,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="No git operation is safe until a git repository and branch are resolved.",
             next_safe_action=str(branch_gate.get("next_safe_action") or "Resolve git repository/branch before SpecKit init."),
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="Git repository/branch state could not be resolved, so no SpecKit ritual phase can be inferred yet.",
             blockers=list(branch_gate.get("blockers") or []),
         )
 
@@ -267,6 +298,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="Run a real SpecKit init command to create .specify/ and .specify/memory/.",
             git_next_action="No git operation is needed until SpecKit is initialized.",
             next_safe_action="Run a real SpecKit init command to initialize the target workspace before /speckit.specify.",
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="SpecKit has not been initialized in this repo, so no ritual phase can be inferred until init creates .specify/.",
             blockers=[f"SpecKit workspace is not initialized; missing: {', '.join(missing)}."],
         )
 
@@ -283,6 +316,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="Run /speckit.constitution (or the HLDspec constitution augmentation) to create .specify/memory/constitution.md.",
             git_next_action="No git operation is needed until the constitution is recorded.",
             next_safe_action="Create .specify/memory/constitution.md before /speckit.specify.",
+            recommended_model=mr.MODEL_STRONG,
+            why_now="SpecKit is initialized but has no constitution; the constitution must exist before /speckit.specify so the ritual has its governing rules.",
             blockers=["SpecKit constitution is missing: .specify/memory/constitution.md."],
         )
 
@@ -298,6 +333,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="No git operation is safe until the branch/spec-directory binding conflict is resolved.",
             next_safe_action=str(branch_gate.get("next_safe_action") or "Resolve the SpecKit branch/artifact binding gate blockers."),
+            recommended_model=mr.MODEL_CRITICAL,
+            why_now="The current branch and its bound spec directory disagree; proceeding would risk writing the wrong feature's artifacts.",
             blockers=list(branch_gate.get("blockers") or []),
         )
 
@@ -308,6 +345,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.specify",
             git_next_action="No git operation is needed; SpecKit owns feature branch creation.",
             next_safe_action="Repo is ready for /speckit.specify; SpecKit owns branch/spec-directory creation.",
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="The constitution exists and the repo is on a non-feature branch with no spec bound yet; /speckit.specify is the only step that doesn't risk drift.",
         )
 
     if not branch_gate.get("spec_md_exists"):
@@ -318,6 +357,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.specify",
             git_next_action="No git operation is needed; SpecKit owns spec.md creation for this branch.",
             next_safe_action=str(branch_gate.get("next_safe_action") or "Run /speckit.specify to generate spec.md for this branch."),
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="This feature branch has no spec.md yet; /speckit.specify must run before any later step can be trusted.",
             blockers=list(branch_gate.get("blockers") or []),
         )
 
@@ -338,6 +379,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.clarify or /speckit.checklist",
             git_next_action="No git operation is needed until clarification/checklist items are resolved.",
             next_safe_action="Resolve outstanding [NEEDS CLARIFICATION] markers and/or checklist items before /speckit.plan.",
+            recommended_model=mr.MODEL_STRONG,
+            why_now="spec.md is bound to this branch but still has unresolved clarification/checklist markers; resolving them now prevents /speckit.plan from building on an ambiguous spec.",
             blockers=blockers,
         )
 
@@ -349,6 +392,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.plan",
             git_next_action="No git operation is needed until plan.md is generated.",
             next_safe_action="Spec is bound and clear; run /speckit.plan next.",
+            recommended_model=mr.MODEL_STRONG,
+            why_now="The spec is bound and free of open clarification markers, and plan.md does not exist yet; /speckit.plan is the next step in the ritual.",
         )
 
     base["verified_evidence"]["plan.md"] = str(spec_dir / "plan.md")
@@ -362,6 +407,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.tasks",
             git_next_action="No git operation is needed until tasks.md is generated.",
             next_safe_action="plan.md is present; run /speckit.tasks next.",
+            recommended_model=mr.MODEL_STRONG,
+            why_now="plan.md exists and tasks.md does not; /speckit.tasks is the next step in the ritual.",
         )
 
     base["verified_evidence"]["tasks.md"] = str(spec_dir / "tasks.md")
@@ -378,6 +425,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="/speckit.analyze",
             git_next_action="No git operation is needed until analyze evidence is recorded.",
             next_safe_action="tasks.md is present; run /speckit.analyze next.",
+            recommended_model=mr.MODEL_STRONG,
+            why_now="tasks.md exists with no recorded analyze evidence; /speckit.analyze is the next step before implementation begins.",
         )
 
     base["verified_evidence"]["analyze_evidence"] = str(analyze_evidence)
@@ -403,6 +452,8 @@ def build_next_feature_readiness_report(
                 speckit_next_action="/speckit.implement (continue) or none if implementation is complete",
                 git_next_action="Commit the implementation changes once reviewed.",
                 next_safe_action=f"Tests passed per recorded evidence; commit: {', '.join(product_dirty[:8])}.",
+                recommended_model=mr.MODEL_DEFAULT,
+                why_now="Recorded evidence says tests passed for the current implementation changes; committing them is the next safe step.",
                 blockers=[],
             )
         return finish(
@@ -411,6 +462,8 @@ def build_next_feature_readiness_report(
             speckit_next_action="Review /speckit.implement output before continuing.",
             git_next_action="No commit yet; review and run tests on the dirty implementation files first.",
             next_safe_action="Uncommitted implementation changes exist with no recorded test/verification evidence; review and test before commit.",
+            recommended_model=mr.MODEL_CRITICAL,
+            why_now="Implementation files changed but no test evidence has been recorded; a human/agent must review and test before committing.",
             blockers=[f"Uncommitted implementation changes without recorded test evidence: {', '.join(product_dirty[:8])}."],
         )
 
@@ -421,6 +474,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="Commit the updated SpecKit phase artifacts once reviewed.",
             next_safe_action=f"SpecKit phase artifacts are uncommitted: {', '.join(phase_dirty[:8])}.",
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="Only SpecKit phase artifacts (not product code) are uncommitted; committing them keeps the ritual state in sync with git.",
             blockers=[],
         )
 
@@ -431,6 +486,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="No further git operation; wait for CI and explicit human review/approval before merge.",
             next_safe_action="Branch is pushed; wait for CI and human approval. HLDspec never merges.",
+            recommended_model=mr.MODEL_CRITICAL,
+            why_now="The branch is pushed; merge requires CI and human approval that HLDspec cannot perform or verify.",
         )
 
     if evidence_status == EVIDENCE_IMPLEMENTED_COMMITTED:
@@ -440,6 +497,8 @@ def build_next_feature_readiness_report(
             speckit_next_action=None,
             git_next_action="Push the branch and open a PR once approved.",
             next_safe_action="Implementation is committed per recorded evidence; push and open a PR through the approved workflow.",
+            recommended_model=mr.MODEL_DEFAULT,
+            why_now="Implementation is committed per recorded evidence and the tree is clean; pushing and opening a PR is the next step in the approved workflow.",
         )
 
     return finish(
@@ -448,6 +507,8 @@ def build_next_feature_readiness_report(
         speckit_next_action="/speckit.implement",
         git_next_action="No git operation is needed until implementation produces changes.",
         next_safe_action="Analyze evidence is present and the tree is clean; run /speckit.implement next.",
+        recommended_model=mr.MODEL_STRONG,
+        why_now="Analyze evidence is present and the tree is clean; /speckit.implement is the next step in the ritual.",
     )
 
 
@@ -457,14 +518,20 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     git_lifecycle = report.get("git_lifecycle") or {}
 
     lines = [
-        "# Next Feature Readiness",
+        "# SpecKit Run Card",
         "",
-        f"Phase: `{report.get('phase', 'UNKNOWN')}`",
-        f"Safety: `{report.get('safety_status', SAFETY_ACTION)}`",
-        f"Target: `{report.get('target')}`",
-        f"Current branch: `{branch_gate.get('current_branch')}`",
-        f"Current spec dir: `{branch_gate.get('current_spec_dir')}`",
-        f"Constitution present: `{str(bool(report.get('constitution_exists'))).lower()}`",
+        "Single-feature, target-repo run card from the read-only next-feature",
+        "readiness driver. Re-run the driver before each next step; do not rely on",
+        "chat history.",
+        "",
+        "## Phase",
+        "",
+        f"- Phase: `{report.get('phase', 'UNKNOWN')}`",
+        f"- Safety: `{report.get('safety_status', SAFETY_ACTION)}`",
+        f"- Target: `{report.get('target')}`",
+        f"- Current branch: `{branch_gate.get('current_branch')}`",
+        f"- Current spec dir: `{branch_gate.get('current_spec_dir')}`",
+        f"- Constitution present: `{str(bool(report.get('constitution_exists'))).lower()}`",
         "",
         "## Completed phases",
         "",
@@ -474,14 +541,14 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     if not completed:
         lines.append("- none")
 
-    lines.extend(["", "## Verified evidence", ""])
+    lines.extend(["", "## Evidence", ""])
     verified = report.get("verified_evidence") or {}
     for name, path in verified.items():
         lines.append(f"- {name}: `{path}`")
     if not verified:
         lines.append("- none")
 
-    lines.extend(["", "## Missing evidence", ""])
+    lines.extend(["", "## Missing", ""])
     missing = report.get("missing_evidence") or []
     lines.extend(f"- {item}" for item in missing)
     if not missing:
@@ -514,11 +581,30 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Next actions",
+            "## Next safe action",
+            "",
+            f"- {report.get('next_safe_action')}",
+            "",
+            "## Command to run",
             "",
             f"- SpecKit: {report.get('speckit_next_action') or 'none'}",
             f"- Git: {report.get('git_next_action')}",
-            f"- Next safe action: {report.get('next_safe_action')}",
+            "",
+            "## Recommended model",
+            "",
+            f"- {report.get('recommended_model') or 'none'}",
+            "",
+            "## Why now",
+            "",
+            f"- {report.get('why_now') or 'none'}",
+            "",
+            "## Do not run yet",
+            "",
+            f"- {report.get('do_not_run_yet')}",
+            "",
+            "## Report back",
+            "",
+            f"- {report.get('report_back')}",
             "",
             f"Merge allowed: `{str(bool(report.get('merge_allowed'))).lower()}`",
             "",

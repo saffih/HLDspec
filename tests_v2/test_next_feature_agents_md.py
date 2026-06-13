@@ -32,6 +32,16 @@ class NextFeatureAgentsMdTests(unittest.TestCase):
         # SpecKit owns generation; agent never writes specs/code.
         self.assertIn("SpecKit", text)
 
+    def test_bootstrap_frames_journey_3_as_target_repo_run_card_loop(self) -> None:
+        text = nfa.build_next_feature_agents_md(self.target)
+        self.assertIn("operating in this target repo", text)
+        self.assertIn("SpecKit run card", text)
+        self.assertIn("recommended_model", text)
+        self.assertIn("do_not_run_yet", text)
+        self.assertIn("report_back", text)
+        self.assertIn("Do **not** create branches yourself", text)
+        self.assertIn("/speckit.specify", text)
+
     def test_snapshot_included_when_report_given(self) -> None:
         report = {"phase": "READY_FOR_PLAN", "speckit_next_action": "/speckit.plan"}
         text = nfa.build_next_feature_agents_md(self.target, report)
