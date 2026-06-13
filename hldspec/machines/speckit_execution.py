@@ -8,9 +8,11 @@ Drives the post-approval SpecKit workflow in strict dependency order:
                → ALL_COMPLETE
 
 State is persisted in speckit_execution_state.json so runs can be
-continued across sessions. The machine never invokes SpecKit itself —
-it gates and orders; the human/orchestrator invokes SpecKit per
-the instructions in each checkpoint.
+continued across sessions. The machine has two modes (see __init__):
+gated (default, invoker=None) only orders and gates -- the
+human/orchestrator invokes SpecKit per each checkpoint's instructions;
+live (invoker provided) actually invokes SpecKit per phase via the
+injected SpecKitInvoker.
 """
 from __future__ import annotations
 

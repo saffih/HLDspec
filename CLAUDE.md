@@ -34,7 +34,7 @@ Source HLD (read-only)
                                           Prework approval gate
                                           (human: approve / rework)
                                                       │
-                                          SpecKit execution (P0 — not yet built)
+                                          SpecKit execution (built: gated by default, live mode invokes)
                                           constitution → features in dependency order
                                           each feature: clarify → plan → tasks
                                                       │
@@ -79,7 +79,7 @@ ProjectMachine
   → SpeckitPreworkMachine
   → write_handoff_docs()        ← orchestration, not a machine
   → ApprovalGateMachine
-  → [SpecKitExecutionMachine]   ← P0: not yet built
+  → SpecKitExecutionMachine     ← built: gated by default, live mode invokes via SpecKitInvoker
 ```
 
 ### Scripts: `scripts/`

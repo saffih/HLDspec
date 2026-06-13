@@ -13,6 +13,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`ARCHITECTURE_LAYERS.md`](ARCHITECTURE_LAYERS.md) | The product/layer map: product purpose, three journeys, implementation modes, the seven product layers, and current/intended/future honesty. |
 | [`REPO_MIGRATION_PLAN.md`](REPO_MIGRATION_PLAN.md) | The phased change plan: top-level classification and the migration phases (no broad moves first; tests before moves; rollback per phase). |
 | [`../AGENTS.md`](../AGENTS.md) | Repo agent bootstrap and HLDspec invocation rules. |
+| [`SPECKIT_DRIVING_MODELS.md`](SPECKIT_DRIVING_MODELS.md) | The two SpecKit driving models (HLD pipeline vs ad-hoc in-target) and the canonical ritual chain they share, bound by an anti-drift test. |
 | [`SPECKIT_SLICE_CONTROL.md`](SPECKIT_SLICE_CONTROL.md) | Technical slice-control model and generated slice artifact contract. |
 | [`SPECKIT_PROXY_PROTOCOL.md`](SPECKIT_PROXY_PROTOCOL.md) | HLDspec-to-SpecKit handoff and proxy protocol. |
 | [`SMOKE_SCENARIOS.md`](SMOKE_SCENARIOS.md) | Deterministic smoke scenarios, commands, target layout, and PASS/FAIL output contract. |
