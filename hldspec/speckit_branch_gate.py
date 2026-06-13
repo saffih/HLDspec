@@ -35,8 +35,9 @@ SAFETY_PASS = "PASS"
 SAFETY_ACTION = "ACTION"
 SAFETY_BLOCKED = "BLOCKED"
 
-# SpecKit feature branches/spec directories follow `<NNN>-<slug>`, e.g. `001-feature-name`.
-FEATURE_BRANCH_RE = re.compile(r"^[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+# SpecKit feature branches/spec directories follow `<NNN...>-<slug>`, e.g. `001-feature-name`.
+# Numbering starts at 001 but is not capped at 3 digits.
+FEATURE_BRANCH_RE = re.compile(r"^[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 PHASE_ARTIFACT_NAMES = ("plan.md", "tasks.md")
 

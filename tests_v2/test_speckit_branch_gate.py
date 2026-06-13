@@ -92,6 +92,34 @@ class SpeckitBranchGateTests(unittest.TestCase):
         self.assertEqual(bg.SAFETY_ACTION, report["safety_status"])
 
     # ------------------------------------------------------------------
+    # Feature branch numbering (3+ digits)
+    # ------------------------------------------------------------------
+
+    def test_001_prefix_is_feature_branch(self) -> None:
+        self.assertTrue(bg._is_feature_branch("001-valid-feature"))
+
+    def test_999_prefix_is_feature_branch(self) -> None:
+        self.assertTrue(bg._is_feature_branch("999-valid-feature"))
+
+    def test_1000_prefix_is_feature_branch(self) -> None:
+        self.assertTrue(bg._is_feature_branch("1000-valid-feature"))
+
+    def test_nonnumeric_prefix_is_not_feature_branch(self) -> None:
+        self.assertFalse(bg._is_feature_branch("abc-valid-feature"))
+        self.assertFalse(bg._is_feature_branch("01a-valid-feature"))
+        self.assertFalse(bg._is_feature_branch("feature-001"))
+
+    def test_speckit_branch_created_with_four_digit_prefix(self) -> None:
+        target = self._target()
+        self._write_spec(target, "1000-valid-feature", plan="plan body", tasks="tasks body")
+
+        report = bg.write_speckit_branch_gate_report(target, run=_RunStub(git_root=target, branch="1000-valid-feature"))
+
+        self.assertEqual(bg.STATUS_SPECKIT_BRANCH_CREATED, report["gate_status"])
+        self.assertEqual(bg.SAFETY_PASS, report["safety_status"])
+        self.assertTrue(report["is_feature_branch"])
+
+    # ------------------------------------------------------------------
     # Before /speckit.specify
     # ------------------------------------------------------------------
 
