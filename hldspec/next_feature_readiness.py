@@ -27,6 +27,7 @@ from typing import Any, Callable
 from . import control_paths
 from . import git_lifecycle as gl
 from . import model_routing as mr
+from . import refresh_target as rt
 from . import speckit_branch_gate as bg
 from . import speckit_workspace as sw
 from .spec_bundles import utc_now
@@ -101,6 +102,12 @@ REPORT_BACK = (
     "back: the new `phase`, any new `blockers`, whether `[NEEDS CLARIFICATION]` "
     "markers remain, and the resulting `speckit_next_action`."
 )
+
+# The only target-write Journey 3 command (see hldspec/refresh_target.py). Recommended
+# in place of "/speckit.constitution" when refresh-target can safely
+# create/refresh the managed constitution support, and advisory elsewhere.
+REFRESH_TARGET_SCRIPT = "scripts/hldspec_refresh_target.py"
+READINESS_SCRIPT = "scripts/next_feature_readiness_report.py"
 
 FUTURE_EXECUTION_PLAN: dict[str, Any] = {
     "one_step_executor": (
@@ -177,6 +184,34 @@ def _read_execution_evidence(target_path: Path, *, current_branch: str | None) -
     return data
 
 
+def _refresh_target_status(
+    target_path: Path,
+    *,
+    run: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> dict[str, Any]:
+    """Read-only: classify the target's HLDspec/SpecKit support files via refresh_target.
+
+    Mirrors `hldspec refresh-target`'s dry-run classification without writing
+    anything, so the run card can recommend refresh-target as a next/advisory
+    action.
+    """
+    plan = rt.build_refresh_plan(target_path, run=run)
+    helper_name = rt.nfa.BOOTSTRAP_FILE
+    helper_item: dict[str, Any] = {}
+    for item in plan.get("items", []):
+        if str(item.get("path", "")).endswith(helper_name):
+            helper_item = item
+            break
+    constitution_item = plan.get("constitution_status", {})
+    return {
+        "constitution": constitution_item,
+        "helper": helper_item,
+        "constitution_refresh_recommended": constitution_item.get("classification") in rt.PLANNED_CLASSIFICATIONS,
+        "constitution_review_required": constitution_item.get("classification") == rt.EXISTS_WITH_LOCAL_CHANGES_REQUIRES_REVIEW,
+        "helper_refresh_recommended": helper_item.get("classification") == rt.MISSING_CAN_CREATE,
+    }
+
+
 def build_next_feature_readiness_report(
     target: Path | str,
     *,
@@ -207,6 +242,8 @@ def build_next_feature_readiness_report(
         "constitution_exists": False,
         "workspace_status": None,
         "future_execution_plan": FUTURE_EXECUTION_PLAN,
+        "refresh_target_status": None,
+        "advisory_actions": [],
     }
 
     def finish(
@@ -219,6 +256,8 @@ def build_next_feature_readiness_report(
         recommended_model: str,
         why_now: str,
         blockers: list[str] | None = None,
+        do_not_run_yet: str | None = None,
+        report_back: str | None = None,
     ) -> dict[str, Any]:
         base["phase"] = phase
         base["safety_status"] = safety
@@ -228,6 +267,10 @@ def build_next_feature_readiness_report(
         base["recommended_model"] = recommended_model
         base["why_now"] = why_now
         base["blockers"] = blockers or []
+        if do_not_run_yet is not None:
+            base["do_not_run_yet"] = do_not_run_yet
+        if report_back is not None:
+            base["report_back"] = report_back
         return base
 
     reserved_suffix = reserved_workspace_root_suffix(target_path)
@@ -305,6 +348,25 @@ def build_next_feature_readiness_report(
 
     base["verified_evidence"][".specify/memory/"] = str(target_path / ".specify" / "memory")
 
+    dry_run_cmd = f"python3 {REFRESH_TARGET_SCRIPT} --target {target_path} --dry-run"
+    apply_cmd = f"python3 {REFRESH_TARGET_SCRIPT} --target {target_path} --apply"
+    readiness_cmd = f"python3 {READINESS_SCRIPT} --target {target_path}"
+
+    refresh_status = _refresh_target_status(target_path, run=run)
+    base["refresh_target_status"] = refresh_status
+    if refresh_status["helper_refresh_recommended"]:
+        helper_path = refresh_status["helper"].get("path", rt.nfa.BOOTSTRAP_FILE)
+        base["advisory_actions"].append(
+            f"`{helper_path}` (target-side agent-guidance bootstrap) is missing. Run `{dry_run_cmd}` "
+            "to preview safely creating it -- advisory only, not required before the next SpecKit step."
+        )
+    if refresh_status["constitution_review_required"]:
+        base["advisory_actions"].append(
+            f"`{refresh_status['constitution'].get('path')}` exists without HLDspec managed markers; "
+            f"`hldspec refresh-target` will not modify it. Run `{dry_run_cmd}` for a review/merge plan if "
+            "you want to opt in -- this does not block the current phase."
+        )
+
     constitution_path = target_path / ".specify" / "memory" / "constitution.md"
     constitution_exists = constitution_path.is_file()
     base["constitution_exists"] = constitution_exists
@@ -313,12 +375,30 @@ def build_next_feature_readiness_report(
         return finish(
             phase=PHASE_NEEDS_CONSTITUTION,
             safety=SAFETY_ACTION,
-            speckit_next_action="Run /speckit.constitution (or the HLDspec constitution augmentation) to create .specify/memory/constitution.md.",
+            speckit_next_action=None,
             git_next_action="No git operation is needed until the constitution is recorded.",
-            next_safe_action="Create .specify/memory/constitution.md before /speckit.specify.",
+            next_safe_action=(
+                f"Run `{dry_run_cmd}` to preview safely creating the HLDspec/SpecKit-managed "
+                f"`.specify/memory/constitution.md` support file. If the plan has no conflict files, run "
+                f"`{apply_cmd}`, then re-run `{readiness_cmd}`."
+            ),
             recommended_model=mr.MODEL_STRONG,
-            why_now="SpecKit is initialized but has no constitution; the constitution must exist before /speckit.specify so the ritual has its governing rules.",
+            why_now=(
+                "SpecKit is initialized but has no constitution; `hldspec refresh-target` can safely "
+                "install the HLDspec/SpecKit-managed constitution support before the ritual continues -- "
+                "do not run /speckit.constitution blindly while this safer, non-destructive path exists."
+            ),
             blockers=["SpecKit constitution is missing: .specify/memory/constitution.md."],
+            do_not_run_yet=(
+                f"Do not run `{apply_cmd}` until the dry-run plan from `{dry_run_cmd}` has no conflict "
+                "files. Do not run /speckit.specify, /speckit.plan, /speckit.tasks, or /speckit.implement "
+                "until the constitution exists."
+            ),
+            report_back=(
+                f"After the dry-run, report the planned updates and any conflict files from `{dry_run_cmd}`, "
+                f"and whether `--apply` is safe. After apply, re-run `{readiness_cmd}` and report the "
+                "resulting `phase` and `constitution_exists`."
+            ),
         )
 
     base["verified_evidence"]["constitution.md"] = str(constitution_path)
@@ -552,6 +632,26 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     missing = report.get("missing_evidence") or []
     lines.extend(f"- {item}" for item in missing)
     if not missing:
+        lines.append("- none")
+
+    refresh_status = report.get("refresh_target_status") or {}
+    if refresh_status:
+        constitution_item = refresh_status.get("constitution") or {}
+        helper_item = refresh_status.get("helper") or {}
+        lines.extend(
+            [
+                "",
+                "## Refresh target status",
+                "",
+                f"- constitution: `{constitution_item.get('path')}` -- `{constitution_item.get('classification')}`",
+                f"- helper bootstrap: `{helper_item.get('path')}` -- `{helper_item.get('classification')}`",
+            ]
+        )
+
+    lines.extend(["", "## Advisory actions", ""])
+    advisory = report.get("advisory_actions") or []
+    lines.extend(f"- {item}" for item in advisory)
+    if not advisory:
         lines.append("- none")
 
     if git_lifecycle:
