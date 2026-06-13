@@ -11,6 +11,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from hldspec import next_feature_agents_md as nfa
 from hldspec import next_feature_readiness as nfr
 from hldspec import speckit_invoker as inv
 from hldspec.machines import speckit_execution as ex
@@ -54,6 +55,12 @@ class SpecKitDrivingModelsDocTests(unittest.TestCase):
         # is the chain from SPECIFY onward, plus the terminal DONE marker.
         self.assertEqual(ex.PHASE_CONSTITUTION, CANONICAL_CHAIN[0])
         self.assertEqual(CANONICAL_CHAIN[1:] + (ex.PHASE_DONE,), tuple(ex.PHASE_ORDER))
+
+    def test_agent_guide_bootstrap_states_canonical_chain(self) -> None:
+        # The target-side agent-guidance bootstrap also renders the chain; bind it
+        # so it cannot drift from the canonical definition either.
+        text = nfa.build_next_feature_agents_md(ROOT)
+        self.assertIn(CHAIN_ARROW, text)
 
     def test_navigator_references_every_chain_step(self) -> None:
         # The ad-hoc navigator drives by emitting /speckit.X next-actions; every
