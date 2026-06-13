@@ -708,6 +708,16 @@ HLDspec is one workflow with three entry points, weighted around a single core:
    separately-gated build loop may execute steps on top of this run-card loop;
    that executor is not part of this journey's current scope.
 
+   **`hldspec refresh-target`** (`hldspec/refresh_target.py`) is this journey's
+   only target-write capability: it safely refreshes a small, classified set of
+   target-side support/governance/helper files (the `next_feature_AGENTS.md`
+   bootstrap and, under a managed marker block, `.specify/memory/constitution.md`).
+   It is dry-run by default, never touches product code or `specs/` progress
+   artifacts, never resets/stashes/cleans/branches/commits/pushes/merges, and is
+   strictly separate from the status/run-card driver above -- refresh writes
+   support files, it does not detect gaps or report phase. See "`hldspec
+   refresh-target`" in `docs/SPECKIT_DRIVING_MODELS.md`.
+
 ### HLD readiness cross-examination
 
 `check HLD` is the user-facing trigger for a practical readiness review before

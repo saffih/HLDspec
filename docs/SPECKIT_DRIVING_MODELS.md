@@ -115,6 +115,42 @@ single feature in the target repo via the lighter readiness-report shape; it is
 not the package-level artifact and does not carry its required fields
 (`package_id`, `subagents`, `runskeptic_checkpoints`, …).
 
+## `hldspec refresh-target` — Journey 3's only target-write capability
+
+`scripts/hldspec_refresh_target.py` (`hldspec/refresh_target.py`) is a separate
+capability from the status/run-card driver above. Where `next_feature_readiness`
+is read-only, `refresh-target` is the **only** Journey 3 operation that writes
+into the target repo, and it writes only a small, explicitly classified set of
+support/governance/helper files:
+
+- `<sync dir>/next_feature_AGENTS.md` — the target-side agent-guidance bootstrap
+  (always regenerable; pure HLDspec output).
+- `.specify/memory/constitution.md` — refreshed only through a managed marker
+  block (`<!-- HLDSPEC:MANAGED:CONSTITUTION:BEGIN -->` /
+  `<!-- HLDSPEC:MANAGED:CONSTITUTION:END -->`); content outside the markers is
+  project-owned and is never modified. If the file exists without these markers,
+  refresh writes nothing to it and instead writes a
+  `constitution_refresh_review.md` review/merge plan alongside it.
+
+Every candidate file is classified before any write: `MISSING_CAN_CREATE`,
+`OWNED_BY_HLDSPEC_SAFE_TO_UPDATE`, `OWNED_BY_SPECKIT_SAFE_TO_REFRESH`,
+`EXISTS_WITH_LOCAL_CHANGES_REQUIRES_REVIEW`, `EXISTS_BUT_UNOWNED_DO_NOT_TOUCH`,
+`CONFLICT_REQUIRES_HUMAN`, or `PRODUCT_FILE_NEVER_TOUCH`. Default mode is dry-run
+(`--target <path>`, no writes); `--apply` performs only the planned writes for
+`MISSING_CAN_CREATE` / `OWNED_BY_HLDSPEC_SAFE_TO_UPDATE` /
+`OWNED_BY_SPECKIT_SAFE_TO_REFRESH` items.
+
+`refresh-target` never touches product code, `specs/<branch>/{spec,plan,tasks}.md`
+or checklists (those are progress artifacts, inspected by the readiness driver,
+not rewritten here), and never resets, stashes, cleans, branches, runs SpecKit,
+or commits/pushes/merges. Its output names the target repo, git branch, dirty
+state, planned updates, skipped files, conflict files, constitution status,
+SpecKit support status, a pointer back to `next_feature_readiness_report.py` for
+"speckit status" / "SpecKit run card" gap detection, and a single safe next
+action. Status/gap detection and refresh remain two separate operations:
+refresh only writes the files above; it never infers phase or reports a run
+card itself.
+
 ---
 
 ## Why two models, and how they stay honest

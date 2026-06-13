@@ -149,3 +149,12 @@ Next small slices (no urgency order):
 | HLDspec repo-development handoff protocol | Added canonical protocol and generator | `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md`, `scripts/hldspec_dev_handoff.py` |
 | HLDspec repo-development backlog | Added durable backlog for unfinished design and implementation work | `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` |
 | Agent bootstrap pointer | `AGENTS.md` first screen points every agent to the handoff and backlog docs | `AGENTS.md` |
+
+## Journey 3 — `hldspec refresh-target` (2026-06-13)
+
+| Item | Status | Files |
+|---|---|---|
+| Target-write capability with file-by-file safety classification (7 classes, dry-run default, `--apply` to write) | ✅ Done | `hldspec/refresh_target.py`, `scripts/hldspec_refresh_target.py` |
+| Manages `next_feature_AGENTS.md` (always regenerable) and `.specify/memory/constitution.md` (managed marker block; unmanaged constitution gets a review plan, never overwritten) | ✅ Done | `hldspec/refresh_target.py` |
+| 12 focused tests: dry-run, create/update helper, constitution create/refresh/review, unowned files, spec progress artifacts, dirty tree, product files, skipped/conflict reporting, status-pointer wording | ✅ Done | `tests_v2/test_refresh_target.py` |
+| Docs: refresh-target as Journey 3's only target-write capability, kept separate from the read-only status/run-card driver | ✅ Done | `docs/SPECKIT_DRIVING_MODELS.md`, `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` |
