@@ -338,6 +338,77 @@ def _setup_readiness_status(
     }
 
 
+def _agent_model_guidance(
+    *,
+    phase: str,
+    safety_status: str,
+    recommended_model: str,
+    blockers: list[str],
+) -> dict[str, Any]:
+    """Advisory-only guidance to help a human pick actor/model/thinking effort.
+
+    Derived from the existing `recommended_model` plus the current phase and
+    safety status. This never runs anything and never changes the single next
+    safe action; it only translates the abstract model tier into a concrete
+    suggestion. "Thinking effort" here means reasoning/effort budget, not any
+    hidden chain-of-thought.
+    """
+    # Escalate to reviewer/critical guidance for hard gates or anything that
+    # needs human interpretation (binding conflicts, unevidenced implementation,
+    # merge/CI/approval). recommended_model is already MODEL_CRITICAL for these,
+    # but we also escalate on a BLOCKED safety status for robustness.
+    escalate = (
+        recommended_model == mr.MODEL_CRITICAL
+        or safety_status == SAFETY_BLOCKED
+        or phase in {
+            PHASE_BRANCH_BINDING_BLOCKED,
+            PHASE_IMPLEMENTATION_REVIEW_REQUIRED,
+            PHASE_MERGE_BLOCKED_PENDING_CI_OR_APPROVAL,
+        }
+    )
+    if escalate:
+        return {
+            "recommended_actor": "skeptic/reviewer agent",
+            "model_tier": mr.MODEL_CRITICAL,
+            "concrete_model": "strongest available reviewer (RunSkeptic-capable, e.g. Claude Opus)",
+            "thinking_effort": "deep",
+            "simple_model_allowed": False,
+            "human_decision_required": True,
+            "why": (
+                f"`{phase}` (safety `{safety_status}`) is a hard gate or needs human interpretation"
+                + (f"; {len(blockers)} blocker(s) to resolve" if blockers else "")
+                + ". Use a RunSkeptic-capable reviewer and a human decision before proceeding."
+            ),
+        }
+    if recommended_model == mr.MODEL_STRONG:
+        return {
+            "recommended_actor": "target repo agent",
+            "model_tier": mr.MODEL_STRONG,
+            "concrete_model": "Claude Sonnet 4.6 or equivalent strong model",
+            "thinking_effort": "high",
+            "simple_model_allowed": False,
+            "human_decision_required": False,
+            "why": (
+                f"`{phase}` is bounded but non-trivial generation/analysis; use a strong model "
+                "at high reasoning effort. A simple low-cost model is not sufficient here."
+            ),
+        }
+    # MODEL_DEFAULT (and any non-escalated default): a navigator for mechanical
+    # status/setup/specify-readiness steps; a lower-cost model is acceptable.
+    return {
+        "recommended_actor": "target repo navigator",
+        "model_tier": mr.MODEL_DEFAULT,
+        "concrete_model": "Claude Sonnet 4.6, or a lower-cost equivalent if the step is mechanical",
+        "thinking_effort": "standard",
+        "simple_model_allowed": True,
+        "human_decision_required": False,
+        "why": (
+            f"`{phase}` is a mechanical status/setup step; a navigator at standard reasoning "
+            "effort suffices and a lower-cost model is acceptable."
+        ),
+    }
+
+
 def build_next_feature_readiness_report(
     target: Path | str,
     *,
@@ -374,6 +445,7 @@ def build_next_feature_readiness_report(
         "speckit_init_status": None,
         "hooks_status": None,
         "setup_next_action": None,
+        "agent_model_guidance": None,
     }
 
     def finish(
@@ -397,6 +469,12 @@ def build_next_feature_readiness_report(
         base["recommended_model"] = recommended_model
         base["why_now"] = why_now
         base["blockers"] = blockers or []
+        base["agent_model_guidance"] = _agent_model_guidance(
+            phase=phase,
+            safety_status=safety,
+            recommended_model=recommended_model,
+            blockers=blockers or [],
+        )
         if do_not_run_yet is not None:
             base["do_not_run_yet"] = do_not_run_yet
         if report_back is not None:
@@ -744,6 +822,24 @@ def build_next_feature_readiness_report(
     )
 
 
+def _agent_model_guidance_lines(guidance: dict[str, Any] | None) -> list[str]:
+    """Render the advisory Agent / model guidance section, or nothing if absent."""
+    if not guidance:
+        return []
+    return [
+        "## Agent / model guidance",
+        "",
+        f"- Recommended actor: {guidance.get('recommended_actor')}",
+        f"- Model tier: `{guidance.get('model_tier')}`",
+        f"- Concrete model suggestion: {guidance.get('concrete_model')}",
+        f"- Thinking effort: {guidance.get('thinking_effort')}",
+        f"- Simple model allowed: `{str(bool(guidance.get('simple_model_allowed'))).lower()}`",
+        f"- Human decision required: `{str(bool(guidance.get('human_decision_required'))).lower()}`",
+        f"- Why: {guidance.get('why')}",
+        "",
+    ]
+
+
 def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     paths = report.get("report_paths") if isinstance(report.get("report_paths"), dict) else {}
     branch_gate = report.get("branch_gate") or {}
@@ -863,6 +959,7 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
             "",
             f"- {report.get('recommended_model') or 'none'}",
             "",
+            *_agent_model_guidance_lines(report.get("agent_model_guidance")),
             "## Why now",
             "",
             f"- {report.get('why_now') or 'none'}",

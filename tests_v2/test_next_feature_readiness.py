@@ -522,6 +522,113 @@ class NextFeatureReadinessTests(unittest.TestCase):
         ):
             self.assertEqual(first[key], second[key], key)
 
+    # ------------------------------------------------------------------
+    # Agent / model guidance (advisory)
+    # ------------------------------------------------------------------
+
+    # 1 + 7. JSON includes agent_model_guidance; recommended_model unchanged.
+    def test_agent_model_guidance_present_and_recommended_model_unchanged(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        guidance = report["agent_model_guidance"]
+        self.assertIsInstance(guidance, dict)
+        for key in (
+            "recommended_actor",
+            "model_tier",
+            "concrete_model",
+            "thinking_effort",
+            "simple_model_allowed",
+            "human_decision_required",
+            "why",
+        ):
+            self.assertIn(key, guidance)
+        # recommended_model field itself is preserved (READY_FOR_SPECKIT_SPECIFY -> MODEL_DEFAULT).
+        self.assertEqual(mr.MODEL_DEFAULT, report["recommended_model"])
+
+    # 2. Markdown includes the section.
+    def test_agent_model_guidance_rendered_section(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+        rendered = nfr.render_next_feature_readiness_report(report)
+
+        self.assertIn("## Agent / model guidance", rendered)
+        self.assertIn("Recommended actor", rendered)
+        self.assertIn("Thinking effort", rendered)
+        self.assertIn("Human decision required", rendered)
+
+    # 3. MODEL_DEFAULT -> standard / lower-cost compatible.
+    def test_guidance_default_is_standard_and_simple_allowed(self) -> None:
+        guidance = nfr._agent_model_guidance(
+            phase=nfr.PHASE_READY_FOR_SPECKIT_SPECIFY,
+            safety_status=nfr.SAFETY_PASS,
+            recommended_model=mr.MODEL_DEFAULT,
+            blockers=[],
+        )
+        self.assertEqual(mr.MODEL_DEFAULT, guidance["model_tier"])
+        self.assertEqual("standard", guidance["thinking_effort"])
+        self.assertTrue(guidance["simple_model_allowed"])
+        self.assertFalse(guidance["human_decision_required"])
+
+    # 4. MODEL_STRONG -> strong / high, simple not allowed.
+    def test_guidance_strong_is_high_no_simple(self) -> None:
+        guidance = nfr._agent_model_guidance(
+            phase=nfr.PHASE_READY_FOR_PLAN,
+            safety_status=nfr.SAFETY_PASS,
+            recommended_model=mr.MODEL_STRONG,
+            blockers=[],
+        )
+        self.assertEqual(mr.MODEL_STRONG, guidance["model_tier"])
+        self.assertEqual("high", guidance["thinking_effort"])
+        self.assertFalse(guidance["simple_model_allowed"])
+        self.assertIn("Sonnet", guidance["concrete_model"])
+
+    # 5. MODEL_CRITICAL -> reviewer / deep / human decision.
+    def test_guidance_critical_is_reviewer_deep_human(self) -> None:
+        guidance = nfr._agent_model_guidance(
+            phase=nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED,
+            safety_status=nfr.SAFETY_ACTION,
+            recommended_model=mr.MODEL_CRITICAL,
+            blockers=["needs review"],
+        )
+        self.assertEqual(mr.MODEL_CRITICAL, guidance["model_tier"])
+        self.assertEqual("deep", guidance["thinking_effort"])
+        self.assertFalse(guidance["simple_model_allowed"])
+        self.assertTrue(guidance["human_decision_required"])
+        self.assertIn("reviewer", guidance["recommended_actor"])
+
+    # 6. branch/spec blocked maps to critical guidance.
+    def test_branch_binding_blocked_gets_critical_guidance(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="002-other"))
+
+        self.assertEqual(nfr.PHASE_BRANCH_BINDING_BLOCKED, report["phase"])
+        guidance = report["agent_model_guidance"]
+        self.assertEqual(mr.MODEL_CRITICAL, guidance["model_tier"])
+        self.assertTrue(guidance["human_decision_required"])
+
+    # 8. Guidance is advisory only -- no execution, single next safe action preserved.
+    def test_guidance_adds_no_execution_and_keeps_single_next_action(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+
+        run = _RunStub(git_root=target, branch="main")
+        report = nfr.build_next_feature_readiness_report(target, run=run)
+
+        # Only read-only git plumbing issued; guidance did not trigger any command.
+        for argv in run.calls:
+            self.assertEqual("git", argv[0])
+            self.assertTrue({"commit", "push", "checkout", "init", "merge"}.isdisjoint(argv), argv)
+        self.assertIsInstance(report["next_safe_action"], str)
+        self.assertNotIsInstance(report["next_safe_action"], (list, tuple))
+
 
 if __name__ == "__main__":
     unittest.main()
