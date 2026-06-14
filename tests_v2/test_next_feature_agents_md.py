@@ -42,6 +42,23 @@ class NextFeatureAgentsMdTests(unittest.TestCase):
         self.assertIn("Do **not** create branches yourself", text)
         self.assertIn("/speckit.specify", text)
 
+    def test_bootstrap_prefers_target_local_run_card_wrapper(self) -> None:
+        text = nfa.build_next_feature_agents_md(self.target)
+        # Target-local wrapper is the primary command; full script path is the fallback.
+        self.assertIn(".hldspec/bin/run-card", text)
+        self.assertIn("hldspec refresh-target", text)
+        self.assertIn("scripts/next_feature_readiness_report.py", text)
+
+    def test_bootstrap_frames_human_as_driver_and_asks_when_ambiguous(self) -> None:
+        text = nfa.build_next_feature_agents_md(self.target)
+        self.assertIn("human drives the build loop", text.lower())
+        self.assertIn("Ask when ambiguous", text)
+        self.assertIn("the next safe item is a *question*", text)
+        # Propose, do not auto-run.
+        self.assertIn("Propose, never auto-run", text)
+        # Decision card, not passive status dump.
+        self.assertIn("decision card", text)
+
     def test_snapshot_included_when_report_given(self) -> None:
         report = {"phase": "READY_FOR_PLAN", "speckit_next_action": "/speckit.plan"}
         text = nfa.build_next_feature_agents_md(self.target, report)

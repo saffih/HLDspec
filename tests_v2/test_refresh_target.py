@@ -195,6 +195,81 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertIn("SpecKit run card", pointer)
         self.assertIn("next_feature_readiness_report.py", pointer)
 
+    # ------------------------------------------------------------------
+    # Target-local run-card wrapper (self-guiding helper)
+    # ------------------------------------------------------------------
+
+    def _run_card_path(self) -> Path:
+        return self.target / rt.RUN_CARD_RELPATH
+
+    # 13. apply installs the read-only run-card wrapper, executable.
+    def test_apply_installs_run_card_wrapper(self) -> None:
+        result = rt.refresh_target(self.target, apply=True)
+
+        path = self._run_card_path()
+        self.assertTrue(path.is_file())
+        self.assertIn(str(rt.RUN_CARD_RELPATH), result["written_files"])
+        # Executable bit set so `.hldspec/bin/run-card` runs directly.
+        self.assertTrue(path.stat().st_mode & 0o111)
+
+    # 14. the wrapper is read-only: it only calls the readiness reader against $PWD.
+    def test_run_card_wrapper_is_read_only_and_target_local(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        text = self._run_card_path().read_text(encoding="utf-8")
+
+        self.assertIn("READ-ONLY", text)
+        self.assertIn('--target "$PWD"', text)
+        self.assertIn(rt.RUN_CARD_READINESS_SCRIPT, text)
+        # Must not run any generation/mutation itself.
+        for forbidden in ("/speckit", "git commit", "git push", "git checkout", "specify init"):
+            self.assertNotIn(forbidden, text)
+
+    # 15. wrapper resolves HLDspec via $HLDSPEC_HOME first, recorded path as fallback.
+    def test_run_card_wrapper_resolves_hldspec_home_then_recorded(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        text = self._run_card_path().read_text(encoding="utf-8")
+
+        self.assertIn('HLDSPEC_HOME="${HLDSPEC_HOME:-$RECORDED_HLDSPEC_HOME}"', text)
+        self.assertIn(f'RECORDED_HLDSPEC_HOME="{rt.HLDSPEC_ROOT}"', text)
+        # Clear error path, no invented command when HLDspec cannot be found.
+        self.assertIn("set HLDSPEC_HOME", text)
+
+    # 16. regenerating the wrapper is idempotent and re-marks it executable.
+    def test_run_card_wrapper_regenerates_idempotently(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        path = self._run_card_path()
+        path.write_text("stale\n", encoding="utf-8")
+        path.chmod(0o644)
+
+        plan = rt.build_refresh_plan(self.target)
+        item = next(i for i in plan["items"] if i["path"] == str(rt.RUN_CARD_RELPATH))
+        self.assertEqual(item["classification"], rt.OWNED_BY_HLDSPEC_SAFE_TO_UPDATE)
+
+        rt.refresh_target(self.target, apply=True)
+        self.assertNotIn("stale", path.read_text(encoding="utf-8"))
+        self.assertIn("READ-ONLY", path.read_text(encoding="utf-8"))
+        self.assertTrue(path.stat().st_mode & 0o111)
+
+    # 17. the generated wrapper actually produces a run card when executed.
+    def test_run_card_wrapper_executes_against_pwd(self) -> None:
+        # Make this a real SpecKit-initialised repo so the driver returns a phase.
+        (self.target / ".specify" / "memory").mkdir(parents=True)
+        rt.refresh_target(self.target, apply=True)
+
+        import os
+
+        completed = subprocess.run(
+            ["bash", str(self._run_card_path())],
+            cwd=str(self.target),
+            text=True,
+            capture_output=True,
+            env={**os.environ, "HLDSPEC_HOME": str(rt.HLDSPEC_ROOT)},
+        )
+        self.assertIn("SpecKit Run Card", completed.stdout)
+        # Read-only execution must not create a feature branch in the target repo.
+        branch = _git(self.target, "branch", "--show-current").stdout.strip()
+        self.assertNotIn("-", branch)  # no SpecKit-style NNN-feature branch was created
+
 
 if __name__ == "__main__":
     unittest.main()
