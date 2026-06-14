@@ -29,6 +29,7 @@ from . import git_lifecycle as gl
 from . import model_routing as mr
 from . import refresh_target as rt
 from . import speckit_branch_gate as bg
+from . import speckit_readiness as sr
 from . import speckit_workspace as sw
 from .spec_bundles import utc_now
 from .workspace_adapter import reserved_workspace_root_suffix
@@ -65,6 +66,13 @@ PHASE_BRANCH_BINDING_BLOCKED = "BRANCH_BINDING_BLOCKED"
 SAFETY_PASS = "PASS"
 SAFETY_ACTION = "ACTION"
 SAFETY_BLOCKED = "BLOCKED"
+
+# Tri-state before_specify hook / branch-policy classification for the
+# "Setup readiness" section. HLDspec never installs hooks; this only reports
+# what evidence (if any) is on disk.
+HOOKS_READY = "HOOKS_READY"
+HOOKS_MISSING = "HOOKS_MISSING"
+HOOKS_UNKNOWN = "HOOKS_UNKNOWN"
 
 # A spec.md (or plan.md/tasks.md) carrying this marker is treated as not yet
 # resolved by /speckit.clarify.
@@ -212,6 +220,73 @@ def _refresh_target_status(
     }
 
 
+def _hooks_readiness_status(target_path: Path, workspace: sw.WorkspaceStatus) -> dict[str, Any]:
+    """Read-only HOOKS_READY / HOOKS_MISSING / HOOKS_UNKNOWN classification.
+
+    Checks the same before_specify hook / branch-policy candidates as
+    speckit_readiness, but reports a tri-state status for the run card and
+    never recommends a hook-install command -- HLDspec has no evidence of
+    one, and hooks setup must remain user-run.
+    """
+    if not workspace.specify_dir_exists:
+        return {
+            "status": HOOKS_UNKNOWN,
+            "path": None,
+            "details": "`.specify/` does not exist yet; hook readiness cannot be evaluated until SpecKit init completes.",
+        }
+    for rel in sr.BRANCH_HOOK_CANDIDATES:
+        candidate = target_path / rel
+        if candidate.is_file():
+            text = _read_text(candidate)
+            if "spec.md" in text:
+                return {
+                    "status": HOOKS_MISSING,
+                    "path": str(candidate),
+                    "details": f"`{rel}` exists but describes creating spec.md; SpecKit owns spec.md creation at /speckit.specify, not a hook.",
+                }
+            return {
+                "status": HOOKS_READY,
+                "path": str(candidate),
+                "details": f"Found `{rel}`.",
+            }
+    return {
+        "status": HOOKS_MISSING,
+        "path": None,
+        "details": (
+            "No before_specify hook or equivalent branch policy file found (checked: "
+            + ", ".join(sr.BRANCH_HOOK_CANDIDATES)
+            + "). This is optional unless your SpecKit workflow requires it; HLDspec does not install hooks."
+        ),
+    }
+
+
+def _setup_readiness_status(
+    target_path: Path,
+    workspace: sw.WorkspaceStatus,
+    branch_gate: dict[str, Any],
+) -> dict[str, Any]:
+    """Read-only snapshot of target setup readiness: init, hooks, branch state.
+
+    Surfaced as the "Setup readiness" section of the run card. Constitution
+    and refresh-target status are reported separately by
+    `_refresh_target_status` once `.specify/memory/` exists.
+    """
+    available = sw.detect_init_commands()
+    hooks = _hooks_readiness_status(target_path, workspace)
+    return {
+        "specify_dir_exists": workspace.specify_dir_exists,
+        "memory_dir_exists": workspace.memory_dir_exists,
+        "available_init_commands": [cmd.display for cmd in available],
+        "recommended_init_command": available[0].display if available else None,
+        "hooks_status": hooks["status"],
+        "hooks_path": hooks["path"],
+        "hooks_details": hooks["details"],
+        "current_branch": branch_gate.get("current_branch"),
+        "is_feature_branch": branch_gate.get("is_feature_branch"),
+        "branch_spec_binding": branch_gate.get("gate_status"),
+    }
+
+
 def build_next_feature_readiness_report(
     target: Path | str,
     *,
@@ -244,6 +319,7 @@ def build_next_feature_readiness_report(
         "future_execution_plan": FUTURE_EXECUTION_PLAN,
         "refresh_target_status": None,
         "advisory_actions": [],
+        "setup_readiness": None,
     }
 
     def finish(
@@ -327,6 +403,8 @@ def build_next_feature_readiness_report(
 
     workspace = sw.inspect_workspace(target_path)
     base["workspace_status"] = workspace.metadata()
+    setup_readiness = _setup_readiness_status(target_path, workspace, branch_gate)
+    base["setup_readiness"] = setup_readiness
 
     if not (workspace.specify_dir_exists and workspace.memory_dir_exists):
         missing = []
@@ -335,15 +413,36 @@ def build_next_feature_readiness_report(
         if not workspace.memory_dir_exists:
             missing.append(".specify/memory/")
         base["missing_evidence"] = missing
+        if setup_readiness["recommended_init_command"]:
+            init_action = (
+                f"Run `{setup_readiness['recommended_init_command']}` to initialize SpecKit "
+                "(creates .specify/ and .specify/memory/)."
+            )
+        else:
+            init_action = (
+                "No supported SpecKit init command (`specify`, `spec-kit`, or `uvx`) was detected on PATH. "
+                "Run the project-approved SpecKit init command for this repo to create .specify/ and "
+                ".specify/memory/ -- HLDspec does not invent a command here."
+            )
         return finish(
             phase=PHASE_NEEDS_SPECKIT_INIT,
             safety=SAFETY_ACTION,
-            speckit_next_action="Run a real SpecKit init command to create .specify/ and .specify/memory/.",
+            speckit_next_action=init_action,
             git_next_action="No git operation is needed until SpecKit is initialized.",
-            next_safe_action="Run a real SpecKit init command to initialize the target workspace before /speckit.specify.",
+            next_safe_action=init_action,
             recommended_model=mr.MODEL_DEFAULT,
             why_now="SpecKit has not been initialized in this repo, so no ritual phase can be inferred until init creates .specify/.",
             blockers=[f"SpecKit workspace is not initialized; missing: {', '.join(missing)}."],
+            do_not_run_yet=(
+                "Do not run /speckit.specify, /speckit.plan, /speckit.tasks, /speckit.implement, or "
+                f"`{REFRESH_TARGET_SCRIPT}` until SpecKit init has created .specify/ and .specify/memory/. "
+                "HLDspec does not run SpecKit init on your behalf."
+            ),
+            report_back=(
+                "After running the SpecKit init command, re-run "
+                f"`python3 {READINESS_SCRIPT} --target {target_path}` and report the resulting "
+                "`phase` and `setup_readiness`."
+            ),
         )
 
     base["verified_evidence"][".specify/memory/"] = str(target_path / ".specify" / "memory")
@@ -365,6 +464,11 @@ def build_next_feature_readiness_report(
             f"`{refresh_status['constitution'].get('path')}` exists without HLDspec managed markers; "
             f"`hldspec refresh-target` will not modify it. Run `{dry_run_cmd}` for a review/merge plan if "
             "you want to opt in -- this does not block the current phase."
+        )
+    if setup_readiness["hooks_status"] == HOOKS_MISSING:
+        base["advisory_actions"].append(
+            f"Hooks status is `{HOOKS_MISSING}`: {setup_readiness['hooks_details']} "
+            "This is advisory only and does not block the current phase."
         )
 
     constitution_path = target_path / ".specify" / "memory" / "constitution.md"
@@ -633,6 +737,21 @@ def render_next_feature_readiness_report(report: dict[str, Any]) -> str:
     lines.extend(f"- {item}" for item in missing)
     if not missing:
         lines.append("- none")
+
+    setup_readiness = report.get("setup_readiness") or {}
+    if setup_readiness:
+        lines.extend(
+            [
+                "",
+                "## Setup readiness",
+                "",
+                f"- .specify/ exists: `{str(bool(setup_readiness.get('specify_dir_exists'))).lower()}`",
+                f"- .specify/memory/ exists: `{str(bool(setup_readiness.get('memory_dir_exists'))).lower()}`",
+                f"- Available SpecKit init commands: {setup_readiness.get('available_init_commands') or 'none detected'}",
+                f"- Hooks status: `{setup_readiness.get('hooks_status')}` -- {setup_readiness.get('hooks_details')}",
+                f"- Branch/spec binding: `{setup_readiness.get('branch_spec_binding')}`",
+            ]
+        )
 
     refresh_status = report.get("refresh_target_status") or {}
     if refresh_status:

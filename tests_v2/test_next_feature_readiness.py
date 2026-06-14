@@ -144,6 +144,97 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertFalse(report["merge_allowed"])
 
     # ------------------------------------------------------------------
+    # Setup readiness (init / hooks / branch / constitution)
+    # ------------------------------------------------------------------
+
+    def test_missing_specify_dir_recommends_init_not_refresh_target_or_specify(self) -> None:
+        target = self._target()
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(nfr.PHASE_NEEDS_SPECKIT_INIT, report["phase"])
+        setup = report["setup_readiness"]
+        self.assertFalse(setup["specify_dir_exists"])
+        self.assertFalse(setup["memory_dir_exists"])
+        self.assertNotIn("refresh_target", report["next_safe_action"])
+        self.assertNotIn("refresh-target", report["next_safe_action"])
+        self.assertNotIn("/speckit.specify", report["next_safe_action"])
+        if setup["recommended_init_command"]:
+            self.assertIn(setup["recommended_init_command"], report["next_safe_action"])
+        else:
+            self.assertIn("does not invent a command", report["next_safe_action"])
+
+    def test_missing_memory_dir_recommends_init_completion(self) -> None:
+        target = self._target()
+        (target / ".specify").mkdir(parents=True, exist_ok=True)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(nfr.PHASE_NEEDS_SPECKIT_INIT, report["phase"])
+        setup = report["setup_readiness"]
+        self.assertTrue(setup["specify_dir_exists"])
+        self.assertFalse(setup["memory_dir_exists"])
+        self.assertIn(".specify/memory/", report["blockers"][0])
+
+    def test_hooks_unknown_when_specify_dir_missing(self) -> None:
+        target = self._target()
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(nfr.HOOKS_UNKNOWN, report["setup_readiness"]["hooks_status"])
+        self.assertEqual([], report["advisory_actions"])
+
+    def test_hooks_missing_is_advisory_only_once_initialized(self) -> None:
+        target = self._target()
+        self._init_speckit(target)  # constitution present, no hook file
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(nfr.HOOKS_MISSING, report["setup_readiness"]["hooks_status"])
+        self.assertTrue(any("HOOKS_MISSING" in item for item in report["advisory_actions"]))
+        # Advisory only -- does not block the normal next SpecKit action.
+        self.assertEqual(nfr.PHASE_READY_FOR_SPECKIT_SPECIFY, report["phase"])
+        self.assertEqual("/speckit.specify", report["speckit_next_action"])
+
+    def test_hooks_ready_when_branch_policy_file_present(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+
+        self.assertEqual(nfr.HOOKS_READY, report["setup_readiness"]["hooks_status"])
+        self.assertFalse(any("HOOKS_MISSING" in item for item in report["advisory_actions"]))
+
+    def test_setup_readiness_rendered_in_run_card(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="main"))
+        rendered = nfr.render_next_feature_readiness_report(report)
+
+        self.assertIn("## Setup readiness", rendered)
+        self.assertIn("HOOKS_READY", rendered)
+        self.assertIn(".specify/ exists: `true`", rendered)
+        self.assertIn(".specify/memory/ exists: `true`", rendered)
+
+    def test_setup_readiness_does_not_run_speckit_install_hooks_or_mutate_git(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+
+        run = _RunStub(git_root=target, branch="main")
+        nfr.build_next_feature_readiness_report(target, run=run)
+
+        # Only read-only git plumbing commands are issued -- no commit/push/checkout/init.
+        mutating = {"commit", "push", "checkout", "init", "merge", "reset"}
+        for argv in run.calls:
+            self.assertEqual("git", argv[0])
+            self.assertTrue(mutating.isdisjoint(argv), argv)
+        self.assertFalse((target / ".specify" / "extensions.yml").exists())
+        self.assertFalse((target / ".specify" / "hooks.yml").exists())
+
+    # ------------------------------------------------------------------
     # Before /speckit.specify
     # ------------------------------------------------------------------
 

@@ -138,6 +138,9 @@ class RefreshTargetIntegrationTests(unittest.TestCase):
         target = self._target()
         self._init_speckit(target, constitution_text=rt.full_constitution_template())
         nfa.write_next_feature_agents_md(target)
+        # Hooks status is reported separately from refresh-target support files;
+        # make it HOOKS_READY too so this "fully current" case has no advisories.
+        (target / ".specify" / "extensions.yml").write_text("before_specify: {}\n", encoding="utf-8")
 
         report = nfr.build_next_feature_readiness_report(target, run=self._run(target))
 
@@ -146,6 +149,7 @@ class RefreshTargetIntegrationTests(unittest.TestCase):
         self.assertEqual(rt.OWNED_BY_HLDSPEC_SAFE_TO_UPDATE, report["refresh_target_status"]["helper"]["classification"])
         self.assertEqual(nfr.PHASE_READY_FOR_SPECKIT_SPECIFY, report["phase"])
         self.assertEqual("/speckit.specify", report["speckit_next_action"])
+        self.assertEqual(nfr.HOOKS_READY, report["setup_readiness"]["hooks_status"])
 
     # 6. output still includes one next safe action only
     def test_next_safe_action_is_a_single_string(self) -> None:
