@@ -223,27 +223,30 @@ class RefreshTargetTests(unittest.TestCase):
         # Executable bit set so `.hldspec/bin/run-card` runs directly.
         self.assertTrue(path.stat().st_mode & 0o111)
 
-    # 14. the wrapper is read-only: it only calls the readiness reader against $PWD.
-    def test_run_card_wrapper_is_read_only_and_target_local(self) -> None:
+    # 14. the wrapper is read-only and runs the vendored runtime (no checkout path).
+    def test_run_card_wrapper_is_read_only_and_self_contained(self) -> None:
         rt.refresh_target(self.target, apply=True)
         text = self._run_card_path().read_text(encoding="utf-8")
 
         self.assertIn("READ-ONLY", text)
-        self.assertIn('--target "$PWD"', text)
-        self.assertIn(rt.RUN_CARD_READINESS_SCRIPT, text)
+        self.assertIn("runtime/run_card_main.py", text)
+        # Self-contained: the wrapper never USES $HLDSPEC_HOME and bakes in no checkout path.
+        self.assertNotIn("$HLDSPEC_HOME", text)
+        self.assertNotIn("HLDSPEC_HOME=", text)
+        hldspec_checkout = str(Path(rt.__file__).resolve().parents[1])
+        self.assertNotIn(hldspec_checkout, text)
         # Must not run any generation/mutation itself.
         for forbidden in ("/speckit", "git commit", "git push", "git checkout", "specify init"):
             self.assertNotIn(forbidden, text)
 
-    # 15. wrapper resolves HLDspec via $HLDSPEC_HOME first, recorded path as fallback.
-    def test_run_card_wrapper_resolves_hldspec_home_then_recorded(self) -> None:
+    # 15. wrapper derives the target root from its own location, fails clearly if runtime missing.
+    def test_run_card_wrapper_self_locates_and_errors_on_missing_runtime(self) -> None:
         rt.refresh_target(self.target, apply=True)
         text = self._run_card_path().read_text(encoding="utf-8")
 
-        self.assertIn('HLDSPEC_HOME="${HLDSPEC_HOME:-$RECORDED_HLDSPEC_HOME}"', text)
-        self.assertIn(f'RECORDED_HLDSPEC_HOME="{rt.HLDSPEC_ROOT}"', text)
-        # Clear error path, no invented command when HLDspec cannot be found.
-        self.assertIn("set HLDSPEC_HOME", text)
+        self.assertIn("BASH_SOURCE", text)
+        self.assertIn("vendored runtime missing", text)
+        self.assertIn("refresh-target --apply", text)
 
     # 16. regenerating the wrapper is idempotent and re-marks it executable.
     def test_run_card_wrapper_regenerates_idempotently(self) -> None:
@@ -260,6 +263,122 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertNotIn("stale", path.read_text(encoding="utf-8"))
         self.assertIn("READ-ONLY", path.read_text(encoding="utf-8"))
         self.assertTrue(path.stat().st_mode & 0o111)
+
+    # ------------------------------------------------------------------
+    # Vendored self-contained runtime
+    # ------------------------------------------------------------------
+
+    def _runtime_dir(self) -> Path:
+        return self.target / rt.RUNTIME_RELDIR
+
+    # 1 + 2. apply writes run-card wrapper and the vendored runtime.
+    def test_apply_installs_vendored_runtime(self) -> None:
+        result = rt.refresh_target(self.target, apply=True)
+
+        self.assertIn(str(rt.RUN_CARD_RELPATH), result["written_files"])
+        runtime = self._runtime_dir()
+        self.assertTrue((runtime / "run_card_main.py").is_file())
+        self.assertTrue((runtime / "MANIFEST.json").is_file())
+        self.assertTrue((runtime / "VERSION").is_file())
+        self.assertTrue((runtime / "hldspec" / "next_feature_readiness.py").is_file())
+        # The runtime bundle is reported as written.
+        self.assertIn(str(rt.RUNTIME_RELDIR / "run_card_main.py"), result["written_files"])
+
+    # 3. runtime files are classified OWNED_BY_HLDSPEC_SAFE_TO_UPDATE once present.
+    def test_runtime_classified_owned_by_hldspec(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        plan = rt.build_refresh_plan(self.target)
+        item = next(i for i in plan["items"] if i["path"] == str(rt.RUNTIME_RELDIR))
+        self.assertEqual(item["classification"], rt.OWNED_BY_HLDSPEC_SAFE_TO_UPDATE)
+
+    # 4. the vendored runtime does not import from the HLDspec checkout.
+    def test_vendored_runtime_has_no_checkout_import(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        checkout = str(Path(rt.__file__).resolve().parents[1])
+        for path in self._runtime_dir().rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn(checkout, text, path)
+            # No env-var lookup of HLDSPEC_HOME anywhere in the vendored runtime.
+            self.assertNotIn('"HLDSPEC_HOME"', text, path)
+            self.assertNotIn("'HLDSPEC_HOME'", text, path)
+
+    # 5 + 6. the vendored runtime produces the key report fields, using only .hldspec/runtime.
+    def test_vendored_runtime_produces_key_fields_self_contained(self) -> None:
+        (self.target / ".specify" / "memory").mkdir(parents=True)
+        rt.refresh_target(self.target, apply=True)
+        import os
+
+        env = {k: v for k, v in os.environ.items() if k not in ("HLDSPEC_HOME", "PYTHONPATH")}
+        # Drive the entry directly (not via the wrapper) to assert no checkout on sys.path.
+        completed = subprocess.run(
+            ["python3", str(self._runtime_dir() / "run_card_main.py"), "--target", str(self.target)],
+            cwd="/",  # run from / to prove no implicit checkout on the path
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        for field in (
+            "## Phase",
+            "## Setup readiness",
+            "## Next safe action",
+            "## Recommended model",
+            "## Agent / model guidance",
+            "## Blockers",
+            "## Do not run yet",
+        ):
+            self.assertIn(field, completed.stdout)
+
+    # 7. missing runtime gives a clear error from the wrapper.
+    def test_missing_runtime_wrapper_errors_clearly(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        # Remove the vendored entry to simulate a missing/corrupt runtime.
+        (self._runtime_dir() / "run_card_main.py").unlink()
+        completed = subprocess.run(
+            ["bash", str(self._run_card_path())],
+            cwd=str(self.target),
+            text=True,
+            capture_output=True,
+        )
+        self.assertNotEqual(0, completed.returncode)
+        self.assertIn("vendored runtime missing", completed.stderr)
+        self.assertIn("refresh-target --apply", completed.stderr)
+
+    # 8. runtime execution is read-only: no git mutation, no specs/product writes.
+    def test_runtime_execution_is_read_only(self) -> None:
+        (self.target / ".specify" / "memory").mkdir(parents=True)
+        product = self.target / "src" / "app.py"
+        product.parent.mkdir(parents=True)
+        product.write_text("x = 1\n", encoding="utf-8")
+        rt.refresh_target(self.target, apply=True)
+
+        subprocess.run(
+            ["bash", str(self._run_card_path())],
+            cwd=str(self.target), text=True, capture_output=True,
+        )
+        # Product untouched; no commits/branches created by the read-only runtime.
+        self.assertEqual(product.read_text(encoding="utf-8"), "x = 1\n")
+        branch = _git(self.target, "branch", "--show-current").stdout.strip()
+        self.assertNotIn("-", branch)
+
+    # Minimality: the installer (runtime_vendor) and unrelated modules are NOT vendored.
+    def test_vendored_runtime_is_minimal(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        vendored = {p.stem for p in (self._runtime_dir() / "hldspec").glob("*.py")}
+        self.assertIn("next_feature_readiness", vendored)
+        self.assertNotIn("runtime_vendor", vendored)  # installer never ships
+        # Unrelated core modules not on the run-card path stay out.
+        for unrelated in ("result_renderer", "reply_parser", "prework_contracts", "handoff_docs"):
+            self.assertNotIn(unrelated, vendored)
+
+    # MANIFEST records version + source commit + the file list.
+    def test_runtime_manifest_shape(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        manifest = json.loads((self._runtime_dir() / "MANIFEST.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["generated_by"], "hldspec refresh-target")
+        self.assertIn("runtime_version", manifest)
+        self.assertIn("source_commit", manifest)
+        self.assertIn(str(rt.RUNTIME_RELDIR / "run_card_main.py"), manifest["files"])
 
     # ------------------------------------------------------------------
     # Explicit constitution managed-block adoption
@@ -416,22 +535,26 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertEqual(result["adoption"]["marker_lines"]["begin"], 1)
         self.assertGreater(result["adoption"]["marker_lines"]["end"], 1)
 
-    # 17. the generated wrapper actually produces a run card when executed.
-    def test_run_card_wrapper_executes_against_pwd(self) -> None:
+    # 17. the generated wrapper produces a run card WITHOUT HLDSPEC_HOME or the checkout.
+    def test_run_card_wrapper_executes_self_contained(self) -> None:
         # Make this a real SpecKit-initialised repo so the driver returns a phase.
         (self.target / ".specify" / "memory").mkdir(parents=True)
         rt.refresh_target(self.target, apply=True)
 
         import os
 
+        # Strip HLDSPEC_HOME and PYTHONPATH so nothing can leak the HLDspec checkout.
+        env = {k: v for k, v in os.environ.items() if k not in ("HLDSPEC_HOME", "PYTHONPATH")}
         completed = subprocess.run(
             ["bash", str(self._run_card_path())],
             cwd=str(self.target),
             text=True,
             capture_output=True,
-            env={**os.environ, "HLDSPEC_HOME": str(rt.HLDSPEC_ROOT)},
+            env=env,
         )
+        self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("SpecKit Run Card", completed.stdout)
+        self.assertIn("Vendored run-card runtime", completed.stdout)  # footer present
         # Read-only execution must not create a feature branch in the target repo.
         branch = _git(self.target, "branch", "--show-current").stdout.strip()
         self.assertNotIn("-", branch)  # no SpecKit-style NNN-feature branch was created
