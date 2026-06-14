@@ -507,10 +507,11 @@ def build_next_feature_readiness_report(
             "to preview safely creating it -- advisory only, not required before the next SpecKit step."
         )
     if refresh_status["constitution_review_required"]:
+        adopt_cmd = f"python3 {REFRESH_TARGET_SCRIPT} --target {target_path} {rt.ADOPT_FLAG}"
         base["advisory_actions"].append(
             f"`{refresh_status['constitution'].get('path')}` exists without HLDspec managed markers; "
-            f"`hldspec refresh-target` will not modify it. Run `{dry_run_cmd}` for a review/merge plan if "
-            "you want to opt in -- this does not block the current phase."
+            f"`hldspec refresh-target` will not modify it. To opt in, run `{adopt_cmd}` (backs up first, "
+            "inserts the managed block, preserves your content) -- this does not block the current phase."
         )
     if setup_readiness["hooks_status"] == HOOKS_MISSING:
         base["advisory_actions"].append(

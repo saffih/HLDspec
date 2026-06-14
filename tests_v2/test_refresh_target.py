@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+import json
 import subprocess
 import tempfile
 import unittest
@@ -7,6 +9,15 @@ from pathlib import Path
 
 from hldspec import refresh_target as rt
 from hldspec import next_feature_agents_md as nfa
+
+_CLI_PATH = Path(__file__).resolve().parents[1] / "scripts" / "hldspec_refresh_target.py"
+
+
+def _load_cli():
+    spec = importlib.util.spec_from_file_location("hldspec_refresh_target_cli", _CLI_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _git(target: Path, *argv: str) -> subprocess.CompletedProcess[str]:
@@ -250,6 +261,161 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertIn("READ-ONLY", path.read_text(encoding="utf-8"))
         self.assertTrue(path.stat().st_mode & 0o111)
 
+    # ------------------------------------------------------------------
+    # Explicit constitution managed-block adoption
+    # ------------------------------------------------------------------
+
+    _UNMARKED = (
+        "# Our Project Constitution\n\n"
+        "## ARCH-001 Hexagonal\n\nPorts and adapters.\n\n"
+        "## ENG-002 Testing\n\nBusiness logic coverage required.\n\n"
+        "## Governance\n\nMaintainers approve changes.\n"
+    )
+
+    def _write_unmarked_constitution(self, text: str | None = None) -> Path:
+        path = self._constitution_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text if text is not None else self._UNMARKED, encoding="utf-8")
+        return path
+
+    # 1. unmarked + normal dry-run does not modify constitution.
+    def test_adopt_unmarked_dry_run_does_not_modify(self) -> None:
+        path = self._write_unmarked_constitution()
+
+        plan = rt.refresh_target(self.target, apply=False)
+
+        self.assertEqual(path.read_text(encoding="utf-8"), self._UNMARKED)
+        self.assertEqual(plan["constitution_status"]["classification"], rt.EXISTS_WITH_LOCAL_CHANGES_REQUIRES_REVIEW)
+        self.assertTrue(plan["constitution_adoption"]["available"])
+        self.assertIn(rt.ADOPT_FLAG, plan["constitution_adoption"]["command"])
+
+    # 2. unmarked + --apply alone still does not modify constitution.
+    def test_adopt_unmarked_apply_alone_does_not_modify(self) -> None:
+        path = self._write_unmarked_constitution()
+
+        result = rt.refresh_target(self.target, apply=True)
+
+        self.assertEqual(path.read_text(encoding="utf-8"), self._UNMARKED)
+        self.assertNotIn(str(rt.CONSTITUTION_RELPATH), result["written_files"])
+
+    # 3 + 4 + 5 + 6. adoption: backup, exactly one block, byte-for-byte preserved, no project rules moved.
+    def test_adoption_backs_up_inserts_one_block_and_preserves_content(self) -> None:
+        path = self._write_unmarked_constitution()
+
+        result = rt.refresh_target(self.target, adopt=True)
+
+        self.assertEqual(result["mode"], "ADOPTED")
+        self.assertEqual(result["adoption"]["state"], rt.ADOPTION_PERFORMED)
+        # backup created with original bytes.
+        backup = path.with_name(path.name + rt.CONSTITUTION_BACKUP_SUFFIX)
+        self.assertTrue(backup.is_file())
+        self.assertEqual(backup.read_text(encoding="utf-8"), self._UNMARKED)
+        self.assertIn(str(backup.relative_to(self.target)), result["backup_files"])
+        # exactly one managed block.
+        new_text = path.read_text(encoding="utf-8")
+        self.assertEqual(new_text.count(rt.MANAGED_BEGIN), 1)
+        self.assertEqual(new_text.count(rt.MANAGED_END), 1)
+        # managed block at top, blank line, then original content byte-for-byte.
+        self.assertTrue(new_text.startswith(rt.managed_block() + "\n\n"))
+        self.assertTrue(new_text.endswith(self._UNMARKED))
+        self.assertEqual(new_text, rt.managed_block() + "\n\n" + self._UNMARKED)
+        # project-owned sections are NOT inside the managed block.
+        before, _block, after = new_text.partition(rt.MANAGED_END)
+        for marker in ("ARCH-001", "ENG-002", "Governance"):
+            self.assertNotIn(marker, before)
+            self.assertIn(marker, after)
+
+    # 7. adoption then dry-run reports OWNED_BY_SPECKIT_SAFE_TO_REFRESH.
+    def test_adoption_then_dry_run_is_owned_safe_to_refresh(self) -> None:
+        self._write_unmarked_constitution()
+        rt.refresh_target(self.target, adopt=True)
+
+        plan = rt.refresh_target(self.target, apply=False)
+
+        self.assertEqual(plan["constitution_status"]["classification"], rt.OWNED_BY_SPECKIT_SAFE_TO_REFRESH)
+        self.assertFalse(plan["constitution_adoption"]["available"])
+
+    # 8. adoption then apply only updates content between markers.
+    def test_adoption_then_apply_only_updates_managed_block(self) -> None:
+        path = self._write_unmarked_constitution()
+        rt.refresh_target(self.target, adopt=True)
+
+        rt.refresh_target(self.target, apply=True)
+
+        text = path.read_text(encoding="utf-8")
+        # Original project sections untouched after a managed --apply.
+        self.assertIn("## ARCH-001 Hexagonal", text)
+        self.assertIn("Business logic coverage required.", text)
+        self.assertIn("## Governance", text)
+        self.assertEqual(text.count(rt.MANAGED_BEGIN), 1)
+
+    # 9. partial marker state blocks adoption.
+    def test_partial_markers_block_adoption(self) -> None:
+        path = self._write_unmarked_constitution(
+            f"# C\n\n{rt.MANAGED_BEGIN}\n\norphan begin only, no end marker.\n"
+        )
+
+        plan = rt.refresh_target(self.target, apply=False)
+        self.assertEqual(plan["constitution_status"]["classification"], rt.CONFLICT_REQUIRES_HUMAN)
+
+        result = rt.refresh_target(self.target, adopt=True)
+        self.assertEqual(result["adoption"]["state"], rt.ADOPTION_PARTIAL_MARKERS_CONFLICT)
+        self.assertFalse(result["adoption"]["performed"])
+        # Unchanged and no backup written.
+        self.assertNotIn(rt.MANAGED_END, path.read_text(encoding="utf-8"))
+        self.assertFalse(path.with_name(path.name + rt.CONSTITUTION_BACKUP_SUFFIX).exists())
+
+    # 10. already-marked constitution does not get a duplicate block.
+    def test_already_marked_adoption_is_noop(self) -> None:
+        path = self._constitution_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"# C\n\n{rt.managed_block()}\n\n## Project rules\n", encoding="utf-8")
+        before = path.read_text(encoding="utf-8")
+
+        result = rt.refresh_target(self.target, adopt=True)
+
+        self.assertEqual(result["adoption"]["state"], rt.ADOPTION_ALREADY_MANAGED)
+        self.assertFalse(result["adoption"]["performed"])
+        self.assertEqual(path.read_text(encoding="utf-8"), before)
+        self.assertEqual(path.read_text(encoding="utf-8").count(rt.MANAGED_BEGIN), 1)
+
+    # 11. missing constitution still follows the create path (adoption is a no-op/declined).
+    def test_missing_constitution_adoption_declined_create_path_intact(self) -> None:
+        result = rt.refresh_target(self.target, adopt=True)
+        self.assertEqual(result["adoption"]["state"], rt.ADOPTION_MISSING_CONSTITUTION)
+        self.assertFalse(self._constitution_path().exists())
+
+        # Normal --apply still creates a fresh managed constitution.
+        rt.refresh_target(self.target, apply=True)
+        text = self._constitution_path().read_text(encoding="utf-8")
+        self.assertIn(rt.MANAGED_BEGIN, text)
+        self.assertIn(rt.MANAGED_END, text)
+
+    # 12. adoption never touches product code or specs/.
+    def test_adoption_does_not_touch_product_or_specs(self) -> None:
+        self._write_unmarked_constitution()
+        product = self.target / "src" / "app.py"
+        product.parent.mkdir(parents=True)
+        product.write_text("def main():\n    pass\n", encoding="utf-8")
+        spec_dir = self.target / "specs" / "001-feature"
+        spec_dir.mkdir(parents=True)
+        (spec_dir / "spec.md").write_text("# spec\noriginal\n", encoding="utf-8")
+
+        result = rt.refresh_target(self.target, adopt=True)
+
+        self.assertEqual(product.read_text(encoding="utf-8"), "def main():\n    pass\n")
+        self.assertEqual((spec_dir / "spec.md").read_text(encoding="utf-8"), "# spec\noriginal\n")
+        self.assertEqual(result["written_files"], [str(rt.CONSTITUTION_RELPATH)])
+
+    # 14. JSON-shaped result includes adoption state/result.
+    def test_adoption_result_includes_adoption_state(self) -> None:
+        self._write_unmarked_constitution()
+        result = rt.refresh_target(self.target, adopt=True)
+        self.assertIn("adoption", result)
+        self.assertIn(result["adoption"]["state"], (rt.ADOPTION_PERFORMED,))
+        self.assertEqual(result["adoption"]["marker_lines"]["begin"], 1)
+        self.assertGreater(result["adoption"]["marker_lines"]["end"], 1)
+
     # 17. the generated wrapper actually produces a run card when executed.
     def test_run_card_wrapper_executes_against_pwd(self) -> None:
         # Make this a real SpecKit-initialised repo so the driver returns a phase.
@@ -269,6 +435,69 @@ class RefreshTargetTests(unittest.TestCase):
         # Read-only execution must not create a feature branch in the target repo.
         branch = _git(self.target, "branch", "--show-current").stdout.strip()
         self.assertNotIn("-", branch)  # no SpecKit-style NNN-feature branch was created
+
+
+class RefreshTargetCliTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-refresh-cli-")
+        self.target = Path(self._tmp.name)
+        _git(self.target, "init", "-q")
+        _git(self.target, "config", "user.email", "test@example.com")
+        _git(self.target, "config", "user.name", "Test")
+        self.cli = _load_cli()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _constitution(self) -> Path:
+        return self.target / rt.CONSTITUTION_RELPATH
+
+    def _write_unmarked(self) -> None:
+        path = self._constitution()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Hand-written\n\n## ARCH-1\nrule\n", encoding="utf-8")
+
+    # 13. CLI accepts explicit --dry-run as a no-op alias.
+    def test_cli_dry_run_is_noop(self) -> None:
+        self._write_unmarked()
+        rc = self.cli.main(["--target", str(self.target), "--dry-run"])
+        self.assertEqual(rc, 1)  # review-required constitution -> conflict exit
+        self.assertNotIn(rt.MANAGED_BEGIN, self._constitution().read_text(encoding="utf-8"))
+
+    # --apply alone must not adopt an unmarked constitution.
+    def test_cli_apply_alone_does_not_adopt(self) -> None:
+        self._write_unmarked()
+        self.cli.main(["--target", str(self.target), "--apply"])
+        self.assertNotIn(rt.MANAGED_BEGIN, self._constitution().read_text(encoding="utf-8"))
+
+    # adoption flag performs adoption.
+    def test_cli_adopt_flag_adopts(self) -> None:
+        self._write_unmarked()
+        rc = self.cli.main(["--target", str(self.target), "--adopt-constitution-managed-block"])
+        self.assertEqual(rc, 0)
+        text = self._constitution().read_text(encoding="utf-8")
+        self.assertIn(rt.MANAGED_BEGIN, text)
+        self.assertIn("## ARCH-1", text)
+
+    # 14. JSON output includes adoption state/result.
+    def test_cli_json_includes_adoption(self) -> None:
+        self._write_unmarked()
+        import io
+        import contextlib
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self.cli.main(["--target", str(self.target), "--adopt-constitution-managed-block", "--json"])
+        payload = json.loads(buf.getvalue())
+        self.assertEqual(payload["mode"], "ADOPTED")
+        self.assertEqual(payload["adoption"]["state"], rt.ADOPTION_PERFORMED)
+
+    # --adopt combined with --apply is rejected (adoption is standalone).
+    def test_cli_adopt_with_apply_is_rejected(self) -> None:
+        self._write_unmarked()
+        with self.assertRaises(SystemExit):
+            self.cli.main(["--target", str(self.target), "--apply", "--adopt-constitution-managed-block"])
+        self.assertNotIn(rt.MANAGED_BEGIN, self._constitution().read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
