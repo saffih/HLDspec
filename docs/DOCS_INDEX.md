@@ -11,6 +11,8 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`../README.md`](../README.md) | Conceptual front door: what HLDspec does, the three journeys, and the normal workflow. |
 | [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) | Authoritative canonical architecture, terminology, ownership boundaries, full flow, and SpecKit Run Card. Wins on conflicts. The canonical terminology/command-surface source. |
 | [`ARCHITECTURE_LAYERS.md`](ARCHITECTURE_LAYERS.md) | The product/layer map: product purpose, three journeys, implementation modes, the seven product layers, and current/intended/future honesty. |
+| [`THREE_JOURNEYS.md`](THREE_JOURNEYS.md) | Product framing: the three journeys with typed handoffs, the "SpecKit is one helper" re-scope of Journey 3, the minimal vocabulary, and the Prompt 1→2→3 contract-hardening sequence. |
+| [`JOURNEY1_SDD_READY_GATE.md`](JOURNEY1_SDD_READY_GATE.md) | Journey 1 contract: the testable SDD-ready HLD gate — definition, required/optional sections, allowed vs blocker ambiguity, PASS/ACTION/BLOCKED bound to `HLD_READY`/`HLD_READY_WITH_ACTIONS`/`HLD_BLOCKED`, evidence for PASS, RunSkeptic questions, and validation strategy. |
 | [`REPO_MIGRATION_PLAN.md`](REPO_MIGRATION_PLAN.md) | The phased change plan: top-level classification and the migration phases (no broad moves first; tests before moves; rollback per phase). |
 | [`../AGENTS.md`](../AGENTS.md) | Repo agent bootstrap and HLDspec invocation rules. |
 | [`SPECKIT_DRIVING_MODELS.md`](SPECKIT_DRIVING_MODELS.md) | The two SpecKit driving models (HLD pipeline vs ad-hoc in-target) and the canonical ritual chain they share, bound by an anti-drift test. |

@@ -672,6 +672,15 @@ packets and each returns to GATE.
 
 ### Three journeys
 
+> **Product-framing note:** `docs/THREE_JOURNEYS.md` re-scopes these three
+> journeys at the product level and renames them (HLD Authoring/Hardening,
+> SDD/Package Preparation, Target Delivery + Helper Runtime). The names map 1:1
+> to the journeys below. The one intended scope change: Journey 3 is generalized
+> from SpecKit-specific supervision to a helper-generic delivery + runtime
+> journey in which **SpecKit is one helper, not the definition**. This section
+> stays authoritative on mechanics; it is updated as each journey contract is
+> hardened (Prompt 1 → 2 → 3 in that doc).
+
 HLDspec is one workflow with three entry points, weighted around a single core:
 
 1. **HLD Shaping** *(formerly HLD Authoring; precondition)* — when no reliable HLD exists yet: interview,
