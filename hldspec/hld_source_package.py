@@ -23,7 +23,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import mediator_guidance
+from . import helper_registry, mediator_guidance
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
@@ -63,6 +63,10 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     "slice_test_policy": "slice_test_policy.md",
     "speckit_slice_execution_prompt": "speckit_slice_execution_prompt.md",
     "anchor_coverage_schema": "anchor_coverage_schema.json",
+    # Journey 2 → Journey 3 advisory seam. Not in REQUIRED_FILES (advisory) and
+    # not in MIRROR_FILES (J3 guidance, not SpecKit runner content). It is in
+    # AUTHORITATIVE_FILES so the manifest hashes it and drift is detectable.
+    "helper_recommendations": "helper_recommendations.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -73,12 +77,20 @@ CONSTITUTION_PROPOSAL_FILE = "constitution.proposed.md"
 SOURCE_MANIFEST_FILE = "source_manifest.json"
 SOURCE_PACKAGE_FILE = "source_package.json"
 
+# Advisory files that live in the source package but must not travel into the
+# SpecKit runner mirror (.specify/source/). Listed explicitly so that adding a
+# new advisory file to AUTHORITATIVE_FILES does not silently mirror it.
+_MIRROR_EXCLUDED: frozenset[str] = frozenset({
+    # J3 advisory guidance — not SpecKit runner content.
+    AUTHORITATIVE_FILES["helper_recommendations"],
+})
+
 # The subset materialised into .specify/source/ for the runner. The constitution
 # proposal and the package metadata file are intentionally excluded; the manifest
 # and reference map travel with the mirror so the runner can verify it.
-MIRROR_FILES: tuple[str, ...] = tuple(AUTHORITATIVE_FILES.values()) + (
-    SOURCE_MANIFEST_FILE,
-)
+MIRROR_FILES: tuple[str, ...] = tuple(
+    f for f in AUTHORITATIVE_FILES.values() if f not in _MIRROR_EXCLUDED
+) + (SOURCE_MANIFEST_FILE,)
 
 # Every filename HLDspec may ever place or manage inside the mirror. The mirror is
 # wiped of these (and only these) before re-materialising, so an orphan left by a
@@ -315,6 +327,86 @@ class SourcePackageBuild:
         return self.validation.ok and not self.unsupported_claims and not self.marking_errors
 
 
+# Advisory, package-fit-only context per implemented helper. Capability facts
+# (status, authority levels) are NOT stored here — they are derived from the
+# helper registry at build time. Only this fit explanation is Journey-2-owned.
+_HELPER_PACKAGE_FIT: dict[str, dict] = {
+    "speckit": {
+        "package_fit": "high",
+        "target_fit": "requires a SpecKit-initialized target repo",
+        "rationale": (
+            "This package is a single anchored spec input plus engineering "
+            "guidelines and implementation slices — the shape SpecKit's "
+            "specify→plan→tasks→implement ritual consumes natively."
+        ),
+    },
+}
+
+
+def build_helper_recommendations(registry: dict | None = None) -> dict:
+    """Advisory Journey 2 output: which helper is recommended for THIS package, and why.
+
+    Helper capability facts (helper_id, status, authority levels) are **derived**
+    from `hldspec/helper_registry.py` — the canonical source of truth for helper
+    capabilities. This file is not a copy of the registry; it adds only advisory
+    package-fit information. The not-implemented helper IDs come from the registry's
+    `PLANNED_HELPER_IDS`, not an independent list here.
+
+    It does NOT record which helper the targeteer selected
+    (`.hldspec/helper_selection.json`, a future Journey 3 slice), an execution
+    prompt (NextActionPacket), or unresolved questions (inquiry/gap ledger).
+    """
+    reg = helper_registry.build_registry() if registry is None else registry
+
+    recommended = []
+    for helper in helper_registry.implemented_helpers(reg):
+        helper_id = helper["helper_id"]
+        fit = _HELPER_PACKAGE_FIT.get(helper_id, {})
+        recommended.append({
+            "helper_id": helper_id,
+            "status": helper["status"],                            # derived from registry
+            "authority_levels": list(helper["authority_levels"]),  # derived from registry
+            "package_fit": fit.get("package_fit", "unknown"),      # advisory (Journey 2)
+            "target_fit": fit.get("target_fit", "unknown"),        # advisory (Journey 2)
+            "rationale": fit.get("rationale", ""),                 # advisory (Journey 2)
+        })
+
+    unsupported = [
+        {
+            "helper_id": helper_id,
+            "status": "not_implemented",
+            "reason": (
+                "Contracted in docs/JOURNEY3_HELPER_CONTRACT.md / "
+                "docs/HELPER_BOOTSTRAP_CONTRACT.md but not yet an operational helper "
+                "in the helper registry."
+            ),
+        }
+        for helper_id in helper_registry.PLANNED_HELPER_IDS
+    ]
+
+    return {
+        "schema_version": 1,
+        "default_helper": helper_registry.default_helper_id(reg),  # derived from registry
+        "registry_provenance": {
+            "schema_version": reg.get("schema_version"),
+            "registry_sha256": helper_registry.registry_sha256(reg),
+        },
+        "recommended_helpers": recommended,
+        "unsupported_helpers": unsupported,
+        "required_capabilities": [
+            "spec-driven implementation guidance over an anchored source package",
+        ],
+        "human_override_allowed": True,
+        "notes": [
+            "Advisory Journey 2 output. Helper capability facts are derived from "
+            "hldspec/helper_registry.py; this file is not a copy of the registry.",
+            "Records which helper is recommended for this package, not which helper "
+            "was selected. Selection is .hldspec/helper_selection.json (future).",
+            "Regenerate after structural HLD changes or after the helper registry changes.",
+        ],
+    }
+
+
 def build_source_package_content(
     target_root: Path,
     hld_text: str,
@@ -357,6 +449,11 @@ def build_source_package_content(
     (source_dir / AUTHORITATIVE_FILES["engineering_guidelines"]).write_text(
         engineering_selection.render_engineering_guidelines_md(hld_text, project_name=project_name),
         encoding="utf-8",
+    )
+
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["helper_recommendations"],
+        build_helper_recommendations(),
     )
 
     valid_anchors = set(ref_map["anchors"].keys())

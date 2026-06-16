@@ -101,15 +101,25 @@ applied to `.specify/memory/constitution.md` only at `CONSTITUTION_APPROVAL_GATE
 where SpecKit owns the applied constitution. Augmented `CONTRACT-*` / `DATA-*`
 rules must survive regeneration (existing invariant).
 
-### 5.4 Helper recommendations — contracted, not yet emitted
+### 5.4 Helper recommendations — emitted, derived from the registry
 
-The three-journey framing says Journey 2 should produce **helper recommendations**
-(which helper(s) suit this package: `speckit`, `claude-code`, `codex`, `devin`,
-`manual`). **No code emits this today** — it appears only in `THREE_JOURNEYS.md`.
+Journey 2 emits `source_package/helper_recommendations.json`
+(`hldspec/hld_source_package.py::build_helper_recommendations`). It is **advisory**
+output answering: which helper is recommended for this package, why, which
+implemented helpers are available, which helper IDs are not implemented, and
+whether a human may override.
 
-Until a `helper_recommendations` field is added to `source_package.json`, Journey 3
-defaults to `helper: speckit` (the only implemented helper). This is a known gap
-(§14), stated honestly rather than implied as working.
+Helper **capability facts** (`helper_id`, `status`, `authority_levels`) are
+**derived from `hldspec/helper_registry.py`** — the canonical source of truth — not
+restated here. The not-implemented helper IDs come from the registry's
+`PLANNED_HELPER_IDS`. The recommendations file is therefore not a copy of the
+registry; it adds only advisory package-fit fields (`package_fit`, `target_fit`,
+`rationale`, `required_capabilities`) plus `registry_provenance`
+(`schema_version` + `registry_sha256`, so drift is detectable).
+
+It does **not** record the selected helper
+(`.hldspec/helper_selection.json`, a future Journey 3 slice), an execution prompt
+(NextActionPacket), or unresolved questions (inquiry/gap ledger).
 
 ---
 
@@ -213,9 +223,15 @@ Journey 3 must never compensate for a package that should not have passed.
 
 ## 14. Known limits (honest scope)
 
-- **Helper recommendations are not produced.** Journey 3 currently defaults to
-  `helper: speckit`. Adding `helper_recommendations` to `source_package.json` is
-  the concrete Journey 2 ↔ Journey 3 seam to define in Prompt 3.
+- **Helper recommendations are now produced** (`helper_recommendations.json`,
+  `hldspec/hld_source_package.py::build_helper_recommendations`). The file is in
+  `AUTHORITATIVE_FILES` (hashed in the manifest), excluded from `MIRROR_FILES` (J3
+  advisory guidance, not SpecKit runner content), and excluded from `REQUIRED_FILES`
+  (advisory — existing packages remain valid without it). Helper capability facts
+  are derived from `hldspec/helper_registry.py` (the canonical registry), not
+  copied. Journey 3 may read it to determine the default helper; the selected
+  helper is recorded separately in `.hldspec/helper_selection.json` (not yet
+  implemented).
 - Anchor integrity proves a requirement *cites* an anchor; it does not prove the
   requirement faithfully reflects that anchor's intent — semantic fidelity remains
   human/Consultant-reviewed at the gate.

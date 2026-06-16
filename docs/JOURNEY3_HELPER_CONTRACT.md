@@ -227,8 +227,12 @@ bad package, Journey 1 for a bad HLD) — Journey 3 never patches around it.
 
 - **Only one helper exists** (`speckit`). `HelperContract` is the shape future
   helpers fill; no second helper is implemented here, by design.
-- **`helper_recommendations` is not emitted.** Selection defaults to `speckit`;
-  the seam (§8) is documented, not built.
+- **`helper_recommendations` is now emitted** by Journey 2
+  (`hldspec/hld_source_package.py::build_helper_recommendations`). Journey 3 may
+  read `source_package/helper_recommendations.json` to determine the recommended
+  default helper. The selected helper state (`.hldspec/helper_selection.json`)
+  is not yet implemented; Journey 3 still defaults to `helper: speckit` at
+  runtime until that read path is added.
 - **`helper_id` is not yet a stored field.** The runtime is implicitly speckit;
   formalizing a `helper_id` in the runtime/manifest is a small future change, not
   claimed as present.
