@@ -598,6 +598,60 @@ warn and are never fully trusted. Source-hash mismatch is checked against the
 `tests_v2/test_target_discovery.py::SourcePackageBindingTests`,
 `tests_v2/test_source_package.py` binding round-trip cases.
 
+### P1-012 Deferred journey-contract runtime gaps
+
+Surfaced by the Journey 1/2/3 contract work (2026-06-16). Docs-only in the
+contracts; implementation deferred. Do not act on these until explicitly gated.
+
+**Journey 1:**
+
+- **Missing-section detection.** The verdict heuristic catches unsourced claims,
+  TBD/high-risk-without-verify, and declared `CONFLICTS_WITH`, but cannot detect a
+  *missing whole required section* (e.g. no architecture section at all). Absence
+  is not currently counted as `unresolved`, so the check is incomplete. Add a
+  required-section presence check in `hld_readiness.py` so absence → BLOCKED.
+- **`accepted_risks` wiring.** `build_hld_readiness_check` emits `accepted_risks: []`
+  today. The acceptance-capture step (human agrees to a provisional item and it is
+  recorded) is contracted in `docs/JOURNEY1_SDD_READY_GATE.md` but not wired.
+  Journey 2 may promote on `HLD_READY_WITH_ACTIONS` only after this capture exists.
+
+**Journey 2:**
+
+- **Emit `helper_recommendations`.** The three-journey framing contracts a
+  `helper_recommendations.json` file adjacent to `source_package/`. No code
+  emits it today. Journey 3 defaults silently to `helper: speckit`. Emit this
+  from the Journey 2 build with the fields defined in
+  `docs/JOURNEY2_PACKAGE_CONTRACT.md §5.4` and `docs/JOURNEY3_HELPER_CONTRACT.md §8`.
+
+**Journey 3:**
+
+- **Store/read selected `helper_id` at runtime.** `helper_id` is not yet a stored
+  field. The runtime is implicitly `speckit`; formalizing the selection needs a
+  storage location (see design note below).
+- **Decide `EXECUTE_WITH_APPROVAL` contract placement.** The existing opt-in
+  `SpecKitInvoker` / `SpecKit drive` loop is an `EXECUTE_WITH_APPROVAL` capability.
+  Decide whether it belongs under `HelperContract` as a per-helper authority field,
+  or remains a separate standalone capability. The contracts describe it as an
+  opt-in exception but do not bind it formally to the `helper_id: speckit` entry.
+
+**Design note — storage separation (do not collapse these into one file):**
+
+```text
+source_package/helper_recommendations.json   = Journey 2 output: recommended/default
+                                               helper set, rationale, per-helper fit.
+.hldspec/helper_selection.json               = Journey 3 selected-helper state:
+                                               which helper the human/agent chose
+                                               and when. Written by Journey 3.
+.hldspec/runtime/MANIFEST.json               = runtime provenance only: installed
+                                               runtime version, source commit, vendor
+                                               manifest. NOT the helper-selection SoT.
+```
+
+Reason: the runtime manifest describes the installed binary, not the product/helper
+selection. Storing the selected helper in `MANIFEST.json` mixes runtime provenance
+with product state and would create a hidden source-of-truth conflict between the
+Journey 2 recommendation and the Journey 3 selection.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
