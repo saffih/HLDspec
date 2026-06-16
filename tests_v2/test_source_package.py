@@ -38,6 +38,18 @@ class SourcePackageContractTests(unittest.TestCase):
     def test_constitution_proposal_not_mirrored(self):
         self.assertNotIn(sp.CONSTITUTION_PROPOSAL_FILE, sp.MIRROR_FILES)
 
+    def test_helper_recommendations_in_authoritative_files(self):
+        self.assertIn("helper_recommendations", sp.AUTHORITATIVE_FILES)
+        self.assertEqual("helper_recommendations.json", sp.AUTHORITATIVE_FILES["helper_recommendations"])
+
+    def test_helper_recommendations_not_in_required_files(self):
+        # Advisory output — must not be required for package validity.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["helper_recommendations"], sp.REQUIRED_FILES)
+
+    def test_helper_recommendations_not_in_mirror_files(self):
+        # J3 advisory guidance — must not be mirrored into .specify/source/ for the SpecKit runner.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["helper_recommendations"], sp.MIRROR_FILES)
+
     def test_manifest_excludes_itself(self):
         # The manifest must not try to hash source_manifest.json/source_package.json.
         self.assertNotIn(sp.SOURCE_MANIFEST_FILE, sp.AUTHORITATIVE_FILES.values())
@@ -252,6 +264,96 @@ class SpecifyMirrorTests(unittest.TestCase):
         sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
         self.assertTrue(keep.is_file())
         self.assertEqual(keep.read_text(encoding="utf-8"), "human notes\n")
+
+
+class HelperRecommendationsTests(unittest.TestCase):
+    """Tests for the Journey 2 → Journey 3 advisory seam."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_schema_shape(self):
+        rec = sp.build_helper_recommendations()
+        for key in ("schema_version", "default_helper", "recommended_helpers",
+                    "unsupported_helpers", "human_override_allowed", "notes"):
+            self.assertIn(key, rec, msg=f"missing key: {key}")
+        self.assertEqual(1, rec["schema_version"])
+
+    def test_default_helper_is_speckit(self):
+        self.assertEqual("speckit", sp.build_helper_recommendations()["default_helper"])
+
+    def test_speckit_is_implemented(self):
+        recs = sp.build_helper_recommendations()["recommended_helpers"]
+        speckit = next((h for h in recs if h["helper_id"] == "speckit"), None)
+        self.assertIsNotNone(speckit, "speckit must be in recommended_helpers")
+        self.assertEqual("implemented", speckit["status"])
+        self.assertIn("GUIDE_ONLY", speckit["authority_levels"])
+        self.assertIn("PROPOSE_COMMAND", speckit["authority_levels"])
+
+    def test_unsupported_helpers_not_implemented(self):
+        unsupported = sp.build_helper_recommendations()["unsupported_helpers"]
+        ids = {h["helper_id"] for h in unsupported}
+        for helper_id in ("claude-code", "codex", "devin", "manual"):
+            self.assertIn(helper_id, ids, msg=f"{helper_id} must be listed as unsupported")
+        for h in unsupported:
+            self.assertEqual("not_implemented", h["status"],
+                             msg=f"{h['helper_id']} must be not_implemented")
+
+    def test_human_override_allowed(self):
+        self.assertTrue(sp.build_helper_recommendations()["human_override_allowed"])
+
+    def test_build_content_emits_helper_recommendations(self):
+        build = sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+        rec_path = self.source_dir / sp.AUTHORITATIVE_FILES["helper_recommendations"]
+        self.assertTrue(rec_path.is_file(), "helper_recommendations.json must be emitted by build")
+
+    def test_helper_recommendations_not_in_mirror(self):
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        mirror_dir = self.adapter.specify_source_mirror_dir
+        mirror_rec = mirror_dir / sp.AUTHORITATIVE_FILES["helper_recommendations"]
+        self.assertFalse(mirror_rec.exists(),
+                         "helper_recommendations.json must not appear in the SpecKit runner mirror")
+
+    def test_manifest_tracks_helper_recommendations(self):
+        import json
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        manifest_data = json.loads((self.source_dir / sp.SOURCE_MANIFEST_FILE).read_text(encoding="utf-8"))
+        entry = manifest_data["files"].get("helper_recommendations")
+        self.assertIsNotNone(entry, "manifest must include helper_recommendations entry")
+        self.assertTrue(entry["present"])
+        self.assertIsNotNone(entry["sha256"])
+
+    def test_existing_validation_still_passes_without_helper_recommendations(self):
+        # A seeded package (no helper_recommendations.json) must still validate OK
+        # since the file is advisory (not in REQUIRED_FILES).
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(result.ok,
+                        msg=f"validation must not require advisory helper_recommendations: "
+                            f"{result.missing} {result.hash_mismatches}")
 
 
 if __name__ == "__main__":

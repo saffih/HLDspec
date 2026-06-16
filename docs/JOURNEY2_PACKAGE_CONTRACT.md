@@ -213,9 +213,13 @@ Journey 3 must never compensate for a package that should not have passed.
 
 ## 14. Known limits (honest scope)
 
-- **Helper recommendations are not produced.** Journey 3 currently defaults to
-  `helper: speckit`. Adding `helper_recommendations` to `source_package.json` is
-  the concrete Journey 2 ↔ Journey 3 seam to define in Prompt 3.
+- **Helper recommendations are now produced** (`helper_recommendations.json`,
+  `hldspec/hld_source_package.py::build_helper_recommendations`). The file is in
+  `AUTHORITATIVE_FILES` (hashed in the manifest), excluded from `MIRROR_FILES` (J3
+  advisory guidance, not SpecKit runner content), and excluded from `REQUIRED_FILES`
+  (advisory — existing packages remain valid without it). Journey 3 may read it to
+  determine the default helper; the selected helper is recorded separately in
+  `.hldspec/helper_selection.json` (not yet implemented).
 - Anchor integrity proves a requirement *cites* an anchor; it does not prove the
   requirement faithfully reflects that anchor's intent — semantic fidelity remains
   human/Consultant-reviewed at the gate.

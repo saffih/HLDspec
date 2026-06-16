@@ -617,11 +617,11 @@ contracts; implementation deferred. Do not act on these until explicitly gated.
 
 **Journey 2:**
 
-- **Emit `helper_recommendations`.** The three-journey framing contracts a
-  `helper_recommendations.json` file adjacent to `source_package/`. No code
-  emits it today. Journey 3 defaults silently to `helper: speckit`. Emit this
-  from the Journey 2 build with the fields defined in
-  `docs/JOURNEY2_PACKAGE_CONTRACT.md §5.4` and `docs/JOURNEY3_HELPER_CONTRACT.md §8`.
+- **Emit `helper_recommendations`.** ✓ DONE (2026-06-16).
+  `hldspec/hld_source_package.py::build_helper_recommendations` emits
+  `helper_recommendations.json` during `build_source_package_content`. File is in
+  `AUTHORITATIVE_FILES` (manifest-hashed), excluded from `MIRROR_FILES` and
+  `REQUIRED_FILES`. Tests in `tests_v2/test_source_package.py::HelperRecommendationsTests`.
 
 **Journey 3:**
 

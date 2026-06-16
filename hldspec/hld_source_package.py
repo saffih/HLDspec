@@ -63,6 +63,10 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     "slice_test_policy": "slice_test_policy.md",
     "speckit_slice_execution_prompt": "speckit_slice_execution_prompt.md",
     "anchor_coverage_schema": "anchor_coverage_schema.json",
+    # Journey 2 → Journey 3 advisory seam. Not in REQUIRED_FILES (advisory) and
+    # not in MIRROR_FILES (J3 guidance, not SpecKit runner content). It is in
+    # AUTHORITATIVE_FILES so the manifest hashes it and drift is detectable.
+    "helper_recommendations": "helper_recommendations.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -73,12 +77,20 @@ CONSTITUTION_PROPOSAL_FILE = "constitution.proposed.md"
 SOURCE_MANIFEST_FILE = "source_manifest.json"
 SOURCE_PACKAGE_FILE = "source_package.json"
 
+# Advisory files that live in the source package but must not travel into the
+# SpecKit runner mirror (.specify/source/). Listed explicitly so that adding a
+# new advisory file to AUTHORITATIVE_FILES does not silently mirror it.
+_MIRROR_EXCLUDED: frozenset[str] = frozenset({
+    # J3 advisory guidance — not SpecKit runner content.
+    AUTHORITATIVE_FILES["helper_recommendations"],
+})
+
 # The subset materialised into .specify/source/ for the runner. The constitution
 # proposal and the package metadata file are intentionally excluded; the manifest
 # and reference map travel with the mirror so the runner can verify it.
-MIRROR_FILES: tuple[str, ...] = tuple(AUTHORITATIVE_FILES.values()) + (
-    SOURCE_MANIFEST_FILE,
-)
+MIRROR_FILES: tuple[str, ...] = tuple(
+    f for f in AUTHORITATIVE_FILES.values() if f not in _MIRROR_EXCLUDED
+) + (SOURCE_MANIFEST_FILE,)
 
 # Every filename HLDspec may ever place or manage inside the mirror. The mirror is
 # wiped of these (and only these) before re-materialising, so an orphan left by a
@@ -315,6 +327,82 @@ class SourcePackageBuild:
         return self.validation.ok and not self.unsupported_claims and not self.marking_errors
 
 
+def build_helper_recommendations() -> dict:
+    """Advisory Journey 2 output: which helpers are available for this package.
+
+    The selected helper is recorded separately in .hldspec/helper_selection.json
+    (Journey 3 state); this file describes what Journey 2 recommends. It is
+    intentionally static today — speckit is the only implemented helper and the
+    default. Future helpers are listed as not_implemented so Journey 3 never
+    mistakes them for working.
+    """
+    return {
+        "schema_version": 1,
+        "default_helper": "speckit",
+        "recommended_helpers": [
+            {
+                "helper_id": "speckit",
+                "status": "implemented",
+                "rationale": (
+                    "SpecKit provides the canonical specify→clarify→plan→tasks→"
+                    "analyze→implement ritual for a structured HLD source package. "
+                    "The Journey 3 run-card runtime (next_feature_readiness) reads "
+                    "this package natively."
+                ),
+                "required_capabilities": [
+                    "speckit_single_spec_input.md",
+                    "engineering_guidelines.md",
+                    "implementation_slices.json",
+                ],
+                "package_fit": "high",
+                "target_fit": "high — requires a SpecKit-initialized target repo",
+                "authority_levels": ["GUIDE_ONLY", "PROPOSE_COMMAND"],
+            }
+        ],
+        "unsupported_helpers": [
+            {
+                "helper_id": "claude-code",
+                "status": "not_implemented",
+                "reason": (
+                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
+                    "but no target-local helper implementation exists yet."
+                ),
+            },
+            {
+                "helper_id": "codex",
+                "status": "not_implemented",
+                "reason": (
+                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
+                    "but no target-local helper implementation exists yet."
+                ),
+            },
+            {
+                "helper_id": "devin",
+                "status": "not_implemented",
+                "reason": (
+                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
+                    "but no target-local helper implementation exists yet."
+                ),
+            },
+            {
+                "helper_id": "manual",
+                "status": "not_implemented",
+                "reason": (
+                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
+                    "but no target-local helper implementation exists yet."
+                ),
+            },
+        ],
+        "human_override_allowed": True,
+        "notes": [
+            "Advisory Journey 2 output. Records which helpers are available for this package.",
+            "Journey 3 reads this file to determine the default helper. The selected helper "
+            "is recorded separately in .hldspec/helper_selection.json, not here.",
+            "Regenerate after structural HLD changes that affect toolchain requirements.",
+        ],
+    }
+
+
 def build_source_package_content(
     target_root: Path,
     hld_text: str,
@@ -357,6 +445,11 @@ def build_source_package_content(
     (source_dir / AUTHORITATIVE_FILES["engineering_guidelines"]).write_text(
         engineering_selection.render_engineering_guidelines_md(hld_text, project_name=project_name),
         encoding="utf-8",
+    )
+
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["helper_recommendations"],
+        build_helper_recommendations(),
     )
 
     valid_anchors = set(ref_map["anchors"].keys())
