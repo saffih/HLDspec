@@ -258,7 +258,7 @@ Prompt 2 — Harden the Journey 2 package contract   [DONE: docs/JOURNEY2_PACKAG
   validation rules, what must be evidence-based, what must not be invented.
   Make the package a stable typed artifact.
 
-Prompt 3 — Review/redesign Journey 3 against those contracts
+Prompt 3 — Review/redesign Journey 3 against those contracts   [DONE: docs/JOURNEY3_HELPER_CONTRACT.md]
   Re-scope Journey 3 to consume the target package and operate a helper runtime.
   Confirm it synthesizes nothing, keep SpecKit as helper #1, and define the
   seam for a second helper without building one yet.
