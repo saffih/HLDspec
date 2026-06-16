@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from hldspec import hld_source_package as sp
+from hldspec import helper_registry as hr
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
@@ -354,6 +355,89 @@ class HelperRecommendationsTests(unittest.TestCase):
         self.assertTrue(result.ok,
                         msg=f"validation must not require advisory helper_recommendations: "
                             f"{result.missing} {result.hash_mismatches}")
+
+    # --- Registry-derivation / de-duplication --------------------------------
+
+    def test_recommended_helper_ids_exist_in_registry(self):
+        rec = sp.build_helper_recommendations()
+        registry = hr.build_registry()
+        for entry in rec["recommended_helpers"]:
+            self.assertIsNotNone(
+                hr.get_helper(registry, entry["helper_id"]),
+                msg=f"recommended helper {entry['helper_id']} is not in the registry",
+            )
+
+    def test_speckit_facts_are_derived_from_registry(self):
+        # status and authority_levels must match the registry exactly (not an
+        # independently maintained copy).
+        rec = sp.build_helper_recommendations()
+        speckit_rec = next(h for h in rec["recommended_helpers"] if h["helper_id"] == "speckit")
+        speckit_reg = hr.get_helper(hr.build_registry(), "speckit")
+        self.assertEqual(speckit_reg["status"], speckit_rec["status"])
+        self.assertEqual(list(speckit_reg["authority_levels"]), speckit_rec["authority_levels"])
+
+    def test_recommendations_reflect_registry_authority_not_hardcoded(self):
+        # Falsifiable de-dup test: if the builder hardcoded speckit authority levels
+        # instead of deriving from the registry, this would fail.
+        registry = hr.build_registry()
+        hr.get_helper(registry, "speckit")["authority_levels"] = ["GUIDE_ONLY"]
+        rec = sp.build_helper_recommendations(registry=registry)
+        speckit_rec = next(h for h in rec["recommended_helpers"] if h["helper_id"] == "speckit")
+        self.assertEqual(["GUIDE_ONLY"], speckit_rec["authority_levels"])
+
+    def test_recommendations_reflect_registry_status_not_hardcoded(self):
+        # If status were hardcoded, demoting speckit in the registry would not drop
+        # it from the implemented/recommended set. Derivation makes it drop.
+        registry = hr.build_registry()
+        hr.get_helper(registry, "speckit")["status"] = "experimental"
+        rec = sp.build_helper_recommendations(registry=registry)
+        ids = [h["helper_id"] for h in rec["recommended_helpers"]]
+        self.assertNotIn("speckit", ids)
+        self.assertIsNone(rec["default_helper"])
+
+    def test_default_helper_derived_from_registry(self):
+        self.assertEqual(
+            hr.default_helper_id(hr.build_registry()),
+            sp.build_helper_recommendations()["default_helper"],
+        )
+
+    def test_unsupported_helpers_come_from_registry_planned_ids(self):
+        rec = sp.build_helper_recommendations()
+        ids = [h["helper_id"] for h in rec["unsupported_helpers"]]
+        self.assertEqual(list(hr.PLANNED_HELPER_IDS), ids)
+
+    def test_unsupported_helper_not_in_implemented_set(self):
+        # A not-implemented helper must never also appear as an implemented/operational one.
+        rec = sp.build_helper_recommendations()
+        implemented_ids = {h["helper_id"] for h in hr.implemented_helpers(hr.build_registry())}
+        for entry in rec["unsupported_helpers"]:
+            self.assertNotIn(entry["helper_id"], implemented_ids)
+
+    def test_no_selected_helper_in_recommendations(self):
+        rec = sp.build_helper_recommendations()
+        self.assertNotIn("selected_helper", rec)
+        self.assertNotIn("helper_selection", rec)
+
+    def test_registry_provenance_present(self):
+        rec = sp.build_helper_recommendations()
+        prov = rec.get("registry_provenance")
+        self.assertIsNotNone(prov)
+        self.assertEqual(hr.SCHEMA_VERSION, prov["schema_version"])
+        self.assertEqual(hr.registry_sha256(), prov["registry_sha256"])
+
+    def test_recommendations_deterministic(self):
+        self.assertEqual(sp.build_helper_recommendations(), sp.build_helper_recommendations())
+
+    def test_runtime_manifest_has_no_selected_helper(self):
+        # Runtime MANIFEST is provenance only; selection must never live there.
+        from hldspec import runtime_vendor
+        manifest = runtime_vendor.build_manifest({})
+        self.assertNotIn("selected_helper", manifest)
+        self.assertNotIn("helper_selection", manifest)
+        self.assertEqual(
+            {"runtime_version", "generated_by", "source_commit", "files"},
+            set(manifest.keys()),
+        )
 
 
 if __name__ == "__main__":

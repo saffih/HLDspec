@@ -60,6 +60,14 @@ VALID_AUTHORITY_LEVELS: frozenset[str] = frozenset({
 # AUTONOMOUS_WITH_GUARDS is future-only and never allowed on a registered helper.
 FORBIDDEN_AUTHORITY_LEVELS: frozenset[str] = frozenset({AUTHORITY_AUTONOMOUS_WITH_GUARDS})
 
+# Known helper IDs that are contracted (docs/JOURNEY3_HELPER_CONTRACT.md,
+# docs/HELPER_BOOTSTRAP_CONTRACT.md) but have no operational implementation yet.
+# Only their IDs and the not-implemented status are canonical here — they carry no
+# capabilities. A future slice promotes one into `helpers` via the Bootstrap. This
+# is the single source of truth for "known but not-implemented" helper IDs so that
+# advisory consumers (e.g. Journey 2 helper_recommendations) never invent the list.
+PLANNED_HELPER_IDS: tuple[str, ...] = ("claude-code", "codex", "devin", "manual")
+
 # --- Schema fields -----------------------------------------------------------
 # Negative-capability fields. These must be concrete and non-empty for every
 # helper (see _is_vague). Concrete negative capability is the load-bearing safety
@@ -224,6 +232,29 @@ def operational_helpers(registry: dict) -> list[dict]:
         if isinstance(helper, dict)
         and helper.get("lifecycle_state") == OPERATIONAL_LIFECYCLE_STATE
     ]
+
+
+def implemented_helpers(registry: dict) -> list[dict]:
+    """Helpers with status 'implemented'. The canonical 'available helpers' set."""
+    return [
+        helper
+        for helper in registry.get("helpers", [])
+        if isinstance(helper, dict) and helper.get("status") == "implemented"
+    ]
+
+
+def default_helper_id(registry: dict) -> str | None:
+    """The safe default helper id: the first implemented helper, or None."""
+    helpers = implemented_helpers(registry)
+    return helpers[0]["helper_id"] if helpers else None
+
+
+def registry_sha256(registry: dict | None = None) -> str:
+    """SHA256 of the canonical registry JSON. Lets advisory consumers record which
+    registry version they derived from, so drift is detectable."""
+    import hashlib
+
+    return hashlib.sha256(registry_json(registry).encode("utf-8")).hexdigest()
 
 
 def validate_helper(entry: dict) -> list[str]:

@@ -23,7 +23,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import mediator_guidance
+from . import helper_registry, mediator_guidance
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
@@ -327,78 +327,82 @@ class SourcePackageBuild:
         return self.validation.ok and not self.unsupported_claims and not self.marking_errors
 
 
-def build_helper_recommendations() -> dict:
-    """Advisory Journey 2 output: which helpers are available for this package.
+# Advisory, package-fit-only context per implemented helper. Capability facts
+# (status, authority levels) are NOT stored here — they are derived from the
+# helper registry at build time. Only this fit explanation is Journey-2-owned.
+_HELPER_PACKAGE_FIT: dict[str, dict] = {
+    "speckit": {
+        "package_fit": "high",
+        "target_fit": "requires a SpecKit-initialized target repo",
+        "rationale": (
+            "This package is a single anchored spec input plus engineering "
+            "guidelines and implementation slices — the shape SpecKit's "
+            "specify→plan→tasks→implement ritual consumes natively."
+        ),
+    },
+}
 
-    The selected helper is recorded separately in .hldspec/helper_selection.json
-    (Journey 3 state); this file describes what Journey 2 recommends. It is
-    intentionally static today — speckit is the only implemented helper and the
-    default. Future helpers are listed as not_implemented so Journey 3 never
-    mistakes them for working.
+
+def build_helper_recommendations(registry: dict | None = None) -> dict:
+    """Advisory Journey 2 output: which helper is recommended for THIS package, and why.
+
+    Helper capability facts (helper_id, status, authority levels) are **derived**
+    from `hldspec/helper_registry.py` — the canonical source of truth for helper
+    capabilities. This file is not a copy of the registry; it adds only advisory
+    package-fit information. The not-implemented helper IDs come from the registry's
+    `PLANNED_HELPER_IDS`, not an independent list here.
+
+    It does NOT record which helper the targeteer selected
+    (`.hldspec/helper_selection.json`, a future Journey 3 slice), an execution
+    prompt (NextActionPacket), or unresolved questions (inquiry/gap ledger).
     """
+    reg = helper_registry.build_registry() if registry is None else registry
+
+    recommended = []
+    for helper in helper_registry.implemented_helpers(reg):
+        helper_id = helper["helper_id"]
+        fit = _HELPER_PACKAGE_FIT.get(helper_id, {})
+        recommended.append({
+            "helper_id": helper_id,
+            "status": helper["status"],                            # derived from registry
+            "authority_levels": list(helper["authority_levels"]),  # derived from registry
+            "package_fit": fit.get("package_fit", "unknown"),      # advisory (Journey 2)
+            "target_fit": fit.get("target_fit", "unknown"),        # advisory (Journey 2)
+            "rationale": fit.get("rationale", ""),                 # advisory (Journey 2)
+        })
+
+    unsupported = [
+        {
+            "helper_id": helper_id,
+            "status": "not_implemented",
+            "reason": (
+                "Contracted in docs/JOURNEY3_HELPER_CONTRACT.md / "
+                "docs/HELPER_BOOTSTRAP_CONTRACT.md but not yet an operational helper "
+                "in the helper registry."
+            ),
+        }
+        for helper_id in helper_registry.PLANNED_HELPER_IDS
+    ]
+
     return {
         "schema_version": 1,
-        "default_helper": "speckit",
-        "recommended_helpers": [
-            {
-                "helper_id": "speckit",
-                "status": "implemented",
-                "rationale": (
-                    "SpecKit provides the canonical specify→clarify→plan→tasks→"
-                    "analyze→implement ritual for a structured HLD source package. "
-                    "The Journey 3 run-card runtime (next_feature_readiness) reads "
-                    "this package natively."
-                ),
-                "required_capabilities": [
-                    "speckit_single_spec_input.md",
-                    "engineering_guidelines.md",
-                    "implementation_slices.json",
-                ],
-                "package_fit": "high",
-                "target_fit": "high — requires a SpecKit-initialized target repo",
-                "authority_levels": ["GUIDE_ONLY", "PROPOSE_COMMAND"],
-            }
-        ],
-        "unsupported_helpers": [
-            {
-                "helper_id": "claude-code",
-                "status": "not_implemented",
-                "reason": (
-                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
-                    "but no target-local helper implementation exists yet."
-                ),
-            },
-            {
-                "helper_id": "codex",
-                "status": "not_implemented",
-                "reason": (
-                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
-                    "but no target-local helper implementation exists yet."
-                ),
-            },
-            {
-                "helper_id": "devin",
-                "status": "not_implemented",
-                "reason": (
-                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
-                    "but no target-local helper implementation exists yet."
-                ),
-            },
-            {
-                "helper_id": "manual",
-                "status": "not_implemented",
-                "reason": (
-                    "Helper contract exists (docs/JOURNEY3_HELPER_CONTRACT.md), "
-                    "but no target-local helper implementation exists yet."
-                ),
-            },
+        "default_helper": helper_registry.default_helper_id(reg),  # derived from registry
+        "registry_provenance": {
+            "schema_version": reg.get("schema_version"),
+            "registry_sha256": helper_registry.registry_sha256(reg),
+        },
+        "recommended_helpers": recommended,
+        "unsupported_helpers": unsupported,
+        "required_capabilities": [
+            "spec-driven implementation guidance over an anchored source package",
         ],
         "human_override_allowed": True,
         "notes": [
-            "Advisory Journey 2 output. Records which helpers are available for this package.",
-            "Journey 3 reads this file to determine the default helper. The selected helper "
-            "is recorded separately in .hldspec/helper_selection.json, not here.",
-            "Regenerate after structural HLD changes that affect toolchain requirements.",
+            "Advisory Journey 2 output. Helper capability facts are derived from "
+            "hldspec/helper_registry.py; this file is not a copy of the registry.",
+            "Records which helper is recommended for this package, not which helper "
+            "was selected. Selection is .hldspec/helper_selection.json (future).",
+            "Regenerate after structural HLD changes or after the helper registry changes.",
         ],
     }
 
