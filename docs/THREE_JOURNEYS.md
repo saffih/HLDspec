@@ -253,7 +253,7 @@ Prompt 1 — Harden the Journey 1 contract   [DONE: docs/JOURNEY1_SDD_READY_GATE
   PASS/ACTION/BLOCKED criteria, what must not pass to Journey 2,
   RunSkeptic questions for HLD quality. Make it testable/gated.
 
-Prompt 2 — Harden the Journey 2 package contract
+Prompt 2 — Harden the Journey 2 package contract   [DONE: docs/JOURNEY2_PACKAGE_CONTRACT.md]
   Define target_package / feature / spec-input / constitution-material schemas,
   validation rules, what must be evidence-based, what must not be invented.
   Make the package a stable typed artifact.
