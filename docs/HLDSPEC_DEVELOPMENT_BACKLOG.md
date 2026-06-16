@@ -634,6 +634,24 @@ contracts; implementation deferred. Do not act on these until explicitly gated.
   or remains a separate standalone capability. The contracts describe it as an
   opt-in exception but do not bind it formally to the `helper_id: speckit` entry.
 
+**P1-012 addendum — Helper Bootstrap runtime (docs/HELPER_BOOTSTRAP_CONTRACT.md,
+added 2026-06-16):**
+
+The Bootstrap contract is docs-only. Implementation slices (do not start without
+a separate gated prompt):
+
+- Slice A: `registry.json` + `.hldspec/helpers/speckit/` entry for the existing
+  `speckit` operational helper (retrofit, no behavior change).
+- Slice B: Intake question runner → writes `INSPECTED_TOOL` JSON.
+- Slice C: Capability probe checklist → writes `REVIEWED_HELPER` JSON or
+  `REJECTED.json`.
+- Slice D: `NextActionPacket` writer/renderer (formalize what
+  `next_feature_readiness` already produces for speckit).
+- Slice E: Human-approval gate for `APPROVED_HELPER` → `OPERATIONAL_HELPER`
+  transition.
+
+Do not implement until Slice A is separately reviewed and gated.
+
 **Design note — storage separation (do not collapse these into one file):**
 
 ```text

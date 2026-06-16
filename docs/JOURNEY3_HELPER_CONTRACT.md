@@ -17,6 +17,12 @@ runtime*). This doc is their binding contract, not a new mechanism.
 > Journey 3 therefore **defaults to `helper: speckit`** today. §8 defines the
 > seam; this doc does not pretend recommendations work.
 
+> **New helper onboarding:** when a new tool/skill is introduced as a candidate
+> helper, it enters through the Generic Helper Bootstrap
+> (`docs/HELPER_BOOTSTRAP_CONTRACT.md`). The Bootstrap generates a candidate
+> HelperContract; this doc defines the operational contract that a Bootstrap
+> graduate fills when it reaches `OPERATIONAL_HELPER`.
+
 ---
 
 ## 1. Purpose
