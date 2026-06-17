@@ -623,6 +623,32 @@ contracts; implementation deferred. Do not act on these until explicitly gated.
   `AUTHORITATIVE_FILES` (manifest-hashed), excluded from `MIRROR_FILES` and
   `REQUIRED_FILES`. Tests in `tests_v2/test_source_package.py::HelperRecommendationsTests`.
 
+### P1-013 Journey 2 inquiry/gap ledger + lens registry (docs/JOURNEY2_INQUIRY_LEDGER_CONTRACT.md, added 2026-06-17)
+
+Contract is docs-only. Implementation slices (do not start without a separate gated
+prompt):
+
+- **Slice A — `lens_registry.py`:** 4 builtin lenses (DOMAIN, ARCHITECTURE,
+  QUALITY, TOOL_HELPER), `validate_lens`, `validate_lens_registry`, `lens_json()`.
+  Mirrors the pattern of `helper_registry.py`. No wiring into compilation path yet.
+- **Slice B — `inquiry_ledger.json` + `gap_register.json` in source package:**
+  Add both to `AUTHORITATIVE_FILES` + `_MIRROR_EXCLUDED` where required. Not in
+  `REQUIRED_FILES` (migration safety). Add gate conditions to
+  `SOURCE_PACKAGE_APPROVAL_GATE`: ESCALATED unresolved → BLOCKED; BLOCKER gap open
+  → BLOCKED; WARNING gap → ACTION.
+- **Slice C — Compilation wiring:** Wire lens registry into `build_source_package_content`
+  so that the four builtin lenses generate question candidates from the HLD anchors
+  and slice set, producing a draft `inquiry_ledger.json` and `gap_register.json`.
+  Question resolution (ASSUMED / ANSWERED_FROM_HLD / ESCALATED) happens at this
+  step or via human input before promotion.
+- **Slice D — Advisory views:** Render `open_questions.md` and
+  `answered_assumptions.md` from the ledger. Render `test_strategy.md` from
+  QUALITY-lens output. All three in `AUTHORITATIVE_FILES` + `_MIRROR_EXCLUDED`,
+  not in `REQUIRED_FILES`.
+
+Tests added with each slice in `tests_v2/`. See §13 of the contract for the full
+14-test list. Do not implement until Slice A is separately reviewed and gated.
+
 **Journey 3:**
 
 - **Store/read selected `helper_id` at runtime.** `helper_id` is not yet a stored
