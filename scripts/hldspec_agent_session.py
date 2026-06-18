@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hldspec import helper_selection as hsel
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
 from hldspec.minimal_agent_request import _workflow_trigger_candidates, detect_workflow_trigger, parse_minimal_agent_request
@@ -169,6 +170,21 @@ def print_speckit_branch_gate_summary(report: dict[str, Any]) -> None:
     print(f"Current branch: {report.get('current_branch') or 'UNKNOWN'}")
     print(f"Current spec dir: {report.get('current_spec_dir') or 'UNKNOWN'}")
     print(f"Report: {paths.get('json', 'UNKNOWN')}")
+    print("")
+
+
+def print_toolchain_status_summary(target: Path) -> None:
+    toolchain_status = hsel.build_toolchain_status(target)
+    print("## Toolchain")
+    print(f"Toolchain: {toolchain_status['toolchain']}")
+    print(f"Recommended helper: {toolchain_status['recommended_helper_id']}")
+    print(f"Recommendation present: {str(toolchain_status['recommendations_present']).lower()}")
+    print(f"Recommendation current: {str(toolchain_status['recommendations_current']).lower()}")
+    print(f"Selected helper: {toolchain_status['selected_helper_id'] or 'none'}")
+    print(f"Effective helper: {toolchain_status['effective_helper_id']}")
+    if toolchain_status["notes"]:
+        print("Notes:")
+        print_bullet_list(toolchain_status["notes"])
     print("")
 
 
@@ -1217,6 +1233,7 @@ def command_status(args: argparse.Namespace) -> int:
             print_git_lifecycle_summary(git_lifecycle, git_lifecycle_plan)
         if branch_gate:
             print_speckit_branch_gate_summary(branch_gate)
+        print_toolchain_status_summary(target)
         print("## Blockers")
         print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
         print("")
@@ -1266,6 +1283,7 @@ def command_status(args: argparse.Namespace) -> int:
     print_speckit_branch_gate_summary(
         operator_report.get("speckit_branch_gate_report") if isinstance(operator_report.get("speckit_branch_gate_report"), dict) else branch_gate
     )
+    print_toolchain_status_summary(target)
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
     print(f"Promotion gate status: {promotion_status} ({promotion_path})")
@@ -1288,6 +1306,27 @@ def command_status(args: argparse.Namespace) -> int:
     else:
         selected_next_action = str(operator_report.get("next_safe_action") or next_safe_action(session, conflicts + blockers, open_questions))
     print(selected_next_action)
+    return 0
+
+
+def command_select_helper(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    status_before = hsel.build_toolchain_status(target)
+    if args.use_recommended:
+        helper_id = status_before["recommended_helper_id"]
+        source = hsel.SOURCE_DEFAULT
+    else:
+        helper_id = args.helper_id
+        source = hsel.SOURCE_EXPLICIT
+
+    try:
+        path = hsel.write_helper_selection(target, helper_id, selected_by=args.selected_by, source=source)
+    except hsel.InvalidHelperSelectionError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"Selected helper: {helper_id}")
+    print(f"Selection written: {path}")
     return 0
 
 
@@ -1714,6 +1753,13 @@ HELP_TOPICS: dict[str, dict[str, str]] = {
         "will_not": "Create branches, run SpecKit phases, approve implementation, commit, merge, or adopt unknown brownfield code.",
         "example": "HLDspec operator-state target: /path/to/target",
     },
+    "select-helper": {
+        "purpose": "Record which Journey 3 helper (toolchain driver) is selected for this target.",
+        "does": "Validates the helper id against the operational helper registry and writes .hldspec/helper_selection.json.",
+        "stops_at": "Confirmation of the written selection, or a rejection if the helper id is not operational.",
+        "will_not": "Select a planned-but-not-implemented helper (e.g. claude-code, codex, devin, manual), or touch any toolchain-owned file.",
+        "example": "HLDspec select-helper target: /path/to/target --use-recommended",
+    },
     "review": {
         "purpose": "Show the human-facing checkpoint/review artifacts for the target.",
         "does": "Lists blocking and optional files the user or judge should inspect.",
@@ -1786,6 +1832,9 @@ def _normalise_help_topic(topic: str) -> str:
         "prompts": "target prompts",
         "target prompt": "target prompts",
         "target prompts": "target prompts",
+        "select helper": "select-helper",
+        "helper select": "select-helper",
+        "choose helper": "select-helper",
     }
     return aliases.get(text, text)
 
@@ -1862,6 +1911,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("status", help="Show current HLDspec agent session status.")
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_status)
+
+    p = sub.add_parser("select-helper", help="Record the selected Journey 3 helper in .hldspec/helper_selection.json.")
+    p.add_argument("--target", required=True)
+    group = p.add_mutually_exclusive_group(required=True)
+    group.add_argument("--helper-id", help="Explicit operational helper id, e.g. speckit.")
+    group.add_argument("--use-recommended", action="store_true", help="Select the current recommended/default helper.")
+    p.add_argument("--selected-by", default="human", help="Who made the selection (human/agent identifier).")
+    p.set_defaults(func=command_select_helper)
 
     p = sub.add_parser("review", help="Show human review files.")
     p.add_argument("--target", required=True)

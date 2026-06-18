@@ -230,9 +230,12 @@ bad package, Journey 1 for a bad HLD) — Journey 3 never patches around it.
 - **`helper_recommendations` is now emitted** by Journey 2
   (`hldspec/hld_source_package.py::build_helper_recommendations`). Journey 3 may
   read `source_package/helper_recommendations.json` to determine the recommended
-  default helper. The selected helper state (`.hldspec/helper_selection.json`)
-  is not yet implemented; Journey 3 still defaults to `helper: speckit` at
-  runtime until that read path is added.
+  default helper. **The selected helper state is now implemented**:
+  `.hldspec/helper_selection.json`, written/read by `hldspec/helper_selection.py`
+  and surfaced in `scripts/hldspec_agent_session.py status` (`## Toolchain`
+  section) and `select-helper` (writer). Selection validates against
+  `helper_registry.operational_helpers()` — a planned-but-not-implemented helper
+  id is rejected. See `docs/TOOLCHAIN_DRIVER_BOUNDARY.md`.
 - **`helper_id` is not yet a stored field.** The runtime is implicitly speckit;
   formalizing a `helper_id` in the runtime/manifest is a small future change, not
   claimed as present.
