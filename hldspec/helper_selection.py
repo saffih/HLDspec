@@ -47,7 +47,14 @@ def selection_path(target: Path) -> Path:
 
 
 def recommendations_path(target: Path) -> Path:
-    return TargetWorkspaceAdapter(target_root=target, layout="new").source_package_dir / "helper_recommendations.json"
+    return (
+        TargetWorkspaceAdapter(
+            target_root=target,
+            layout="new",
+            controller_root=control_paths.resolve_controller_root(target),
+        ).source_package_dir
+        / "helper_recommendations.json"
+    )
 
 
 def read_helper_selection(target: Path) -> dict[str, Any] | None:

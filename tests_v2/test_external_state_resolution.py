@@ -26,6 +26,8 @@ from hldspec import run_state  # noqa: E402
 from hldspec import session_control as sc  # noqa: E402
 from hldspec import source_freshness as sf  # noqa: E402
 from hldspec import speckit_readiness as sr  # noqa: E402
+from hldspec import helper_selection as hsel  # noqa: E402
+from hldspec.hld_source_package import build_helper_recommendations  # noqa: E402
 
 
 def _make_external(tmp: str) -> tuple[Path, Path]:
@@ -121,6 +123,22 @@ class SourceFreshnessExternalTests(unittest.TestCase):
             result = sf.build_source_freshness(target, source)
             # Pre-fix: looked under controller/targetHLD (absent) -> "missing" -> stale.
             self.assertEqual(result["state"], "fresh", result.get("warnings"))
+
+
+class HelperSelectionExternalTests(unittest.TestCase):
+    def test_toolchain_status_reads_controller_source_package_recommendations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target, controller = _make_external(tmp)
+            source_package = controller / ".hldspec" / "source_package"
+            source_package.mkdir(parents=True)
+            (source_package / "helper_recommendations.json").write_text(
+                json.dumps(build_helper_recommendations()), encoding="utf-8"
+            )
+
+            status = hsel.build_toolchain_status(target)
+
+            self.assertTrue(status["recommendations_present"])
+            self.assertTrue(status["recommendations_current"])
 
 
 class RemainingExternalReadSweepTests(unittest.TestCase):
