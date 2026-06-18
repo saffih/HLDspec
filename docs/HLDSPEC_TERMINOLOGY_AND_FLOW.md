@@ -60,7 +60,7 @@ Hard rules:
   command/tool surface. This list is authoritative for the command surface;
   README and other docs defer to it. Current commands: `start`, `status`,
   `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`
-  (alias `speckit-state`), and read-only `git-lifecycle`. It is the
+  (alias `speckit-state`), read-only `git-lifecycle`, and `select-helper`. It is the
   internal/manual tool surface that agents run
   on the user's behalf and that maintainers use for debug/fallback — it is
   **not the primary human UX**. Hides internal scripts behind one entry point;

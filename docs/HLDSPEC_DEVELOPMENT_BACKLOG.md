@@ -651,9 +651,13 @@ Tests added with each slice in `tests_v2/`. See §13 of the contract for the ful
 
 **Journey 3:**
 
-- **Store/read selected `helper_id` at runtime.** `helper_id` is not yet a stored
-  field. The runtime is implicitly `speckit`; formalizing the selection needs a
-  storage location (see design note below).
+- **Store/read selected `helper_id` at runtime.** ✓ DONE (2026-06-18).
+  `hldspec/helper_selection.py` writes/reads `.hldspec/helper_selection.json`
+  (validated against `helper_registry.operational_helpers()`), surfaced via
+  `scripts/hldspec_agent_session.py status` (`## Toolchain` section) and the new
+  `select-helper` command. See `docs/TOOLCHAIN_DRIVER_BOUNDARY.md`. Tests:
+  `tests_v2/test_helper_selection.py`, `tests_v2/test_toolchain_driver_boundary.py`,
+  `tests_v2/test_toolchain_driver_status_cli.py`.
 - **Decide `EXECUTE_WITH_APPROVAL` contract placement.** The existing opt-in
   `SpecKitInvoker` / `SpecKit drive` loop is an `EXECUTE_WITH_APPROVAL` capability.
   Decide whether it belongs under `HelperContract` as a per-helper authority field,

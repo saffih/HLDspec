@@ -158,3 +158,34 @@ Next small slices (no urgency order):
 | Manages `next_feature_AGENTS.md` (always regenerable) and `.specify/memory/constitution.md` (managed marker block; unmanaged constitution gets a review plan, never overwritten) | ✅ Done | `hldspec/refresh_target.py` |
 | 12 focused tests: dry-run, create/update helper, constitution create/refresh/review, unowned files, spec progress artifacts, dirty tree, product files, skipped/conflict reporting, status-pointer wording | ✅ Done | `tests_v2/test_refresh_target.py` |
 | Docs: refresh-target as Journey 3's only target-write capability, kept separate from the read-only status/run-card driver | ✅ Done | `docs/SPECKIT_DRIVING_MODELS.md`, `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` |
+
+## Toolchain Driver Boundary + helper selection (2026-06-18)
+
+Smallest usable slice making HLDspec's existing SpecKit-driving capability
+helper-explicit: surfaces which toolchain/helper is selected vs recommended,
+and gives the boundary between HLDspec-owned and tool-owned files a name and a
+mutation-safety test, instead of leaving it as prose only.
+
+| Item | Status | Files |
+|---|---|---|
+| Ownership-zone classifier (`HLDSPEC_OWNED`/`ADAPTER_MIRROR`/`READ_ONLY_EVIDENCE`/`TOOL_OWNED_FORBIDDEN`/`AMBIGUOUS_ESCALATE`, default-deny on unknown paths) | ✅ Done | `hldspec/toolchain_driver_boundary.py` |
+| Selected-helper state: `.hldspec/helper_selection.json` writer/reader, validated against `helper_registry.operational_helpers()`; composite toolchain status (recommended vs selected vs effective helper, recommendation staleness via `registry_sha256`) | ✅ Done | `hldspec/helper_selection.py` |
+| `status` command: new `## Toolchain` section (toolchain, recommended/selected/effective helper, staleness notes); new `select-helper` command (`--helper-id` or `--use-recommended`) | ✅ Done | `scripts/hldspec_agent_session.py` |
+| Tests: zone classification, write/read/validation of helper selection, composite status, CLI wiring, and a mutation-safety test proving `status`/`select-helper` never write under `.specify/` or `specs/` | ✅ Done (30 tests) | `tests_v2/test_toolchain_driver_boundary.py`, `tests_v2/test_helper_selection.py`, `tests_v2/test_toolchain_driver_status_cli.py` |
+| Docs: Toolchain Driver Boundary contract (vocabulary bridge, zones, SpecKit driver path, ISG Governance future-seam, SourceBinding bridge table) | ✅ Done | `docs/TOOLCHAIN_DRIVER_BOUNDARY.md`, registered in `docs/DOCS_INDEX.md`; updates to `docs/JOURNEY3_HELPER_CONTRACT.md` §13, `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` P1-012, `README.md`, `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` command list |
+
+**Deliberately deferred (not in this slice):** live `EXECUTE_WITH_APPROVAL`
+drive-loop proof (still unproven per the "Live SpecKit invocation" section
+above), `NextActionPacket`/READY gating, inquiry/gap ledger implementation
+(docs-only, separately gated per `docs/JOURNEY2_INQUIRY_LEDGER_CONTRACT.md`),
+ISG Governance implementation (seam documented only), and refactoring
+`refresh_target.py` to import the new boundary module (left as-is; surgical
+change discipline — two call sites agreeing on the same boundary is sufficient,
+they do not need to share code).
+
+**Residual / pre-existing doc drift noticed, not fixed (out of scope):**
+`docs/JOURNEY3_HELPER_CONTRACT.md` lines 15 and 121/124 still say
+`helper_recommendations` is "not emitted by any code", which predates the
+2026-06-16 `build_helper_recommendations` slice and is now stale; §13 already
+has a correct "now emitted" note. Pre-existing inconsistency, unrelated to this
+slice.
