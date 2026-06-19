@@ -435,7 +435,7 @@ class HelperRecommendationsTests(unittest.TestCase):
         self.assertNotIn("selected_helper", manifest)
         self.assertNotIn("helper_selection", manifest)
         self.assertEqual(
-            {"runtime_version", "generated_by", "source_commit", "files"},
+            {"runtime_version", "generated_by", "source_commit", "helper_id", "toolchain", "files"},
             set(manifest.keys()),
         )
 

@@ -380,6 +380,33 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertIn("source_commit", manifest)
         self.assertIn(str(rt.RUNTIME_RELDIR / "run_card_main.py"), manifest["files"])
 
+    # MANIFEST records the identity of the helper/toolchain this runtime is.
+    def test_runtime_manifest_records_helper_identity(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        manifest = json.loads((self._runtime_dir() / "MANIFEST.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["helper_id"], "speckit")
+        self.assertEqual(manifest["toolchain"], "SpecKit")
+
+    # Legacy manifests without helper identity must not crash the footer.
+    def test_runtime_footer_handles_legacy_manifest_without_helper_identity(self) -> None:
+        (self.target / ".specify" / "memory").mkdir(parents=True)
+        rt.refresh_target(self.target, apply=True)
+        manifest_path = self._runtime_dir() / "MANIFEST.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest.pop("helper_id", None)
+        manifest.pop("toolchain", None)
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        completed = subprocess.run(
+            ["bash", str(self._run_card_path())],
+            cwd=str(self.target),
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertIn("Vendored run-card runtime", completed.stdout)
+        self.assertNotIn("helper speckit", completed.stdout)
+
     # ------------------------------------------------------------------
     # Explicit constitution managed-block adoption
     # ------------------------------------------------------------------
@@ -555,6 +582,8 @@ class RefreshTargetTests(unittest.TestCase):
         self.assertEqual(0, completed.returncode, completed.stderr)
         self.assertIn("SpecKit Run Card", completed.stdout)
         self.assertIn("Vendored run-card runtime", completed.stdout)  # footer present
+        self.assertIn("helper speckit", completed.stdout)  # footer surfaces helper identity
+        self.assertIn("toolchain SpecKit", completed.stdout)
         # Read-only execution must not create a feature branch in the target repo.
         branch = _git(self.target, "branch", "--show-current").stdout.strip()
         self.assertNotIn("-", branch)  # no SpecKit-style NNN-feature branch was created
