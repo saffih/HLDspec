@@ -27,6 +27,7 @@ from hldspec import git_lifecycle as gl
 from hldspec import speckit_branch_gate as bg
 from hldspec import target_discovery as td
 from hldspec import speckit_workspace as sw
+from hldspec import toolchain_driver as tcdrv
 from hldspec.machines.project import ProjectMachine
 from hldspec.promotion import read_json as read_promotion_json
 from hldspec.result_renderer import render_machine_result
@@ -185,6 +186,26 @@ def print_toolchain_status_summary(target: Path) -> None:
     if toolchain_status["notes"]:
         print("Notes:")
         print_bullet_list(toolchain_status["notes"])
+    print("")
+
+
+def print_driver_summary(target: Path) -> None:
+    report = tcdrv.build_driver_report(target)
+    print("## Driver")
+    print(f"Actor: {report['driver_actor']}")
+    print(f"Authority: {report['driver_authority']}")
+    print(f"Status: {report['driver_status']}")
+    print(f"Recommended helper: {report['recommended_helper_id']}")
+    print(f"Selected helper: {report['selected_helper_id'] or 'none'}")
+    print(f"Effective helper: {report['effective_helper_id']}")
+    print(f"Installed runtime helper: {report['installed_runtime_helper_id'] or 'none'}")
+    print(f"Installed runtime toolchain: {report['installed_runtime_toolchain'] or 'none'}")
+    print(f"Identity match: {str(report['identity_match']).lower()}")
+    print(f"Next safe action: {report['next_safe_action']}")
+    print("Forbidden actions:")
+    print_bullet_list(report["forbidden_actions"])
+    print("Reality checks:")
+    print_bullet_list(report["reality_check_notes"])
     print("")
 
 
@@ -1234,6 +1255,7 @@ def command_status(args: argparse.Namespace) -> int:
         if branch_gate:
             print_speckit_branch_gate_summary(branch_gate)
         print_toolchain_status_summary(target)
+        print_driver_summary(target)
         print("## Blockers")
         print_bullet_list([str(item) for item in discovery.get("blockers", []) if str(item).strip()])
         print("")
@@ -1284,6 +1306,7 @@ def command_status(args: argparse.Namespace) -> int:
         operator_report.get("speckit_branch_gate_report") if isinstance(operator_report.get("speckit_branch_gate_report"), dict) else branch_gate
     )
     print_toolchain_status_summary(target)
+    print_driver_summary(target)
     print("## Validation")
     print(f"Validation status: {validation_status} ({validation_path})")
     print(f"Promotion gate status: {promotion_status} ({promotion_path})")
