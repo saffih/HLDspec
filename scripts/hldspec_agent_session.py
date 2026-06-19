@@ -204,6 +204,7 @@ def print_driver_summary(target: Path) -> None:
     print(f"Operator replacement: {'allowed' if report['operator_replacement_allowed'] else 'not allowed'}")
     print(f"Approver replacement: {'allowed' if report['approver_replacement_allowed'] else 'not allowed'}")
     print(f"Observation: {'allowed' if report['observation_allowed'] else 'not allowed'}")
+    print(f"Execution: {'approval-gated' if report['execution_posture'] == 'approval_gated' else 'not allowed'}")
     print(f"Mutation: {'approval-gated' if report['mutation_posture'] == 'approval_gated' else 'not allowed'}")
     print(f"Next safe action: {report['next_safe_action']}")
     print("Protected approvals (owner-only):")

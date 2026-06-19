@@ -106,6 +106,9 @@ class ToolchainStatusCliTests(unittest.TestCase):
         self.assertIn("Actor: human", output)
         self.assertIn("Authority: GUIDE_ONLY", output)
         self.assertIn("Observation: allowed", output)
+        # Execution and mutation are surfaced separately, never conflated.
+        self.assertIn("Execution: not allowed", output)
+        self.assertIn("Mutation: not allowed", output)
         # Operator vs approver distinction is explicit and never conflated.
         self.assertIn("Operator replacement:", output)
         self.assertIn("Approver replacement: not allowed", output)
