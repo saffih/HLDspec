@@ -12,10 +12,13 @@ Like the Journey 1 and Journey 2 contracts, this documents and hardens
 `hldspec/refresh_target.py` (commit *vendor self-contained Journey 3 run-card
 runtime*). This doc is their binding contract, not a new mechanism.
 
-> Honest gap up front: `helper_recommendations` is **not emitted by any code**
-> (it appears only in `THREE_JOURNEYS.md` and `JOURNEY2_PACKAGE_CONTRACT.md`).
-> Journey 3 therefore **defaults to `helper: speckit`** today. §8 defines the
-> seam; this doc does not pretend recommendations work.
+> Status update: `helper_recommendations` is **now emitted by Journey 2**
+> (`hldspec/hld_source_package.py::build_helper_recommendations`) to
+> `target/.hldspec/source_package/helper_recommendations.json`. Journey 3 has
+> selected-helper state at `.hldspec/helper_selection.json`
+> (`hldspec/helper_selection.py`), surfaced via the `## Toolchain` status section
+> and the `select-helper` CLI command. §8 and §13 define the seam and the
+> remaining gaps.
 
 > **New helper onboarding:** when a new tool/skill is introduced as a candidate
 > helper, it enters through the Generic Helper Bootstrap
@@ -118,7 +121,7 @@ universalizes).
 runtime is read-only (build + render only; no report persistence, no git/SpecKit/
 product mutation), which is exactly these two levels.
 
-## 8. `helper_recommendations` seam (contracted, not emitted)
+## 8. `helper_recommendations` seam (now emitted)
 
 **Where it should live:** `target/.hldspec/source_package/helper_recommendations.json`
 (adjacent to the package; keeps `source_package.json` focused on binding metadata).
@@ -133,14 +136,15 @@ product mutation), which is exactly these two levels.
 - `unsupported_helpers` — helpers that cannot serve this package, with reasons.
 - `human_override_allowed` — whether the human may override the recommendation.
 
-**Behavior when missing (current behavior):** Journey 3 **defaults to
-`helper: speckit`** and records that no recommendation was present. This is an
-**ACTION-class** condition (defaultable), never a silent claim that a
-recommendation existed.
+**Current behavior:** Journey 2 emits `helper_recommendations.json` per the
+fields above. Journey 3 reads it via `hldspec/helper_selection.py` to determine
+the recommended default. `select-helper --use-recommended` writes the chosen
+`helper_id` to `.hldspec/helper_selection.json`, validated against
+`helper_registry.operational_helpers()`.
 
-**Do not implement emission now.** This contract documents the seam; emission is a
-later, separately-gated Journey 2 change (it belongs to Journey 2's output, not
-Journey 3's runtime).
+**Behavior when missing or stale:** Journey 3 **defaults to `helper: speckit`**
+and records that no (or no current) recommendation was present. This is an
+**ACTION-class** condition (defaultable), never a silent PASS.
 
 ## 9. CompletionMap
 
@@ -221,7 +225,7 @@ bad package, Journey 1 for a bad HLD) — Journey 3 never patches around it.
 | targeteer | the human/agent completing work in the target repo |
 | helper / `helper_id: speckit` | the existing run-card runtime |
 | install / materialize helper | `refresh-target --apply` |
-| helper_recommendations | *not yet emitted* — §8 seam |
+| helper_recommendations | emitted by Journey 2 — §8 seam |
 
 ## 13. Known limits (honest scope)
 
