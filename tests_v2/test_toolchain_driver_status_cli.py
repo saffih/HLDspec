@@ -9,6 +9,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from hldspec import helper_selection as hsel
+from hldspec import refresh_target as rt
 from hldspec import run_state
 from hldspec import toolchain_driver_boundary as tdb
 
@@ -80,6 +81,21 @@ class ToolchainStatusCliTests(unittest.TestCase):
         self.assertIn("Toolchain: SpecKit", output)
         self.assertIn("Recommended helper: speckit", output)
         self.assertIn("Selected helper: none", output)
+
+    def test_status_includes_driver_section_with_runtime_identity(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        hsel.write_helper_selection(self.target, "speckit", selected_by="human")
+
+        _exit_code, output = self._run(["status", "--target", str(self.target)])
+
+        self.assertIn("## Driver", output)
+        self.assertIn("Actor: human", output)
+        self.assertIn("Authority: GUIDE_ONLY", output)
+        self.assertIn("Status: PASS", output)
+        self.assertIn("Effective helper: speckit", output)
+        self.assertIn("Installed runtime helper: speckit", output)
+        self.assertIn("Installed runtime toolchain: SpecKit", output)
+        self.assertIn("Identity match: true", output)
 
     def test_select_helper_writes_selection_and_status_reflects_it(self) -> None:
         exit_code, output = self._run(["select-helper", "--target", str(self.target), "--use-recommended"])
