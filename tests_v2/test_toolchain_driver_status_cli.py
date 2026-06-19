@@ -9,6 +9,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 from hldspec import helper_selection as hsel
+from hldspec import run_state
 from hldspec import toolchain_driver_boundary as tdb
 
 _CLI_PATH = Path(__file__).resolve().parents[1] / "scripts" / "hldspec_agent_session.py"
@@ -108,6 +109,75 @@ class ToolchainStatusCliTests(unittest.TestCase):
 
         snapshot_after = _snapshot_forbidden_zone(self.target)
         self.assertEqual(snapshot_before, snapshot_after)
+
+
+class ToolchainStatusCliExternalStateTests(unittest.TestCase):
+    """External-state mode: the target carries only the `.hldspec-run.json`
+    pointer; real control state lives under the controller root. Covers the
+    residual risk that CLI-level status/select-helper might mutate
+    target-owned/tool-owned files or leak helper selection into the target."""
+
+    def setUp(self) -> None:
+        self.module = _load_cli()
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-toolchain-status-cli-external-")
+        root = Path(self._tmp.name)
+        self.target = root / "target"
+        self.controller = root / "controller"
+        self.target.mkdir()
+        (self.controller / ".hldspec").mkdir(parents=True)
+        _git(self.target, "init", "-q")
+        _git(self.target, "config", "user.email", "test@example.com")
+        _git(self.target, "config", "user.name", "Test")
+        source = self.target / "HLD.md"
+        source.write_text("# HLD\n", encoding="utf-8")
+        run_state.write_pointer(
+            self.target,
+            controller_root=self.controller,
+            source=source,
+            source_hash="deadbeef",
+            mode="update",
+            agent="test",
+            workflow_trigger="build_loop_ready",
+            created_or_updated_at="2026-06-07T00:00:00+00:00",
+        )
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _run(self, argv: list[str]) -> tuple[int, str]:
+        parser = self.module.build_parser()
+        args = parser.parse_args(argv)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            exit_code = args.func(args)
+        return exit_code, buf.getvalue()
+
+    def test_status_and_select_helper_external_mode_safety(self) -> None:
+        before = _seed_toolchain_owned_files(self.target)
+        snapshot_before = _snapshot_forbidden_zone(self.target)
+        self.assertGreaterEqual(len(snapshot_before), len(before))
+        git_status_before = _git(self.target, "status", "--porcelain").stdout
+
+        self._run(["status", "--target", str(self.target)])
+        exit_code, output = self._run(
+            ["select-helper", "--target", str(self.target), "--use-recommended"]
+        )
+        self._run(["status", "--target", str(self.target)])
+
+        self.assertEqual(0, exit_code)
+        self.assertIn("Selected helper: speckit", output)
+
+        # Seeded .specify/ and specs/ bytes are untouched.
+        snapshot_after = _snapshot_forbidden_zone(self.target)
+        self.assertEqual(snapshot_before, snapshot_after)
+
+        # Helper selection lands only under the controller root, never the target.
+        self.assertTrue((self.controller / ".hldspec" / "helper_selection.json").is_file())
+        self.assertFalse((self.target / ".hldspec" / "helper_selection.json").exists())
+
+        # No git mutation in the product target repo (status stays GUIDE_ONLY-safe).
+        git_status_after = _git(self.target, "status", "--porcelain").stdout
+        self.assertEqual(git_status_before, git_status_after)
 
 
 if __name__ == "__main__":
