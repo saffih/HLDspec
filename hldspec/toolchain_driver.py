@@ -105,9 +105,14 @@ FORBIDDEN_WITHOUT_APPROVAL: tuple[str, ...] = (
     "write to an approved write seam",
 )
 
-# Posture for state-changing actions (execution / mutation). v0 never executes,
-# so this is the *contracted gate*, not current capability: EXECUTE_WITH_APPROVAL
-# reports approval_gated; every other authority reports not_allowed.
+# Posture for state-changing actions. v0 has no execution channel and never
+# executes or mutates, so these are the *contracted gate* (what a future slice
+# would require), not current capability: EXECUTE_WITH_APPROVAL reports
+# approval_gated; every other authority reports not_allowed. execution_posture
+# and mutation_posture are reported separately so neither is misread as the
+# other, but they move together because v0 mutation can only ever happen via an
+# approved execution. The booleans (execution_allowed/mutation_allowed) stay
+# False regardless of posture.
 POSTURE_NOT_ALLOWED = "not_allowed"
 POSTURE_APPROVAL_GATED = "approval_gated"
 
@@ -123,9 +128,10 @@ def build_authority_profile(actor: str, authority: str) -> dict[str, Any]:
     (`operator_replacement_allowed`), but no v0 mode may replace the human
     approver/owner (`approver_replacement_allowed` is always False). v0 is
     read-only -- `mutation_allowed`/`execution_allowed` are always False; for
-    EXECUTE_WITH_APPROVAL the posture is `approval_gated` to record the
-    *contracted* gate, while the booleans stay False because v0 executes
-    nothing. Owner-only boundaries are always listed and never granted.
+    EXECUTE_WITH_APPROVAL `execution_posture`/`mutation_posture` are
+    `approval_gated` to record the *contracted* gate, while the booleans stay
+    False because v0 has no execution channel and executes/mutates nothing.
+    Owner-only boundaries are always listed and never granted.
 
     Validates inputs and raises InvalidDriverInputError on an unknown actor or
     authority, so there is no silent fall-back to unsafe behavior.
@@ -155,7 +161,9 @@ def build_authority_profile(actor: str, authority: str) -> dict[str, Any]:
         # v0 touches nothing, regardless of declared authority.
         "mutation_allowed": False,
         "execution_allowed": False,
-        # Contracted gate (not v0 capability): see docstring.
+        # Contracted gate (not v0 capability): reported separately for execution
+        # and mutation so neither is misread as the other. See module comment.
+        "execution_posture": action_posture,
         "mutation_posture": action_posture,
         "protected_approval_boundaries": list(PROTECTED_APPROVAL_BOUNDARIES),
         "allowed_observations": list(ALLOWED_OBSERVATIONS),

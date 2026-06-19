@@ -47,12 +47,14 @@ operator, so there is nothing to replace (`operator_replacement_allowed` is
 | `EXECUTE_WITH_APPROVAL` | execute only after explicit approval for that action/scope | act without approval |
 | `AUTONOMOUS_WITH_GUARDS` | (future/highest) act as process operator inside declared safe bounds | self-approve protected transitions; bypass owner approval |
 
-v0 **does not implement autonomous execution**. `AUTONOMOUS_WITH_GUARDS` is
-reported as future-only and resolves to `BLOCKED`. Even for
-`EXECUTE_WITH_APPROVAL`, v0 executes and mutates **nothing**:
-`execution_allowed` and `mutation_allowed` are always `False`. The
-`mutation_posture` field records the *contracted* gate
-(`approval_gated` vs `not_allowed`), not current capability.
+v0 **does not implement autonomous execution** and has **no execution
+channel**. `AUTONOMOUS_WITH_GUARDS` is reported as future-only and resolves to
+`BLOCKED`. Even for `EXECUTE_WITH_APPROVAL`, v0 executes and mutates
+**nothing**: `execution_allowed` and `mutation_allowed` are always `False`. The
+`execution_posture` and `mutation_posture` fields record the *contracted* gate
+(`approval_gated` vs `not_allowed`), not current capability. They are reported
+separately so neither is misread as the other, and they move together because
+v0 mutation could only ever happen via an approved execution.
 
 ## Observation vs mutation
 

@@ -134,6 +134,7 @@ class ToolchainDriverReportTests(unittest.TestCase):
         )
         self.assertTrue(report["operator_replacement_allowed"])
         self.assertFalse(report["approver_replacement_allowed"])
+        self.assertEqual(report["execution_posture"], "approval_gated")
         self.assertEqual(report["mutation_posture"], "approval_gated")
         self.assertFalse(report["execution_allowed"])
         self.assertFalse(report["mutation_allowed"])
@@ -164,6 +165,7 @@ class ToolchainDriverReportTests(unittest.TestCase):
             "observation_allowed",
             "mutation_allowed",
             "execution_allowed",
+            "execution_posture",
             "mutation_posture",
             "protected_approval_boundaries",
             "allowed_observations",
@@ -185,6 +187,7 @@ class DriverAuthorityProfileTests(unittest.TestCase):
         self.assertFalse(p["operator_replacement_allowed"])
         self.assertFalse(p["mutation_allowed"])
         self.assertFalse(p["execution_allowed"])
+        self.assertEqual(p["execution_posture"], "not_allowed")
         self.assertEqual(p["mutation_posture"], "not_allowed")
         self.assertTrue(p["protected_approval_boundaries"])
 
@@ -194,6 +197,7 @@ class DriverAuthorityProfileTests(unittest.TestCase):
         self.assertTrue(p["operator_replacement_allowed"])
         self.assertFalse(p["approver_replacement_allowed"])
         self.assertFalse(p["execution_allowed"])
+        self.assertEqual(p["execution_posture"], "not_allowed")
         self.assertEqual(p["mutation_posture"], "not_allowed")
         self.assertTrue(p["protected_approval_boundaries"])
 
@@ -202,15 +206,20 @@ class DriverAuthorityProfileTests(unittest.TestCase):
         p = tcd.build_authority_profile("system", "EXECUTE_WITH_APPROVAL")
         self.assertTrue(p["operator_replacement_allowed"])
         self.assertFalse(p["approver_replacement_allowed"])
+        self.assertEqual(p["execution_posture"], "approval_gated")
         self.assertEqual(p["mutation_posture"], "approval_gated")
-        self.assertFalse(p["execution_allowed"])  # gate is contracted, not v0 capability
+        # The gate is contracted/declared, not v0 capability -- nothing executes.
+        self.assertFalse(p["execution_allowed"])
+        self.assertFalse(p["mutation_allowed"])
 
     # 4. AUTONOMOUS_WITH_GUARDS never grants owner authority or v0 execution.
     def test_autonomous_with_guards(self) -> None:
         p = tcd.build_authority_profile("system", "AUTONOMOUS_WITH_GUARDS")
         self.assertFalse(p["approver_replacement_allowed"])
+        self.assertEqual(p["execution_posture"], "not_allowed")
         self.assertEqual(p["mutation_posture"], "not_allowed")
         self.assertFalse(p["execution_allowed"])
+        self.assertFalse(p["mutation_allowed"])
         self.assertTrue(p["protected_approval_boundaries"])
 
     # 5. Invalid actor/authority raises -- no silent unsafe fall-back.
@@ -241,9 +250,8 @@ class DriverAuthorityProfileTests(unittest.TestCase):
         self.assertTrue(p["observation_allowed"])
         self.assertFalse(p["mutation_allowed"])
 
-    # The invariant, across every (actor, authority) combination: the driver
-    # never replaces the approver/owner and always lists owner-only boundaries.
-    def test_approver_protection_holds_across_all_modes(self) -> None:
+    # The v0 invariants, asserted across every (actor, authority) combination.
+    def test_invariants_hold_across_all_modes(self) -> None:
         actors = ("human", "system")
         authorities = (
             "GUIDE_ONLY",
@@ -255,8 +263,32 @@ class DriverAuthorityProfileTests(unittest.TestCase):
             for authority in authorities:
                 with self.subTest(actor=actor, authority=authority):
                     p = tcd.build_authority_profile(actor, authority)
+                    # The driver never replaces the approver/owner, in any mode.
                     self.assertFalse(p["approver_replacement_allowed"])
+                    # Operator replacement is allowed only for a system driver.
+                    self.assertEqual(p["operator_replacement_allowed"], actor == "system")
+                    # v0 never executes or mutates, regardless of authority.
+                    self.assertFalse(p["execution_allowed"])
+                    self.assertFalse(p["mutation_allowed"])
+                    # Owner-only boundaries are always present (never unlocked).
                     self.assertTrue(p["protected_approval_boundaries"])
+                    # Execution and mutation postures move together.
+                    self.assertEqual(p["execution_posture"], p["mutation_posture"])
+
+    # Protected boundaries cover the owner-only transitions the rule names.
+    def test_protected_boundaries_cover_owner_only_transitions(self) -> None:
+        joined = " ".join(tcd.PROTECTED_APPROVAL_BOUNDARIES).lower()
+        for needle in (
+            "commit",
+            "push",
+            "merge",
+            "delete a branch",
+            "approve a new helper",
+            "operational",
+            "accept unresolved risk",
+            "override a blocked",
+        ):
+            self.assertIn(needle, joined)
 
 
 class ToolchainDriverExternalStateTests(unittest.TestCase):
