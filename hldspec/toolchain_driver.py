@@ -54,9 +54,113 @@ FORBIDDEN_ACTIONS: tuple[str, ...] = (
     "Do not repair or regenerate files under the hood as a side effect of reporting status.",
 )
 
+# --- Driver Authority Contract v0 (docs/DRIVER_AUTHORITY_CONTRACT.md) ----------
+# Core product rule encoded here:
+#   An automatic (system) driver MAY replace the human *operator*.
+#   It MUST NOT automatically replace the human *approver/owner*.
+# So approver_replacement_allowed is False for every v0 (actor, authority) mode,
+# unconditionally, and the owner-only boundaries below are always reported and
+# never granted. "Watch broadly. Touch narrowly."
+
+# Owner/approver-only transitions. The driver never self-approves any of these at
+# any authority level; they belong to the human approver/owner. Always reported,
+# never granted -- distinct from FORBIDDEN_WITHOUT_APPROVAL (operator-gated).
+PROTECTED_APPROVAL_BOUNDARIES: tuple[str, ...] = (
+    "approve a new helper",
+    "mark a helper OPERATIONAL",
+    "change SourceBinding",
+    "change ISG Governance",
+    "change NextActionPacket / READY policy",
+    "mutate product / application code",
+    "mutate toolchain-owned or generated artifacts",
+    "commit",
+    "push",
+    "merge",
+    "delete a branch",
+    "accept unresolved risk",
+    "override a BLOCKED or ACTION gate",
+)
+
+# Reality-check observation categories. The driver may inspect all of these to
+# decide whether reality matches the intended journey state, even outside the
+# selected toolchain. Observation never implies mutation.
+ALLOWED_OBSERVATIONS: tuple[str, ...] = (
+    "git status",
+    "worktree ownership",
+    "branch / PR / merge state",
+    "test result evidence (when available)",
+    "helper recommendation",
+    "helper selection",
+    "installed runtime manifest / helper identity",
+    "generated / owned artifact boundary checks",
+    "journey phase evidence",
+)
+
+# Operator-gated actions: forbidden unless explicitly approved for that action
+# and scope. Unlike PROTECTED_APPROVAL_BOUNDARIES these are within the operator
+# role once approved -- but v0 performs none of them ("Touch narrowly").
+FORBIDDEN_WITHOUT_APPROVAL: tuple[str, ...] = (
+    "execute a command or toolchain step (only after explicit per-action "
+    "approval; v0 executes nothing)",
+    "write to an approved write seam",
+)
+
+# Posture for state-changing actions (execution / mutation). v0 never executes,
+# so this is the *contracted gate*, not current capability: EXECUTE_WITH_APPROVAL
+# reports approval_gated; every other authority reports not_allowed.
+POSTURE_NOT_ALLOWED = "not_allowed"
+POSTURE_APPROVAL_GATED = "approval_gated"
+
 
 class InvalidDriverInputError(ValueError):
     pass
+
+
+def build_authority_profile(actor: str, authority: str) -> dict[str, Any]:
+    """Pure Driver Authority Contract v0 view for an (actor, authority) pair.
+
+    Encodes the product rule: a *system* driver may replace the human operator
+    (`operator_replacement_allowed`), but no v0 mode may replace the human
+    approver/owner (`approver_replacement_allowed` is always False). v0 is
+    read-only -- `mutation_allowed`/`execution_allowed` are always False; for
+    EXECUTE_WITH_APPROVAL the posture is `approval_gated` to record the
+    *contracted* gate, while the booleans stay False because v0 executes
+    nothing. Owner-only boundaries are always listed and never granted.
+
+    Validates inputs and raises InvalidDriverInputError on an unknown actor or
+    authority, so there is no silent fall-back to unsafe behavior.
+    """
+    if actor not in VALID_DRIVER_ACTORS:
+        raise InvalidDriverInputError(
+            f"unknown driver actor: {actor!r} (valid: {sorted(VALID_DRIVER_ACTORS)})"
+        )
+    if authority not in VALID_DRIVER_AUTHORITIES:
+        raise InvalidDriverInputError(
+            f"unknown driver authority: {authority!r} (valid: {sorted(VALID_DRIVER_AUTHORITIES)})"
+        )
+
+    action_posture = (
+        POSTURE_APPROVAL_GATED
+        if authority == helper_registry.AUTHORITY_EXECUTE_WITH_APPROVAL
+        else POSTURE_NOT_ALLOWED
+    )
+    return {
+        # A system driver may stand in for the human operator; a human driver is
+        # one, so there is nothing to "replace".
+        "operator_replacement_allowed": actor == ACTOR_SYSTEM,
+        # The load-bearing invariant: never, in any v0 mode.
+        "approver_replacement_allowed": False,
+        # Floor capability: the driver may always watch broadly.
+        "observation_allowed": True,
+        # v0 touches nothing, regardless of declared authority.
+        "mutation_allowed": False,
+        "execution_allowed": False,
+        # Contracted gate (not v0 capability): see docstring.
+        "mutation_posture": action_posture,
+        "protected_approval_boundaries": list(PROTECTED_APPROVAL_BOUNDARIES),
+        "allowed_observations": list(ALLOWED_OBSERVATIONS),
+        "forbidden_without_approval": list(FORBIDDEN_WITHOUT_APPROVAL),
+    }
 
 
 def _installed_runtime_manifest(target: Path) -> dict[str, Any] | None:
@@ -91,14 +195,8 @@ def build_driver_report(
     Never executes anything; an identity mismatch or missing runtime evidence
     surfaces as ACTION/BLOCKED rather than PASS.
     """
-    if actor not in VALID_DRIVER_ACTORS:
-        raise InvalidDriverInputError(
-            f"unknown driver actor: {actor!r} (valid: {sorted(VALID_DRIVER_ACTORS)})"
-        )
-    if authority not in VALID_DRIVER_AUTHORITIES:
-        raise InvalidDriverInputError(
-            f"unknown driver authority: {authority!r} (valid: {sorted(VALID_DRIVER_AUTHORITIES)})"
-        )
+    # Validates actor/authority and raises early, before any filesystem work.
+    authority_profile = build_authority_profile(actor, authority)
 
     toolchain_status = hsel.build_toolchain_status(target)
     effective_helper_id = toolchain_status["effective_helper_id"]
@@ -158,4 +256,5 @@ def build_driver_report(
         "next_safe_action": next_safe_action,
         "forbidden_actions": list(FORBIDDEN_ACTIONS),
         "reality_check_notes": notes,
+        **authority_profile,
     }

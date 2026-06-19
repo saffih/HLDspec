@@ -122,6 +122,142 @@ class ToolchainDriverReportTests(unittest.TestCase):
         self.assertIn("silently", joined)
         self.assertIn("product", joined)
 
+    # System + EXECUTE_WITH_APPROVAL: operator-replacing, approval-gated, but the
+    # v0 report still executes/mutates nothing while being built.
+    def test_system_execute_with_approval_report_is_gated_and_inert(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        hsel.write_helper_selection(self.target, "speckit", selected_by="human")
+        before = sorted(str(p.relative_to(self.target)) for p in self.target.rglob("*"))
+
+        report = tcd.build_driver_report(
+            self.target, actor="system", authority="EXECUTE_WITH_APPROVAL"
+        )
+        self.assertTrue(report["operator_replacement_allowed"])
+        self.assertFalse(report["approver_replacement_allowed"])
+        self.assertEqual(report["mutation_posture"], "approval_gated")
+        self.assertFalse(report["execution_allowed"])
+        self.assertFalse(report["mutation_allowed"])
+
+        after = sorted(str(p.relative_to(self.target)) for p in self.target.rglob("*"))
+        self.assertEqual(before, after)
+
+    # Autonomous mode stays BLOCKED yet still reports owner protections intact.
+    def test_autonomous_report_keeps_owner_protections(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        hsel.write_helper_selection(self.target, "speckit", selected_by="human")
+
+        report = tcd.build_driver_report(
+            self.target, actor="system", authority="AUTONOMOUS_WITH_GUARDS"
+        )
+        self.assertEqual(report["driver_status"], "BLOCKED")
+        self.assertFalse(report["approver_replacement_allowed"])
+        self.assertEqual(report["mutation_posture"], "not_allowed")
+        self.assertFalse(report["execution_allowed"])
+        self.assertTrue(report["protected_approval_boundaries"])
+
+    # The full report carries the authority-contract fields.
+    def test_report_includes_authority_contract_fields(self) -> None:
+        report = tcd.build_driver_report(self.target)
+        for field in (
+            "operator_replacement_allowed",
+            "approver_replacement_allowed",
+            "observation_allowed",
+            "mutation_allowed",
+            "execution_allowed",
+            "mutation_posture",
+            "protected_approval_boundaries",
+            "allowed_observations",
+            "forbidden_without_approval",
+        ):
+            self.assertIn(field, report)
+
+
+class DriverAuthorityProfileTests(unittest.TestCase):
+    """Pure authority-contract view -- no filesystem. Encodes the product rule:
+    a system driver may replace the human operator; no v0 mode may replace the
+    human approver/owner."""
+
+    # 1. Default human + GUIDE_ONLY: observe only, owner protections intact.
+    def test_default_human_guide_only(self) -> None:
+        p = tcd.build_authority_profile("human", "GUIDE_ONLY")
+        self.assertTrue(p["observation_allowed"])
+        self.assertFalse(p["approver_replacement_allowed"])
+        self.assertFalse(p["operator_replacement_allowed"])
+        self.assertFalse(p["mutation_allowed"])
+        self.assertFalse(p["execution_allowed"])
+        self.assertEqual(p["mutation_posture"], "not_allowed")
+        self.assertTrue(p["protected_approval_boundaries"])
+
+    # 2. System + PROPOSE_COMMAND: may replace operator; proposes, never executes.
+    def test_system_propose_command(self) -> None:
+        p = tcd.build_authority_profile("system", "PROPOSE_COMMAND")
+        self.assertTrue(p["operator_replacement_allowed"])
+        self.assertFalse(p["approver_replacement_allowed"])
+        self.assertFalse(p["execution_allowed"])
+        self.assertEqual(p["mutation_posture"], "not_allowed")
+        self.assertTrue(p["protected_approval_boundaries"])
+
+    # 3. System + EXECUTE_WITH_APPROVAL: operator-replacing, execution approval-gated.
+    def test_system_execute_with_approval(self) -> None:
+        p = tcd.build_authority_profile("system", "EXECUTE_WITH_APPROVAL")
+        self.assertTrue(p["operator_replacement_allowed"])
+        self.assertFalse(p["approver_replacement_allowed"])
+        self.assertEqual(p["mutation_posture"], "approval_gated")
+        self.assertFalse(p["execution_allowed"])  # gate is contracted, not v0 capability
+
+    # 4. AUTONOMOUS_WITH_GUARDS never grants owner authority or v0 execution.
+    def test_autonomous_with_guards(self) -> None:
+        p = tcd.build_authority_profile("system", "AUTONOMOUS_WITH_GUARDS")
+        self.assertFalse(p["approver_replacement_allowed"])
+        self.assertEqual(p["mutation_posture"], "not_allowed")
+        self.assertFalse(p["execution_allowed"])
+        self.assertTrue(p["protected_approval_boundaries"])
+
+    # 5. Invalid actor/authority raises -- no silent unsafe fall-back.
+    def test_unknown_actor_rejected(self) -> None:
+        with self.assertRaises(tcd.InvalidDriverInputError):
+            tcd.build_authority_profile("robot", "GUIDE_ONLY")
+
+    def test_unknown_authority_rejected(self) -> None:
+        with self.assertRaises(tcd.InvalidDriverInputError):
+            tcd.build_authority_profile("human", "bogus")
+
+    # 6. Reality-check: broad observation allowed; observation implies no mutation.
+    def test_allowed_observations_cover_reality_check_categories(self) -> None:
+        p = tcd.build_authority_profile("system", "GUIDE_ONLY")
+        joined = " ".join(p["allowed_observations"]).lower()
+        for needle in (
+            "git",
+            "worktree",
+            "branch",
+            "test",
+            "helper recommendation",
+            "helper selection",
+            "runtime",
+            "artifact",
+            "journey phase",
+        ):
+            self.assertIn(needle, joined)
+        self.assertTrue(p["observation_allowed"])
+        self.assertFalse(p["mutation_allowed"])
+
+    # The invariant, across every (actor, authority) combination: the driver
+    # never replaces the approver/owner and always lists owner-only boundaries.
+    def test_approver_protection_holds_across_all_modes(self) -> None:
+        actors = ("human", "system")
+        authorities = (
+            "GUIDE_ONLY",
+            "PROPOSE_COMMAND",
+            "EXECUTE_WITH_APPROVAL",
+            "AUTONOMOUS_WITH_GUARDS",
+        )
+        for actor in actors:
+            for authority in authorities:
+                with self.subTest(actor=actor, authority=authority):
+                    p = tcd.build_authority_profile(actor, authority)
+                    self.assertFalse(p["approver_replacement_allowed"])
+                    self.assertTrue(p["protected_approval_boundaries"])
+
 
 class ToolchainDriverExternalStateTests(unittest.TestCase):
     """External-state mode: target carries only the `.hldspec-run.json`
