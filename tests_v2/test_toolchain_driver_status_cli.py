@@ -97,6 +97,20 @@ class ToolchainStatusCliTests(unittest.TestCase):
         self.assertIn("Installed runtime toolchain: SpecKit", output)
         self.assertIn("Identity match: true", output)
 
+    def test_status_driver_section_shows_authority_contract(self) -> None:
+        rt.refresh_target(self.target, apply=True)
+        hsel.write_helper_selection(self.target, "speckit", selected_by="human")
+
+        _exit_code, output = self._run(["status", "--target", str(self.target)])
+
+        self.assertIn("Actor: human", output)
+        self.assertIn("Authority: GUIDE_ONLY", output)
+        self.assertIn("Observation: allowed", output)
+        # Operator vs approver distinction is explicit and never conflated.
+        self.assertIn("Operator replacement:", output)
+        self.assertIn("Approver replacement: not allowed", output)
+        self.assertIn("Protected approvals (owner-only):", output)
+
     def test_select_helper_writes_selection_and_status_reflects_it(self) -> None:
         exit_code, output = self._run(["select-helper", "--target", str(self.target), "--use-recommended"])
         self.assertEqual(0, exit_code)
