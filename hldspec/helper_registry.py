@@ -165,13 +165,13 @@ def build_speckit_helper() -> dict:
             "specs/<branch>/ phase artifacts",
         ],
         "allowed_actions": [
-            "recommend the next /speckit.* command for the current phase",
+            "recommend the next concrete /speckit-* command for the current phase",
             "cite source_package files and HLD anchors as evidence",
             "report phase, blockers, and the single next safe action",
         ],
         "forbidden_actions": [
-            "must not run /speckit.plan before /speckit.specify output exists",
-            "must not run /speckit.tasks before a /speckit.plan output exists",
+            "must not run /speckit-plan before /speckit-specify output exists",
+            "must not run /speckit-tasks before a /speckit-plan output exists",
             "must not start implementation before the implementation-approval gate",
             "must not commit, merge, or push target code",
             "must not initialize SpecKit or create branches on the human's behalf",

@@ -91,10 +91,10 @@ column shows the existing realization; other helpers are **not implemented**.
 | Field | Meaning | `speckit` (today) |
 |---|---|---|
 | `helper_id` | Stable identity | `speckit` |
-| `supported_toolchain` | Harness it drives | SpecKit (`/speckit.*`) |
+| `supported_toolchain` | Harness it drives | SpecKit (`/speckit-*` installed commands) |
 | `required_package_fields` | Package inputs it needs | `speckit_single_spec_input.md`, `constitution.proposed.md`, slices |
 | `required_target_evidence` | Target-repo evidence it reads | git state, `.specify/memory/`, `specs/<branch>/` artifacts |
-| `recommendable_commands` | Commands/prompts it may *recommend* | `/speckit.specify|clarify|plan|tasks|analyze`, slice prompts |
+| `recommendable_commands` | Commands/prompts it may *recommend* | `/speckit-specify`, `/speckit-clarify`, `/speckit-plan`, `/speckit-tasks`, `/speckit-analyze`, slice prompts |
 | `must_ask_before_proceeding` | Human-owned questions it must raise | architecture / source-of-truth / scope / `[NEEDS CLARIFICATION]` |
 | `completion_map_stages` | Its stage set | the phase model (§9) |
 | `stop_rules` | Conditions that force a stop | ACTION/BLOCKED phase, failed tests, human-owned question, RunSkeptic ACTION/CONFLICT, scope expansion |
