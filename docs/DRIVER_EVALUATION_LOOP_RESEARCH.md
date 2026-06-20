@@ -85,8 +85,8 @@ The following are follow-ups, not implemented:
 
 ## Recommended Sequencing
 
-9. Merge PR #22 proof/command/authority alignment.
-10. Design safer non-stateful readiness/smoke probe.
-11. Add Driver Evaluation Loop / RunSkeptic checkpoint contract.
-12. Add brownfield fixture suite.
-13. Only later consider approved execution authority.
+1. Merge PR #22 proof/command/authority alignment.
+2. Design safer non-stateful readiness/smoke probe.
+3. Add Driver Evaluation Loop / RunSkeptic checkpoint contract.
+4. Add brownfield fixture suite.
+5. Only later consider approved execution authority.
