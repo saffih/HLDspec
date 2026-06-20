@@ -36,8 +36,8 @@ DEFAULT_TARGET = "/tmp/proof-target"
 SPECIFY_DIR = ".specify"
 SKILL_GLOB = ".claude/skills/speckit-*/SKILL.md"
 
-EVIDENCE_PRESENT = "EVIDENCE_PRESENT"
-EVIDENCE_MISSING = "EVIDENCE_MISSING"
+SKILL_EVIDENCE_PRESENT = "SKILL_EVIDENCE_PRESENT"
+SKILL_EVIDENCE_MISSING = "SKILL_EVIDENCE_MISSING"
 
 LIVE_PROOF_GATE = "proof_e2e_v0.py --live (requires HLDSPEC_LIVE_E2E=1 and a passing smoke)"
 
@@ -55,7 +55,7 @@ def probe_skill_evidence(target: str | Path) -> dict[str, Any]:
 
     Pure over the filesystem -- stats ``.specify/`` and globs
     ``.claude/skills/speckit-*/SKILL.md``. A missing target resolves to
-    EVIDENCE_MISSING (empty glob, no ``.specify/``) rather than raising. Writes
+    SKILL_EVIDENCE_MISSING (empty glob, no ``.specify/``) rather than raising. Writes
     nothing and runs no subprocess, so any path is safe to probe; unlike the live
     doctor there is no temp-root refusal because there is nothing to mutate.
     """
@@ -71,12 +71,12 @@ def probe_skill_evidence(target: str | Path) -> dict[str, Any]:
 
     # Both independent signals are required: .specify/ alone is a SpecKit init with no
     # claude integration; skill files alone is an integration without the workflow
-    # scaffolding. Either-only is EVIDENCE_MISSING, but both booleans are exposed so
+    # scaffolding. Either-only is SKILL_EVIDENCE_MISSING, but both booleans are exposed so
     # the partial case is visible without inventing a third verdict tier.
     verdict = (
-        EVIDENCE_PRESENT
+        SKILL_EVIDENCE_PRESENT
         if specify_dir_present and speckit_skills_present
-        else EVIDENCE_MISSING
+        else SKILL_EVIDENCE_MISSING
     )
 
     return {
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report, indent=2))
     else:
         print(summarize(report))
-    return 0 if report["verdict"] == EVIDENCE_PRESENT else 1
+    return 0 if report["verdict"] == SKILL_EVIDENCE_PRESENT else 1
 
 
 if __name__ == "__main__":

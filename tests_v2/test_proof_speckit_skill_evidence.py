@@ -36,7 +36,7 @@ class SkillEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             target = _make_target(d, specify=True, skills=True)
             report = probe.probe_skill_evidence(target)
-            self.assertEqual(report["verdict"], "EVIDENCE_PRESENT")
+            self.assertEqual(report["verdict"], "SKILL_EVIDENCE_PRESENT")
             self.assertTrue(report["specify_dir_present"])
             self.assertTrue(report["speckit_skills_present"])
             self.assertIn(".claude/skills/speckit-specify/SKILL.md", report["speckit_skill_files"])
@@ -45,7 +45,7 @@ class SkillEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             target = _make_target(d, specify=True, skills=False)
             report = probe.probe_skill_evidence(target)
-            self.assertEqual(report["verdict"], "EVIDENCE_MISSING")
+            self.assertEqual(report["verdict"], "SKILL_EVIDENCE_MISSING")
             self.assertTrue(report["specify_dir_present"])
             self.assertFalse(report["speckit_skills_present"])
             self.assertEqual(report["speckit_skill_files"], [])
@@ -54,7 +54,7 @@ class SkillEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             target = _make_target(d, specify=False, skills=True)
             report = probe.probe_skill_evidence(target)
-            self.assertEqual(report["verdict"], "EVIDENCE_MISSING")
+            self.assertEqual(report["verdict"], "SKILL_EVIDENCE_MISSING")
             self.assertFalse(report["specify_dir_present"])
             self.assertTrue(report["speckit_skills_present"])
 
@@ -62,12 +62,12 @@ class SkillEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             target = _make_target(d, specify=False, skills=False)
             report = probe.probe_skill_evidence(target)
-            self.assertEqual(report["verdict"], "EVIDENCE_MISSING")
+            self.assertEqual(report["verdict"], "SKILL_EVIDENCE_MISSING")
 
     def test_nonexistent_target_is_missing_not_error(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             report = probe.probe_skill_evidence(Path(d) / "does-not-exist")
-            self.assertEqual(report["verdict"], "EVIDENCE_MISSING")
+            self.assertEqual(report["verdict"], "SKILL_EVIDENCE_MISSING")
             self.assertFalse(report["specify_dir_present"])
             self.assertFalse(report["speckit_skills_present"])
 
