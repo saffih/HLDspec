@@ -138,6 +138,83 @@ def _validate_slice(slice_obj: Any, index: int) -> list[str]:
     return findings
 
 
+ARCHITECTURE_PACKAGE_SCHEMA_VERSION = 0
+
+
+def _empty_architecture_fields() -> dict[str, Any]:
+    """The 14 required fields as an EMPTY typed slot.
+
+    Human-owned architecture reasoning is intentionally left empty so
+    `validate_architecture_package` returns ACTION until it is authored. The
+    emitter never fabricates architecture truth the HLD/human did not decide
+    (`docs/JOURNEY2_PACKAGE_CONTRACT.md` §8) -- it materializes the typed slot so
+    the gap is *visible and authorable*, not absent. `helper_recommendation` is
+    filled by the caller from the registry-derived recommendations (the one
+    genuinely grounded field); everything else awaits authorship.
+    """
+    return {
+        "product_goal_summary": "",
+        "architecture_intent": "",
+        "source_of_truth_map": {},
+        "ownership_boundaries": {},
+        "contracts_and_seams": [],
+        "brownfield_constraints": [],
+        "expert_lenses_applied": {},
+        "domain_assumptions": [],
+        "slice_roadmap": [],
+        "next_slice_packet": {},
+        "test_strategy": "",
+        "forbidden_shortcuts": [],
+        "growth_and_change_notes": "",
+        "helper_recommendation": {},
+    }
+
+
+def build_architecture_package(*, helper_recommendation: Any = None) -> dict[str, Any]:
+    """Emit an ADVISORY Journey 2 architecture package artifact (the typed slot).
+
+    Pure and side-effect free: returns a dict, writes nothing. The package builder
+    (`hld_source_package.build_source_package_content`) persists it as
+    `architecture_package.json`, mirroring `helper_recommendations.json`.
+
+    The 14 required fields are present, but the human-owned architecture-reasoning
+    fields are left **empty** -- this emitter never invents architecture the HLD/
+    human did not decide (`docs/JOURNEY2_PACKAGE_CONTRACT.md` §8). The only grounded
+    field is `helper_recommendation`, injected by the caller from the
+    registry-derived recommendations. This module imports neither `helper_selection`
+    nor `helper_registry`, so helper-selection semantics are unchanged.
+
+    The artifact embeds its own `validate_architecture_package` result, so it
+    honestly reports **ACTION** ("fields await authorship") until authored. It is
+    advisory: excluded from `REQUIRED_FILES` and the `.specify` mirror and wired
+    into no gate -- an ACTION artifact promotes nothing.
+
+    `next_slice_packet` is descriptive data, never an execution channel /
+    NextActionPacket (`docs/JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md` §3).
+    """
+    fields = _empty_architecture_fields()
+    if helper_recommendation is not None:
+        fields["helper_recommendation"] = helper_recommendation
+    validation = validate_architecture_package(fields)
+    return {
+        "schema_version": ARCHITECTURE_PACKAGE_SCHEMA_VERSION,
+        "advisory": True,
+        **fields,
+        "validation": validation,
+        "notes": [
+            "Advisory Journey 2 architecture package (typed slot). Human-owned "
+            "architecture-reasoning fields are left empty until authored; this "
+            "emitter never invents architecture truth (JOURNEY2_PACKAGE_CONTRACT.md §8).",
+            "helper_recommendation is derived from the helper registry (advisory); "
+            "its value never drives helper selection.",
+            "next_slice_packet is descriptive data, not a NextActionPacket / "
+            "execution channel (JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md §3).",
+            "Excluded from REQUIRED_FILES and the .specify mirror; wired into no "
+            "gate. status ACTION here promotes nothing.",
+        ],
+    }
+
+
 def validate_architecture_package(package: Any) -> dict[str, Any]:
     """Validate a Journey 2 architecture package dict. Pure and deterministic.
 

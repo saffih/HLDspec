@@ -23,7 +23,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import helper_registry, mediator_guidance
+from . import helper_registry, journey2_architecture_package, mediator_guidance
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
@@ -67,6 +67,11 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     # not in MIRROR_FILES (J3 guidance, not SpecKit runner content). It is in
     # AUTHORITATIVE_FILES so the manifest hashes it and drift is detectable.
     "helper_recommendations": "helper_recommendations.json",
+    # Journey 2 architecture-design slot (advisory). Same treatment as
+    # helper_recommendations: hashed for drift, never mirrored, never required.
+    # Emitted as an honest ACTION typed slot until a human authors its fields
+    # (see journey2_architecture_package.build_architecture_package).
+    "architecture_package": "architecture_package.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -83,6 +88,8 @@ SOURCE_PACKAGE_FILE = "source_package.json"
 _MIRROR_EXCLUDED: frozenset[str] = frozenset({
     # J3 advisory guidance — not SpecKit runner content.
     AUTHORITATIVE_FILES["helper_recommendations"],
+    # J2 architecture-design slot — advisory, not SpecKit runner content.
+    AUTHORITATIVE_FILES["architecture_package"],
 })
 
 # The subset materialised into .specify/source/ for the runner. The constitution
@@ -451,9 +458,19 @@ def build_source_package_content(
         encoding="utf-8",
     )
 
+    helper_recommendations = build_helper_recommendations()
     write_json_dict(
         source_dir / AUTHORITATIVE_FILES["helper_recommendations"],
-        build_helper_recommendations(),
+        helper_recommendations,
+    )
+    # Advisory Journey 2 architecture slot. Grounds only helper_recommendation
+    # (registry-derived); the human-owned fields are emitted empty so the artifact
+    # honestly validates ACTION until authored. Never required, never mirrored.
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["architecture_package"],
+        journey2_architecture_package.build_architecture_package(
+            helper_recommendation=helper_recommendations,
+        ),
     )
 
     valid_anchors = set(ref_map["anchors"].keys())

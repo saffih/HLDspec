@@ -167,5 +167,104 @@ class Journey2ArchitecturePackageTests(unittest.TestCase):
             )
 
 
+# Keys that would turn next_slice_packet into an execution channel / NextActionPacket.
+# Their absence is what makes "descriptive, not execution" falsifiable.
+_EXECUTION_KEYS = frozenset(
+    {"command", "argv", "run", "execute", "exec", "ready", "action",
+     "action_packet", "next_action", "channel", "invoke"}
+)
+
+
+class BuildArchitecturePackageTests(unittest.TestCase):
+    """The emitter (`build_architecture_package`) materializes the typed slot.
+
+    Honest design: only `helper_recommendation` is grounded (injected); the
+    human-owned architecture-reasoning fields are emitted empty, so the artifact
+    validates ACTION until authored — it never fabricates a PASS.
+    """
+
+    def test_emits_all_14_fields_present(self) -> None:
+        pkg = j2ap.build_architecture_package(helper_recommendation={"default_helper": "speckit"})
+        for field in j2ap.REQUIRED_ARCHITECTURE_PACKAGE_FIELDS:
+            self.assertIn(field, pkg)
+
+    def test_emitted_slot_validates_action_until_authored(self) -> None:
+        # PO:SI guard — the empty typed slot must NOT pass; it must be honest ACTION.
+        pkg = j2ap.build_architecture_package(helper_recommendation={"default_helper": "speckit"})
+        result = j2ap.validate_architecture_package(pkg)
+        self.assertEqual(result["status"], "ACTION")
+        self.assertNotIn("helper_recommendation", result["missing_fields"])  # grounded
+        self.assertIn("architecture_intent", result["missing_fields"])       # awaits authorship
+        self.assertIn("slice_roadmap", result["missing_fields"])
+
+    def test_embedded_validation_matches_recomputed(self) -> None:
+        pkg = j2ap.build_architecture_package(helper_recommendation={"x": 1})
+        self.assertEqual(pkg["validation"], j2ap.validate_architecture_package(pkg))
+        self.assertEqual(pkg["validation"]["status"], "ACTION")
+
+    def test_complete_authored_package_passes(self) -> None:
+        # The validator's contract (Task 4 bullet 1): a complete dict — all 14 fields
+        # present and non-empty — is PASS. Authoring the emitted slot reaches PASS.
+        pkg = j2ap.build_architecture_package(helper_recommendation={"default_helper": "speckit"})
+        authored = dict(pkg)
+        authored.update(_valid_package())  # fills all 14 fields with non-empty content
+        self.assertEqual(j2ap.validate_architecture_package(authored)["status"], "PASS")
+
+    def test_validation_catches_missing_or_empty_fields(self) -> None:
+        # Task 4 bullet 4: empties/removals in the architecture package are caught.
+        pkg = j2ap.build_architecture_package(helper_recommendation={"default_helper": "speckit"})
+        authored = dict(pkg)
+        authored.update(_valid_package())
+        self.assertEqual(j2ap.validate_architecture_package(authored)["status"], "PASS")
+        authored["contracts_and_seams"] = []  # emptied
+        del authored["test_strategy"]          # removed
+        result = j2ap.validate_architecture_package(authored)
+        self.assertEqual(result["status"], "ACTION")
+        self.assertIn("contracts_and_seams", result["missing_fields"])
+        self.assertIn("test_strategy", result["missing_fields"])
+
+    def test_next_slice_packet_is_descriptive_not_execution(self) -> None:
+        # Task 4 bullet 2: descriptive data, never an execution channel.
+        pkg = j2ap.build_architecture_package(helper_recommendation={"default_helper": "speckit"})
+        nsp = pkg["next_slice_packet"]
+        self.assertIsInstance(nsp, dict)
+        self.assertEqual(set(nsp) & _EXECUTION_KEYS, set())
+        # A populated descriptive next_slice_packet (slice_id + why) is still pure
+        # descriptive data — no execution keys — and the validator accepts it.
+        descriptive = {"slice_id": "S1", "why": "establishes the seam first"}
+        self.assertEqual(set(descriptive) & _EXECUTION_KEYS, set())
+        authored = dict(pkg)
+        authored.update(_valid_package())
+        authored["next_slice_packet"] = descriptive
+        self.assertEqual(j2ap.validate_architecture_package(authored)["status"], "PASS")
+
+    def test_helper_recommendation_grounded_and_advisory(self) -> None:
+        # Task 4 bullet 3: advisory. Grounded value lands verbatim; its value never
+        # changes the verdict (still ACTION from empty human-owned fields).
+        rec = {"default_helper": "speckit", "recommended_helpers": [{"helper_id": "speckit"}]}
+        pkg = j2ap.build_architecture_package(helper_recommendation=rec)
+        self.assertEqual(pkg["helper_recommendation"], rec)
+        for value in ("speckit", "codex", {"default_helper": "devin"}, ["manual"]):
+            p = j2ap.build_architecture_package(helper_recommendation=copy.deepcopy(value))
+            self.assertEqual(j2ap.validate_architecture_package(p)["status"], "ACTION")
+
+    def test_builder_does_not_import_selection_or_registry(self) -> None:
+        # No helper-selection coupling and no registry coupling: the recommendation
+        # is injected, not fetched, keeping selection semantics untouched here.
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(j2ap))
+        imported: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                imported.add(node.module or "")
+                imported.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+        self.assertFalse(any("helper_selection" in n for n in imported), sorted(imported))
+        self.assertFalse(any("helper_registry" in n for n in imported), sorted(imported))
+
+
 if __name__ == "__main__":
     unittest.main()
