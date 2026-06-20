@@ -6,17 +6,25 @@ machine-checkable shape of that *architecture package*: a design-reasoning view
 that organizes HLD-grounded constraints, contracts/seams, expert-lens findings,
 and a reviewable slice roadmap. See docs/JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md.
 
-This module is intentionally minimal and side-effect free:
+This module is intentionally minimal and side-effect free (pure functions only --
+no filesystem reads, no mutation, no helper run, no helper-selection change):
 
-- It only *validates* a package dict; it never generates one, reads the
-  filesystem, mutates anything, runs a helper, or changes helper selection.
-- It is not wired into any gate or pipeline -- it is a contract slice, a shape a
-  package author (human or upstream tool) can check against.
+- `validate_architecture_package` validates a package dict against the required
+  shape.
+- `build_architecture_package` builds the advisory typed-slot dict (the human-owned
+  architecture fields left empty, only `helper_recommendation` grounded via an
+  injected value). It returns a dict and writes nothing.
+
+The package builder (`hld_source_package.build_source_package_content`) persists
+that dict as the advisory `architecture_package.json` artifact -- manifest-hashed
+but excluded from `REQUIRED_FILES`, the `.specify` mirror, and every gate, so it
+is informational and blocks no promotion. Neither function reads the filesystem or
+is wired into a gate; emission lives in the package builder, not here.
 
 `helper_recommendation` is treated as an opaque required field: validation checks
-only that it is present and non-empty. It does not import or call
-`helper_selection`, and the recommendation's *value* never affects the verdict --
-selection semantics live elsewhere and are unchanged here.
+only that it is present and non-empty. This module does not import or call
+`helper_selection` (or `helper_registry`), and the recommendation's *value* never
+affects the verdict -- selection semantics live elsewhere and are unchanged here.
 """
 from __future__ import annotations
 
