@@ -100,6 +100,63 @@ class ReadinessClassificationTests(unittest.TestCase):
             self.assertEqual(report["status"], "TARGET_NOT_SPECKIT_READY")
             self.assertNotEqual(report["status"], "SMOKE_PASS")
 
+    def test_unsafe_target_refused_before_probing(self) -> None:
+        # A non-temp target is refused before claude/smoke even when the runner would PASS.
+        report = doctor.classify_readiness(
+            "/Users/nobody/real-repo", model="haiku",
+            runner=_fake_runner(returncode=0, stdout="SMOKE_OK\n"),
+            which=_which(claude=True), env={},
+        )
+        self.assertEqual(report["status"], "UNSAFE_TARGET")
+        self.assertEqual(report["verdict"], "BLOCKED")
+
+    def test_allow_nontemp_override_proceeds_past_safety(self) -> None:
+        report = doctor.classify_readiness(
+            "/Users/nobody/real-repo", model="haiku", allow_nontemp=True, write=False,
+            runner=_fake_runner(returncode=0, stdout="SMOKE_OK\n"),
+            which=_which(claude=True), env={},
+        )
+        self.assertNotEqual(report["status"], "UNSAFE_TARGET")
+
+    def test_target_not_clean(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "proof-target"
+            target.mkdir()
+            report = doctor.classify_readiness(
+                target, model="haiku", git_clean=lambda t: False,
+                runner=_fake_runner(returncode=0, stdout="SMOKE_OK\n"),
+                which=_which(claude=True), env={},
+            )
+            self.assertEqual(report["status"], "TARGET_NOT_CLEAN")
+            self.assertEqual(report["verdict"], "BLOCKED")
+
+    def test_clean_unknown_does_not_block(self) -> None:
+        # Not a git repo -> cleanliness gate is N/A (None) and the ladder proceeds.
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "proof-target"
+            target.mkdir()
+            (target / ".specify").mkdir()
+            report = doctor.classify_readiness(
+                target, model="haiku", git_clean=lambda t: None,
+                runner=_fake_runner(returncode=0, stdout="SMOKE_OK\n"),
+                which=_which(claude=True), env={},
+            )
+            self.assertEqual(report["status"], "SMOKE_PASS")
+
+    def test_hollow_completion_on_blank_success(self) -> None:
+        # Exit 0, blank stdout, no marker, no token -> ran but produced nothing.
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "proof-target"
+            target.mkdir()
+            (target / ".specify").mkdir()
+            report = doctor.classify_readiness(
+                target, model="haiku",
+                runner=_fake_runner(returncode=0, stdout="   \n"),
+                which=_which(claude=True), env={},
+            )
+            self.assertEqual(report["status"], "HOLLOW_COMPLETION")
+            self.assertEqual(report["verdict"], "BLOCKED")
+
     def test_report_written_with_exact_status(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             target = Path(d) / "proof-target"

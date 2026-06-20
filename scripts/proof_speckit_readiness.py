@@ -53,7 +53,10 @@ STATUS_CLAUDE_MISSING = "CLAUDE_MISSING"
 STATUS_MODEL_REJECTED = "MODEL_REJECTED"
 STATUS_UNKNOWN_COMMAND = "UNKNOWN_COMMAND"
 STATUS_SKILL_UNAVAILABLE = "SKILL_UNAVAILABLE"
+STATUS_HOLLOW_COMPLETION = "HOLLOW_COMPLETION"
 STATUS_TARGET_NOT_SPECKIT_READY = "TARGET_NOT_SPECKIT_READY"
+STATUS_TARGET_NOT_CLEAN = "TARGET_NOT_CLEAN"
+STATUS_UNSAFE_TARGET = "UNSAFE_TARGET"
 STATUS_SMOKE_PASS = "SMOKE_PASS"
 STATUS_TIMEOUT = "TIMEOUT"  # not in the required set, but an honest distinct outcome
 
@@ -78,6 +81,18 @@ def _specify_dir_present(target: Path) -> bool:
     return (target / ".specify").is_dir()
 
 
+def _default_git_clean(target: Path) -> bool | None:
+    """Cleanliness of the target's git tree: True=clean, False=dirty, None=not a
+    git repo (gate N/A). Reuses the e2e harness's git helpers so cleanliness has
+    one definition. The filesystem short-circuit keeps unit tests subprocess-free:
+    a non-repo temp dir resolves to None without invoking git."""
+    if not (Path(target) / ".git").exists():
+        return None
+    if not e2e.is_git_repo(Path(target)):
+        return None
+    return not e2e.git_status_porcelain(Path(target)).strip()
+
+
 def _under_temp_root(path: Path) -> bool:
     ap = Path(os.path.realpath(os.path.abspath(path)))
     for root in (Path("/tmp"), Path(os.path.realpath("/tmp"))):
@@ -97,6 +112,21 @@ def _under_temp_root(path: Path) -> bool:
 
 
 def _remediation(status: str, target: Path, init_labels: list[str], smoke_command: str) -> str:
+    if status == STATUS_UNSAFE_TARGET:
+        return (
+            f"Refusing a non-temp target: {target}. Point --target at {DEFAULT_TARGET} (or "
+            "pass --allow-nontemp to override for a deliberately sandboxed path)."
+        )
+    if status == STATUS_TARGET_NOT_CLEAN:
+        return (
+            f"Target git tree is dirty; commit or stash changes in {target} so the proof's "
+            "bounded diff can attribute new files to /speckit.* (`git -C <target> status`)."
+        )
+    if status == STATUS_HOLLOW_COMPLETION:
+        return (
+            "claude exited 0 but produced no usable output (no SMOKE_OK line, no error "
+            "marker). Likely a silent no-op; inspect raw stdout before trusting any PASS."
+        )
     if status == STATUS_CLAUDE_MISSING:
         return "Install/enable the `claude` CLI on PATH, then rerun readiness."
     if status == STATUS_MODEL_REJECTED:
@@ -129,6 +159,8 @@ def classify_readiness(
     which: Callable[[str], str | None] | None = None,
     env: dict | None = None,
     write: bool = True,
+    allow_nontemp: bool = False,
+    git_clean: Callable[[Path], bool | None] | None = None,
 ) -> dict[str, Any]:
     """Classify proof-target SpecKit readiness. Pure over injectable runner/which.
 
@@ -154,6 +186,7 @@ def classify_readiness(
         "model": model,
         "smoke_command": smoke_command,
         "claude_available": bool(claude_path),
+        "target_clean": None,
         "specify_dir_present": specify_present,
         "speckit_init_tooling": init_labels,
         "speckit_skills_origin": "SpecKit init output (specify/spec-kit/uvx init -> .specify/ + project-local /speckit.* commands)",
@@ -167,13 +200,28 @@ def classify_readiness(
 
     def finish(status: str) -> dict[str, Any]:
         report["status"] = status
+        report["verdict"] = "PASS" if status == STATUS_SMOKE_PASS else "BLOCKED"
         report["remediation"] = _remediation(status, target, init_labels, smoke_command)
-        if write and target.is_dir():
+        # Never write a report into a non-temp target (would mutate outside the sandbox).
+        write_ok = write and target.is_dir() and (allow_nontemp or _under_temp_root(target))
+        if write_ok:
             _write_report(target, report)
         return report
 
+    # Rung 0 (safety): refuse a non-temp target before any probe or write.
+    if not allow_nontemp and not _under_temp_root(target):
+        return finish(STATUS_UNSAFE_TARGET)
+
     if not claude_path:
         return finish(STATUS_CLAUDE_MISSING)
+
+    # Rung (target precondition): a dirty tree would let the bounded diff mis-attribute
+    # changes; a non-repo target leaves cleanliness N/A (None) and does not block here.
+    clean_fn = git_clean or _default_git_clean
+    clean = clean_fn(Path(target))
+    report["target_clean"] = clean
+    if clean is False:
+        return finish(STATUS_TARGET_NOT_CLEAN)
 
     cmd = ["claude", "--print", "--dangerously-skip-permissions"]
     if model:
@@ -202,6 +250,10 @@ def classify_readiness(
 
     if e2e.smoke_confirmed(res.get("stdout") or "") and res.get("returncode") == 0:
         return finish(STATUS_SMOKE_PASS)
+
+    # Exit 0 with empty output and no marker: claude ran and produced nothing usable.
+    if res.get("returncode") == 0 and not (res.get("stdout") or "").strip():
+        return finish(STATUS_HOLLOW_COMPLETION)
 
     # Not confirmed and no explicit marker: root-cause by structure.
     return finish(STATUS_TARGET_NOT_SPECKIT_READY if not specify_present else STATUS_SKILL_UNAVAILABLE)
@@ -243,11 +295,12 @@ def propose_prepare(target: str | Path, *, which: Callable[[str], str | None] | 
 
 def _render_md(report: dict[str, Any]) -> str:
     lines = [
-        f"# Proof Target SpecKit Readiness -- {report['status']}",
+        f"# Proof Target SpecKit Readiness -- {report.get('verdict', '?')} / {report['status']}",
         "",
         f"- target: `{report['target']}`",
         f"- model: `{report['model']}`",
         f"- claude available: `{report['claude_available']}`",
+        f"- target git tree clean: `{report['target_clean']}`",
         f"- .specify/ present: `{report['specify_dir_present']}`",
         f"- SpecKit init tooling: `{report['speckit_init_tooling']}`",
         f"- /speckit.* origin: {report['speckit_skills_origin']}",
@@ -284,6 +337,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-command", default=None)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     parser.add_argument(
+        "--allow-nontemp",
+        action="store_true",
+        help="override the temp-root safety refusal for a deliberately sandboxed non-temp target.",
+    )
+    parser.add_argument(
         "--prepare-proof-target",
         action="store_true",
         help="PROPOSE (never run) a sandbox-scoped SpecKit init; refuses non-temp targets.",
@@ -291,8 +349,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     report = classify_readiness(
-        args.target, model=args.model, smoke_command=args.smoke_command, timeout=args.timeout
+        args.target, model=args.model, smoke_command=args.smoke_command,
+        timeout=args.timeout, allow_nontemp=args.allow_nontemp,
     )
+    print(f"verdict: {report['verdict']}")
     print(f"status: {report['status']}")
     print(f"remediation: {report['remediation']}")
     print(f"report: {Path(report['target']) / REPORT_DIR_NAME / REPORT_JSON}")
