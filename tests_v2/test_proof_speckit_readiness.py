@@ -45,14 +45,14 @@ def _which(claude=True, specify=False):
 
 
 class ReadinessClassificationTests(unittest.TestCase):
-    def _classify(self, tmp, *, specify_dir=False, runner=None, which=None):
+    def _classify(self, tmp, *, specify_dir=False, runner=None, which=None, smoke_command=None):
         target = Path(tmp) / "proof-target"
         target.mkdir()
         if specify_dir:
             (target / ".specify").mkdir()
         return doctor.classify_readiness(
             target, model="haiku", runner=runner or _fake_runner(),
-            which=which or _which(claude=True), env={},
+            which=which or _which(claude=True), env={}, smoke_command=smoke_command,
         )
 
     def test_claude_missing(self) -> None:
@@ -68,8 +68,9 @@ class ReadinessClassificationTests(unittest.TestCase):
 
     def test_unknown_command(self) -> None:
         with tempfile.TemporaryDirectory() as d:
+            # Wrong dot spelling -> unknown command -> the hyphen alternate is suggested.
             runner = _fake_runner(returncode=0, stdout="Unknown command: /speckit.specify")
-            report = self._classify(d, runner=runner)
+            report = self._classify(d, runner=runner, smoke_command="/speckit.specify say only SMOKE_OK")
             self.assertEqual(report["status"], "UNKNOWN_COMMAND")
             self.assertTrue(any("/speckit-specify" in n for n in report["notes"]))
 

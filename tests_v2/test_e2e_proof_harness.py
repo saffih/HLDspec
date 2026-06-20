@@ -152,27 +152,31 @@ class ProofRunnerModeTests(unittest.TestCase):
             self.assertEqual(data["blocker_code"], "SMOKE_NOT_CONFIRMED")
             self.assertEqual(len(runner.calls), 1)
 
-    def test_default_smoke_command_is_dot_style_and_configurable(self) -> None:
-        self.assertTrue(e2e.DEFAULT_SMOKE_COMMAND.startswith("/speckit.specify"))
+    def test_default_smoke_command_is_hyphen_style_and_configurable(self) -> None:
+        # Hyphen is what `specify init` actually installs (.claude/skills/speckit-*);
+        # dot fuzzy-matches and triggers a real-workflow side effect (see module docs).
+        self.assertTrue(e2e.DEFAULT_SMOKE_COMMAND.startswith("/speckit-specify"))
         with tempfile.TemporaryDirectory() as d:
             tmp = Path(d)
             target, hld = _make_clean_repo(tmp)
-            # Default: dot-style command appears in the recorded command.
+            # Default: hyphen-style command appears in the recorded command.
             r1 = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True,
                                runner=_fake_runner(returncode=0, stdout="nope"), env={})
             self.assertEqual(r1["command"][-1], e2e.DEFAULT_SMOKE_COMMAND)
             # Configurable override is honored verbatim.
             r2 = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True,
                                runner=_fake_runner(returncode=0, stdout="nope"), env={},
-                               smoke_command="/speckit.specify custom SMOKE")
-            self.assertEqual(r2["command"][-1], "/speckit.specify custom SMOKE")
+                               smoke_command="/speckit-specify custom SMOKE")
+            self.assertEqual(r2["command"][-1], "/speckit-specify custom SMOKE")
 
     def test_unknown_command_classified_separately_with_alternate(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             tmp = Path(d)
             target, hld = _make_clean_repo(tmp)
+            # Someone uses the wrong dot spelling -> unknown command -> suggest hyphen.
             runner = _fake_runner(returncode=0, stdout="Unknown command: /speckit.specify")
-            report = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            report = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={},
+                                   smoke_command="/speckit.specify say only SMOKE_OK")
             self.assertEqual(report["status"], "BLOCKED")
             self.assertEqual(report["blocker_code"], "UNKNOWN_COMMAND")
             self.assertIn("syntax", report["blocker"])  # distinguishes syntax vs missing-skill
