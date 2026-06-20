@@ -34,9 +34,20 @@ class ProofTargetInitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             tmp = Path(d)
             target, _ = _make_clean_repo(tmp)
-            for rel in ("calc/__init__.py", "calc/core.py", "tests/test_core.py", "README.md"):
+            for rel in ("calc/__init__.py", "calc/core.py", "tests/test_core.py", "README.md", ".gitignore"):
                 self.assertTrue((target / rel).exists(), rel)
             self.assertIn("def add", (target / "calc" / "core.py").read_text())
+
+    def test_gitignore_excludes_report_dir_and_is_committed(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, _ = _make_clean_repo(tmp)
+            self.assertIn(".hldspec-proof/", (target / ".gitignore").read_text())
+            tracked = subprocess.run(
+                ["git", "-C", str(target), "ls-files", ".gitignore"],
+                text=True, capture_output=True,
+            ).stdout
+            self.assertIn(".gitignore", tracked)  # committed in the seed, not left untracked
 
     def test_hld_is_created(self) -> None:
         with tempfile.TemporaryDirectory() as d:
@@ -138,7 +149,82 @@ class ProofRunnerModeTests(unittest.TestCase):
 
             data = json.loads(json_path.read_text())
             self.assertEqual(data["status"], "BLOCKED")
+            self.assertEqual(data["blocker_code"], "SMOKE_NOT_CONFIRMED")
             self.assertEqual(len(runner.calls), 1)
+
+    def test_default_smoke_command_is_dot_style_and_configurable(self) -> None:
+        self.assertTrue(e2e.DEFAULT_SMOKE_COMMAND.startswith("/speckit.specify"))
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, hld = _make_clean_repo(tmp)
+            # Default: dot-style command appears in the recorded command.
+            r1 = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True,
+                               runner=_fake_runner(returncode=0, stdout="nope"), env={})
+            self.assertEqual(r1["command"][-1], e2e.DEFAULT_SMOKE_COMMAND)
+            # Configurable override is honored verbatim.
+            r2 = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True,
+                               runner=_fake_runner(returncode=0, stdout="nope"), env={},
+                               smoke_command="/speckit.specify custom SMOKE")
+            self.assertEqual(r2["command"][-1], "/speckit.specify custom SMOKE")
+
+    def test_unknown_command_classified_separately_with_alternate(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, hld = _make_clean_repo(tmp)
+            runner = _fake_runner(returncode=0, stdout="Unknown command: /speckit.specify")
+            report = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            self.assertEqual(report["status"], "BLOCKED")
+            self.assertEqual(report["blocker_code"], "UNKNOWN_COMMAND")
+            self.assertIn("syntax", report["blocker"])  # distinguishes syntax vs missing-skill
+            self.assertTrue(any("/speckit-specify" in n for n in report["notes"]))  # alternate spelling suggested
+
+    def test_skill_unavailable_prose_is_blocked_not_pass(self) -> None:
+        # Exact hollow-completion observed live: skill not installed, yet the model
+        # echoes "SMOKE_OK" inside prose. Must be BLOCKED/SKILL_UNAVAILABLE, not PASS.
+        prose = (
+            "The skill `speckit.specify` is not available. \n\n"
+            "If you'd like to respond with \"SMOKE_OK\", I can do that. Otherwise, let "
+            "me know which skill you intended to use from the available options.\n"
+        )
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, hld = _make_clean_repo(tmp)
+            runner = _fake_runner(returncode=0, stdout=prose)
+            report = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            self.assertEqual(report["status"], "BLOCKED")
+            self.assertEqual(report["blocker_code"], "SKILL_UNAVAILABLE")
+
+    def test_standalone_smoke_ok_line_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, hld = _make_clean_repo(tmp)
+            runner = _fake_runner(returncode=0, stdout="SMOKE_OK\n")
+            report = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            self.assertEqual(report["status"], "PASS", report["blocker"])
+
+    def test_smoke_confirmed_rejects_prose_echo(self) -> None:
+        self.assertTrue(e2e.smoke_confirmed("SMOKE_OK"))
+        self.assertTrue(e2e.smoke_confirmed('  "SMOKE_OK"  '))
+        self.assertFalse(e2e.smoke_confirmed('I can respond with "SMOKE_OK" if you like'))
+
+    def test_repeated_blocked_smoke_is_safe(self) -> None:
+        # The report dir is gitignored, so a second run must not be falsely BLOCKED as
+        # "not clean" merely because a prior .hldspec-proof/ report exists.
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            target, hld = _make_clean_repo(tmp)
+            runner = _fake_runner(returncode=0, stdout="nope")
+            first = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            self.assertEqual(first["blocker_code"], "SMOKE_NOT_CONFIRMED")
+            second = e2e.run_proof(target, hld, "C2", mode="smoke", allow_non_temp=True, runner=runner, env={})
+            self.assertEqual(second["status"], "BLOCKED")
+            self.assertEqual(second["blocker_code"], "SMOKE_NOT_CONFIRMED")  # not a cleanliness block
+            self.assertNotIn("not clean", second["blocker"] or "")
+            # Tree still clean to git (report dir ignored).
+            porcelain = subprocess.run(
+                ["git", "-C", str(target), "status", "--porcelain"], text=True, capture_output=True
+            ).stdout
+            self.assertEqual(porcelain.strip(), "")
 
 
 class BoundedDiffTests(unittest.TestCase):

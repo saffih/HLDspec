@@ -42,6 +42,12 @@ Isolated brownfield fixture for the HLDspec E2E proof harness. This is not a rea
 project; it is recreated from scratch by `scripts/proof_target_init.py`.
 """
 
+# The proof harness writes its report under `.hldspec-proof/`. Ignoring + committing
+# this in the seed keeps the target clean across repeated runs, so a second smoke run
+# is never falsely BLOCKED merely because a prior report exists.
+GITIGNORE = """.hldspec-proof/
+"""
+
 HLD = """# proof-target HLD
 
 ## Current capability
@@ -132,6 +138,7 @@ def init_proof_target(
     (target / "tests").mkdir()
     (target / "tests" / "test_core.py").write_text(TEST_CORE)
     (target / "README.md").write_text(README)
+    (target / ".gitignore").write_text(GITIGNORE)
 
     _git(target, "init", "-q")
     _git(target, "add", "-A")

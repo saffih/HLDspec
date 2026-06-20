@@ -5,8 +5,14 @@ This is NOT an execution channel, autonomous executor, new helper, or general
 proof system. It runs a single bounded check against an isolated `/tmp/proof-target`
 repo and reports PASS / ACTION / BLOCKED:
 
-- `--smoke` : one raw, bounded `claude` invocation; PASS only if it exits 0, prints
-  `SMOKE_OK`, and leaves the target clean (report files aside).
+- `--smoke` : one raw, bounded `claude` invocation; PASS only if it exits 0, emits a
+  standalone `SMOKE_OK` line, and leaves the target clean (report files aside). Smoke
+  is a *recognition/reachability* probe -- it proves `claude` runs and the command is
+  accepted without mutating the target. It does NOT prove the `/speckit.*` skill
+  executed: a real `/speckit.specify` would create a branch + spec.md (dirtying the
+  tree), so a clean PASS means the say-only probe did not trigger real skill work.
+  An "...not available..." / "unknown command" reply is classified BLOCKED
+  (`SKILL_UNAVAILABLE` vs `UNKNOWN_COMMAND`) so a hollow completion never passes.
 - `--live`  : double-gated (requires env `HLDSPEC_LIVE_E2E=1` *and* a passing smoke),
   then reuses the existing `hldspec.speckit_invoker.SpecKitInvoker` seam for one
   bounded IMPLEMENT invocation and verifies the acceptance criteria. It adds no new
@@ -33,7 +39,12 @@ REPORT_DIR_NAME = ".hldspec-proof"
 PROOF_JSON = "proof_e2e_v0.json"
 PROOF_MD = "proof_e2e_v0.md"
 SMOKE_TOKEN = "SMOKE_OK"
-SMOKE_SKILL = "speckit-specify"
+# Canonical SpecKit command spelling is dot-style, per the helper source of truth:
+# hldspec/helper_registry.py::build_speckit_helper -> "/speckit.*", "/speckit.specify";
+# docs/JOURNEY3_HELPER_CONTRACT.md -> supported_toolchain "SpecKit (/speckit.*)".
+# (The hyphen form "/speckit-specify" in speckit_invoker.py is a headless skill-name
+# convention, not the slash command the agent accepts.) Configurable via --smoke-command.
+DEFAULT_SMOKE_COMMAND = f"/speckit.specify say only {SMOKE_TOKEN}"
 LIVE_ENV_VAR = "HLDSPEC_LIVE_E2E"
 DEFAULT_TIMEOUT = 120
 EXCERPT_LIMIT = 2000
@@ -54,6 +65,44 @@ AgentRunner = Callable[..., dict[str, Any]]
 def _excerpt(text: str | None) -> str:
     text = text or ""
     return text if len(text) <= EXCERPT_LIMIT else text[:EXCERPT_LIMIT] + "\n...[truncated]"
+
+
+# Phrases that mean the /speckit.* skill is recognized-as-a-name but not installed in
+# the target (distinct from "unknown command", which is a syntax/spelling rejection).
+SKILL_UNAVAILABLE_MARKERS = (
+    "not available",
+    "isn't available",
+    "no such skill",
+    "not installed",
+    "don't have access",
+    "do not have access",
+)
+
+
+def smoke_confirmed(stdout: str) -> bool:
+    """True only if SMOKE_OK appears as a standalone line, not echoed inside prose.
+
+    Guards against the observed hollow-completion where the agent *explains* it could
+    say SMOKE_OK (token present as a substring) while the skill never actually ran.
+    Note: even a bare standalone SMOKE_OK cannot prove the skill *executed* -- the
+    smoke is a recognition/reachability probe, not proof of skill execution (a real
+    /speckit.specify would create a branch + spec.md and dirty the tree). See the
+    module docstring.
+    """
+    for line in (stdout or "").splitlines():
+        if line.strip().strip("\"'`*.:- ") == SMOKE_TOKEN:
+            return True
+    return False
+
+
+def alternate_spelling(command: str) -> str:
+    """Flip dot-style <-> hyphen-style for the /speckit.* skill in a command string,
+    so a rejected command can suggest the other spelling to try next."""
+    if "/speckit." in command:
+        return command.replace("/speckit.", "/speckit-", 1)
+    if "/speckit-" in command:
+        return command.replace("/speckit-", "/speckit.", 1)
+    return command
 
 
 def default_agent_runner(cmd: list[str], *, cwd: str | None, timeout: int, env: dict | None) -> dict[str, Any]:
@@ -164,6 +213,7 @@ def _new_report(target: Path, hld: Path, feature: str, mode: str, model: str | N
         "pytest": None,
         "bounded_diff": None,
         "blocker": None,
+        "blocker_code": None,
         "notes": [],
     }
 
@@ -218,10 +268,12 @@ def write_report(target: Path, report: dict[str, Any]) -> tuple[Path, Path]:
     return json_path, md_path
 
 
-def _finalize(report: dict[str, Any], status: str, *, blocker: str | None = None, write: bool = False) -> dict[str, Any]:
+def _finalize(report: dict[str, Any], status: str, *, blocker: str | None = None, blocker_code: str | None = None, write: bool = False) -> dict[str, Any]:
     report["status"] = status
     if blocker:
         report["blocker"] = blocker
+    if blocker_code:
+        report["blocker_code"] = blocker_code
     if write:
         write_report(Path(report["target"]), report)
     return report
@@ -249,12 +301,14 @@ def run_proof(
     timeout: int = DEFAULT_TIMEOUT,
     runner: AgentRunner | None = None,
     env: dict | None = None,
+    smoke_command: str | None = None,
 ) -> dict[str, Any]:
     """Run one proof pass. Pure orchestration over git + an injectable agent runner."""
     target = Path(target)
     hld = Path(hld)
     runner = runner or default_agent_runner
     env = dict(os.environ if env is None else env)
+    smoke_command = smoke_command or DEFAULT_SMOKE_COMMAND
     report = _new_report(target, hld, feature, mode, model)
 
     # 1. Target location guard (report not written into a non-approved target).
@@ -279,17 +333,17 @@ def run_proof(
         return _finalize(report, STATUS_BLOCKED, blocker=f"HLD not found: {hld}", write=True)
 
     if mode == "smoke":
-        return _run_smoke(report, target, model, timeout, runner, env)
+        return _run_smoke(report, target, model, timeout, runner, env, smoke_command)
     if mode == "live":
-        return _run_live(report, target, hld, feature, model, timeout, env)
+        return _run_live(report, target, hld, feature, model, timeout, env, runner, smoke_command)
     return _finalize(report, STATUS_BLOCKED, blocker=f"unknown mode: {mode}", write=True)
 
 
-def _run_smoke(report, target, model, timeout, runner, env) -> dict[str, Any]:
+def _run_smoke(report, target, model, timeout, runner, env, smoke_command) -> dict[str, Any]:
     cmd = ["claude", "--print", "--dangerously-skip-permissions"]
     if model:
         cmd += ["--model", model]
-    cmd.append(f"/{SMOKE_SKILL} say only {SMOKE_TOKEN}")
+    cmd.append(smoke_command)
     report["command"] = cmd
     report["expected_artifacts"] = ["(none -- smoke must not mutate the target)"]
 
@@ -302,11 +356,41 @@ def _run_smoke(report, target, model, timeout, runner, env) -> dict[str, Any]:
     report["observed_artifacts"] = diff["unexpected"]
 
     if res.get("not_found"):
-        return _finalize(report, STATUS_BLOCKED, blocker="claude command not found", write=True)
+        return _finalize(report, STATUS_BLOCKED, blocker="claude command not found", blocker_code="CLAUDE_NOT_FOUND", write=True)
     if res.get("timed_out"):
-        return _finalize(report, STATUS_BLOCKED, blocker=f"smoke timed out after {timeout}s (interactive/hang)", write=True)
+        return _finalize(report, STATUS_BLOCKED, blocker=f"smoke timed out after {timeout}s (interactive/hang)", blocker_code="TIMEOUT", write=True)
 
-    token_ok = SMOKE_TOKEN in (res.get("stdout") or "")
+    # An "Unknown command" reply is ambiguous: wrong command *syntax* (dot vs hyphen)
+    # vs the /speckit.* skill set not being installed. Report both, with the alternate
+    # spelling as the next thing to try -- the agent's reply alone can't disambiguate.
+    combined = f"{res.get('stdout') or ''}\n{res.get('stderr') or ''}".lower()
+    if "unknown command" in combined:
+        alt = alternate_spelling(smoke_command)
+        report["notes"].append(f"alternate spelling to try next: {alt}")
+        blocker = (
+            f"UNKNOWN_COMMAND: agent rejected the smoke command. tried={smoke_command!r}. "
+            f"likely cause: command syntax (dot vs hyphen) OR the /speckit.* skill set is "
+            f"not installed in this target -- indistinguishable from the reply alone. "
+            f"next: retry with --smoke-command {alt!r}, or verify the SpecKit skills are "
+            f"installed in the target."
+        )
+        return _finalize(report, STATUS_BLOCKED, blocker=blocker, blocker_code="UNKNOWN_COMMAND", write=True)
+
+    # Skill recognized-as-a-name but not installed in the target. Checked BEFORE the
+    # token so an "...is not available... I could say SMOKE_OK" prose reply (a hollow
+    # completion) cannot pass on the substring alone.
+    marker = next((m for m in SKILL_UNAVAILABLE_MARKERS if m in combined), None)
+    if marker:
+        blocker = (
+            f"SKILL_UNAVAILABLE: the agent reports the smoke skill is not installed in "
+            f"this target (matched {marker!r}). tried={smoke_command!r}. the command "
+            f"syntax is accepted but the /speckit.* skill set is absent here; install/"
+            f"verify SpecKit in the target to reach PASS."
+        )
+        return _finalize(report, STATUS_BLOCKED, blocker=blocker, blocker_code="SKILL_UNAVAILABLE", write=True)
+
+    # PASS requires a standalone SMOKE_OK line (not a prose echo), exit 0, clean tree.
+    token_ok = smoke_confirmed(res.get("stdout") or "")
     exit_ok = res.get("returncode") == 0
     if exit_ok and token_ok and diff["ok"]:
         return _finalize(report, STATUS_PASS, write=True)
@@ -315,18 +399,18 @@ def _run_smoke(report, target, model, timeout, runner, env) -> dict[str, Any]:
     if not exit_ok:
         reasons.append(f"exit code {res.get('returncode')}")
     if not token_ok:
-        reasons.append(f"missing {SMOKE_TOKEN} in stdout (/speckit-* likely unavailable)")
+        reasons.append(f"no standalone {SMOKE_TOKEN} line in stdout")
     if not diff["ok"]:
         reasons.append(f"unexpected target mutation: {diff['unexpected']}")
-    return _finalize(report, STATUS_BLOCKED, blocker="; ".join(reasons), write=True)
+    return _finalize(report, STATUS_BLOCKED, blocker="; ".join(reasons), blocker_code="SMOKE_NOT_CONFIRMED", write=True)
 
 
-def _run_live(report, target, hld, feature, model, timeout, env) -> dict[str, Any]:
+def _run_live(report, target, hld, feature, model, timeout, env, runner, smoke_command) -> dict[str, Any]:
     # Double gate: env var, then a passing smoke.
     if env.get(LIVE_ENV_VAR) != "1":
-        return _finalize(report, STATUS_BLOCKED, blocker=f"{LIVE_ENV_VAR}=1 required for --live; refusing", write=True)
+        return _finalize(report, STATUS_BLOCKED, blocker=f"{LIVE_ENV_VAR}=1 required for --live; refusing", blocker_code="LIVE_GATE", write=True)
 
-    smoke = run_proof(target, hld, feature, mode="smoke", model=model, allow_non_temp=True, timeout=timeout, env=env)
+    smoke = run_proof(target, hld, feature, mode="smoke", model=model, allow_non_temp=True, timeout=timeout, runner=runner, env=env, smoke_command=smoke_command)
     if smoke["status"] != STATUS_PASS:
         report["notes"].append("live requires a passing smoke first")
         report["stdout_excerpt"] = smoke["stdout_excerpt"]
@@ -440,6 +524,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--feature", default="C2")
     parser.add_argument("--model", default=None)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
+    parser.add_argument(
+        "--smoke-command",
+        default=None,
+        help=f"override the smoke command (default dot-style: {DEFAULT_SMOKE_COMMAND!r})",
+    )
     parser.add_argument("--allow-non-temp-target", action="store_true")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--smoke", action="store_true")
@@ -455,8 +544,11 @@ def main(argv: list[str] | None = None) -> int:
         model=args.model,
         allow_non_temp=args.allow_non_temp_target,
         timeout=args.timeout,
+        smoke_command=args.smoke_command,
     )
     print(f"status: {report['status']}")
+    if report.get("blocker_code"):
+        print(f"blocker_code: {report['blocker_code']}")
     if report.get("blocker"):
         print(f"blocker: {report['blocker']}")
     print(f"report: {Path(report['target']) / REPORT_DIR_NAME / PROOF_JSON}")
