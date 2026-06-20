@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Proof Target SpecKit Readiness Doctor (read-only).
 
-Classifies *why* the E2E proof target can or cannot honestly run ``/speckit.*``
-commands, and *proposes* (never performs) the human-owned remediation.
+Classifies *why* the E2E proof target can or cannot honestly run concrete
+``/speckit-*`` commands, and *proposes* (never performs) the human-owned
+remediation.
 
-Where do ``/speckit.*`` commands come from? -> a real **SpecKit init** in the
-target: ``specify init`` / ``spec-kit init`` / ``uvx --from <spec-kit> spec-kit
-init`` (see hldspec/speckit_workspace.py), which materializes ``.specify/`` and the
-project-local ``/speckit.*`` commands. They are NOT global Claude skills and NOT
-HLDspec-vendored (HLDspec vendors only the read-only run-card runtime).
+Where do concrete ``/speckit-*`` commands come from? -> a real **SpecKit init**
+in the target: ``specify init`` / ``spec-kit init`` / ``uvx --from <spec-kit>
+spec-kit init`` (see hldspec/speckit_workspace.py), which materializes
+``.specify/`` and the project-local commands. ``/speckit.*`` is abstract
+command-family shorthand only; it is not a concrete installed spelling. The
+commands are NOT global Claude skills and NOT HLDspec-vendored (HLDspec vendors
+only the read-only run-card runtime).
 
 This doctor never installs skills, never initializes SpecKit, and never mutates the
 target. Per hldspec/helper_registry.py the ``speckit`` helper is GUIDE_ONLY/
@@ -18,8 +21,8 @@ init command (and refuses any non-temp target); it does not run it.
 
 Scope note: init/git prerequisite classification already lives in
 hldspec/speckit_readiness.py::build_speckit_init_prereq_report. This script's novel
-contribution is the *claude ``/speckit.*`` skill-availability smoke* for the proof
-target -- it reuses init detection rather than reimplementing it.
+contribution is the *claude concrete ``/speckit-*`` skill-availability smoke* for
+the proof target -- it reuses init detection rather than reimplementing it.
 """
 from __future__ import annotations
 
@@ -120,7 +123,7 @@ def _remediation(status: str, target: Path, init_labels: list[str], smoke_comman
     if status == STATUS_TARGET_NOT_CLEAN:
         return (
             f"Target git tree is dirty; commit or stash changes in {target} so the proof's "
-            "bounded diff can attribute new files to /speckit.* (`git -C <target> status`)."
+            "bounded diff can attribute new files to /speckit-* (`git -C <target> status`)."
         )
     if status == STATUS_HOLLOW_COMPLETION:
         return (
@@ -137,15 +140,15 @@ def _remediation(status: str, target: Path, init_labels: list[str], smoke_comman
         have = f"detected init tools: {init_labels}" if init_labels else "no SpecKit init tool detected (specify/spec-kit/uvx)"
         return (
             f"Target has no .specify/; run a real SpecKit init in {target} to materialize "
-            f"/speckit.* commands ({have}). HLDspec will not run it for you "
+            f"/speckit-* commands ({have}). HLDspec will not run it for you "
             f"(speckit helper is GUIDE_ONLY/PROPOSE_COMMAND); see --prepare-proof-target."
         )
     if status == STATUS_SKILL_UNAVAILABLE:
-        return ".specify/ exists but /speckit.* is still not exposed; verify the SpecKit init created the project-local commands."
+        return ".specify/ exists but /speckit-* is still not exposed; verify the SpecKit init created the project-local commands."
     if status == STATUS_TIMEOUT:
         return "The smoke command did not return in time (possible interactive prompt or hang)."
     if status == STATUS_SMOKE_PASS:
-        return "Target can run /speckit.*; proceed to the bounded smoke / live proof."
+        return "Target can run /speckit-*; proceed to the bounded smoke / live proof."
     return "Unclassified; inspect the smoke output."
 
 
@@ -188,7 +191,7 @@ def classify_readiness(
         "target_clean": None,
         "specify_dir_present": specify_present,
         "speckit_init_tooling": init_labels,
-        "speckit_skills_origin": "SpecKit init output (specify/spec-kit/uvx init -> .specify/ + project-local /speckit.* commands)",
+        "speckit_skills_origin": "SpecKit init output (specify/spec-kit/uvx init -> .specify/ + project-local /speckit-* commands)",
         "command": None,
         "stdout_excerpt": "",
         "stderr_excerpt": "",
@@ -285,7 +288,7 @@ def propose_prepare(target: str | Path, *, which: Callable[[str], str | None] | 
         "run_in": str(target),
         "note": (
             "PROPOSAL ONLY -- not executed. Run this yourself in the target to "
-            "materialize .specify/ and the /speckit.* commands. HLDspec will not "
+            "materialize .specify/ and the /speckit-* commands. HLDspec will not "
             "initialize SpecKit on your behalf (speckit helper is GUIDE_ONLY/"
             "PROPOSE_COMMAND)."
         ),
@@ -302,7 +305,7 @@ def _render_md(report: dict[str, Any]) -> str:
         f"- target git tree clean: `{report['target_clean']}`",
         f"- .specify/ present: `{report['specify_dir_present']}`",
         f"- SpecKit init tooling: `{report['speckit_init_tooling']}`",
-        f"- /speckit.* origin: {report['speckit_skills_origin']}",
+        f"- /speckit-* origin: {report['speckit_skills_origin']}",
         f"- smoke command: `{report['smoke_command']}`",
         f"- command: `{report['command']}`",
         "",

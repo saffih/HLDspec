@@ -56,8 +56,8 @@ class NegativeCapabilityTests(unittest.TestCase):
         # Authoritative check: the specific concrete capabilities are present,
         # not just non-vague strings.
         forbidden = " ".join(self.speckit["forbidden_actions"]).lower()
-        self.assertIn("/speckit.plan", forbidden)
-        self.assertIn("/speckit.specify", forbidden)
+        self.assertIn("/speckit-plan", forbidden)
+        self.assertIn("/speckit-specify", forbidden)
         self.assertIn("commit, merge, or push", forbidden)
 
         cannot = " ".join(self.speckit["cannot_do"]).lower()
