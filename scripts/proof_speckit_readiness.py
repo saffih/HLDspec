@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Proof Target SpecKit Readiness Doctor (read-only).
+"""Proof Target SpecKit Readiness Doctor.
 
 Classifies *why* the E2E proof target can or cannot honestly run concrete
 ``/speckit-*`` commands, and *proposes* (never performs) the human-owned
 remediation.
+
+Default mode is **non-stateful**: it reports filesystem skill-evidence via
+scripts/proof_speckit_skill_evidence.py (no ``claude``, no subprocess, no target
+mutation). The stateful ``claude /speckit-* ...`` smoke (``classify_readiness``)
+is opt-in behind ``--live`` only -- evidence is not execution proof, so the live
+smoke stays gated.
 
 Where do concrete ``/speckit-*`` commands come from? -> a real **SpecKit init**
 in the target: ``specify init`` / ``spec-kit init`` / ``uvx --from <spec-kit>
@@ -48,6 +54,13 @@ _spec = importlib.util.spec_from_file_location("proof_e2e_v0", _E2E_PATH)
 assert _spec and _spec.loader
 e2e = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(e2e)
+
+# The non-stateful default readiness path: filesystem skill-evidence, no claude.
+_EVID_PATH = Path(__file__).resolve().parent / "proof_speckit_skill_evidence.py"
+_evid_spec = importlib.util.spec_from_file_location("proof_speckit_skill_evidence", _EVID_PATH)
+assert _evid_spec and _evid_spec.loader
+skill_evidence = importlib.util.module_from_spec(_evid_spec)
+_evid_spec.loader.exec_module(skill_evidence)
 
 DEFAULT_TARGET = "/tmp/proof-target"
 DEFAULT_TIMEOUT = 120
@@ -333,11 +346,17 @@ def _write_report(target: Path, report: dict[str, Any]) -> tuple[Path, Path]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Proof target SpecKit readiness doctor (read-only).")
+    parser = argparse.ArgumentParser(description="Proof target SpecKit readiness doctor.")
     parser.add_argument("--target", default=DEFAULT_TARGET)
     parser.add_argument("--model", default=None)
     parser.add_argument("--smoke-command", default=None)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="OPT-IN: run the stateful `claude /speckit-* ...` smoke. Default is the "
+        "non-stateful filesystem skill-evidence probe (no claude, no subprocess, no mutation).",
+    )
     parser.add_argument(
         "--prepare-proof-target",
         action="store_true",
@@ -345,14 +364,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    report = classify_readiness(
-        args.target, model=args.model, smoke_command=args.smoke_command,
-        timeout=args.timeout,
-    )
-    print(f"verdict: {report['verdict']}")
-    print(f"status: {report['status']}")
-    print(f"remediation: {report['remediation']}")
-    print(f"report: {Path(report['target']) / REPORT_DIR_NAME / REPORT_JSON}")
+    if args.live:
+        report = classify_readiness(
+            args.target, model=args.model, smoke_command=args.smoke_command,
+            timeout=args.timeout,
+        )
+        print("mode: live (stateful claude /speckit-* smoke; opt-in)")
+        print(f"verdict: {report['verdict']}")
+        print(f"status: {report['status']}")
+        print(f"remediation: {report['remediation']}")
+        print(f"report: {Path(report['target']) / REPORT_DIR_NAME / REPORT_JSON}")
+        exit_code = 0 if report["status"] == STATUS_SMOKE_PASS else 1
+    else:
+        report = skill_evidence.probe_skill_evidence(args.target)
+        print("mode: default (non-stateful skill-evidence probe; no claude, no subprocess, no mutation)")
+        print(skill_evidence.summarize(report))
+        exit_code = 0 if report["verdict"] == skill_evidence.SKILL_EVIDENCE_PRESENT else 1
 
     if args.prepare_proof_target:
         try:
@@ -363,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"prepare (PROPOSAL ONLY, not executed): {proposal['proposed_command']} (run in {proposal['run_in']})")
         print(f"  {proposal['note']}")
 
-    return 0 if report["status"] == STATUS_SMOKE_PASS else 1
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -180,5 +180,70 @@ class PrepareRefusalTests(unittest.TestCase):
             self.assertIn("PROPOSAL ONLY", proposal["note"])
 
 
+class DefaultModeIsNonStatefulTests(unittest.TestCase):
+    """The default CLI path must not invoke the stateful claude smoke.
+
+    classify_readiness is the *only* path to the claude subprocess, so a tripwire
+    on it proves the default path runs no stateful smoke. Paired with a --live test
+    so the tripwire cannot pass vacuously on broken flag wiring.
+    """
+
+    def _tripwire(self):
+        calls = []
+        original = doctor.classify_readiness
+
+        def spy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return {
+                "verdict": "BLOCKED",
+                "status": doctor.STATUS_SKILL_UNAVAILABLE,
+                "remediation": "stub",
+                "target": kwargs.get("target") or (args[0] if args else ""),
+            }
+
+        return calls, original, spy
+
+    def test_default_path_does_not_invoke_stateful_smoke(self) -> None:
+        calls, original, spy = self._tripwire()
+        doctor.classify_readiness = spy
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                target = Path(d) / "proof-target"
+                (target / ".specify").mkdir(parents=True)
+                skill = target / ".claude" / "skills" / "speckit-specify"
+                skill.mkdir(parents=True)
+                (skill / "SKILL.md").write_text("# x\n")
+                rc = doctor.main(["--target", str(target)])  # no --live
+        finally:
+            doctor.classify_readiness = original
+        self.assertEqual(calls, [])  # stateful smoke never invoked
+        self.assertEqual(rc, 0)  # both evidence signals present -> exit 0
+
+    def test_default_path_missing_evidence_exits_nonzero(self) -> None:
+        calls, original, spy = self._tripwire()
+        doctor.classify_readiness = spy
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                target = Path(d) / "proof-target"
+                target.mkdir()  # neither .specify/ nor skill files
+                rc = doctor.main(["--target", str(target)])
+        finally:
+            doctor.classify_readiness = original
+        self.assertEqual(calls, [])  # still no stateful smoke
+        self.assertEqual(rc, 1)
+
+    def test_live_flag_opts_into_stateful_smoke(self) -> None:
+        calls, original, spy = self._tripwire()
+        doctor.classify_readiness = spy
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                target = Path(d) / "proof-target"
+                target.mkdir()
+                doctor.main(["--live", "--target", str(target)])
+        finally:
+            doctor.classify_readiness = original
+        self.assertEqual(len(calls), 1)  # --live DID invoke the stateful path
+
+
 if __name__ == "__main__":
     unittest.main()
