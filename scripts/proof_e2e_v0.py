@@ -30,8 +30,17 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Callable
+
+# Make the repo root importable when run as a standalone script, so the live path's
+# `from hldspec.speckit_invoker import SpecKitInvoker` resolves without requiring
+# PYTHONPATH=. (mirrors scripts/proof_speckit_readiness.py). Without this, the
+# documented `python3 scripts/proof_e2e_v0.py --live` aborts with ModuleNotFoundError.
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 DEFAULT_TARGET = "/tmp/proof-target"
 DEFAULT_HLD = "/tmp/proof-target-HLD.md"
