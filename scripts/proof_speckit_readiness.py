@@ -114,8 +114,8 @@ def _under_temp_root(path: Path) -> bool:
 def _remediation(status: str, target: Path, init_labels: list[str], smoke_command: str) -> str:
     if status == STATUS_UNSAFE_TARGET:
         return (
-            f"Refusing a non-temp target: {target}. Point --target at {DEFAULT_TARGET} (or "
-            "pass --allow-nontemp to override for a deliberately sandboxed path)."
+            f"Refusing a non-temp target: {target}. Point --target at {DEFAULT_TARGET}; the "
+            "doctor only ever probes and writes under a temp root."
         )
     if status == STATUS_TARGET_NOT_CLEAN:
         return (
@@ -159,7 +159,6 @@ def classify_readiness(
     which: Callable[[str], str | None] | None = None,
     env: dict | None = None,
     write: bool = True,
-    allow_nontemp: bool = False,
     git_clean: Callable[[Path], bool | None] | None = None,
 ) -> dict[str, Any]:
     """Classify proof-target SpecKit readiness. Pure over injectable runner/which.
@@ -203,13 +202,13 @@ def classify_readiness(
         report["verdict"] = "PASS" if status == STATUS_SMOKE_PASS else "BLOCKED"
         report["remediation"] = _remediation(status, target, init_labels, smoke_command)
         # Never write a report into a non-temp target (would mutate outside the sandbox).
-        write_ok = write and target.is_dir() and (allow_nontemp or _under_temp_root(target))
+        write_ok = write and target.is_dir() and _under_temp_root(target)
         if write_ok:
             _write_report(target, report)
         return report
 
     # Rung 0 (safety): refuse a non-temp target before any probe or write.
-    if not allow_nontemp and not _under_temp_root(target):
+    if not _under_temp_root(target):
         return finish(STATUS_UNSAFE_TARGET)
 
     if not claude_path:
@@ -337,11 +336,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--smoke-command", default=None)
     parser.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
     parser.add_argument(
-        "--allow-nontemp",
-        action="store_true",
-        help="override the temp-root safety refusal for a deliberately sandboxed non-temp target.",
-    )
-    parser.add_argument(
         "--prepare-proof-target",
         action="store_true",
         help="PROPOSE (never run) a sandbox-scoped SpecKit init; refuses non-temp targets.",
@@ -350,7 +344,7 @@ def main(argv: list[str] | None = None) -> int:
 
     report = classify_readiness(
         args.target, model=args.model, smoke_command=args.smoke_command,
-        timeout=args.timeout, allow_nontemp=args.allow_nontemp,
+        timeout=args.timeout,
     )
     print(f"verdict: {report['verdict']}")
     print(f"status: {report['status']}")

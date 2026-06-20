@@ -110,14 +110,6 @@ class ReadinessClassificationTests(unittest.TestCase):
         self.assertEqual(report["status"], "UNSAFE_TARGET")
         self.assertEqual(report["verdict"], "BLOCKED")
 
-    def test_allow_nontemp_override_proceeds_past_safety(self) -> None:
-        report = doctor.classify_readiness(
-            "/Users/nobody/real-repo", model="haiku", allow_nontemp=True, write=False,
-            runner=_fake_runner(returncode=0, stdout="SMOKE_OK\n"),
-            which=_which(claude=True), env={},
-        )
-        self.assertNotEqual(report["status"], "UNSAFE_TARGET")
-
     def test_target_not_clean(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             target = Path(d) / "proof-target"
