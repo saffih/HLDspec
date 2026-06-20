@@ -39,13 +39,31 @@ class FirstLiveE2EProofDocTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
 
+    # Concrete installed SpecKit commands are hyphen-style (`/speckit-specify`).
+    # The dot wildcard `/speckit.*` is allowed only as abstract shorthand (e.g. in
+    # FIRST_LIVE_E2E_PROOF.md), never as the spelling of a concrete command. This
+    # guard is scoped to the two command-identity sources PR #22 normalized; the
+    # repo at large still uses dot-style as legacy shorthand (a documented follow-up).
+    CONCRETE_DOT_COMMANDS = (
+        "/speckit.specify",
+        "/speckit.clarify",
+        "/speckit.plan",
+        "/speckit.tasks",
+        "/speckit.analyze",
+        "/speckit.implement",
+    )
+
     def test_concrete_command_identity_rejects_dot_style_in_contract_and_registry(self) -> None:
         journey3 = JOURNEY3_DOC.read_text(encoding="utf-8")
         registry = REGISTRY.read_text(encoding="utf-8")
         for text, source in ((journey3, JOURNEY3_DOC), (registry, REGISTRY)):
             with self.subTest(source=source):
-                self.assertNotIn("/speckit.specify", text)
-                self.assertNotIn("/speckit.plan", text)
+                for command in self.CONCRETE_DOT_COMMANDS:
+                    self.assertNotIn(
+                        command, text,
+                        f"{source.name} uses concrete dot-style {command!r}; "
+                        f"use hyphen-style {command.replace('.', '-', 1)!r}",
+                    )
                 self.assertIn("/speckit-*", text)
 
     def test_docs_index_registers_the_supporting_evidence_record(self) -> None:
