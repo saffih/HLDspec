@@ -39,17 +39,20 @@ REPORT_DIR_NAME = ".hldspec-proof"
 PROOF_JSON = "proof_e2e_v0.json"
 PROOF_MD = "proof_e2e_v0.md"
 SMOKE_TOKEN = "SMOKE_OK"
-# SpecKit command spelling is HYPHEN-style, confirmed by live empirical evidence:
-# `specify init . --integration claude` installs skills as `.claude/skills/speckit-*`
-# (e.g. `/speckit-specify`), and a hyphen smoke returns a clean standalone "SMOKE_OK".
-# This matches hldspec/speckit_invoker.py (PHASE_SKILL "speckit-specify").
+# Use the HYPHEN command name. Live evidence: `specify init . --integration claude`
+# installs skills as `.claude/skills/speckit-*`, so `/speckit-specify` is the real,
+# existing command; `/speckit.specify` is NOT a real command -- it only "works" by
+# the agent fuzzy-matching to the same skill. Hyphen also matches
+# hldspec/speckit_invoker.py (PHASE_SKILL "speckit-specify"). This reverses the
+# PR #19 dot-style default; the dot claims in helper_registry.py /
+# docs/JOURNEY3_HELPER_CONTRACT.md are unreconciled outliers (follow-up, not here).
 #
-# The dot form "/speckit.specify" is wrong AND unsafe as a default: the agent
-# fuzzy-matches it to the real skill and executes the workflow, creating a stray
-# branch (observed: "001-smoke-ok") -- a side effect a smoke must never cause.
-# (This reverses the PR #19 dot-style default; the dot claims in
-# helper_registry.py / docs/JOURNEY3_HELPER_CONTRACT.md are the unreconciled
-# outliers -- flagged as follow-up, not fixed here.) Configurable via --smoke-command.
+# KNOWN LIMITATION (observed, flagged as follow-up): the spelling fix does NOT make
+# the smoke reliably side-effect-free. `/speckit-specify` is a stateful *workflow*
+# skill, so "say only SMOKE_OK" is an unreliable neuter -- BOTH spellings have been
+# seen to run the real workflow and create a feature branch + specs/ (observed:
+# `001-smoke-ok` via dot, `002-smoke-ok` via hyphen). A recognition smoke built on a
+# workflow skill is inherently non-deterministic; redesigning it is out of scope.
 DEFAULT_SMOKE_COMMAND = f"/speckit-specify say only {SMOKE_TOKEN}"
 LIVE_ENV_VAR = "HLDSPEC_LIVE_E2E"
 DEFAULT_TIMEOUT = 120
