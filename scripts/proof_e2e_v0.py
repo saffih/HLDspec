@@ -8,8 +8,8 @@ repo and reports PASS / ACTION / BLOCKED:
 - `--smoke` : one raw, bounded `claude` invocation; PASS only if it exits 0, emits a
   standalone `SMOKE_OK` line, and leaves the target clean (report files aside). Smoke
   is a *recognition/reachability* probe -- it proves `claude` runs and the command is
-  accepted without mutating the target. It does NOT prove the `/speckit.*` skill
-  executed: a real `/speckit.specify` would create a branch + spec.md (dirtying the
+  accepted without mutating the target. It does NOT prove the `/speckit-*` skill
+  executed: a real `/speckit-specify` would create a branch + spec.md (dirtying the
   tree), so a clean PASS means the say-only probe did not trigger real skill work.
   An "...not available..." / "unknown command" reply is classified BLOCKED
   (`SKILL_UNAVAILABLE` vs `UNKNOWN_COMMAND`) so a hollow completion never passes.
@@ -39,12 +39,18 @@ REPORT_DIR_NAME = ".hldspec-proof"
 PROOF_JSON = "proof_e2e_v0.json"
 PROOF_MD = "proof_e2e_v0.md"
 SMOKE_TOKEN = "SMOKE_OK"
-# Canonical SpecKit command spelling is dot-style, per the helper source of truth:
-# hldspec/helper_registry.py::build_speckit_helper -> "/speckit.*", "/speckit.specify";
-# docs/JOURNEY3_HELPER_CONTRACT.md -> supported_toolchain "SpecKit (/speckit.*)".
-# (The hyphen form "/speckit-specify" in speckit_invoker.py is a headless skill-name
-# convention, not the slash command the agent accepts.) Configurable via --smoke-command.
-DEFAULT_SMOKE_COMMAND = f"/speckit.specify say only {SMOKE_TOKEN}"
+# SpecKit command spelling is HYPHEN-style, confirmed by live empirical evidence:
+# `specify init . --integration claude` installs skills as `.claude/skills/speckit-*`
+# (e.g. `/speckit-specify`), and a hyphen smoke returns a clean standalone "SMOKE_OK".
+# This matches hldspec/speckit_invoker.py (PHASE_SKILL "speckit-specify").
+#
+# The dot form "/speckit.specify" is wrong AND unsafe as a default: the agent
+# fuzzy-matches it to the real skill and executes the workflow, creating a stray
+# branch (observed: "001-smoke-ok") -- a side effect a smoke must never cause.
+# (This reverses the PR #19 dot-style default; the dot claims in
+# helper_registry.py / docs/JOURNEY3_HELPER_CONTRACT.md are the unreconciled
+# outliers -- flagged as follow-up, not fixed here.) Configurable via --smoke-command.
+DEFAULT_SMOKE_COMMAND = f"/speckit-specify say only {SMOKE_TOKEN}"
 LIVE_ENV_VAR = "HLDSPEC_LIVE_E2E"
 DEFAULT_TIMEOUT = 120
 EXCERPT_LIMIT = 2000
@@ -86,7 +92,7 @@ def smoke_confirmed(stdout: str) -> bool:
     say SMOKE_OK (token present as a substring) while the skill never actually ran.
     Note: even a bare standalone SMOKE_OK cannot prove the skill *executed* -- the
     smoke is a recognition/reachability probe, not proof of skill execution (a real
-    /speckit.specify would create a branch + spec.md and dirty the tree). See the
+    /speckit-specify would create a branch + spec.md and dirty the tree). See the
     module docstring.
     """
     for line in (stdout or "").splitlines():
@@ -527,7 +533,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--smoke-command",
         default=None,
-        help=f"override the smoke command (default dot-style: {DEFAULT_SMOKE_COMMAND!r})",
+        help=f"override the smoke command (default hyphen-style: {DEFAULT_SMOKE_COMMAND!r})",
     )
     parser.add_argument("--allow-non-temp-target", action="store_true")
     group = parser.add_mutually_exclusive_group(required=True)
