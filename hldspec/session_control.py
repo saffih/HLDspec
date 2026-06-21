@@ -394,7 +394,15 @@ def build_session_plan(
         session_name = default_tmux_session_name(target_repo_path, current_gate)
     target = str(target_repo_path)
     hldspec = str(hldspec_repo_path)
-    pkt_dir = ".hldspec/source_package/subagent_packets"
+    pkt_dir = ".hldspec/source_package/subagent_packets"  # relative descriptor (packet_file)
+    # Resolved, pointer-aware ABSOLUTE packets dir for the *executable* role commands
+    # (controller root in external mode) — same resolver write_session_artifacts uses,
+    # so a rendered command points where the packet was actually written.
+    from . import hld_source_package  # lazy: mirror write_session_artifacts; no import cycle
+
+    resolved_pkt_dir = str(
+        hld_source_package.source_package_paths(Path(target_repo_path))[0] / "subagent_packets"
+    )
 
     basepack = build_basepack_packet()
     runner = build_runner_packet()
@@ -415,7 +423,7 @@ def build_session_plan(
         ),
         BASEPACK: _role_entry(
             role=BASEPACK,
-            command=_role_command(BASEPACK, target, hldspec, backend),
+            command=_role_command(BASEPACK, target, hldspec, backend, resolved_pkt_dir),
             prompt_file=".hldspec/source_package/speckit_runbook.md",
             packet_file=f"{pkt_dir}/basepack_packet.md",
             allowed_files=basepack.allowed_files,
@@ -427,7 +435,7 @@ def build_session_plan(
         ),
         RUNNER: _role_entry(
             role=RUNNER,
-            command=_role_command(RUNNER, target, hldspec, backend),
+            command=_role_command(RUNNER, target, hldspec, backend, resolved_pkt_dir),
             prompt_file=".hldspec/source_package/runner_prompt.md",
             packet_file=f"{pkt_dir}/runner_packet.md",
             allowed_files=runner.allowed_files,
@@ -439,7 +447,7 @@ def build_session_plan(
         ),
         CONSULTANT: _role_entry(
             role=CONSULTANT,
-            command=_role_command(CONSULTANT, target, hldspec, backend),
+            command=_role_command(CONSULTANT, target, hldspec, backend, resolved_pkt_dir),
             prompt_file=".hldspec/source_package/consultant_prompt.md",
             packet_file=f"{pkt_dir}/consultant_packet.md",
             allowed_files=consultant.allowed_files,
@@ -464,19 +472,27 @@ def build_session_plan(
     }
 
 
-def _role_command(role: str, target: str, hldspec: str, backend: str) -> str:
-    """Command string a role would run, per backend. Never executed here."""
-    pkt = {
-        BASEPACK: ".hldspec/source_package/subagent_packets/basepack_packet.md",
-        RUNNER: ".hldspec/source_package/subagent_packets/runner_packet.md",
-        CONSULTANT: ".hldspec/source_package/subagent_packets/consultant_packet.md",
+def _role_command(role: str, target: str, hldspec: str, backend: str, pkt_dir: str) -> str:
+    """Command string a role would run, per backend. Never executed here.
+
+    `pkt_dir` is the resolved, pointer-aware ABSOLUTE subagent-packets directory —
+    the controller location in external mode, in-target otherwise — so the rendered
+    command reads the packet that write_session_artifacts actually wrote. The role
+    agent still works in {target} (`-C {target}` / "in {target}"); only the packet
+    path is resolved (single source of truth: same resolver as the writer).
+    """
+    filename = {
+        BASEPACK: "basepack_packet.md",
+        RUNNER: "runner_packet.md",
+        CONSULTANT: "consultant_packet.md",
     }.get(role, "")
+    pkt = f"{pkt_dir}/{filename}" if filename else ""
     if backend == "claude":
-        return f"claude -p \"$(cat {target}/{pkt})\""
+        return f"claude -p \"$(cat {pkt})\""
     if backend == "codex":
         return f"codex exec --sandbox workspace-write -C {target} \"$(cat {pkt})\""
     if backend == "manual":
-        return f"Paste {target}/{pkt} into a fresh {role} agent session."
+        return f"Paste {pkt} into a fresh {role} agent session."
     # dry-run / command-only / tmux all describe the same bounded invocation
     return f"run {role} from packet {pkt} in {target} (bounded; stop after the phase)"
 
