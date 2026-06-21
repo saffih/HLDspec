@@ -700,6 +700,27 @@ selection. Storing the selected helper in `MANIFEST.json` mixes runtime provenan
 with product state and would create a hidden source-of-truth conflict between the
 Journey 2 recommendation and the Journey 3 selection.
 
+### P1-015 Engineering Quality Gates enforcement (docs/ENGINEERING_QUALITY_GATES.md, added 2026-06-21)
+
+The policy is docs/governance only (`docs/ENGINEERING_QUALITY_GATES.md`): 15 gates
+(EQG-1..EQG-15) for implementation work on the HLDspec repo — TDD/red→green evidence,
+regression test per bug fix, characterization before refactor, no test weakening,
+smallest slice, contract-first, compatibility/fail-closed, single source of truth,
+explicit ownership, read-only proof, evidence-based report. Several gates are
+currently **receipt-** or **judgment-**enforced only.
+
+Follow-up (do not start without a separate gated prompt):
+
+- Promote receipt-only gates to machine enforcement: add a `tests_v2/` check (e.g. a
+  behavior-changing PR with no red→green evidence fails), and a corresponding row in
+  `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md` (whose own rule marks unenforced
+  principles documentation-only / ACTION).
+- Decide whether to promote the gates to a protected contract in
+  `docs/ANTI_DRIFT_CONTRACTS.md` (would invoke that doc's change-policy).
+
+Note: P1-014 (external target-artifacts placement contract) is reserved by the open
+draft PR #29; this item is numbered P1-015 to avoid a merge collision.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
