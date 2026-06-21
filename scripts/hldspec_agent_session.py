@@ -16,6 +16,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from hldspec import helper_selection as hsel
+from hldspec import journey3_driver as j3drv
+from hldspec import next_feature_readiness as nfr
 from hldspec import session_control as sc
 from hldspec.hld_source_package import build_source_package_content
 from hldspec.minimal_agent_request import _workflow_trigger_candidates, detect_workflow_trigger, parse_minimal_agent_request
@@ -1753,6 +1755,29 @@ def command_operator_state(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "PASS" else 2
 
 
+# Exit map mirrors the standalone scripts/hldspec_journey3_status.py contract,
+# anchored to the driver's STATUS_* constants so only the int codes are literal.
+_JOURNEY3_EXIT = {
+    j3drv.STATUS_PASS: 0,
+    j3drv.STATUS_ACTION: 1,
+    j3drv.STATUS_BLOCKED: 2,
+}
+
+
+def command_journey3_status(args: argparse.Namespace) -> int:
+    target = Path(args.target).expanduser().resolve()
+    # Phase comes from the read-only readiness engine (read-only git observation),
+    # injected into the pure aggregator so the driver itself runs no subprocess.
+    # --no-phase skips it entirely; the driver then reports phase as UNKNOWN.
+    next_feature_report = None if args.no_phase else nfr.build_next_feature_readiness_report(target)
+    report = j3drv.build_journey3_status(target, next_feature_report=next_feature_report)
+    if args.json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print(j3drv.render_status_text(report), end="")
+    return _JOURNEY3_EXIT.get(report["driver_status"], 1)
+
+
 def command_git_lifecycle(args: argparse.Namespace) -> int:
     target = Path(args.target).expanduser().resolve()
     report, plan = gl.write_git_lifecycle_artifacts(target)
@@ -1900,6 +1925,7 @@ def command_help(args: argparse.Namespace) -> int:
     print("- `HLDspec status target: /path/to/target` — current state, blockers, open questions, next safe action.")
     print("- `HLDspec doctor target: /path/to/target` — why the target is not ready and what to fix.")
     print("- `HLDspec operator-state target: /path/to/target` — readiness/lifecycle safety for Build Loop or SpecKit work.")
+    print("- `HLDspec journey3-status target: /path/to/target` — read-only Journey 3 Driver 'where are we?' status.")
     print("- `HLDspec review target: /path/to/target` — human-facing review files and checkpoint evidence.")
     print("- `HLDspec continue target: /path/to/target` — advance only if gates say it is safe.")
     print("")
@@ -1978,6 +2004,19 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("git-lifecycle", help="Write/read the read-only Git lifecycle report and non-executing plan.")
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_git_lifecycle)
+
+    p = sub.add_parser(
+        "journey3-status",
+        help="Show the read-only Journey 3 Driver status ('where are we?') for a target.",
+    )
+    p.add_argument("--target", default=".", help="target repo root (default: cwd)")
+    p.add_argument("--json", action="store_true", help="emit the machine-readable JSON report")
+    p.add_argument(
+        "--no-phase",
+        action="store_true",
+        help="skip the read-only phase engine (fully subprocess-free); phase = UNKNOWN_REQUIRES_READINESS_RUN",
+    )
+    p.set_defaults(func=command_journey3_status)
 
     return parser
 
