@@ -723,21 +723,31 @@ draft PR #29; this item is numbered P1-015 to avoid a merge collision.
 
 ### P1-016 Journey 3 controller/target/agent-bridge implementation (docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md, added 2026-06-21)
 
-Terminology + UX are defined; the following are named there but **not implemented**.
-None grant authority by themselves — approval gates stay controller-owned.
+Terminology + UX are defined; the roadmap A–M below is named in the doc (§8) but
+**not implemented**. None grant authority by themselves — approval gates stay
+controller-owned. The doc's §8 is the authoritative roadmap; this is the tracking row.
 
-1. Implement `agent_bridge` discovery at the canonical `.agents/hldspec/` location.
-2. Implement `bridge.json` schema + driver validation; fail closed (BLOCKED) on broken
-   or ambiguous binding (it mirrors, never replaces, the `.hldspec-run.json` pointer).
-3. Implement optional provider-specific shims (`.devin|.claude|.codex/hldspec/`) that
-   point at the canonical bridge rather than fork it.
-4. Formalize `command_envelope` as a typed seam (lift the existing session-packet shape
-   in `hldspec/session_control.py`).
-5. Add a static guard that fails closed on accidental in-target control-plane
-   accumulation in external mode (today only source-package split-brain is detected via
-   `hld_source_package.source_package_split_brain`).
-6. Optional `Target Controller Link` symlink support (`target/.agents/hldspec ->
-   controller/.agents/hldspec`); untracked by default; broken/mismatched link BLOCKED.
+- **A.** Canonical `.agents/hldspec/` bridge structure.
+- **B.** `SKILL.md` + `bridge.json` (mirrors, never replaces, the `.hldspec-run.json`
+  pointer).
+- **C.** Optional provider shims (`.devin|.claude|.codex/hldspec/`) pointing at the
+  canonical bridge.
+- **D.** Bridge discovery from either `controller_root` or `target_root`.
+- **E.** Bridge validation, fail closed: broken=BLOCKED, mismatch=BLOCKED, multiple
+  candidates=BLOCKED, stale=ACTION/BLOCKED.
+- **F.** Optional `Target Controller Link` symlink (`target/.agents/hldspec ->
+  controller/.agents/hldspec`); untracked by default; broken/mismatched=BLOCKED.
+- **G.** `helper_runtime_capsule` defined precisely per helper.
+- **H.** Generic `HelperAdapter` + concrete `SpecKitAdapter` contract (formalizes
+  `helper_selection.py` + Toolchain Driver).
+- **I.** `command_envelope` typed schema (lift the session-packet shape in
+  `hldspec/session_control.py`).
+- **J.** Literal/path hardening that fails closed on accidental
+  `target/.hldspec/source_package/` leaks in external mode (today only source-package
+  split-brain is detected via `hld_source_package.source_package_split_brain`).
+- **K.** Read-only dogfood against `~/code/flow` (no mutation, no helper/SpecKit run).
+- **L.** Reassess **PR #29** (dogfood package-placement gap) after this contract lands.
+- **M.** Reassess **PR #26** (Journey 2 architecture-package authoring) separately.
 
 ### P1-017 Reconcile canonical control-plane doc with external-controller mode (added 2026-06-21)
 

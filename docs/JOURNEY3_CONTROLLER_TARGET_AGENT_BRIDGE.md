@@ -140,6 +140,12 @@ shapes, expected outputs, and forbidden areas. It **does not replace the helper*
 **does not own product truth**. The generic driver delegates helper-specific
 knowledge to the adapter.
 
+Per-helper specialization (**PROPOSED**): a generic `HelperAdapter` interface with a
+concrete **`SpecKitAdapter`** that knows SpecKit's runtime capsule, the
+`specify → plan → tasks → implement` command shapes, expected outputs, and forbidden
+areas. The existing `helper_selection.py` + Toolchain Driver are the seam this would
+formalize (roadmap H).
+
 ### 2.7 `agent_bridge` — **PROPOSED** (not implemented)
 
 An agent-discoverable skill/doorway letting an agent that starts in **either** the
@@ -242,6 +248,17 @@ plane in-target at `~/code/flow/.hldspec/`, and there is no controller_root.
     (split-brain is detected and fails closed).
 11. **Helper runtime in the target is allowed only when explicitly declared/selected**
     (helper selection is controller-owned).
+12. **`target_root/.hldspec/source_package/` is forbidden/legacy in external-controller
+    mode** unless explicitly classified — in external mode the source package lives
+    under `control_state_root`; an in-target copy is a leak/split-brain signal, not
+    authoritative.
+13. **`target_root/.specify/` is helper runtime, not control-plane state.** It is part
+    of the `helper_runtime_capsule` and is owned per
+    [`TOOLCHAIN_DRIVER_BOUNDARY.md`](TOOLCHAIN_DRIVER_BOUNDARY.md); it must never be
+    treated as HLDspec control state.
+14. **Provider-specific skill dirs (`.devin|.claude|.codex/hldspec/`) are shims;** the
+    canonical bridge is `.agents/hldspec/`. Shims point at the canonical bridge rather
+    than fork it.
 
 ---
 
@@ -271,6 +288,9 @@ describe existing mechanisms.
 13. Agent writes receipts/reports **only** to approved controller report locations.
 14. Driver validates reports and gates continuation (`session_continue_preflight`,
     gate validator).
+15. Human **approves protected next actions** — commit, push, merge, helper-mode
+    changes, and binding changes. These stay controller-owned human gates; neither the
+    agent nor the bridge may self-approve them.
 
 **Starts-from-controller vs starts-from-target:** the model must work both ways. From
 the controller, `--target` makes the target explicit. From the target, the
@@ -321,20 +341,43 @@ behavior**. The following are **named here but not implemented**:
 
 ---
 
-## 8. Backlog follow-ups
+## 8. Planned implementation roadmap (A–M)
 
-Tracked in [`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md):
+All items are **PROPOSED / not implemented**; tracked in
+[`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) (P1-016). None grant
+authority — approval gates stay controller-owned regardless of what lands.
 
-1. Implement agent-bridge discovery (`.agents/hldspec/`).
-2. Implement `bridge.json` validation (fail closed on broken/ambiguous binding).
-3. Implement optional provider-specific shims pointing at the canonical bridge.
-4. Formalize `command_envelope` (lift the session-packet shape into a typed seam).
-5. Add a static guard for accidental control-plane accumulation in the target
-   (external mode).
-6. **Reconcile** the canonical
-   [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) in-target
-   control-plane description (`target/.hldspec/`) with the implemented Option-C
-   external-controller mode, so the canonical doc reflects both modes.
+- **A.** Define the canonical `.agents/hldspec/` bridge structure.
+- **B.** Add `SKILL.md` (operating contract) and `bridge.json` (binding metadata).
+- **C.** Add optional provider shims (`.devin/`, `.claude/`, `.codex/`) that point at
+  the canonical bridge.
+- **D.** Add bridge discovery from **either** `controller_root` or `target_root`.
+- **E.** Add bridge validation, failing closed: broken link = **BLOCKED**; identity
+  mismatch = **BLOCKED**; multiple candidates = **BLOCKED**; stale bridge =
+  **ACTION/BLOCKED**.
+- **F.** Add optional `Target Controller Link` symlink setup (untracked by default;
+  never canonical over `--controller`).
+- **G.** Define the `helper_runtime_capsule` precisely per helper.
+- **H.** Define the generic `HelperAdapter` interface + a concrete `SpecKitAdapter`
+  contract (formalizing `helper_selection.py` + the Toolchain Driver seam).
+- **I.** Define `command_envelope` as a typed schema (lift the session-packet shape).
+- **J.** Add literal/path hardening that fails closed on accidental
+  `target_root/.hldspec/source_package/` control-plane leaks in external mode (today
+  only source-package split-brain is detected via
+  `hld_source_package.source_package_split_brain`).
+- **K.** Run a **read-only** dogfood against `~/code/flow` to validate the model (no
+  mutation, no helper/SpecKit execution).
+- **L.** Reassess **PR #29** (dogfood package-placement gap) once this terminology/UX
+  contract lands.
+- **M.** Reassess **PR #26** (Journey 2 architecture-package authoring) separately if
+  its roadmap needs this vocabulary.
+
+**Separate reconciliation item (P1-017):** the canonical
+[`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) currently describes
+the control plane only as in-target `target/.hldspec/`. Update it (and its locked tests)
+to reflect the implemented Option-C external-controller mode, so the authoritative doc
+covers both modes. Until then this doc states the mode-dependent rule and defers to the
+canonical doc on conflict.
 
 ---
 
