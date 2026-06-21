@@ -167,5 +167,68 @@ class ReceiptTemplateGuidanceTests(unittest.TestCase):
             self.assertIn(".specify/memory/constitution.md", prompt)
 
 
+class MirrorReceiptTemplatePropertyTests(unittest.TestCase):
+    """F1 (review finding) — characterize the materialized-mirror property.
+
+    `runner_prompt.md` / `consultant_prompt.md` are MIRROR_FILES that embed the
+    receipt template, so once it renders absolute controller source-package paths
+    (external mode), those paths can land inside the target-delivered
+    `.specify/source/` mirror. This is the FIRST slice with that property:
+    PR #33's absolute paths live in `session_plan.json`, which is not mirrored.
+    The behavior is guidance text only (no IO consumer), but it is locked here so a
+    future change to the relative-vs-controller posture cannot pass silently.
+    """
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-j3-mirror-")
+        self.root = Path(self._tmp.name).resolve()
+        self.target = self.root / "target"
+        self.controller = self.root / "controller"
+        self.target.mkdir()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _materialize_external_mirror(self) -> Path:
+        _write_pointer(self.target, self.controller)
+        plan = sc.build_session_plan(self.target, self.root / "hldspec")
+        sc.write_session_artifacts(self.target, plan)  # prompts -> controller source dir
+        source_dir, mirror_dir = hld_source_package.source_package_paths(self.target)
+        hld_source_package.materialize_specify_mirror(source_dir, mirror_dir)
+        self.assertTrue(str(mirror_dir).startswith(str(self.target)), "mirror dir stays in-target")
+        return mirror_dir
+
+    # The two template-bearing prompts carry controller paths into the in-target mirror.
+    def test_mirrored_prompts_carry_controller_paths(self) -> None:
+        mirror_dir = self._materialize_external_mirror()
+        ctrl = f"{self.controller}/.hldspec/source_package"
+        for name in ("runner_prompt.md", "consultant_prompt.md"):
+            text = (mirror_dir / name).read_text(encoding="utf-8")
+            self.assertIn(f"{ctrl}/source_package.json", text, name)
+            self.assertNotIn("[ ] .hldspec/source_package/", text, name)
+
+    # The mirror must NOT relocate the SpecKit `.specify/` line to the controller.
+    def test_mirror_keeps_specify_line_target_relative(self) -> None:
+        mirror_dir = self._materialize_external_mirror()
+        for name in ("runner_prompt.md", "consultant_prompt.md"):
+            text = (mirror_dir / name).read_text(encoding="utf-8")
+            self.assertIn(".specify/memory/constitution.md", text, name)
+            self.assertNotIn(f"{self.controller}/.specify", text, name)
+
+    # speckit_runbook.md is mirrored but does not embed the receipt template.
+    def test_runbook_mirrored_without_receipt_template(self) -> None:
+        mirror_dir = self._materialize_external_mirror()
+        self.assertIn("speckit_runbook.md", hld_source_package.MIRROR_FILES)
+        text = (mirror_dir / "speckit_runbook.md").read_text(encoding="utf-8")
+        self.assertNotIn("CONTEXT RECEIPT", text)
+        self.assertNotIn(f"{self.controller}/.hldspec/source_package", text)
+
+    # session_plan.json is not a mirrored file — PR #33's paths never reach the target.
+    def test_session_plan_not_mirrored(self) -> None:
+        self.assertNotIn("session_plan.json", hld_source_package.MIRROR_FILES)
+        mirror_dir = self._materialize_external_mirror()
+        self.assertFalse((mirror_dir / "session_plan.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
