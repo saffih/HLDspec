@@ -721,6 +721,36 @@ Follow-up (do not start without a separate gated prompt):
 Note: P1-014 (external target-artifacts placement contract) is reserved by the open
 draft PR #29; this item is numbered P1-015 to avoid a merge collision.
 
+### P1-016 Journey 3 controller/target/agent-bridge implementation (docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md, added 2026-06-21)
+
+Terminology + UX are defined; the following are named there but **not implemented**.
+None grant authority by themselves — approval gates stay controller-owned.
+
+1. Implement `agent_bridge` discovery at the canonical `.agents/hldspec/` location.
+2. Implement `bridge.json` schema + driver validation; fail closed (BLOCKED) on broken
+   or ambiguous binding (it mirrors, never replaces, the `.hldspec-run.json` pointer).
+3. Implement optional provider-specific shims (`.devin|.claude|.codex/hldspec/`) that
+   point at the canonical bridge rather than fork it.
+4. Formalize `command_envelope` as a typed seam (lift the existing session-packet shape
+   in `hldspec/session_control.py`).
+5. Add a static guard that fails closed on accidental in-target control-plane
+   accumulation in external mode (today only source-package split-brain is detected via
+   `hld_source_package.source_package_split_brain`).
+6. Optional `Target Controller Link` symlink support (`target/.agents/hldspec ->
+   controller/.agents/hldspec`); untracked by default; broken/mismatched link BLOCKED.
+
+### P1-017 Reconcile canonical control-plane doc with external-controller mode (added 2026-06-21)
+
+`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (canonical, test-locked by
+`tests_v2/test_terminology_and_flow_docs.py`) describes the control plane only as
+in-target `target/.hldspec/`. The implemented Option-C external-controller mode
+(PR #30/#32/#33/#34/#35) resolves the same control plane to `controller_root/.hldspec/`
+when a `.hldspec-run.json` pointer is present. Update the canonical doc to describe both
+modes (and adjust the locked tests in the same slice) so the authoritative terminology
+matches shipped behavior. Until then,
+`docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md` states the mode-dependent rule and
+defers to the canonical doc on conflict.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
