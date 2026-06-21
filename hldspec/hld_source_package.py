@@ -23,7 +23,7 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import helper_registry, journey2_architecture_package, mediator_guidance
+from . import control_paths, helper_registry, journey2_architecture_package, mediator_guidance
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
@@ -315,9 +315,44 @@ def materialize_specify_mirror(
 
 
 def source_package_paths(target_root: Path, layout: str = "new") -> tuple[Path, Path]:
-    """Convenience: (authoritative source dir, derived mirror dir)."""
-    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
+    """The single pointer-aware resolver for (authoritative source dir, mirror dir).
+
+    Pointer-aware (Option C): when a valid ``.hldspec-run.json`` pointer names an
+    external controller root, the *authoritative* source package resolves under the
+    controller (the externalized HLDspec control plane). The mirror always stays at
+    the target's ``.specify/source/`` because it is the delivered, in-target SpecKit
+    runtime. Without a pointer this is byte-identical to legacy in-target resolution.
+
+    Both the Journey 3 driver (read) and ``build_source_package_content`` (write)
+    resolve through here, so read and write can never disagree on the location.
+    """
+    adapter = TargetWorkspaceAdapter(
+        target_root=target_root,
+        layout=layout,
+        controller_root=control_paths.resolve_controller_root(target_root),
+    )
     return adapter.source_package_dir, adapter.specify_source_mirror_dir
+
+
+def source_package_split_brain(target_root: Path) -> Path | None:
+    """Detect a source-package split-brain; return the conflicting in-target dir, else None.
+
+    A completed externalization deletes the in-target ``.hldspec/`` entirely
+    (``run_state.externalize_target_control_artifacts``), so a healthy external
+    target never holds an in-target ``source_package.json``. When external mode is
+    active AND an authoritative package exists in BOTH the controller and the
+    target, ownership is ambiguous (interrupted externalization, or a manual
+    in-target build). The caller must fail closed rather than silently pick one or
+    repair — this only reports the conflict; it never deletes or reconciles.
+    """
+    controller = control_paths.resolve_controller_root(target_root)
+    if controller is None:
+        return None  # normal mode: in-target IS the single authoritative location.
+    controller_pkg = controller / ".hldspec" / "source_package" / SOURCE_PACKAGE_FILE
+    in_target = Path(target_root) / ".hldspec" / "source_package"
+    if controller_pkg.is_file() and (in_target / SOURCE_PACKAGE_FILE).is_file():
+        return in_target
+    return None
 
 
 @dataclass
@@ -436,8 +471,9 @@ def build_source_package_content(
     # Imported here to avoid an import cycle (those modules import this one).
     from . import hld_marking, single_spec_input, implementation_slicing, engineering_selection
 
-    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
-    source_dir = adapter.source_package_dir
+    # Resolve through the single pointer-aware resolver so write lands where the
+    # driver reads (controller root in external mode, in-target otherwise).
+    source_dir, mirror_dir = source_package_paths(target_root, layout=layout)
     source_dir.mkdir(parents=True, exist_ok=True)
 
     (source_dir / AUTHORITATIVE_FILES["hld"]).write_text(hld_text, encoding="utf-8")
@@ -487,7 +523,7 @@ def build_source_package_content(
     validation = validate_source_package(source_dir)
     mirrored: list[str] = []
     if materialize_mirror:
-        mirrored = materialize_specify_mirror(source_dir, adapter.specify_source_mirror_dir)
+        mirrored = materialize_specify_mirror(source_dir, mirror_dir)
 
     try:
         mediator_guidance.write_mediator_guidance_artifacts(target_root)
