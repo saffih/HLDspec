@@ -6,8 +6,8 @@ but `build_session_plan`'s rendered role *commands* still hardcoded
 in external mode. This routes the *executable* command path through the same
 pointer-aware resolver (`hld_source_package.source_package_paths`) that
 `write_session_artifacts` uses, so command paths and written packets agree in both
-modes. (The descriptor fields `packet_file`/`prompt_file` remain relative — a
-documented follow-up; nothing executes off them.)
+modes. (The descriptor fields `packet_file`/`prompt_file` are made pointer-aware in
+`tests_v2/test_journey3_session_descriptor_fields.py` — the follow-up to this slice.)
 """
 from __future__ import annotations
 

@@ -169,14 +169,26 @@ def render_packet(packet: SubagentPacket) -> str:
     )
 
 
-CONTEXT_RECEIPT_TEMPLATE = """\
+def render_context_receipt_template(source_pkg_dir: str | Path = ".hldspec/source_package") -> str:
+    """Context Receipt checklist with the source-package required-reads under `source_pkg_dir`.
+
+    Pointer-aware callers (write_session_artifacts) pass the *resolved* source-package
+    dir — the controller root in external mode — so the checklist points operators at
+    the packets that were actually written, not a target-local path that does not exist
+    in external mode. The `.specify/memory/constitution.md` line stays target-relative:
+    the SpecKit mirror always lives in the target (the agent's working dir), never under
+    the controller (the resolver's Option C boundary). The default keeps the legacy
+    target-relative shape and is byte-identical to the prior constant.
+    """
+    p = str(source_pkg_dir).rstrip("/")
+    return f"""\
 CONTEXT RECEIPT
 - Required files read:
-  - [ ] .hldspec/source_package/source_package.json
-  - [ ] .hldspec/source_package/source_manifest.json
-  - [ ] .hldspec/source_package/session_plan.json
-  - [ ] .hldspec/source_package/speckit_runbook.md
-  - [ ] .hldspec/source_package/runner_prompt.md or consultant_prompt.md
+  - [ ] {p}/source_package.json
+  - [ ] {p}/source_manifest.json
+  - [ ] {p}/session_plan.json
+  - [ ] {p}/speckit_runbook.md
+  - [ ] {p}/runner_prompt.md or consultant_prompt.md
   - [ ] .specify/memory/constitution.md, if initialized
 - Current phase:
 - Actor:
@@ -194,6 +206,10 @@ CONTEXT RECEIPT
   - RunSkeptic ACTION/CONFLICT
   - failed validation
 """
+
+
+# Canonical target-relative default (single text definition lives in the renderer).
+CONTEXT_RECEIPT_TEMPLATE = render_context_receipt_template()
 
 PHASE_REPORT_TEMPLATE = """\
 PHASE REPORT
@@ -394,15 +410,15 @@ def build_session_plan(
         session_name = default_tmux_session_name(target_repo_path, current_gate)
     target = str(target_repo_path)
     hldspec = str(hldspec_repo_path)
-    pkt_dir = ".hldspec/source_package/subagent_packets"  # relative descriptor (packet_file)
-    # Resolved, pointer-aware ABSOLUTE packets dir for the *executable* role commands
-    # (controller root in external mode) — same resolver write_session_artifacts uses,
-    # so a rendered command points where the packet was actually written.
+    # Resolve the source-package dir once through the single pointer-aware resolver
+    # (controller root in external mode, in-target otherwise) — the same resolver
+    # write_session_artifacts uses — so the executable role commands AND the
+    # descriptor fields (packet_file/prompt_file) point where the artifacts were
+    # actually written. In legacy no-pointer mode this is the target-local path.
     from . import hld_source_package  # lazy: mirror write_session_artifacts; no import cycle
 
-    resolved_pkt_dir = str(
-        hld_source_package.source_package_paths(Path(target_repo_path))[0] / "subagent_packets"
-    )
+    source_dir = hld_source_package.source_package_paths(Path(target_repo_path))[0]
+    resolved_pkt_dir = str(source_dir / "subagent_packets")
 
     basepack = build_basepack_packet()
     runner = build_runner_packet()
@@ -424,8 +440,8 @@ def build_session_plan(
         BASEPACK: _role_entry(
             role=BASEPACK,
             command=_role_command(BASEPACK, target, hldspec, backend, resolved_pkt_dir),
-            prompt_file=".hldspec/source_package/speckit_runbook.md",
-            packet_file=f"{pkt_dir}/basepack_packet.md",
+            prompt_file=f"{source_dir}/speckit_runbook.md",
+            packet_file=f"{resolved_pkt_dir}/basepack_packet.md",
             allowed_files=basepack.allowed_files,
             forbidden_files=basepack.forbidden_files,
             stop_condition=basepack.stop_condition,
@@ -436,8 +452,8 @@ def build_session_plan(
         RUNNER: _role_entry(
             role=RUNNER,
             command=_role_command(RUNNER, target, hldspec, backend, resolved_pkt_dir),
-            prompt_file=".hldspec/source_package/runner_prompt.md",
-            packet_file=f"{pkt_dir}/runner_packet.md",
+            prompt_file=f"{source_dir}/runner_prompt.md",
+            packet_file=f"{resolved_pkt_dir}/runner_packet.md",
             allowed_files=runner.allowed_files,
             forbidden_files=runner.forbidden_files,
             stop_condition=runner.stop_condition,
@@ -448,8 +464,8 @@ def build_session_plan(
         CONSULTANT: _role_entry(
             role=CONSULTANT,
             command=_role_command(CONSULTANT, target, hldspec, backend, resolved_pkt_dir),
-            prompt_file=".hldspec/source_package/consultant_prompt.md",
-            packet_file=f"{pkt_dir}/consultant_packet.md",
+            prompt_file=f"{source_dir}/consultant_prompt.md",
+            packet_file=f"{resolved_pkt_dir}/consultant_packet.md",
             allowed_files=consultant.allowed_files,
             forbidden_files=consultant.forbidden_files,
             stop_condition=consultant.stop_condition,
@@ -581,19 +597,23 @@ def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") 
         written[filename] = path
 
     # Runner/consultant prompts embed the Context Receipt the gate requires.
+    # Render its required-read checklist under the resolved source-package dir so the
+    # source-package lines point at the packets actually written here (controller in
+    # external mode); the `.specify/` mirror line stays target-relative.
     # Authoritative files carry no mirror banner; the mirror step is the sole
     # banner-adder (these live in .hldspec/, not the derived mirror).
+    receipt_template = render_context_receipt_template(source_dir)
     runner_prompt = (
         "# Target Runner Prompt\n\n"
         "You run ONE bounded phase, then stop. Before acting, output a Context "
         "Receipt; after the phase, output a Phase Report. The main-controller owns "
-        "continuation.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
+        "continuation.\n\n" + receipt_template + "\n" + PHASE_REPORT_TEMPLATE
     )
     consultant_prompt = (
         "# Consultant / RunSkeptic Prompt\n\n"
         "You are review-only. Check meaning and source consistency, apply RunSkeptic, "
         "and return PASS / ACTION / CONFLICT. You write nothing and never approve your "
-        "own findings.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
+        "own findings.\n\n" + receipt_template + "\n" + PHASE_REPORT_TEMPLATE
     )
     runbook = (
         "# SpecKit Runbook\n\n"
