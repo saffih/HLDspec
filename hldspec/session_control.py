@@ -540,8 +540,13 @@ def render_role_commands(plan: dict) -> dict[str, str]:
 # Artifact writers
 # ---------------------------------------------------------------------------
 def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") -> dict[str, Path]:
-    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
-    source_dir = adapter.source_package_dir
+    # Resolve through the single pointer-aware source-package resolver (Option C):
+    # in external mode the control-plane artifacts land under the controller root,
+    # exactly where session_continue_preflight reads them — no in-target leak, no
+    # write/read split. Without a pointer this is byte-identical to in-target.
+    from . import hld_source_package  # lazy: avoid any import-cycle, mirror stale_check pattern
+
+    source_dir, _mirror = hld_source_package.source_package_paths(target_root, layout=layout)
     pkt_dir = source_dir / "subagent_packets"
     pkt_dir.mkdir(parents=True, exist_ok=True)
 
