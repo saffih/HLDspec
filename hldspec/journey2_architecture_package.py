@@ -6,17 +6,25 @@ machine-checkable shape of that *architecture package*: a design-reasoning view
 that organizes HLD-grounded constraints, contracts/seams, expert-lens findings,
 and a reviewable slice roadmap. See docs/JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md.
 
-This module is intentionally minimal and side-effect free:
+This module is intentionally minimal and side-effect free (pure functions only --
+no filesystem reads, no mutation, no helper run, no helper-selection change):
 
-- It only *validates* a package dict; it never generates one, reads the
-  filesystem, mutates anything, runs a helper, or changes helper selection.
-- It is not wired into any gate or pipeline -- it is a contract slice, a shape a
-  package author (human or upstream tool) can check against.
+- `validate_architecture_package` validates a package dict against the required
+  shape.
+- `build_architecture_package` builds the advisory typed-slot dict (the human-owned
+  architecture fields left empty, only `helper_recommendation` grounded via an
+  injected value). It returns a dict and writes nothing.
+
+The package builder (`hld_source_package.build_source_package_content`) persists
+that dict as the advisory `architecture_package.json` artifact -- manifest-hashed
+but excluded from `REQUIRED_FILES`, the `.specify` mirror, and every gate, so it
+is informational and blocks no promotion. Neither function reads the filesystem or
+is wired into a gate; emission lives in the package builder, not here.
 
 `helper_recommendation` is treated as an opaque required field: validation checks
-only that it is present and non-empty. It does not import or call
-`helper_selection`, and the recommendation's *value* never affects the verdict --
-selection semantics live elsewhere and are unchanged here.
+only that it is present and non-empty. This module does not import or call
+`helper_selection` (or `helper_registry`), and the recommendation's *value* never
+affects the verdict -- selection semantics live elsewhere and are unchanged here.
 """
 from __future__ import annotations
 
@@ -136,6 +144,83 @@ def _validate_slice(slice_obj: Any, index: int) -> list[str]:
             )
 
     return findings
+
+
+ARCHITECTURE_PACKAGE_SCHEMA_VERSION = 0
+
+
+def _empty_architecture_fields() -> dict[str, Any]:
+    """The 14 required fields as an EMPTY typed slot.
+
+    Human-owned architecture reasoning is intentionally left empty so
+    `validate_architecture_package` returns ACTION until it is authored. The
+    emitter never fabricates architecture truth the HLD/human did not decide
+    (`docs/JOURNEY2_PACKAGE_CONTRACT.md` §8) -- it materializes the typed slot so
+    the gap is *visible and authorable*, not absent. `helper_recommendation` is
+    filled by the caller from the registry-derived recommendations (the one
+    genuinely grounded field); everything else awaits authorship.
+    """
+    return {
+        "product_goal_summary": "",
+        "architecture_intent": "",
+        "source_of_truth_map": {},
+        "ownership_boundaries": {},
+        "contracts_and_seams": [],
+        "brownfield_constraints": [],
+        "expert_lenses_applied": {},
+        "domain_assumptions": [],
+        "slice_roadmap": [],
+        "next_slice_packet": {},
+        "test_strategy": "",
+        "forbidden_shortcuts": [],
+        "growth_and_change_notes": "",
+        "helper_recommendation": {},
+    }
+
+
+def build_architecture_package(*, helper_recommendation: Any = None) -> dict[str, Any]:
+    """Emit an ADVISORY Journey 2 architecture package artifact (the typed slot).
+
+    Pure and side-effect free: returns a dict, writes nothing. The package builder
+    (`hld_source_package.build_source_package_content`) persists it as
+    `architecture_package.json`, mirroring `helper_recommendations.json`.
+
+    The 14 required fields are present, but the human-owned architecture-reasoning
+    fields are left **empty** -- this emitter never invents architecture the HLD/
+    human did not decide (`docs/JOURNEY2_PACKAGE_CONTRACT.md` §8). The only grounded
+    field is `helper_recommendation`, injected by the caller from the
+    registry-derived recommendations. This module imports neither `helper_selection`
+    nor `helper_registry`, so helper-selection semantics are unchanged.
+
+    The artifact embeds its own `validate_architecture_package` result, so it
+    honestly reports **ACTION** ("fields await authorship") until authored. It is
+    advisory: excluded from `REQUIRED_FILES` and the `.specify` mirror and wired
+    into no gate -- an ACTION artifact promotes nothing.
+
+    `next_slice_packet` is descriptive data, never an execution channel /
+    NextActionPacket (`docs/JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md` §3).
+    """
+    fields = _empty_architecture_fields()
+    if helper_recommendation is not None:
+        fields["helper_recommendation"] = helper_recommendation
+    validation = validate_architecture_package(fields)
+    return {
+        "schema_version": ARCHITECTURE_PACKAGE_SCHEMA_VERSION,
+        "advisory": True,
+        **fields,
+        "validation": validation,
+        "notes": [
+            "Advisory Journey 2 architecture package (typed slot). Human-owned "
+            "architecture-reasoning fields are left empty until authored; this "
+            "emitter never invents architecture truth (JOURNEY2_PACKAGE_CONTRACT.md §8).",
+            "helper_recommendation is derived from the helper registry (advisory); "
+            "its value never drives helper selection.",
+            "next_slice_packet is descriptive data, not a NextActionPacket / "
+            "execution channel (JOURNEY2_ARCHITECTURE_PACKAGE_CONTRACT.md §3).",
+            "Excluded from REQUIRED_FILES and the .specify mirror; wired into no "
+            "gate. status ACTION here promotes nothing.",
+        ],
+    }
 
 
 def validate_architecture_package(package: Any) -> dict[str, Any]:

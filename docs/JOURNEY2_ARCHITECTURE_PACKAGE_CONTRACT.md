@@ -6,10 +6,22 @@ the **architecture package** — the architecture wisdom and slice design Journe
 produces — and the deterministic shape a package must satisfy.
 
 It is validated by a pure helper, `hldspec/journey2_architecture_package.py`
-(`validate_architecture_package`). That helper only validates a dict; it does not
-generate packages, read the filesystem, mutate anything, run a helper, or change
-helper selection. **This is a contract slice, not automation** — it is not wired
-into any gate or pipeline.
+(`validate_architecture_package`). That validator only validates a dict; it does
+not read the filesystem, mutate anything, run a helper, or change helper
+selection.
+
+> **Now emitted as an advisory artifact.** The package builder
+> (`hldspec/hld_source_package.py::build_source_package_content`) emits the typed
+> slot as `architecture_package.json` via
+> `journey2_architecture_package.build_architecture_package`. Mirroring
+> `helper_recommendations.json`: it is hashed in the manifest (drift detectable),
+> **excluded from `REQUIRED_FILES`** (advisory — packages stay valid without it)
+> and **from the `.specify` mirror** (design reasoning, not SpecKit runner
+> content), and wired into **no gate**. The emitter grounds only
+> `helper_recommendation` (registry-derived, injected) and leaves the human-owned
+> architecture-reasoning fields **empty**, so the artifact honestly validates
+> **ACTION** until authored — it invents no architecture truth and promotes
+> nothing.
 
 > **Relationship to the existing Journey 2 docs.** This doc is **complementary**,
 > not a replacement.
@@ -224,4 +236,8 @@ This contract intentionally does **not** implement:
 - product-repo Git mutation
 - a broad refactor of existing runtime/driver code
 
-It adds one doc, one pure validation module, and its tests.
+It adds this doc, the validation + advisory-emitter module
+(`journey2_architecture_package.py`), the `architecture_package.json` emission
+wiring in the package builder, and their tests. The emitter writes only the
+advisory artifact into the existing source-package container; it adds no
+execution channel, no mutation channel, and no helper-selection change.

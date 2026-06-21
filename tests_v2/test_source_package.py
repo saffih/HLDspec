@@ -51,6 +51,18 @@ class SourcePackageContractTests(unittest.TestCase):
         # J3 advisory guidance — must not be mirrored into .specify/source/ for the SpecKit runner.
         self.assertNotIn(sp.AUTHORITATIVE_FILES["helper_recommendations"], sp.MIRROR_FILES)
 
+    def test_architecture_package_in_authoritative_files(self):
+        self.assertIn("architecture_package", sp.AUTHORITATIVE_FILES)
+        self.assertEqual("architecture_package.json", sp.AUTHORITATIVE_FILES["architecture_package"])
+
+    def test_architecture_package_not_in_required_files(self):
+        # Advisory typed slot — must not be required for package validity.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["architecture_package"], sp.REQUIRED_FILES)
+
+    def test_architecture_package_not_in_mirror_files(self):
+        # J2 design-reasoning — must not be mirrored into .specify/source/ for the SpecKit runner.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["architecture_package"], sp.MIRROR_FILES)
+
     def test_manifest_excludes_itself(self):
         # The manifest must not try to hash source_manifest.json/source_package.json.
         self.assertNotIn(sp.SOURCE_MANIFEST_FILE, sp.AUTHORITATIVE_FILES.values())
@@ -207,6 +219,47 @@ class SourcePackageBuildTests(unittest.TestCase):
         manifest = sp.compute_manifest(self.source_dir)
         self.assertTrue(manifest["engineering_guidelines"]["present"])
         self.assertIsNotNone(manifest["engineering_guidelines"]["sha256"])
+
+    def test_build_emits_advisory_architecture_package_artifact(self):
+        import json
+
+        from hldspec import journey2_architecture_package as j2ap
+
+        build = sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## Intro\n\nText.\n",
+            hld_source_ref=str(self.root / "SourceHLD.md"),
+            layout="new",
+        )
+        # Advisory artifact does not affect package validity (excluded from REQUIRED_FILES).
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+
+        art_path = self.source_dir / sp.AUTHORITATIVE_FILES["architecture_package"]
+        self.assertTrue(art_path.is_file(), msg="architecture_package.json must be emitted by the builder")
+        artifact = json.loads(art_path.read_text(encoding="utf-8"))
+
+        # All 14 required fields are present (the typed slot is materialized).
+        for field in j2ap.REQUIRED_ARCHITECTURE_PACKAGE_FIELDS:
+            self.assertIn(field, artifact)
+
+        # Honest ACTION: human-owned fields are emitted empty, so the slot validates
+        # ACTION until authored — it never promotes (and is not in REQUIRED_FILES).
+        result = j2ap.validate_architecture_package(artifact)
+        self.assertEqual(result["status"], "ACTION")
+        self.assertEqual(artifact["validation"]["status"], "ACTION")
+
+        # helper_recommendation is grounded from the registry-derived recommendations,
+        # so it is NOT among the missing fields; the human-owned fields are.
+        self.assertNotIn("helper_recommendation", result["missing_fields"])
+        self.assertEqual(artifact["helper_recommendation"], sp.build_helper_recommendations())
+        self.assertIn("architecture_intent", result["missing_fields"])
+
+        # Manifest hashes it (drift detectable); it is NOT mirrored into .specify/source/.
+        manifest = sp.compute_manifest(self.source_dir)
+        self.assertTrue(manifest["architecture_package"]["present"])
+        self.assertIsNotNone(manifest["architecture_package"]["sha256"])
+        mirror_art = self.mirror_dir / sp.AUTHORITATIVE_FILES["architecture_package"]
+        self.assertFalse(mirror_art.exists(), msg="architecture_package.json must not be mirrored")
 
 
 class SpecifyMirrorTests(unittest.TestCase):
