@@ -129,13 +129,24 @@ def build_journey3_status(
     evidence: list[str] = []
     missing_evidence: list[str] = []
 
+    # Split-brain fails closed before anything else: an authoritative package in
+    # both the controller and the target is ambiguous ownership; never auto-pick.
+    split_brain_dir = hld_source_package.source_package_split_brain(target)
+    if split_brain_dir is not None:
+        blockers.append(
+            "Source-package split-brain: an authoritative source package exists BOTH at the "
+            f"external controller and in-target ({split_brain_dir}). External mode must own "
+            "exactly one — this is not auto-repaired. Resolve which is authoritative "
+            "(re-externalize, or remove the stale in-target package) before Journey 3."
+        )
+
     if source_package_present:
         evidence.append("source_package present")
     else:
         missing_evidence.append("source package")
         blockers.append(
-            "Source package missing — return to Journey 2 to generate/import "
-            "target/.hldspec/source_package/ before Journey 3."
+            f"Source package missing — return to Journey 2 to generate/import {source_dir}/ "
+            "before Journey 3."
         )
 
     if source_package_present and not source_package_validation["ok"]:
