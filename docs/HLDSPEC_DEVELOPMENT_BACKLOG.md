@@ -700,6 +700,31 @@ selection. Storing the selected helper in `MANIFEST.json` mixes runtime provenan
 with product state and would create a hidden source-of-truth conflict between the
 Journey 2 recommendation and the Journey 3 selection.
 
+### P1-014 External target-artifacts placement contract (dogfood 2026-06-21)
+
+Surfaced by the first real Journey 3 driver dogfood against `~/code/flow`
+(`docs/JOURNEY3_DRIVER_DOGFOOD_20260621.md`). Driver returned BLOCKED / PACKAGE_GAP:
+it looks for the source package at `target/.hldspec/source_package/`, but the only
+package generated landed in an ephemeral scratch copy at
+`target/.hldspec-runs/<run-id>/.hldspec/source_package/`. Emission ≠ discovery ≠
+desired durable home.
+
+Placement decision (human, 2026-06-21): keep the real source target clean;
+HLDspec-owned artifacts live in a named **external sibling** directory, preferably
+`~/code/<name>.hldspec`, not inside the target.
+
+Residual work (do not start without a separate gated prompt; this is a layout-wide
+decision, not package-only):
+
+- **Reconcile with CONFLICT-003** (which currently places HLDspec-owned artifacts
+  *inside* `target/.hldspec/`). This decision reopens it. See CONFLICT-003 below.
+- Journey 2 emits/binds the source package into the external sibling, not only the
+  `.hldspec-runs/<run-id>/.hldspec/` scratch copy.
+- Journey 3 driver discovery path follows the placement contract instead of
+  assuming in-target `target/.hldspec/source_package/`.
+- Related: CONFLICT-002 (layout migration), P1-005 (package discovery/invocation
+  wiring), P1-011 (source-package↔target binding; defines `UNBOUND_LEGACY`).
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation
@@ -775,6 +800,12 @@ Decision:
 - Event history lives under `target/.hldspec/events.jsonl`.
 - SpecKit-owned final artifacts remain under `target/.specify/` and `target/specs/`.
 - Legacy/debug runs may still read or write old `.specify/sync` shapes through the adapter during migration.
+
+**REOPENED 2026-06-21** by the Journey 3 dogfood placement decision (P1-014 /
+`docs/JOURNEY3_DRIVER_DOGFOOD_20260621.md`): the human now wants HLDspec-owned
+artifacts in an **external sibling** directory (`~/code/<name>.hldspec`), *outside*
+the target, which contradicts "inside `target/.hldspec/`" above. Reconcile before
+implementing P1-014.
 
 ### CONFLICT-004 Use-case API doc vs current facade
 
