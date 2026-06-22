@@ -382,6 +382,45 @@ continues to defer to the canonical doc on conflict.
 
 ---
 
+## 8b. Agent Handoff Pack (current per-run instruction package)
+
+**Status: EXISTS** (implemented in `hldspec/agent_handoff_pack.py`; renamed from the
+earlier "mediator guidance" concept).
+
+The **Agent Handoff Pack** is the current per-run / per-slice instruction, check, and
+evidence package handed to a target-side agent. It replaces the misleading "mediator
+guidance" terminology.
+
+Roles in one line:
+
+- the **agent bridge** discovers (PROPOSED);
+- the **Agent Handoff Pack** instructs (EXISTS);
+- the **command envelope** bounds one proposed action (PROPOSED);
+- the **driver** authorizes; the **human** approves; the agent executes only inside
+  the approved scope.
+
+What it is **not**:
+
+- It is **not** the agent bridge (it does not discover or bind controller↔target).
+- It is **not** approval state and grants no authority — protected approval / user
+  chat remains the only authority.
+- It executes nothing; Implementation Agent output is evidence only.
+
+**Pointer-aware placement (Option C):** the handoff packet and its prompt docs are
+control-plane artifacts (`CONTROL_ARTIFACTS = .hldspec, prompts`). They resolve to
+`control_state_root` — `target/.hldspec/` + `target/prompts/` in default/no-pointer
+mode, and `controller_root/.hldspec/` + `controller_root/prompts/` when a
+`.hldspec-run.json` pointer is present. The source-package paths the pack renders
+resolve the same way; helper runtime (`.specify/source/`, `specs/`) always stays
+target-local.
+
+**Compatibility:** the legacy module name `hldspec/mediator_guidance.py`, the on-disk
+artifact names (`mediator/`, `mediator_packet.json`, `*_MEDIATOR*.md`), and the packet
+JSON keys are kept as compatibility aliases for this slice. Their rename is tracked in
+backlog **P1-018**.
+
+---
+
 ## 9. See also
 
 - [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) — **canonical**
