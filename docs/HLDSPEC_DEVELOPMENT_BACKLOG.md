@@ -721,6 +721,46 @@ Follow-up (do not start without a separate gated prompt):
 Note: P1-014 (external target-artifacts placement contract) is reserved by the open
 draft PR #29; this item is numbered P1-015 to avoid a merge collision.
 
+### P1-016 Journey 3 controller/target/agent-bridge implementation (docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md, added 2026-06-21)
+
+Terminology + UX are defined; the roadmap A–M below is named in the doc (§8) but
+**not implemented**. None grant authority by themselves — approval gates stay
+controller-owned. The doc's §8 is the authoritative roadmap; this is the tracking row.
+
+- **A.** Canonical `.agents/hldspec/` bridge structure.
+- **B.** `SKILL.md` + `bridge.json` (mirrors, never replaces, the `.hldspec-run.json`
+  pointer).
+- **C.** Optional provider shims (`.devin|.claude|.codex/hldspec/`) pointing at the
+  canonical bridge.
+- **D.** Bridge discovery from either `controller_root` or `target_root`.
+- **E.** Bridge validation, fail closed: broken=BLOCKED, mismatch=BLOCKED, multiple
+  candidates=BLOCKED, stale=ACTION/BLOCKED.
+- **F.** Optional `Target Controller Link` symlink (`target/.agents/hldspec ->
+  controller/.agents/hldspec`); untracked by default; broken/mismatched=BLOCKED.
+- **G.** `helper_runtime_capsule` defined precisely per helper.
+- **H.** Generic `HelperAdapter` + concrete `SpecKitAdapter` contract (formalizes
+  `helper_selection.py` + Toolchain Driver).
+- **I.** `command_envelope` typed schema (lift the session-packet shape in
+  `hldspec/session_control.py`).
+- **J.** Literal/path hardening that fails closed on accidental
+  `target/.hldspec/source_package/` leaks in external mode (today only source-package
+  split-brain is detected via `hld_source_package.source_package_split_brain`).
+- **K.** Read-only dogfood against `~/code/flow` (no mutation, no helper/SpecKit run).
+- **L.** Reassess **PR #29** (dogfood package-placement gap) after this contract lands.
+- **M.** Reassess **PR #26** (Journey 2 architecture-package authoring) separately.
+
+### P1-017 Reconcile canonical control-plane doc with external-controller mode (added 2026-06-21)
+
+`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (canonical, test-locked by
+`tests_v2/test_terminology_and_flow_docs.py`) describes the control plane only as
+in-target `target/.hldspec/`. The implemented Option-C external-controller mode
+(PR #30/#32/#33/#34/#35) resolves the same control plane to
+`controller_root/.hldspec/` when a `.hldspec-run.json` pointer is present. Update the canonical doc to describe both
+modes (and adjust the locked tests in the same slice) so the authoritative terminology
+matches shipped behavior. Until then,
+`docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md` states the mode-dependent rule and
+defers to the canonical doc on conflict.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation

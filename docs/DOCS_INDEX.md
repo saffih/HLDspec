@@ -52,6 +52,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract. |
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents. |
 | [`AGENT_ARTIFACT_HYGIENE.md`](AGENT_ARTIFACT_HYGIENE.md) | Policy for ad hoc docs, archive records, scratch output, target artifacts, and cleanup metadata. |
+| [`JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md`](JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md) | Journey 3 controller/target/helper/agent-bridge terminology + UX operating model. Names the four roots (`hldspec_tool_root`, `controller_root`, `control_state_root`, `target_root`), the helper runtime capsule and adapter, and the proposed agent bridge (`.agents/hldspec/`, `bridge.json`, `SKILL.md`, `command_envelope`). Each term tagged EXISTS/PROPOSED; mode-dependent control-state rule; fail-closed safety. Design + terminology proposal — defers to `HLDSPEC_TERMINOLOGY_AND_FLOW.md` on conflict; bridge/symlink not yet implemented. |
 
 ---
 
