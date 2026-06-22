@@ -55,13 +55,31 @@ BACKENDS: tuple[str, ...] = (
 DEFAULT_SESSION_NAME = "hldspec-run"
 CONTEXT_BUDGET = "SMALL_RELEVANT_ARTIFACTS_ONLY"
 
-# Required reads every Runner/Consultant must confirm in their Context Receipt.
-REQUIRED_READS: tuple[str, ...] = (
-    ".hldspec/source_package/source_package.json",
-    ".hldspec/source_package/source_manifest.json",
-    ".hldspec/source_package/session_plan.json",
-    ".hldspec/source_package/speckit_runbook.md",
+# Source-package control-plane files every Runner/Consultant must confirm. These are
+# basenames so they can be rendered under the resolved source-package dir (controller
+# root in external mode); the relative tuple below is the legacy target-local default.
+REQUIRED_READ_BASENAMES: tuple[str, ...] = (
+    "source_package.json",
+    "source_manifest.json",
+    "session_plan.json",
+    "speckit_runbook.md",
 )
+
+
+def required_reads_for(source_pkg_dir: str | Path = ".hldspec/source_package") -> list[str]:
+    """Source-package required reads rendered under `source_pkg_dir`.
+
+    Pointer-aware callers pass the *resolved* source-package dir (controller root in
+    external mode); the default keeps the legacy target-relative shape. Single basename
+    list (REQUIRED_READ_BASENAMES) so packet reads and the relative constant cannot drift.
+    """
+    p = str(source_pkg_dir).rstrip("/")
+    return [f"{p}/{name}" for name in REQUIRED_READ_BASENAMES]
+
+
+# Required reads every Runner/Consultant must confirm in their Context Receipt.
+# Legacy target-relative default; byte-identical to the prior constant.
+REQUIRED_READS: tuple[str, ...] = tuple(required_reads_for())
 
 # Machine-readable companions the gate reads (finding F2). Markdown stays human-facing.
 CONTEXT_RECEIPT_FILE = "context_receipt.json"
@@ -234,12 +252,16 @@ Continuation is owned by the main-controller. This actor must STOP after this re
 # ---------------------------------------------------------------------------
 # Packet builders — model tier is routed per task (finding F3)
 # ---------------------------------------------------------------------------
-def build_basepack_packet(phase: str = "source_package_preparation") -> SubagentPacket:
+def build_basepack_packet(
+    phase: str = "source_package_preparation",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=BASEPACK,
         phase=phase,
         model_tier=mr.tier_for_operation("manifest_generation"),  # MODEL_SIMPLE
-        required_reads=list(REQUIRED_READS),
+        required_reads=required_reads_for(source_pkg_dir),
         allowed_files=[".hldspec/source_package/**"],
         forbidden_files=[".specify/**", "source HLD (read-only)", "target application code"],
         task=(
@@ -257,12 +279,17 @@ def build_basepack_packet(phase: str = "source_package_preparation") -> Subagent
     )
 
 
-def build_runner_packet(phase: str = "speckit_specify") -> SubagentPacket:
+def build_runner_packet(
+    phase: str = "speckit_specify",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=RUNNER,
         phase=phase,
         model_tier=mr.tier_for_operation("command_execution"),  # MODEL_SIMPLE
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/runner_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/runner_prompt.md"],
         allowed_files=["target repo files within the phase scope"],
         forbidden_files=[
             ".hldspec/source_package/** (read-only for the runner)",
@@ -283,12 +310,17 @@ def build_runner_packet(phase: str = "speckit_specify") -> SubagentPacket:
     )
 
 
-def build_consultant_packet(phase: str = "review") -> SubagentPacket:
+def build_consultant_packet(
+    phase: str = "review",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=CONSULTANT,
         phase=phase,
         model_tier=mr.tier_for_operation("consultant_review"),  # MODEL_SMART
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/consultant_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/consultant_prompt.md"],
         allowed_files=["read-only access to target + source package"],
         forbidden_files=["ALL — consultant is review-only and writes nothing"],
         task=(
@@ -305,12 +337,17 @@ def build_consultant_packet(phase: str = "review") -> SubagentPacket:
     )
 
 
-def build_ui_test_packet(phase: str = "ui_validation") -> SubagentPacket:
+def build_ui_test_packet(
+    phase: str = "ui_validation",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=CONSULTANT,
         phase=phase,
         model_tier=mr.tier_for_operation("consultant_review"),  # MODEL_SMART
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/consultant_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/consultant_prompt.md"],
         allowed_files=["read-only access to UI test evidence + target"],
         forbidden_files=["ALL — review-only; writes nothing"],
         task="Aggregate UI test evidence and report PASS/ACTION/CONFLICT for the UI_VALIDATION_GATE.",
@@ -584,11 +621,14 @@ def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") 
 
     write_json_dict(source_dir / SESSION_PLAN_FILE, plan)
 
+    # Render packet required_reads under the resolved source-package dir so they point
+    # at the control-plane files actually written here (controller in external mode),
+    # mirroring how the descriptor fields and receipt checklist resolve (PR #33/#34).
     packets = {
-        "basepack_packet.md": build_basepack_packet(),
-        "runner_packet.md": build_runner_packet(),
-        "consultant_packet.md": build_consultant_packet(),
-        "ui_test_packet.md": build_ui_test_packet(),
+        "basepack_packet.md": build_basepack_packet(source_pkg_dir=source_dir),
+        "runner_packet.md": build_runner_packet(source_pkg_dir=source_dir),
+        "consultant_packet.md": build_consultant_packet(source_pkg_dir=source_dir),
+        "ui_test_packet.md": build_ui_test_packet(source_pkg_dir=source_dir),
     }
     written: dict[str, Path] = {SESSION_PLAN_FILE: source_dir / SESSION_PLAN_FILE}
     for filename, packet in packets.items():
