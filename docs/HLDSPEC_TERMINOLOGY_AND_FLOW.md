@@ -39,9 +39,40 @@ equal; see §13.
 Hard rules:
 
 - HLDspec must not manually write final SpecKit specs.
-- HLDspec control artifacts live in `target/.hldspec/`, never in `.specify/`.
+- HLDspec control artifacts live in the resolved `.hldspec/` control plane (see
+  *Control-plane location* below), never in `.specify/`.
 - `target/.specify/` and `target/specs/` are SpecKit-owned.
 - The source HLD is read-only evidence; only the working HLD may be modified.
+
+### Control-plane location: default vs external-controller mode
+
+`control_state_root` is the **resolved** `.hldspec/` control plane — the single
+directory that owns the source package, session state, packets, reports, approvals,
+binding, and helper selection. Its location is **mode-dependent** (resolved by
+`hldspec/control_paths.py` / `hldspec/run_state.py`):
+
+- **Default / no-pointer mode:** `target_root/.hldspec/`. The target legitimately
+  holds the control plane here. This is the original canonical location.
+- **External-controller mode:** when a `.hldspec-run.json` pointer names a controller
+  root, the *same* control plane resolves to `controller_root/.hldspec/`.
+  Externalization copies control state to the controller and removes the in-target
+  `.hldspec/`; the target then keeps only the pointer plus any declared helper runtime.
+
+Target ownership in both modes:
+
+- The target always owns product code and product tests.
+- The target may hold a **declared helper runtime capsule** (`target/.specify/`,
+  `target/.specify/source/`, `target/specs/`) — helper runtime, **not** control state.
+- In external mode the target **must not** silently accumulate HLDspec control-plane
+  state; an in-target `target/.hldspec/source_package/` is then a leak/split-brain
+  signal, not authoritative.
+
+The `.specify/` boundary above is unchanged: HLDspec never authors control artifacts
+into `.specify/` in either mode. See
+[`JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md`](JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md)
+(controller/target/agent-bridge terminology + UX),
+[`TOOLCHAIN_DRIVER_BOUNDARY.md`](TOOLCHAIN_DRIVER_BOUNDARY.md) (ownership zones), and
+[`JOURNEY3_HELPER_CONTRACT.md`](JOURNEY3_HELPER_CONTRACT.md) (helper model).
 
 ---
 
@@ -559,7 +590,7 @@ proxy dossier, and prework quality review.
 | Dependency graph / queue | `hldspec/machines/`, `scripts/build_speckit_prework_plan.py` |
 | Spec packages / bundles | `hldspec/spec_bundles.py`, `scripts/build_speckit_bundle_queue.py` |
 | Run Card (target state) | `target/prompts/speckit/<package-id>/RUN_CARD.{md,json}` |
-| Control plane (target state) | `target/.hldspec/` |
+| Control plane (resolved `.hldspec/`) | `target/.hldspec/` (default) or `controller_root/.hldspec/` (external-controller mode); see §2 *Control-plane location* |
 
 > Note on current state: the repo today implements much of §1–§7 and §9 via
 > machines, scripts, bundle prompts, and the execution-state assessor

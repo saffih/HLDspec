@@ -199,6 +199,24 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         text = _read(CANONICAL)
         self.assertNotIn("target-spec generation is allowed", text)
 
+    def test_canonical_doc_defines_both_control_plane_modes(self) -> None:
+        # P1-017: the canonical doc must describe BOTH the default in-target control
+        # plane and the external-controller mode, so it no longer drifts from the
+        # implemented Option-C resolver (PR #30/#32/#33/#34/#35).
+        text = _read(CANONICAL)
+        for phrase in (
+            "Control-plane location: default vs external-controller mode",
+            "Default / no-pointer mode:",
+            "`target_root/.hldspec/`",
+            "External-controller mode:",
+            "`controller_root/.hldspec/`",
+            ".hldspec-run.json",
+            "declared helper runtime capsule",
+            "must not** silently accumulate HLDspec control-plane",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
 
 if __name__ == "__main__":
     unittest.main()
