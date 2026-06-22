@@ -15,6 +15,20 @@ automated path that fills the reasoning fields from HLD evidence**. Recommendati
 **DO_NOT_PATCH** the derive-into-fields approach; keep the artifact advisory and
 ACTION-until-human-authored; keep gating deferred.
 
+> **Post-#37/#38 terminology note:** this report was written against `main @ 507b398`
+> and uses the then-current default-mode phrase `target/.hldspec/source_package/`. In
+> current HLDspec terminology, source-package artifacts live under the resolved
+> `control_state_root/source_package/`: `target/.hldspec/source_package/` in
+> default/no-pointer mode, or `controller_root/.hldspec/source_package/` in
+> external-controller mode (pointer-aware since PR #35; canonical terminology
+> reconciled by PR #37; the Agent Handoff Pack rename landed in PR #38). This
+> terminology update does **not** change the report's core Journey 2 conclusion —
+> `DO_NOT_PATCH` automated derivation of the 13 human-owned / do-not-derive
+> architecture fields — which was re-verified against `main` after #38: the field set
+> is still the same 14 (only `helper_recommendation` derivable), and
+> `architecture_package.json` remains advisory, manifest-hashed, mirror-excluded, out
+> of `REQUIRED_FILES`, and unreferenced by `gate_validator.py`.
+
 ---
 
 ## 1. `main` SHA inspected
@@ -45,7 +59,11 @@ Tests: `tests_v2/test_journey2_architecture_package.py`,
   typed slot: only `helper_recommendation` grounded (injected), the other 13 fields
   emitted **empty** → the artifact validates **ACTION** until authored.
 - `hldspec/hld_source_package.py::build_source_package_content` emits
-  `architecture_package.json` into `target/.hldspec/source_package/`. It is in
+  `architecture_package.json` into the resolved source-package directory
+  (`control_state_root/source_package/`; this was `target/.hldspec/source_package/`
+  in default/no-pointer mode at the inspected SHA, and resolves to
+  `controller_root/.hldspec/source_package/` in external-controller mode on current
+  `main`). It is in
   `AUTHORITATIVE_FILES` (manifest-hashed), in `_MIRROR_EXCLUDED` (kept out of
   `.specify/source/`), **not** in `REQUIRED_FILES`, and **not** referenced by
   `gate_validator.py`. So `validate_source_package().ok()` and
