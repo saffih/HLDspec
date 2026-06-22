@@ -761,6 +761,40 @@ source package as resolved paths: default/no-pointer mode uses
 `controller_root/.hldspec/` when a `.hldspec-run.json` pointer is present. The
 locked tests cover both modes and the target-local helper-runtime boundary.
 
+### P1-018 Agent Handoff Pack pointer-aware path rendering (added 2026-06-22)
+
+**Status: code path implemented; on-disk/schema rename deferred.**
+
+The Journey 3 "mediator guidance" generator was renamed to the **Agent Handoff Pack**
+and made pointer-aware (`hldspec/agent_handoff_pack.py`). Previously
+`write_mediator_guidance_artifacts` built `TargetWorkspaceAdapter(...)` without a
+`controller_root` and hard-coded `target/.hldspec/source_package/...` strings, so in
+external-controller mode the packet, prompts, and rendered source-package paths leaked
+into the target. They now resolve through `control_paths.resolve_controller_root` (the
+same resolution Journey 3 uses): packet + prompts follow `control_state_root`
+(controller in external mode), helper runtime (`.specify/source/`, `specs/`) stays
+target-local. Locked by `tests_v2/test_agent_handoff_pack.py` (default + external mode,
+terminology, compat shim) — the external-mode test fails if a target-local
+`.hldspec/source_package/...` path reappears in generated handoff output.
+
+Deferred (do not start without a separate gated prompt):
+
+- **On-disk artifact rename:** `mediator/` → `agent_handoff/`, `mediator_packet.json`
+  → `agent_handoff_packet.json`, `START_MEDIATOR.md`/`DEVIN_MEDIATOR_SKILL.md`/
+  `CODEX_CLAUDE_MEDIATOR.md` → `AGENT_HANDOFF.md`/`DEVIN_AGENT_HANDOFF.md`/
+  `DIRECT_AGENT_HANDOFF.md`. Kept legacy this slice to avoid breaking downstream
+  consumers (`hldspec_agent_session.py` output, `scripts/hldspec_smoke_slice_e2e.py`,
+  `tests_v2/fixtures/expected_smoke_artifacts.txt`, `cli_contract`).
+- **Packet JSON key rename:** `mediator_boundaries` → `handoff_boundaries`,
+  `speckit_paths` → `helper_runtime_paths`, etc. Kept legacy for schema stability.
+- **Residual legacy sub-terms in rendered prose** kept for cross-locked tests
+  (`Agent Mediator is not the Implementation Agent.`, the `Codex / Claude direct
+  mediator mode` label). Reconcile with `docs/MEDIATOR_PROMPT_PROTOCOL.md`,
+  `docs/ANTI_DRIFT_CONTRACTS.md`, and the canonical flow string in
+  `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (all test-locked) when those docs are renamed.
+- **Remove the `hldspec/mediator_guidance.py` compatibility shim** once all consumers
+  migrate to `hldspec/agent_handoff_pack.py`.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation

@@ -305,6 +305,57 @@ class AgentFirstCliContractTests(unittest.TestCase):
         self.assertFalse((controller / "targetHLD").exists())           # not moved to controller
         self.assertIn("HLDspec controller state externalized", result.stdout)
 
+    def test_start_external_mode_displays_controller_handoff_paths(self) -> None:
+        """Regression: the start display must show controller handoff paths in
+        external mode, never hand-rolled target-local prompt paths (which do not
+        exist after externalization). Locks the CLI display-gap fix."""
+        source = self.tmp_path / "HLD.md"
+        target = self.tmp_path / "target-external-display"
+        runs = self.tmp_path / "runs"
+        source.write_text("# HLD\n\n## HLD-001 - Purpose\n\nHLD-ID: HLD-001\n", encoding="utf-8")
+        env = os.environ.copy()
+        env["HLDSPEC_RUNS_DIR"] = str(runs)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(self.repo / "scripts" / "hldspec_agent_session.py"),
+                "start",
+                "--source",
+                str(source),
+                "--target",
+                str(target),
+                "--state-location",
+                "external",
+            ],
+            cwd=self.repo,
+            text=True,
+            capture_output=True,
+            check=False,
+            env=env,
+        )
+        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+
+        controller = Path(json.loads((target / ".hldspec-run.json").read_text(encoding="utf-8"))["controller_root"])
+
+        # Display shows controller handoff paths.
+        self.assertIn(str(controller / ".hldspec" / "mediator" / "mediator_packet.json"), result.stdout)
+        self.assertIn(str(controller / "prompts" / "mediator" / "START_MEDIATOR.md"), result.stdout)
+        self.assertIn(str(controller / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"), result.stdout)
+        self.assertIn(str(controller / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"), result.stdout)
+
+        # Display must NOT invent target-local prompt/packet paths.
+        self.assertNotIn(str(target / "prompts" / "mediator" / "START_MEDIATOR.md"), result.stdout)
+        self.assertNotIn(str(target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"), result.stdout)
+        self.assertNotIn(str(target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"), result.stdout)
+        self.assertNotIn(str(target / ".hldspec" / "mediator" / "mediator_packet.json"), result.stdout)
+
+        # CLI output matches actual files on disk.
+        self.assertTrue((controller / ".hldspec" / "mediator" / "mediator_packet.json").is_file())
+        self.assertTrue((controller / "prompts" / "mediator" / "START_MEDIATOR.md").is_file())
+        self.assertFalse((target / "prompts" / "mediator").exists())
+        self.assertFalse((target / ".hldspec" / "mediator").exists())
+
     def test_doctor_checks_interview_artifacts_when_target_is_provided(self) -> None:
         source = self.tmp_path / "HLD.md"
         target = self.tmp_path / "target"
