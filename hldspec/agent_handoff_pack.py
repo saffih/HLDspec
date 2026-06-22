@@ -7,8 +7,8 @@ model:
 - the (future) **agent bridge** discovers the controller<->target binding;
 - the **Agent Handoff Pack** instructs (this module);
 - the (future) **command envelope** bounds one proposed action;
-- the **driver** authorizes; the **human** approves; the agent executes only
-  inside the approved scope.
+- the **driver** validates/gates/recommends the next safe action; the **human**
+  approves protected transitions; the agent executes only inside approved scope.
 
 The handoff pack is **not** the bridge, is **not** approval state, and executes
 nothing. It only renders guidance and resolved evidence paths and stops on
@@ -170,6 +170,29 @@ def _adapter_for(target_path: Path | str) -> TargetWorkspaceAdapter:
         layout="new",
         controller_root=control_paths.resolve_controller_root(target),
     )
+
+
+def resolve_handoff_paths(target_root: Path | str) -> dict[str, Path]:
+    """Single source of truth for Agent Handoff Pack artifact locations.
+
+    Pointer-aware: the packet and prompt docs are control-plane artifacts
+    (``CONTROL_ARTIFACTS = .hldspec, prompts``) and resolve to ``control_state_root``
+    — the controller in external mode, target-local otherwise. Both the writer
+    and any CLI/display caller resolve through here, so what the CLI shows can
+    never diverge from where the writer puts the files.
+    """
+    adapter = _adapter_for(target_root)
+    prompt_root = adapter.controller_root or adapter.target_root
+    packet_dir = adapter.hldspec_dir / HANDOFF_DIR_NAME
+    prompt_dir = prompt_root / "prompts" / HANDOFF_DIR_NAME
+    direct = prompt_dir / DIRECT_HANDOFF_FILE
+    return {
+        "packet": packet_dir / PACKET_FILE,
+        "start": prompt_dir / START_HANDOFF_FILE,
+        "devin": prompt_dir / DEVIN_HANDOFF_FILE,
+        "codex_claude": direct,
+        "direct": direct,
+    }
 
 
 def _render_common_heading(
@@ -604,16 +627,16 @@ def write_agent_handoff_pack_artifacts(
     # Pointer-aware: packet + prompts are control-plane artifacts and follow the
     # resolved controller in external mode (CONTROL_ARTIFACTS = .hldspec, prompts).
     # The target keeps only the .specify/source mirror + specs helper runtime.
-    prompt_root = adapter.controller_root or adapter.target_root
-    packet_dir = adapter.hldspec_dir / HANDOFF_DIR_NAME
-    prompt_dir = prompt_root / "prompts" / HANDOFF_DIR_NAME
-    packet_path = packet_dir / PACKET_FILE
-    start_path = prompt_dir / START_HANDOFF_FILE
-    devin_path = prompt_dir / DEVIN_HANDOFF_FILE
-    direct_path = prompt_dir / DIRECT_HANDOFF_FILE
+    # Resolved through the shared resolver so a display caller (CLI) and the
+    # writer can never disagree on where these files live.
+    paths = resolve_handoff_paths(target)
+    packet_path = paths["packet"]
+    start_path = paths["start"]
+    devin_path = paths["devin"]
+    direct_path = paths["direct"]
 
-    packet_dir.mkdir(parents=True, exist_ok=True)
-    prompt_dir.mkdir(parents=True, exist_ok=True)
+    packet_path.parent.mkdir(parents=True, exist_ok=True)
+    start_path.parent.mkdir(parents=True, exist_ok=True)
 
     write_json_dict(packet_path, packet)
     start_path.write_text(render_start_handoff_md(packet), encoding="utf-8")

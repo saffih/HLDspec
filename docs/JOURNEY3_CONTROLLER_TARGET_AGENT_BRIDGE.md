@@ -396,8 +396,8 @@ Roles in one line:
 - the **agent bridge** discovers (PROPOSED);
 - the **Agent Handoff Pack** instructs (EXISTS);
 - the **command envelope** bounds one proposed action (PROPOSED);
-- the **driver** authorizes; the **human** approves; the agent executes only inside
-  the approved scope.
+- the **driver** validates/gates/recommends the next safe action; the **human**
+  approves protected transitions; the agent executes only inside approved scope.
 
 What it is **not**:
 

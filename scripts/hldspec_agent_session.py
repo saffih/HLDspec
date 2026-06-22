@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from hldspec import agent_handoff_pack as ahp
 from hldspec import helper_selection as hsel
 from hldspec import journey3_driver as j3drv
 from hldspec import next_feature_readiness as nfr
@@ -1224,15 +1225,16 @@ def command_start(args: argparse.Namespace) -> int:
     print(f"  Phase ledger safety: {discovery.get('phase_ledger_safety')}")
     print(f"  Discovery report: {discovery_paths.get('discovery_json', 'UNKNOWN')}")
     print(f"  Phase ledger: {discovery_paths.get('ledger_json', 'UNKNOWN')}")
-    mediator_packet = _resolve_hldspec_dir(target) / "mediator" / "mediator_packet.json"
-    mediator_start = target / "prompts" / "mediator" / "START_MEDIATOR.md"
-    mediator_devin = target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md"
-    mediator_direct = target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md"
+    # Pointer-aware: resolve through the shared Agent Handoff Pack resolver so the
+    # displayed paths match where the writer placed the files (controller in
+    # external mode, target-local otherwise) — no hand-rolled target-local paths.
+    # The "Mediator guidance" label is a legacy display alias (rename deferred, P1-018).
+    handoff_paths = ahp.resolve_handoff_paths(target)
     print("Mediator guidance:")
-    print(f"  Mediator packet: {mediator_packet}")
-    print(f"  Mediator start prompt: {mediator_start}")
-    print(f"  Devin mediator prompt: {mediator_devin}")
-    print(f"  Codex/Claude mediator prompt: {mediator_direct}")
+    print(f"  Mediator packet: {handoff_paths['packet']}")
+    print(f"  Mediator start prompt: {handoff_paths['start']}")
+    print(f"  Devin mediator prompt: {handoff_paths['devin']}")
+    print(f"  Codex/Claude mediator prompt: {handoff_paths['direct']}")
     print(
         "  Devin activation sentence: "
         "create agent on {path} as {session-name} using model {model} [permission-mode {mode}]"

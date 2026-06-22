@@ -273,6 +273,81 @@ class CompatShimTests(unittest.TestCase):
         self.assertEqual([], mg.validate_mediator_packet(old_packet))
 
 
+class ResolverTests(unittest.TestCase):
+    """`resolve_handoff_paths` is the single source of truth for display + write."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-ahp-resolver-")
+        self.root = Path(self._tmp.name).resolve()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_default_mode_resolves_target_local(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        paths = ahp.resolve_handoff_paths(target)
+        self.assertEqual(target / ".hldspec" / "mediator" / "mediator_packet.json", paths["packet"])
+        self.assertEqual(target / "prompts" / "mediator" / "START_MEDIATOR.md", paths["start"])
+        self.assertEqual(target / "prompts" / "mediator" / "DEVIN_MEDIATOR_SKILL.md", paths["devin"])
+        self.assertEqual(target / "prompts" / "mediator" / "CODEX_CLAUDE_MEDIATOR.md", paths["direct"])
+
+    def test_external_mode_resolves_controller(self) -> None:
+        target = self.root / "workspace"
+        controller = self.root / "controller"
+        target.mkdir()
+        controller.mkdir()
+        source = target / "SourceHLD.md"
+        source.write_text(_HLD, encoding="utf-8")
+        run_state.write_pointer(
+            target,
+            controller_root=controller,
+            source=source,
+            source_hash="deadbeef",
+            mode="external",
+            agent="test",
+            workflow_trigger="build_loop_ready",
+            created_or_updated_at="2026-06-21T00:00:00+00:00",
+        )
+        paths = ahp.resolve_handoff_paths(target)
+        self.assertEqual(controller / ".hldspec" / "mediator" / "mediator_packet.json", paths["packet"])
+        self.assertEqual(controller / "prompts" / "mediator" / "START_MEDIATOR.md", paths["start"])
+        # No target-local prompt/packet path.
+        for value in paths.values():
+            self.assertFalse(str(value).startswith(str(target / "prompts")), value)
+            self.assertFalse(str(value).startswith(str(target / ".hldspec")), value)
+
+    def test_writer_paths_match_resolver_no_duplicate_logic(self) -> None:
+        target = self.root / "target"
+        target.mkdir()
+        _build_package(target)
+        result = ahp.write_agent_handoff_pack_artifacts(target)
+        resolved = ahp.resolve_handoff_paths(target)
+        for key in ("packet", "start", "devin", "codex_claude", "direct"):
+            self.assertEqual(resolved[key], result["paths"][key], key)
+            self.assertTrue(result["paths"][key].is_file())
+
+
+class WordingTests(unittest.TestCase):
+    """The controller/target/agent model must not say the driver 'authorizes'."""
+
+    def _read(self, rel: str) -> str:
+        return (Path(__file__).resolve().parents[1] / rel).read_text(encoding="utf-8")
+
+    def test_module_uses_driver_gate_wording(self) -> None:
+        source = self._read("hldspec/agent_handoff_pack.py")
+        self.assertNotIn("driver** authorizes", source)
+        self.assertNotIn("driver authorizes", source)
+        self.assertIn("validates/gates/recommends", source)
+        self.assertIn("approves protected transitions", source)
+
+    def test_bridge_doc_uses_driver_gate_wording(self) -> None:
+        doc = self._read("docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md")
+        self.assertNotIn("driver** authorizes", doc)
+        self.assertIn("validates/gates/recommends", doc)
+        self.assertIn("approves protected transitions", doc)
+
+
 class NoSubprocessTests(unittest.TestCase):
     def test_module_does_not_shell_out(self) -> None:
         source = Path(ahp.__file__).read_text(encoding="utf-8")
