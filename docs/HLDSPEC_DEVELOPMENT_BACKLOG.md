@@ -751,15 +751,15 @@ controller-owned. The doc's §8 is the authoritative roadmap; this is the tracki
 
 ### P1-017 Reconcile canonical control-plane doc with external-controller mode (added 2026-06-21)
 
+**Status: implemented by PR #37.**
+
 `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (canonical, test-locked by
-`tests_v2/test_terminology_and_flow_docs.py`) describes the control plane only as
-in-target `target/.hldspec/`. The implemented Option-C external-controller mode
+`tests_v2/test_terminology_and_flow_docs.py`) now describes the control plane and
+source package as resolved paths: default/no-pointer mode uses
+`target_root/.hldspec/`, while the implemented Option-C external-controller mode
 (PR #30/#32/#33/#34/#35) resolves the same control plane to
-`controller_root/.hldspec/` when a `.hldspec-run.json` pointer is present. Update the canonical doc to describe both
-modes (and adjust the locked tests in the same slice) so the authoritative terminology
-matches shipped behavior. Until then,
-`docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md` states the mode-dependent rule and
-defers to the canonical doc on conflict.
+`controller_root/.hldspec/` when a `.hldspec-run.json` pointer is present. The
+locked tests cover both modes and the target-local helper-runtime boundary.
 
 ## P2 backlog
 

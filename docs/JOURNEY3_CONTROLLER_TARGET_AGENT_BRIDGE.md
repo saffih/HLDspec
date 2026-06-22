@@ -375,12 +375,10 @@ authority — approval gates stay controller-owned regardless of what lands.
 - **M.** Reassess **PR #26** (Journey 2 architecture-package authoring) separately if
   its roadmap needs this vocabulary.
 
-**Separate reconciliation item (P1-017):** the canonical
-[`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) currently describes
-the control plane only as in-target `target/.hldspec/`. Update it (and its locked tests)
-to reflect the implemented Option-C external-controller mode, so the authoritative doc
-covers both modes. Until then this doc states the mode-dependent rule and defers to the
-canonical doc on conflict.
+**P1-017 reconciliation:** implemented by PR #37. The canonical
+[`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) now describes the
+default/no-pointer and external-controller control-plane modes; this companion doc
+continues to defer to the canonical doc on conflict.
 
 ---
 
