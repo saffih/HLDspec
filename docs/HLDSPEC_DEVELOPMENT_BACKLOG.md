@@ -700,6 +700,101 @@ selection. Storing the selected helper in `MANIFEST.json` mixes runtime provenan
 with product state and would create a hidden source-of-truth conflict between the
 Journey 2 recommendation and the Journey 3 selection.
 
+### P1-015 Engineering Quality Gates enforcement (docs/ENGINEERING_QUALITY_GATES.md, added 2026-06-21)
+
+The policy is docs/governance only (`docs/ENGINEERING_QUALITY_GATES.md`): 15 gates
+(EQG-1..EQG-15) for implementation work on the HLDspec repo — TDD/red→green evidence,
+regression test per bug fix, characterization before refactor, no test weakening,
+smallest slice, contract-first, compatibility/fail-closed, single source of truth,
+explicit ownership, read-only proof, evidence-based report. Several gates are
+currently **receipt-** or **judgment-**enforced only.
+
+Follow-up (do not start without a separate gated prompt):
+
+- Promote receipt-only gates to machine enforcement: add a `tests_v2/` check (e.g. a
+  behavior-changing PR with no red→green evidence fails), and a corresponding row in
+  `docs/HLDSPEC_PRINCIPLE_ENFORCEMENT_MATRIX.md` (whose own rule marks unenforced
+  principles documentation-only / ACTION).
+- Decide whether to promote the gates to a protected contract in
+  `docs/ANTI_DRIFT_CONTRACTS.md` (would invoke that doc's change-policy).
+
+Note: P1-014 (external target-artifacts placement contract) is reserved by the open
+draft PR #29; this item is numbered P1-015 to avoid a merge collision.
+
+### P1-016 Journey 3 controller/target/agent-bridge implementation (docs/JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md, added 2026-06-21)
+
+Terminology + UX are defined; the roadmap A–M below is named in the doc (§8) but
+**not implemented**. None grant authority by themselves — approval gates stay
+controller-owned. The doc's §8 is the authoritative roadmap; this is the tracking row.
+
+- **A.** Canonical `.agents/hldspec/` bridge structure.
+- **B.** `SKILL.md` + `bridge.json` (mirrors, never replaces, the `.hldspec-run.json`
+  pointer).
+- **C.** Optional provider shims (`.devin|.claude|.codex/hldspec/`) pointing at the
+  canonical bridge.
+- **D.** Bridge discovery from either `controller_root` or `target_root`.
+- **E.** Bridge validation, fail closed: broken=BLOCKED, mismatch=BLOCKED, multiple
+  candidates=BLOCKED, stale=ACTION/BLOCKED.
+- **F.** Optional `Target Controller Link` symlink (`target/.agents/hldspec ->
+  controller/.agents/hldspec`); untracked by default; broken/mismatched=BLOCKED.
+- **G.** `helper_runtime_capsule` defined precisely per helper.
+- **H.** Generic `HelperAdapter` + concrete `SpecKitAdapter` contract (formalizes
+  `helper_selection.py` + Toolchain Driver).
+- **I.** `command_envelope` typed schema (lift the session-packet shape in
+  `hldspec/session_control.py`).
+- **J.** Literal/path hardening that fails closed on accidental
+  `target/.hldspec/source_package/` leaks in external mode (today only source-package
+  split-brain is detected via `hld_source_package.source_package_split_brain`).
+- **K.** Read-only dogfood against `~/code/flow` (no mutation, no helper/SpecKit run).
+- **L.** Reassess **PR #29** (dogfood package-placement gap) after this contract lands.
+- **M.** Reassess **PR #26** (Journey 2 architecture-package authoring) separately.
+
+### P1-017 Reconcile canonical control-plane doc with external-controller mode (added 2026-06-21)
+
+**Status: implemented by PR #37.**
+
+`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (canonical, test-locked by
+`tests_v2/test_terminology_and_flow_docs.py`) now describes the control plane and
+source package as resolved paths: default/no-pointer mode uses
+`target_root/.hldspec/`, while the implemented Option-C external-controller mode
+(PR #30/#32/#33/#34/#35) resolves the same control plane to
+`controller_root/.hldspec/` when a `.hldspec-run.json` pointer is present. The
+locked tests cover both modes and the target-local helper-runtime boundary.
+
+### P1-018 Agent Handoff Pack pointer-aware path rendering (added 2026-06-22)
+
+**Status: code path implemented; on-disk/schema rename deferred.**
+
+The Journey 3 "mediator guidance" generator was renamed to the **Agent Handoff Pack**
+and made pointer-aware (`hldspec/agent_handoff_pack.py`). Previously
+`write_mediator_guidance_artifacts` built `TargetWorkspaceAdapter(...)` without a
+`controller_root` and hard-coded `target/.hldspec/source_package/...` strings, so in
+external-controller mode the packet, prompts, and rendered source-package paths leaked
+into the target. They now resolve through `control_paths.resolve_controller_root` (the
+same resolution Journey 3 uses): packet + prompts follow `control_state_root`
+(controller in external mode), helper runtime (`.specify/source/`, `specs/`) stays
+target-local. Locked by `tests_v2/test_agent_handoff_pack.py` (default + external mode,
+terminology, compat shim) — the external-mode test fails if a target-local
+`.hldspec/source_package/...` path reappears in generated handoff output.
+
+Deferred (do not start without a separate gated prompt):
+
+- **On-disk artifact rename:** `mediator/` → `agent_handoff/`, `mediator_packet.json`
+  → `agent_handoff_packet.json`, `START_MEDIATOR.md`/`DEVIN_MEDIATOR_SKILL.md`/
+  `CODEX_CLAUDE_MEDIATOR.md` → `AGENT_HANDOFF.md`/`DEVIN_AGENT_HANDOFF.md`/
+  `DIRECT_AGENT_HANDOFF.md`. Kept legacy this slice to avoid breaking downstream
+  consumers (`hldspec_agent_session.py` output, `scripts/hldspec_smoke_slice_e2e.py`,
+  `tests_v2/fixtures/expected_smoke_artifacts.txt`, `cli_contract`).
+- **Packet JSON key rename:** `mediator_boundaries` → `handoff_boundaries`,
+  `speckit_paths` → `helper_runtime_paths`, etc. Kept legacy for schema stability.
+- **Residual legacy sub-terms in rendered prose** kept for cross-locked tests
+  (`Agent Mediator is not the Implementation Agent.`, the `Codex / Claude direct
+  mediator mode` label). Reconcile with `docs/MEDIATOR_PROMPT_PROTOCOL.md`,
+  `docs/ANTI_DRIFT_CONTRACTS.md`, and the canonical flow string in
+  `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` (all test-locked) when those docs are renamed.
+- **Remove the `hldspec/mediator_guidance.py` compatibility shim** once all consumers
+  migrate to `hldspec/agent_handoff_pack.py`.
+
 ## P2 backlog
 
 ### P2-001 Optional workflow engine evaluation

@@ -39,9 +39,40 @@ equal; see §13.
 Hard rules:
 
 - HLDspec must not manually write final SpecKit specs.
-- HLDspec control artifacts live in `target/.hldspec/`, never in `.specify/`.
+- HLDspec control artifacts live in the resolved `.hldspec/` control plane (see
+  *Control-plane location* below), never in `.specify/`.
 - `target/.specify/` and `target/specs/` are SpecKit-owned.
 - The source HLD is read-only evidence; only the working HLD may be modified.
+
+### Control-plane location: default vs external-controller mode
+
+`control_state_root` is the **resolved** `.hldspec/` control plane — the single
+directory that owns the source package, session state, packets, reports, approvals,
+binding, and helper selection. Its location is **mode-dependent** (resolved by
+`hldspec/control_paths.py` / `hldspec/run_state.py`):
+
+- **Default / no-pointer mode:** `target_root/.hldspec/`. The target legitimately
+  holds the control plane here. This is the original canonical location.
+- **External-controller mode:** when a `.hldspec-run.json` pointer names a controller
+  root, the *same* control plane resolves to `controller_root/.hldspec/`.
+  Externalization copies control state to the controller and removes the in-target
+  `.hldspec/`; the target then keeps only the pointer plus any declared helper runtime.
+
+Target ownership in both modes:
+
+- The target always owns product code and product tests.
+- The target may hold a **declared helper runtime capsule** (`target/.specify/`,
+  `target/.specify/source/`, `target/specs/`) — helper runtime, **not** control state.
+- In external mode the target **must not** silently accumulate HLDspec control-plane
+  state; an in-target `target/.hldspec/source_package/` is then a leak/split-brain
+  signal, not authoritative.
+
+The `.specify/` boundary above is unchanged: HLDspec never authors control artifacts
+into `.specify/` in either mode. See
+[`JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md`](JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md)
+(controller/target/agent-bridge terminology + UX),
+[`TOOLCHAIN_DRIVER_BOUNDARY.md`](TOOLCHAIN_DRIVER_BOUNDARY.md) (ownership zones), and
+[`JOURNEY3_HELPER_CONTRACT.md`](JOURNEY3_HELPER_CONTRACT.md) (helper model).
 
 ---
 
@@ -60,7 +91,8 @@ Hard rules:
   command/tool surface. This list is authoritative for the command surface;
   README and other docs defer to it. Current commands: `start`, `status`,
   `review`, `continue`, `diff`, `doctor`, `speckit-doctor`, `operator-state`
-  (alias `speckit-state`), read-only `git-lifecycle`, and `select-helper`. It is the
+  (alias `speckit-state`), read-only `git-lifecycle`, `select-helper`, and
+  read-only `journey3-status`. It is the
   internal/manual tool surface that agents run
   on the user's behalf and that maintainers use for debug/fallback — it is
   **not the primary human UX**. Hides internal scripts behind one entry point;
@@ -116,7 +148,9 @@ Hard rules:
 - **Arbitrary brownfield adoption** — adopting an existing codebase or SpecKit
   workspace that lacks trusted HLDspec lineage. This remains unsupported unless a
   future explicit brownfield adoption flow is added.
-- **HLDspec Control Plane** — `target/.hldspec/`: state, gates, validation, sync.
+- **HLDspec Control Plane** — the resolved `.hldspec/`: state, gates, validation,
+  and sync. It is `target_root/.hldspec/` in default/no-pointer mode and
+  `controller_root/.hldspec/` in external-controller mode.
 - **SpecKit Workspace** — `target/.specify/` + `target/specs/`: SpecKit-owned.
 - **Execution Handoff** — the act and artifact of passing a bounded Run Card to the
   external build/SpecKit agent.
@@ -188,10 +222,10 @@ Scripts        = deterministic tools
   heading.
 - **Spec Build Plan** — the plan of planned specs/packages and their quality state.
 - **Feature Dependency Graph** — legacy multi-package ordering artifact
-  (`target/.hldspec/feature_dependency_graph.{json,md}`) used only when an
+  (`control_state_root/feature_dependency_graph.{json,md}`) used only when an
   explicitly approved multi-package flow requires it. Not a default start output.
 - **SpecKit Invocation Queue** — legacy ordered queue
-  (`target/.hldspec/speckit_invocation_queue.{json,md}`) derived from the legacy
+  (`control_state_root/speckit_invocation_queue.{json,md}`) derived from the legacy
   graph. Not a default start output.
 - **SpecKit Prework Package** — the evidence/prework bundle for review/approval.
 - **SpecKit Proxy Dossier** — the evidence bundle (facts/approved context/sections/
@@ -252,11 +286,10 @@ Scripts        = deterministic tools
 ```
 
 Target discovery is read-only with respect to product code and SpecKit execution.
-It may write HLDspec control reports under `target/.hldspec/sync/`, but it must
-not wipe target state, run SpecKit, or implement product code. HLDspec
-orchestration runs from the HLDspec repository; later product work runs from the
-target repository only after a bounded Run Card or approved implementation-slice
-handoff exists.
+It may write HLDspec control reports under the resolved `control_state_root/sync/`,
+but it must not wipe target state, run SpecKit, or implement product code. HLDspec
+orchestration runs from the HLDspec repository; later product work runs from the target
+repository only after a bounded Run Card or approved implementation-slice handoff exists.
 
 ---
 
@@ -333,15 +366,16 @@ Default start/output rule:
 ```text
 HLDspec must plan a real SpecKit workspace init first.
 .specify/ is created only by a detected SpecKit init command.
-HLDspec-authored control artifacts remain under target/.hldspec/source_package/.
-target/.specify/source/ is a generated mirror only.
+HLDspec-authored control artifacts remain under the resolved
+`control_state_root/source_package/`.
+target/.specify/source/ is a target-local generated helper-runtime mirror only.
 ```
 
 Legacy ordering source of truth for explicitly approved multi-package flows:
 
 ```text
-Feature Dependency Graph  (target/.hldspec/feature_dependency_graph.*)
-  -> SpecKit Invocation Queue  (target/.hldspec/speckit_invocation_queue.*)
+Feature Dependency Graph  (control_state_root/feature_dependency_graph.*)
+  -> SpecKit Invocation Queue  (control_state_root/speckit_invocation_queue.*)
 ```
 
 The queue is **derived** from the graph; there is no separately hand-built queue. If
@@ -531,7 +565,8 @@ create specs manually from HLDspec
 direct scripts as product workflow (scripts are agent/maintainer tools, not the UX)
 subagent without a named role
 review without naming owner/type
-.specify/sync as HLDspec control state (control state lives in target/.hldspec/)
+.specify/sync as HLDspec control state (control state lives in the resolved
+.hldspec/ control plane, not .specify/)
 ```
 
 Legacy/fallback artifacts (`target_spec_work_order.*`, `spec_branch_queue.*`) may
@@ -558,7 +593,7 @@ proxy dossier, and prework quality review.
 | Dependency graph / queue | `hldspec/machines/`, `scripts/build_speckit_prework_plan.py` |
 | Spec packages / bundles | `hldspec/spec_bundles.py`, `scripts/build_speckit_bundle_queue.py` |
 | Run Card (target state) | `target/prompts/speckit/<package-id>/RUN_CARD.{md,json}` |
-| Control plane (target state) | `target/.hldspec/` |
+| Control plane (resolved `.hldspec/`) | `target/.hldspec/` (default) or `controller_root/.hldspec/` (external-controller mode); see §2 *Control-plane location* |
 
 > Note on current state: the repo today implements much of §1–§7 and §9 via
 > machines, scripts, bundle prompts, and the execution-state assessor
@@ -579,14 +614,19 @@ differ.
 ### Ownership of the source package (C1/C2)
 
 - HLDspec **authors** the approved source package under
-  `target/.hldspec/source_package/` (the control plane).
+  `control_state_root/source_package/`: the same resolved `.hldspec/` control
+  plane described in §2. In **default / no-pointer mode** this is
+  `target_root/.hldspec/source_package/`; in **external-controller mode** it is
+  `controller_root/.hldspec/source_package/`.
 - The import step **materialises a derived, read-only mirror** into
-  `target/.specify/source/` for the SpecKit runner. The mirror is *generated*, never
-  hand-authored, and is regenerated from `.hldspec/`; every mirrored markdown file
-  carries a `GENERATED by HLDspec` banner. This preserves the §2 invariant that
-  HLDspec never *authors* into `.specify/`.
+  `target/.specify/source/` for the target-local SpecKit helper runtime. The mirror
+  is *generated*, never hand-authored, and is regenerated from the resolved source
+  package / resolved `.hldspec/` control plane; every mirrored markdown file carries
+  a `GENERATED by HLDspec` banner. This preserves the §2 invariant that HLDspec never
+  *authors* into `.specify/`.
 - The constitution is authored here only as a **proposal**
-  (`.hldspec/source_package/constitution.proposed.md`). It is applied to
+  (`control_state_root/source_package/constitution.proposed.md`, with the
+  default/external resolution inherited from §2). It is applied to
   `.specify/memory/constitution.md` **only at `CONSTITUTION_APPROVAL_GATE`** — SpecKit
   remains the owner of the applied constitution.
 
@@ -803,8 +843,8 @@ The Build Loop is the execution boundary between prepared HLDspec evidence and
 real SpecKit/build-agent work. It must be described with explicit trigger phrases
 so every runtime (Codex, Claude, Devin, or manual) uses the same gates.
 
-`SOURCE_PACKAGE_READY` means the target has a validated
-`target/.hldspec/source_package/` and a current `speckit_single_spec_input.md`.
+`SOURCE_PACKAGE_READY` means the resolved control plane has a validated
+`control_state_root/source_package/` and a current `speckit_single_spec_input.md`.
 This is HLDspec-owned source truth. It is not permission to run SpecKit.
 
 `INIT_PREREQS_READY` means the target has a supported SpecKit init command, the
@@ -816,9 +856,9 @@ path is ready. This is the last pre-init check.
 `.specify/memory/` from an existing or newly executed real SpecKit init command.
 `.specify/source/` alone never proves initialization.
 
-`MIRROR_SYNCED` means HLDspec regenerated `target/.specify/source/` from the
-current `target/.hldspec/source_package/` after `WORKSPACE_INITIALIZED`.
-The mirror is derived context only; it is never source truth.
+`MIRROR_SYNCED` means HLDspec regenerated the target-local `target/.specify/source/`
+mirror from the current resolved `control_state_root/source_package/` after
+`WORKSPACE_INITIALIZED`. The mirror is derived context only; it is never source truth.
 
 `READY_FOR_SPECIFY` means `SOURCE_PACKAGE_READY`, `INIT_PREREQS_READY`,
 `WORKSPACE_INITIALIZED`, and `MIRROR_SYNCED` are true, the branch path is ready,
@@ -1122,15 +1162,17 @@ optional `permission-mode` names the allowed execution/write mode. The mediator 
 still obey HLDspec gates, implementation slice scope, Engineering Toolbox guidance,
 stage-safe testing, and the user approval boundary.
 
-The Devin mediator skill must read or cite, when present:
+The Devin mediator skill must read or cite, when present, the resolved source-package
+paths (default/no-pointer: `target/.hldspec/source_package/`; external-controller:
+`controller_root/.hldspec/source_package/`) and target-local helper runtime:
 
 ```text
-target/.hldspec/source_package/
-target/.hldspec/source_package/engineering_guidelines.md
-target/.hldspec/source_package/implementation_slices.json
-target/.hldspec/source_package/implementation_slicing_policy.md
-target/.hldspec/source_package/slice_test_policy.md
-target/.hldspec/source_package/speckit_slice_execution_prompt.md
+control_state_root/source_package/
+control_state_root/source_package/engineering_guidelines.md
+control_state_root/source_package/implementation_slices.json
+control_state_root/source_package/implementation_slicing_policy.md
+control_state_root/source_package/slice_test_policy.md
+control_state_root/source_package/speckit_slice_execution_prompt.md
 target/.specify/source/
 target/specs/
 ```

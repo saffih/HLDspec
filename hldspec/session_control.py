@@ -55,13 +55,31 @@ BACKENDS: tuple[str, ...] = (
 DEFAULT_SESSION_NAME = "hldspec-run"
 CONTEXT_BUDGET = "SMALL_RELEVANT_ARTIFACTS_ONLY"
 
-# Required reads every Runner/Consultant must confirm in their Context Receipt.
-REQUIRED_READS: tuple[str, ...] = (
-    ".hldspec/source_package/source_package.json",
-    ".hldspec/source_package/source_manifest.json",
-    ".hldspec/source_package/session_plan.json",
-    ".hldspec/source_package/speckit_runbook.md",
+# Source-package control-plane files every Runner/Consultant must confirm. These are
+# basenames so they can be rendered under the resolved source-package dir (controller
+# root in external mode); the relative tuple below is the legacy target-local default.
+REQUIRED_READ_BASENAMES: tuple[str, ...] = (
+    "source_package.json",
+    "source_manifest.json",
+    "session_plan.json",
+    "speckit_runbook.md",
 )
+
+
+def required_reads_for(source_pkg_dir: str | Path = ".hldspec/source_package") -> list[str]:
+    """Source-package required reads rendered under `source_pkg_dir`.
+
+    Pointer-aware callers pass the *resolved* source-package dir (controller root in
+    external mode); the default keeps the legacy target-relative shape. Single basename
+    list (REQUIRED_READ_BASENAMES) so packet reads and the relative constant cannot drift.
+    """
+    p = str(source_pkg_dir).rstrip("/")
+    return [f"{p}/{name}" for name in REQUIRED_READ_BASENAMES]
+
+
+# Required reads every Runner/Consultant must confirm in their Context Receipt.
+# Legacy target-relative default; byte-identical to the prior constant.
+REQUIRED_READS: tuple[str, ...] = tuple(required_reads_for())
 
 # Machine-readable companions the gate reads (finding F2). Markdown stays human-facing.
 CONTEXT_RECEIPT_FILE = "context_receipt.json"
@@ -169,14 +187,26 @@ def render_packet(packet: SubagentPacket) -> str:
     )
 
 
-CONTEXT_RECEIPT_TEMPLATE = """\
+def render_context_receipt_template(source_pkg_dir: str | Path = ".hldspec/source_package") -> str:
+    """Context Receipt checklist with the source-package required-reads under `source_pkg_dir`.
+
+    Pointer-aware callers (write_session_artifacts) pass the *resolved* source-package
+    dir — the controller root in external mode — so the checklist points operators at
+    the packets that were actually written, not a target-local path that does not exist
+    in external mode. The `.specify/memory/constitution.md` line stays target-relative:
+    the SpecKit mirror always lives in the target (the agent's working dir), never under
+    the controller (the resolver's Option C boundary). The default keeps the legacy
+    target-relative shape and is byte-identical to the prior constant.
+    """
+    p = str(source_pkg_dir).rstrip("/")
+    return f"""\
 CONTEXT RECEIPT
 - Required files read:
-  - [ ] .hldspec/source_package/source_package.json
-  - [ ] .hldspec/source_package/source_manifest.json
-  - [ ] .hldspec/source_package/session_plan.json
-  - [ ] .hldspec/source_package/speckit_runbook.md
-  - [ ] .hldspec/source_package/runner_prompt.md or consultant_prompt.md
+  - [ ] {p}/source_package.json
+  - [ ] {p}/source_manifest.json
+  - [ ] {p}/session_plan.json
+  - [ ] {p}/speckit_runbook.md
+  - [ ] {p}/runner_prompt.md or consultant_prompt.md
   - [ ] .specify/memory/constitution.md, if initialized
 - Current phase:
 - Actor:
@@ -194,6 +224,10 @@ CONTEXT RECEIPT
   - RunSkeptic ACTION/CONFLICT
   - failed validation
 """
+
+
+# Canonical target-relative default (single text definition lives in the renderer).
+CONTEXT_RECEIPT_TEMPLATE = render_context_receipt_template()
 
 PHASE_REPORT_TEMPLATE = """\
 PHASE REPORT
@@ -218,12 +252,16 @@ Continuation is owned by the main-controller. This actor must STOP after this re
 # ---------------------------------------------------------------------------
 # Packet builders — model tier is routed per task (finding F3)
 # ---------------------------------------------------------------------------
-def build_basepack_packet(phase: str = "source_package_preparation") -> SubagentPacket:
+def build_basepack_packet(
+    phase: str = "source_package_preparation",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=BASEPACK,
         phase=phase,
         model_tier=mr.tier_for_operation("manifest_generation"),  # MODEL_SIMPLE
-        required_reads=list(REQUIRED_READS),
+        required_reads=required_reads_for(source_pkg_dir),
         allowed_files=[".hldspec/source_package/**"],
         forbidden_files=[".specify/**", "source HLD (read-only)", "target application code"],
         task=(
@@ -241,12 +279,17 @@ def build_basepack_packet(phase: str = "source_package_preparation") -> Subagent
     )
 
 
-def build_runner_packet(phase: str = "speckit_specify") -> SubagentPacket:
+def build_runner_packet(
+    phase: str = "speckit_specify",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=RUNNER,
         phase=phase,
         model_tier=mr.tier_for_operation("command_execution"),  # MODEL_SIMPLE
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/runner_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/runner_prompt.md"],
         allowed_files=["target repo files within the phase scope"],
         forbidden_files=[
             ".hldspec/source_package/** (read-only for the runner)",
@@ -267,12 +310,17 @@ def build_runner_packet(phase: str = "speckit_specify") -> SubagentPacket:
     )
 
 
-def build_consultant_packet(phase: str = "review") -> SubagentPacket:
+def build_consultant_packet(
+    phase: str = "review",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=CONSULTANT,
         phase=phase,
         model_tier=mr.tier_for_operation("consultant_review"),  # MODEL_SMART
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/consultant_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/consultant_prompt.md"],
         allowed_files=["read-only access to target + source package"],
         forbidden_files=["ALL — consultant is review-only and writes nothing"],
         task=(
@@ -289,12 +337,17 @@ def build_consultant_packet(phase: str = "review") -> SubagentPacket:
     )
 
 
-def build_ui_test_packet(phase: str = "ui_validation") -> SubagentPacket:
+def build_ui_test_packet(
+    phase: str = "ui_validation",
+    *,
+    source_pkg_dir: str | Path = ".hldspec/source_package",
+) -> SubagentPacket:
     return SubagentPacket(
         role=CONSULTANT,
         phase=phase,
         model_tier=mr.tier_for_operation("consultant_review"),  # MODEL_SMART
-        required_reads=list(REQUIRED_READS) + [".hldspec/source_package/consultant_prompt.md"],
+        required_reads=required_reads_for(source_pkg_dir)
+        + [f"{str(source_pkg_dir).rstrip('/')}/consultant_prompt.md"],
         allowed_files=["read-only access to UI test evidence + target"],
         forbidden_files=["ALL — review-only; writes nothing"],
         task="Aggregate UI test evidence and report PASS/ACTION/CONFLICT for the UI_VALIDATION_GATE.",
@@ -394,7 +447,15 @@ def build_session_plan(
         session_name = default_tmux_session_name(target_repo_path, current_gate)
     target = str(target_repo_path)
     hldspec = str(hldspec_repo_path)
-    pkt_dir = ".hldspec/source_package/subagent_packets"
+    # Resolve the source-package dir once through the single pointer-aware resolver
+    # (controller root in external mode, in-target otherwise) — the same resolver
+    # write_session_artifacts uses — so the executable role commands AND the
+    # descriptor fields (packet_file/prompt_file) point where the artifacts were
+    # actually written. In legacy no-pointer mode this is the target-local path.
+    from . import hld_source_package  # lazy: mirror write_session_artifacts; no import cycle
+
+    source_dir = hld_source_package.source_package_paths(Path(target_repo_path))[0]
+    resolved_pkt_dir = str(source_dir / "subagent_packets")
 
     basepack = build_basepack_packet()
     runner = build_runner_packet()
@@ -415,9 +476,9 @@ def build_session_plan(
         ),
         BASEPACK: _role_entry(
             role=BASEPACK,
-            command=_role_command(BASEPACK, target, hldspec, backend),
-            prompt_file=".hldspec/source_package/speckit_runbook.md",
-            packet_file=f"{pkt_dir}/basepack_packet.md",
+            command=_role_command(BASEPACK, target, hldspec, backend, resolved_pkt_dir),
+            prompt_file=f"{source_dir}/speckit_runbook.md",
+            packet_file=f"{resolved_pkt_dir}/basepack_packet.md",
             allowed_files=basepack.allowed_files,
             forbidden_files=basepack.forbidden_files,
             stop_condition=basepack.stop_condition,
@@ -427,9 +488,9 @@ def build_session_plan(
         ),
         RUNNER: _role_entry(
             role=RUNNER,
-            command=_role_command(RUNNER, target, hldspec, backend),
-            prompt_file=".hldspec/source_package/runner_prompt.md",
-            packet_file=f"{pkt_dir}/runner_packet.md",
+            command=_role_command(RUNNER, target, hldspec, backend, resolved_pkt_dir),
+            prompt_file=f"{source_dir}/runner_prompt.md",
+            packet_file=f"{resolved_pkt_dir}/runner_packet.md",
             allowed_files=runner.allowed_files,
             forbidden_files=runner.forbidden_files,
             stop_condition=runner.stop_condition,
@@ -439,9 +500,9 @@ def build_session_plan(
         ),
         CONSULTANT: _role_entry(
             role=CONSULTANT,
-            command=_role_command(CONSULTANT, target, hldspec, backend),
-            prompt_file=".hldspec/source_package/consultant_prompt.md",
-            packet_file=f"{pkt_dir}/consultant_packet.md",
+            command=_role_command(CONSULTANT, target, hldspec, backend, resolved_pkt_dir),
+            prompt_file=f"{source_dir}/consultant_prompt.md",
+            packet_file=f"{resolved_pkt_dir}/consultant_packet.md",
             allowed_files=consultant.allowed_files,
             forbidden_files=consultant.forbidden_files,
             stop_condition=consultant.stop_condition,
@@ -464,19 +525,27 @@ def build_session_plan(
     }
 
 
-def _role_command(role: str, target: str, hldspec: str, backend: str) -> str:
-    """Command string a role would run, per backend. Never executed here."""
-    pkt = {
-        BASEPACK: ".hldspec/source_package/subagent_packets/basepack_packet.md",
-        RUNNER: ".hldspec/source_package/subagent_packets/runner_packet.md",
-        CONSULTANT: ".hldspec/source_package/subagent_packets/consultant_packet.md",
+def _role_command(role: str, target: str, hldspec: str, backend: str, pkt_dir: str) -> str:
+    """Command string a role would run, per backend. Never executed here.
+
+    `pkt_dir` is the resolved, pointer-aware ABSOLUTE subagent-packets directory —
+    the controller location in external mode, in-target otherwise — so the rendered
+    command reads the packet that write_session_artifacts actually wrote. The role
+    agent still works in {target} (`-C {target}` / "in {target}"); only the packet
+    path is resolved (single source of truth: same resolver as the writer).
+    """
+    filename = {
+        BASEPACK: "basepack_packet.md",
+        RUNNER: "runner_packet.md",
+        CONSULTANT: "consultant_packet.md",
     }.get(role, "")
+    pkt = f"{pkt_dir}/{filename}" if filename else ""
     if backend == "claude":
-        return f"claude -p \"$(cat {target}/{pkt})\""
+        return f"claude -p \"$(cat {pkt})\""
     if backend == "codex":
         return f"codex exec --sandbox workspace-write -C {target} \"$(cat {pkt})\""
     if backend == "manual":
-        return f"Paste {target}/{pkt} into a fresh {role} agent session."
+        return f"Paste {pkt} into a fresh {role} agent session."
     # dry-run / command-only / tmux all describe the same bounded invocation
     return f"run {role} from packet {pkt} in {target} (bounded; stop after the phase)"
 
@@ -540,18 +609,26 @@ def render_role_commands(plan: dict) -> dict[str, str]:
 # Artifact writers
 # ---------------------------------------------------------------------------
 def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") -> dict[str, Path]:
-    adapter = TargetWorkspaceAdapter(target_root=target_root, layout=layout)
-    source_dir = adapter.source_package_dir
+    # Resolve through the single pointer-aware source-package resolver (Option C):
+    # in external mode the control-plane artifacts land under the controller root,
+    # exactly where session_continue_preflight reads them — no in-target leak, no
+    # write/read split. Without a pointer this is byte-identical to in-target.
+    from . import hld_source_package  # lazy: avoid any import-cycle, mirror stale_check pattern
+
+    source_dir, _mirror = hld_source_package.source_package_paths(target_root, layout=layout)
     pkt_dir = source_dir / "subagent_packets"
     pkt_dir.mkdir(parents=True, exist_ok=True)
 
     write_json_dict(source_dir / SESSION_PLAN_FILE, plan)
 
+    # Render packet required_reads under the resolved source-package dir so they point
+    # at the control-plane files actually written here (controller in external mode),
+    # mirroring how the descriptor fields and receipt checklist resolve (PR #33/#34).
     packets = {
-        "basepack_packet.md": build_basepack_packet(),
-        "runner_packet.md": build_runner_packet(),
-        "consultant_packet.md": build_consultant_packet(),
-        "ui_test_packet.md": build_ui_test_packet(),
+        "basepack_packet.md": build_basepack_packet(source_pkg_dir=source_dir),
+        "runner_packet.md": build_runner_packet(source_pkg_dir=source_dir),
+        "consultant_packet.md": build_consultant_packet(source_pkg_dir=source_dir),
+        "ui_test_packet.md": build_ui_test_packet(source_pkg_dir=source_dir),
     }
     written: dict[str, Path] = {SESSION_PLAN_FILE: source_dir / SESSION_PLAN_FILE}
     for filename, packet in packets.items():
@@ -560,19 +637,23 @@ def write_session_artifacts(target_root: Path, plan: dict, layout: str = "new") 
         written[filename] = path
 
     # Runner/consultant prompts embed the Context Receipt the gate requires.
+    # Render its required-read checklist under the resolved source-package dir so the
+    # source-package lines point at the packets actually written here (controller in
+    # external mode); the `.specify/` mirror line stays target-relative.
     # Authoritative files carry no mirror banner; the mirror step is the sole
     # banner-adder (these live in .hldspec/, not the derived mirror).
+    receipt_template = render_context_receipt_template(source_dir)
     runner_prompt = (
         "# Target Runner Prompt\n\n"
         "You run ONE bounded phase, then stop. Before acting, output a Context "
         "Receipt; after the phase, output a Phase Report. The main-controller owns "
-        "continuation.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
+        "continuation.\n\n" + receipt_template + "\n" + PHASE_REPORT_TEMPLATE
     )
     consultant_prompt = (
         "# Consultant / RunSkeptic Prompt\n\n"
         "You are review-only. Check meaning and source consistency, apply RunSkeptic, "
         "and return PASS / ACTION / CONFLICT. You write nothing and never approve your "
-        "own findings.\n\n" + CONTEXT_RECEIPT_TEMPLATE + "\n" + PHASE_REPORT_TEMPLATE
+        "own findings.\n\n" + receipt_template + "\n" + PHASE_REPORT_TEMPLATE
     )
     runbook = (
         "# SpecKit Runbook\n\n"

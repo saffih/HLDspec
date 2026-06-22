@@ -39,6 +39,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`HLDSPEC_ARTIFACT_CONTRACT_STYLE.md`](HLDSPEC_ARTIFACT_CONTRACT_STYLE.md) | Standard interface-contract shape for handoffs, prompts, reports, gap handoffs, and slice execution artifacts. |
 | [`ENGINEERING_TOOLBOX.md`](ENGINEERING_TOOLBOX.md) | Durable engineering doctrine for constitution candidates, preferred choice selection, clean-software cards, and stage-safety guidance. |
 | [`ANTI_DRIFT_CONTRACTS.md`](ANTI_DRIFT_CONTRACTS.md) | Non-droppable product, ownership, slice/mediator, and engineering-toolbox contracts that future changes must preserve. |
+| [`ENGINEERING_QUALITY_GATES.md`](ENGINEERING_QUALITY_GATES.md) | Engineering practice gates (EQG-1..EQG-15) for implementation work **on the HLDspec repo**: TDD/red→green evidence, regression per bug fix, characterization before refactor, no test weakening, smallest slice, contract-first, fail-closed, single source of truth, ownership, read-only proof, evidence-based report. Repo-development governance — distinct from the target-software `ENGINEERING_TOOLBOX.md`. |
 | [`HLDSPEC_GAP_HANDOFF_TEMPLATE.md`](HLDSPEC_GAP_HANDOFF_TEMPLATE.md) | Status handoff template for gaps, dirty state, next patch, and tests actually run. Not architecture truth. |
 | [`HLDSPEC_DEVELOPMENT_HANDOFF.md`](HLDSPEC_DEVELOPMENT_HANDOFF.md) | Development handoff protocol for moving HLDspec repo work between models/agents/sessions. |
 | [`HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) | Durable backlog of unfinished repo-development work and open design decisions. |
@@ -51,6 +52,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`RUNSKEPTIC_EVIDENCE_QUALITY.md`](RUNSKEPTIC_EVIDENCE_QUALITY.md) | RunSkeptic evidence field contract. |
 | [`CONTEXT_TAILORING_PROTOCOL.md`](CONTEXT_TAILORING_PROTOCOL.md) | Context tailoring for subagents. |
 | [`AGENT_ARTIFACT_HYGIENE.md`](AGENT_ARTIFACT_HYGIENE.md) | Policy for ad hoc docs, archive records, scratch output, target artifacts, and cleanup metadata. |
+| [`JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md`](JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md) | Journey 3 controller/target/helper/agent-bridge terminology + UX operating model. Names the four roots (`hldspec_tool_root`, `controller_root`, `control_state_root`, `target_root`), the helper runtime capsule and adapter, and the proposed agent bridge (`.agents/hldspec/`, `bridge.json`, `SKILL.md`, `command_envelope`). Each term tagged EXISTS/PROPOSED; mode-dependent control-state rule; fail-closed safety. Design + terminology proposal — defers to `HLDSPEC_TERMINOLOGY_AND_FLOW.md` on conflict; bridge/symlink not yet implemented. |
 
 ---
 
