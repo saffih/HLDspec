@@ -3,14 +3,16 @@
 Ownership model (resolved 2026-05-27, see
 docs/archive/REWRITE_PROMPT_RUNSKEPTIC_REVIEW_2026-05-27.md):
 
-- HLDspec *authors* the approved source package under
-  ``target/.hldspec/source_package/`` (the control plane).
+- HLDspec *authors* the approved source package under the resolved control plane,
+  ``control_state_root/source_package/``. In default/no-pointer mode this resolves
+  to ``target/.hldspec/source_package/``; in external-controller mode it resolves
+  to ``controller_root/.hldspec/source_package/``.
 - A *derived, read-only mirror* is materialised under ``target/.specify/source/``
   for the SpecKit runner. The mirror is generated, never hand-authored, so the
   canonical invariant "HLDspec never authors into .specify/" still holds.
 - The constitution is authored here only as a *proposal*
-  (``constitution.proposed.md``); it is applied to ``.specify/memory/`` at the
-  CONSTITUTION_APPROVAL_GATE, not by this module.
+  (``control_state_root/source_package/constitution.proposed.md``); it is applied
+  to ``.specify/memory/`` only at CONSTITUTION_APPROVAL_GATE, not by this module.
 
 This module owns the *container*: the file contract, the manifest (with hashes),
 ``source_package.json`` metadata, validation, and mirror materialisation. The

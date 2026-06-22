@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from hldspec import hld_source_package
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 CANONICAL = DOCS / "HLDSPEC_TERMINOLOGY_AND_FLOW.md"
@@ -216,6 +218,68 @@ class TerminologyAndFlowDocTests(unittest.TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, text)
+
+    def test_canonical_doc_locks_resolved_source_package_ownership(self) -> None:
+        text = _read(CANONICAL)
+        for phrase in (
+            "control_state_root/source_package/",
+            "target_root/.hldspec/source_package/",
+            "controller_root/.hldspec/source_package/",
+            ".specify/sync as HLDspec control state",
+            "resolved `.hldspec/` control plane",
+            "target/.specify/source/",
+            "declared helper runtime capsule",
+            "Default / no-pointer mode:",
+            "External-controller mode:",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+        self.assertNotIn("control state lives in target/" ".hldspec/", text)
+        self.assertNotIn(
+            "HLDspec **authors** the approved source package under\n"
+            "  `target/.hldspec/source_package/`",
+            text,
+        )
+        self.assertNotIn(
+            ".specify/sync as HLDspec control state (control state lives in "
+            "target/.hldspec/)",
+            text,
+        )
+        self.assertNotIn(
+            "HLDspec-authored control artifacts remain under target/.hldspec/source_package/.",
+            text,
+        )
+        self.assertNotIn(
+            "`SOURCE_PACKAGE_READY` means the target has a validated\n"
+            "`target/.hldspec/source_package/`",
+            text,
+        )
+        self.assertNotIn(
+            "current `target/.hldspec/source_package/` after `WORKSPACE_INITIALIZED`.",
+            text,
+        )
+        self.assertNotIn(
+            "It may write HLDspec control reports under `target/.hldspec/sync/`",
+            text,
+        )
+
+    def test_source_package_docstring_locks_resolved_ownership(self) -> None:
+        text = hld_source_package.__doc__ or ""
+        self.assertIn("control_state_root/source_package/", text)
+        self.assertIn("controller_root/.hldspec/source_package/", text)
+        self.assertIn("target/.specify/source/", text)
+        self.assertNotIn(
+            "HLDspec *authors* the approved source package under\n"
+            "  ``target/.hldspec/source_package/``",
+            text,
+        )
+
+    def test_bridge_doc_does_not_leave_p1_017_pending(self) -> None:
+        text = _read(DOCS / "JOURNEY3_CONTROLLER_TARGET_AGENT_BRIDGE.md")
+        self.assertIn("P1-017 reconciliation:** implemented by PR #37", text)
+        self.assertNotIn("currently describes\nthe control plane only as in-target", text)
+        self.assertNotIn("covers both modes. Until then", text)
 
 
 if __name__ == "__main__":
