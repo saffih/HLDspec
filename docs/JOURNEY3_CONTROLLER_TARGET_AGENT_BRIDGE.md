@@ -85,10 +85,10 @@ receipts, driver status, queues, and protected approval state.
   [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md)
   ("HLDspec Control Plane — `target/.hldspec/`").
 - **External-controller mode (pointer present):** the *same* control plane resolves
-  to `controller_root/.hldspec/` (Option C; implemented by **PR #30/#32/#33/#34**; the
-  packet-required-reads follow-up **PR #35 is an open draft**, not yet shipped).
-  Externalization copies control state to the controller and removes the in-target
-  `.hldspec/`.
+  to `controller_root/.hldspec/` (Option C; **implemented by PR #30/#32/#33/#34/#35** —
+  PR #30/#32/#33/#34 built the resolver/path-rendering chain and PR #35 (merge
+  `ea5e990`) added packet-required-reads rendering). Externalization copies control
+  state to the controller and removes the in-target `.hldspec/`.
 
 So `control_state_root` = "the resolved `.hldspec/` — in-target by default, under the
 controller once a pointer externalizes it," not "always under the controller." The
@@ -196,8 +196,8 @@ work happens there (SpecKit reads `.specify/`, edits `specs/` and product code).
 Instructions, packets, receipts, reports, and control metadata remain
 **controller-owned** unless they are specifically target-runtime material (the
 capsule). The session role commands already run "in `{target}`" while reading packets
-from the resolved control plane (**PR #33/#34** implemented; the packet
-required-reads follow-up is the **open draft PR #35**).
+from the resolved control plane (**PR #33/#34/#35** implemented the role-command,
+descriptor/receipt, and packet-required-reads path rendering).
 
 ### 2.13 Target Controller Link — **PROPOSED** (not implemented)
 
