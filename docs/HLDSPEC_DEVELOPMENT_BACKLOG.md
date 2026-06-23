@@ -77,10 +77,9 @@ proposed future feature is implemented. Full suites green on `ef3f934`: `tests_v
 All three journeys are safe for current use in their implemented scope. No journey is
 "perfect" or feature-complete; the deferred column is the honest remainder.
 
-PR status at snapshot: #35/#36/#37/#38 merged; #29 closed/superseded; #26 open draft
-(UPDATE_NEEDED — substantively current DO_NOT_PATCH analysis, but base SHA `507b398`
-predates #30–#38 and one sentence describes `architecture_package.json` emission as
-target-local only without the post-#35 `control_state_root` resolution).
+PR status at snapshot: #35/#36/#37/#38 merged; #29 closed/superseded; #26 merged
+(`add352c` — Journey 2 architecture authoring report; conclusion remains DO_NOT_PATCH
+for automated derivation, with future human-authoring stage deferred).
 
 ## Current implementation notes
 
