@@ -61,6 +61,26 @@ Overall current mark: 6/10.
 
 Reason: the foundational contracts and several enforcement gates now exist, but HLDspec is not yet product-ready. Remaining blockers are guarded product-flow integration, end-to-end journey coverage, stale-artifact/diff handling, domain validators, and RunSkeptic status propagation through handoff/gate-machine outputs.
 
+## Current Journey Status — 2026-06-23
+
+Snapshot after merging PR #38 (`ef3f934`). "Done" here means: the **currently
+implemented** Journeys 1/2/3 are verified against `main`; it does **not** mean every
+proposed future feature is implemented. Full suites green on `ef3f934`: `tests_v2`
+1391 OK, `tests` 173 OK.
+
+| Journey | Status | Evidence | Deferred / future |
+|---|---|---|---|
+| **J1 — HLD Shaping / SDD-ready gate** | PASS_WITH_DEFERRED_WORK | `hldspec/hld_readiness.py`, `docs/JOURNEY1_SDD_READY_GATE.md`; tests `test_hld_verify_coverage`, `test_raw_hld_conversion_machine`, `test_hld_marking`, `test_constitution_from_hld_verify` (30 focused OK) | P1-012: missing-whole-section detection; `accepted_risks` capture wiring |
+| **J2 — SpecKit Groundwork / source + architecture package** | PASS_WITH_DEFERRED_WORK | `hldspec/hld_source_package.py`, `hldspec/journey2_architecture_package.py`; tests `test_source_package`, `test_journey2_architecture_package` (65 focused OK) | `architecture_package.json` 13 reasoning fields stay human-owned (emitted ACTION-by-default; PR #26 analysis); P1-013 inquiry/gap ledger + lens registry |
+| **J3 — Build Loop Supervision / Agent Handoff Pack** | PASS_WITH_DEFERRED_WORK | pointer-aware control plane + Agent Handoff Pack (`hldspec/agent_handoff_pack.py`, PR #38); tests `test_journey3_*`, `test_agent_handoff_pack`, `test_agent_first_cli_contract`, `test_hldspec_smoke_slice_e2e` (104 focused OK) | bridge / `command_envelope` (P1-016, PROPOSED only); P1-018 compat cleanup; post-#37 read-only dogfood not yet run (P1-016/K) |
+
+All three journeys are safe for current use in their implemented scope. No journey is
+"perfect" or feature-complete; the deferred column is the honest remainder.
+
+PR status at snapshot: #35/#36/#37/#38 merged; #29 closed/superseded; #26 merged
+(`add352c` — Journey 2 architecture authoring report; conclusion remains DO_NOT_PATCH
+for automated derivation, with future human-authoring stage deferred).
+
 ## Current implementation notes
 
 ### Context economy
