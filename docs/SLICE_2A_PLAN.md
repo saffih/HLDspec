@@ -5,6 +5,10 @@
 Classify rows from the product QA feature ledger into one of 8 categories.
 A classification is not a work order and is not implementation approval.
 
+**Status:** implementation plan and receipt for Slice 2A. The final implementation
+also updates `tests_v2/test_feature_ledger.py` to lock the `feature-ledger` artifact
+contract's `ledger_classifier` consumer.
+
 ## Input / Output
 
 | Artifact | Location | Owner |
@@ -189,8 +193,9 @@ the classification output uses plain overwrite. Rationale:
 | File | Change |
 |---|---|
 | `hldspec/artifact_contracts.py` | Register `product-ledger-classification` contract |
+| `tests_v2/test_feature_ledger.py` | Lock the `feature-ledger` contract's `ledger_classifier` consumer |
 
-No other existing files are modified.
+No other existing production files are modified.
 
 ---
 
