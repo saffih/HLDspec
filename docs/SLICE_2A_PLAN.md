@@ -26,12 +26,17 @@ VALID_CLASSIFICATIONS = frozenset({
     "NEEDS_EXPECTED_BEHAVIOR",
     "BUGFIX_CANDIDATE",
     "UX_FIX_CANDIDATE",
-    "HARNESS_FIX_CANDIDATE",
+    "HARNESS_FIX_CANDIDATE",   # reserved — not assigned in Slice 2A (no clean signal)
     "SPEC_GAP_CANDIDATE",
     "PRODUCT_DECISION_REQUIRED",
     "BLOCKED_NO_EVIDENCE",
 })
 ```
+
+`HARNESS_FIX_CANDIDATE` is a valid classification value but is **not assigned by any rule in Slice 2A**.
+It is reserved for future use when explicit harness/tooling evidence is available (e.g. a dedicated
+`blocked_reason` field or harness-specific `defect_category`). In Slice 2A, `status == "blocked"` routes
+to `PRODUCT_DECISION_REQUIRED`.
 
 ---
 
@@ -56,7 +61,7 @@ Rules are evaluated in priority order; first match wins.
 | 10 | `status == "fail"` AND `defect_category in ("functional_bug", "data_integrity", "integration", "security", "performance")` | `BUGFIX_CANDIDATE` | Functional defect with sufficient evidence and expected behavior. |
 | 11 | `status == "fail"` AND `defect_category == "missing_feature"` | `SPEC_GAP_CANDIDATE` | Feature missing, not broken. |
 | 12 | `status == "fail"` AND `defect_category in ("none", other)` | `PRODUCT_DECISION_REQUIRED` | Failure signal with unspecified category — do not drop silently. |
-| 13 | `status == "blocked"` | `HARNESS_FIX_CANDIDATE` | See CONFLICT-1 below. |
+| 13 | `status == "blocked"` | `PRODUCT_DECISION_REQUIRED` | Blocked status conflates harness, dependency, and environment issues. No clean signal to distinguish — escalate for human triage. (CONFLICT-1 resolved) |
 | 14 | `defect_category == "missing_feature"` AND `status != "fail"` AND `evidence_level != "INFERRED"` | `SPEC_GAP_CANDIDATE` | Spec gap identified outside failure path. Evidence gate applied: code-scan can evidence absence (a feature is observably missing from the codebase), but pure inference cannot. |
 | 15 | `defect_category == "missing_feature"` AND `status != "fail"` AND `evidence_level == "INFERRED"` | `PRODUCT_DECISION_REQUIRED` | Inferred spec gap — insufficient evidence for candidate classification. |
 | 16 | `status == "untested"` AND no failure signals | `NO_ACTION` | Pure inventory row. Nothing actionable yet. |
@@ -97,22 +102,17 @@ This enforces: **a classification is not overclaim. Static/code-only evidence ca
 
 ---
 
-## CONFLICT-1: HARNESS_FIX_CANDIDATE Signal
+## CONFLICT-1: HARNESS_FIX_CANDIDATE Signal — RESOLVED
 
 **Issue**: There is no `defect_category` value for harness/tooling issues. The ledger schema has no field
 that distinguishes "blocked by test infrastructure" from "blocked by dependency" or "blocked by environment."
 
-**Current mapping**: `status == "blocked"` → `HARNESS_FIX_CANDIDATE`. This conflates multiple blocked reasons.
+**Decision**: `status == "blocked"` → `PRODUCT_DECISION_REQUIRED` in Slice 2A.
+`HARNESS_FIX_CANDIDATE` remains a valid reserved classification value for future use
+when explicit harness evidence is available (e.g. a dedicated `blocked_reason` field
+or a harness-specific `defect_category` value).
 
-**Options**:
-1. Accept the conflation — all blocked rows become `HARNESS_FIX_CANDIDATE` and Slice 2B triages further.
-2. Add a `blocked_reason` field to the ledger schema (Slice 1 schema change — higher cost).
-3. Use `notes` field content to distinguish (fragile, non-deterministic).
-
-**Recommendation**: Option 1 for Slice 2A. `HARNESS_FIX_CANDIDATE` is advisory, not executory.
-Slice 2B can further triage blocked rows when creating work orders.
-
-**Status**: Requires human decision before implementation.
+**Status**: Resolved. No remaining CONFLICTs.
 
 ---
 
@@ -244,7 +244,7 @@ No other existing files are modified.
 | `test_fail_integration` | status=fail, defect=integration, expected="x", actual="y", evidence_level=REPRODUCED | BUGFIX_CANDIDATE |
 | `test_fail_missing_feature` | status=fail, defect=missing_feature, expected="x", actual="y", evidence_level=OBSERVED | SPEC_GAP_CANDIDATE |
 | `test_fail_none_category` | status=fail, defect=none, expected="x", actual="y", evidence_level=OBSERVED | PRODUCT_DECISION_REQUIRED |
-| `test_blocked_status` | status=blocked | HARNESS_FIX_CANDIDATE |
+| `test_blocked_status` | status=blocked | PRODUCT_DECISION_REQUIRED |
 | `test_missing_feature_not_fail_observed` | status=untested, defect=missing_feature, evidence_level=OBSERVED | SPEC_GAP_CANDIDATE |
 | `test_missing_feature_not_fail_inferred` | status=untested, defect=missing_feature, evidence_level=INFERRED | PRODUCT_DECISION_REQUIRED |
 | `test_untested_no_signals` | status=untested, defect=none, all defaults | NO_ACTION |
@@ -263,6 +263,8 @@ No other existing files are modified.
 | `test_no_specify_writes` | No .specify/ writes |
 | `test_classification_not_work_order` | Output has no work_order, task, or implementation fields |
 | `test_stable_feature_id_preserved` | Output feature_ids match input feature_ids exactly |
+| `test_harness_fix_never_assigned` | No rule in Slice 2A assigns HARNESS_FIX_CANDIDATE |
+| `test_harness_fix_is_valid_value` | HARNESS_FIX_CANDIDATE is in VALID_CLASSIFICATIONS (reserved) |
 
 ### Output format tests
 
@@ -307,7 +309,7 @@ No other existing files are modified.
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| CONFLICT-1: HARNESS_FIX_CANDIDATE has no clean signal | Medium | Accept conflation in 2A; Slice 2B triages further |
+| ~~CONFLICT-1~~: HARNESS_FIX_CANDIDATE has no clean signal | Resolved | `blocked` → `PRODUCT_DECISION_REQUIRED`; `HARNESS_FIX_CANDIDATE` reserved for future explicit evidence |
 | Classification overclaim | High | Evidence strength gate (rules 7-8) demotes INFERRED/code-only to PRODUCT_DECISION_REQUIRED |
 | Stale classification after ledger update | Low | source_ledger_sha256 tracks input version; consumer can compare |
 | Future schema drift between ledger and classifier | Low | Classifier reads via FeatureLedger.load() / LedgerRow — single source |
@@ -375,7 +377,7 @@ No other existing files are modified.
   **Resolution**: BLOCKED_NO_EVIDENCE and PRODUCT_DECISION_REQUIRED are the explicit "not enough data" answers.
   The classifier does not invent signals or wait — it classifies what's there and flags gaps.
 - `SH:HC` — No hidden conflict. Classifier reads ledger fields; does not need SpecKit knowledge.
-- SH finding on HARNESS_FIX_CANDIDATE: **CONFLICT** surfaced (CONFLICT-1 above).
+- SH finding on HARNESS_FIX_CANDIDATE: **CONFLICT** surfaced (CONFLICT-1). **Resolved**: `blocked` → `PRODUCT_DECISION_REQUIRED`; value reserved for future explicit evidence.
 
 ### Evidence levels
 
@@ -392,15 +394,13 @@ No other existing files are modified.
 |---|---|---|
 | Overclaim risk | FIX (in plan) | Rules 7-8 added to decision table |
 | Silent drop of fail+none | FIX (in plan) | Rule 12 added |
-| HARNESS_FIX_CANDIDATE signal | CONFLICT | Requires human decision (options in CONFLICT-1) |
+| HARNESS_FIX_CANDIDATE signal | HANDLED | Resolved: `blocked` → `PRODUCT_DECISION_REQUIRED`; value reserved for future explicit evidence |
 | Stale Slice 1 comment | Out of scope | Mention, don't fix |
 
 ### Verdict
 
-**The plan is ready to implement** contingent on resolving CONFLICT-1 (HARNESS_FIX_CANDIDATE signal).
-
-Recommended resolution for CONFLICT-1: Option 1 (accept conflation in Slice 2A, triage in Slice 2B).
-If accepted, no remaining CONFLICTs and implementation can proceed.
+**The plan is ready to implement.** CONFLICT-1 resolved: `blocked` → `PRODUCT_DECISION_REQUIRED`;
+`HARNESS_FIX_CANDIDATE` reserved for future explicit harness evidence. No remaining CONFLICTs.
 
 Design notes resolved during review:
 - Rule 17 catch-all escalates to PRODUCT_DECISION_REQUIRED (never silently drops to NO_ACTION)
@@ -435,4 +435,5 @@ Design notes resolved during review:
 > - All tests in `tests_v2/test_ledger_classifier.py` must pass
 > - `python3 -m unittest discover -s tests_v2 -v` must remain fully green
 >
-> CONFLICT-1 resolution: [HUMAN DECISION NEEDED — Option 1 recommended]
+> CONFLICT-1 resolved: `blocked` → `PRODUCT_DECISION_REQUIRED`. `HARNESS_FIX_CANDIDATE` is a
+> valid reserved value but no Slice 2A rule assigns it.
