@@ -187,6 +187,25 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "overall_status is lifecycle only; safety_status (PASS/ACTION/BLOCKED) gates continuation."
         ),
     ),
+    "feature-ledger": ArtifactContract(
+        artifact_name="feature-ledger",
+        schema_version=1,
+        producer="product-ledger scanner / Product QA Loop Driver Slice 1",
+        consumers=[],
+        required_fields=["schema_version", "rows"],
+        optional_fields=[],
+        input_artifacts=[],
+        output_artifacts=["qa/feature-ledger.json", "qa/feature-ledger.csv"],
+        notes=(
+            "Target-owned product QA artifact (NOT a SpecKit artifact). Observed-behavior "
+            "inventory keyed by stable feature_id. Lives under the resolved target product QA "
+            "dir (default <target>/qa/), never under .specify/. Slice 1 only produces inventory "
+            "rows; a failing ledger row is NOT permission to invoke SpecKit. Future Slice 2 "
+            "(ledger-to-SpecKit workorder converter) must classify failing rows before creating "
+            "work orders; future Slice 3 (browser/user retest loop) must provide reproduced "
+            "evidence before setting PASS."
+        ),
+    ),
 }
 
 
