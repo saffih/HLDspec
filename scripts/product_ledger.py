@@ -44,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
 
     qa_dir = fl.resolve_product_qa_dir(target)
     control_sync = control_paths.resolve_control_sync_dir(target, create=True)
+    provenance_dir = control_sync / fl.PRODUCT_QA_REPORT_SUBDIR
 
     ledger = fl.scan_target(target)
     errors = ledger.validate()
@@ -53,7 +54,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {e}", file=sys.stderr)
         return 3
 
-    result = fl.safe_write(ledger, qa_dir)
+    result = fl.safe_write(ledger, qa_dir, provenance_dir)
 
     meta = {
         "target": str(target),

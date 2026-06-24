@@ -287,6 +287,9 @@ class WriteResult:
     reason: str = ""
 
 
+PROVENANCE_FILE = "feature-ledger.provenance.json"
+
+
 def _existing_is_compatible(qa_dir: Path) -> tuple[bool, str]:
     """Return (compatible, reason). A fresh dir is compatible."""
     json_path = qa_dir / LEDGER_JSON
@@ -304,17 +307,74 @@ def _existing_is_compatible(qa_dir: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def safe_write(ledger: "FeatureLedger", qa_dir: Path) -> WriteResult:
-    """Write the ledger unless an incompatible/manual file already exists.
+def _ledger_content_hash(qa_dir: Path) -> str | None:
+    json_path = qa_dir / LEDGER_JSON
+    if not json_path.is_file():
+        return None
+    return hashlib.sha256(json_path.read_bytes()).hexdigest()
 
-    A compatible (current schema, valid JSON) existing ledger is a normal
-    regeneration target and is overwritten. An unknown schema version or
-    malformed file is treated as a potential manual edit: do not overwrite.
+
+def _read_provenance(provenance_dir: Path) -> str | None:
+    prov = provenance_dir / PROVENANCE_FILE
+    if not prov.is_file():
+        return None
+    try:
+        data = json.loads(prov.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    value = data.get("ledger_sha256")
+    return value if isinstance(value, str) else None
+
+
+def _write_provenance(provenance_dir: Path, ledger_hash: str) -> None:
+    provenance_dir.mkdir(parents=True, exist_ok=True)
+    (provenance_dir / PROVENANCE_FILE).write_text(
+        json.dumps({"ledger_sha256": ledger_hash}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def safe_write(ledger: "FeatureLedger", qa_dir: Path, provenance_dir: Path) -> WriteResult:
+    """Write the ledger unless an incompatible or externally-edited file exists.
+
+    Two conflict guards, both fail closed (never overwrite silently):
+
+    1. Format/schema: a malformed or unknown-schema-version existing ledger is
+       not overwritten.
+    2. Provenance: the scanner records the sha256 of every ledger it writes
+       under the control plane. On a later run, if an existing ledger's on-disk
+       hash differs from the last recorded hash, it was edited outside the
+       scanner (a human filled status/expected behavior/approval flags) — that
+       is a manual edit and must not be silently regenerated away. A
+       compatible existing ledger the scanner itself wrote (hash matches) is a
+       normal regeneration target.
     """
     compatible, reason = _existing_is_compatible(qa_dir)
     if not compatible:
         return WriteResult(written=False, conflict=True, reason=reason)
+
+    existing_hash = _ledger_content_hash(qa_dir)
+    if existing_hash is not None:
+        recorded = _read_provenance(provenance_dir)
+        if recorded is None:
+            return WriteResult(
+                written=False,
+                conflict=True,
+                reason="existing feature-ledger.json has no scanner provenance record "
+                "(hand-created or from another tool); not overwriting",
+            )
+        if existing_hash != recorded:
+            return WriteResult(
+                written=False,
+                conflict=True,
+                reason="existing feature-ledger.json was edited outside the scanner "
+                "(content hash differs from last recorded); not overwriting manual edits",
+            )
+
     ledger.write(qa_dir)
+    new_hash = _ledger_content_hash(qa_dir)
+    if new_hash is not None:
+        _write_provenance(provenance_dir, new_hash)
     return WriteResult(written=True, conflict=False)
 
 
