@@ -799,11 +799,11 @@ class ArtifactContractTests(unittest.TestCase):
         for f in contract.output_artifacts:
             self.assertNotIn(".specify", f)
 
-    def test_contract_no_current_consumers(self) -> None:
+    def test_contract_has_classifier_consumer(self) -> None:
         from hldspec.artifact_contracts import ARTIFACT_CONTRACTS
 
         contract = ARTIFACT_CONTRACTS["feature-ledger"]
-        self.assertEqual(contract.consumers, [])
+        self.assertIn("ledger_classifier", contract.consumers)
 
     def test_contract_non_execution_boundary_documented(self) -> None:
         from hldspec.artifact_contracts import ARTIFACT_CONTRACTS
