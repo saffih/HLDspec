@@ -273,6 +273,35 @@ class DuplicateMergeTests(unittest.TestCase):
         self.assertIn("views.py:10", ledger.rows[0].evidence)
         self.assertIn("README mentions login", ledger.rows[0].evidence)
 
+    def test_merge_upgrades_observed_to_reproduced(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row
+
+        ledger = FeatureLedger()
+        ledger.upsert_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="views.py:10"))
+        ledger.upsert_row(make_row("auth", "login", evidence_level="REPRODUCED", evidence="browser test"))
+        self.assertEqual(ledger.rows[0].evidence_level, "REPRODUCED")
+
+    def test_merge_keeps_reproduced_over_observed(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row
+
+        ledger = FeatureLedger()
+        ledger.upsert_row(make_row("auth", "login", evidence_level="REPRODUCED", evidence="browser test"))
+        ledger.upsert_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="views.py:10"))
+        self.assertEqual(ledger.rows[0].evidence_level, "REPRODUCED")
+
+    def test_merge_evidence_strength_order(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row
+
+        ledger = FeatureLedger()
+        ledger.upsert_row(make_row("a", "b", evidence_level="INFERRED", evidence="guess"))
+        self.assertEqual(ledger.rows[0].evidence_level, "INFERRED")
+        ledger.upsert_row(make_row("a", "b", evidence_level="HISTORICAL", evidence="readme"))
+        self.assertEqual(ledger.rows[0].evidence_level, "HISTORICAL")
+        ledger.upsert_row(make_row("a", "b", evidence_level="OBSERVED", evidence="code"))
+        self.assertEqual(ledger.rows[0].evidence_level, "OBSERVED")
+        ledger.upsert_row(make_row("a", "b", evidence_level="REPRODUCED", evidence="browser"))
+        self.assertEqual(ledger.rows[0].evidence_level, "REPRODUCED")
+
     def test_upsert_distinct_keys_keeps_separate_rows(self) -> None:
         from hldspec.feature_ledger import FeatureLedger, make_row
 
@@ -558,6 +587,104 @@ class ConflictOnOverwriteTests(unittest.TestCase):
             result = safe_write(ledger1, qa, prov)
             self.assertFalse(result.written)
             self.assertTrue(result.conflict)
+
+    def test_manual_edit_to_csv_only_is_not_overwritten(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row, safe_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            qa = Path(tmp) / "qa"
+            prov = Path(tmp) / "prov"
+            ledger0 = FeatureLedger()
+            ledger0.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            safe_write(ledger0, qa, prov)
+
+            csv_before = (qa / "feature-ledger.csv").read_text()
+            (qa / "feature-ledger.csv").write_text(csv_before + "# HUMAN EDIT\n", encoding="utf-8")
+            csv_edited = (qa / "feature-ledger.csv").read_text()
+
+            ledger1 = FeatureLedger()
+            ledger1.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            result = safe_write(ledger1, qa, prov)
+
+            self.assertFalse(result.written)
+            self.assertTrue(result.conflict)
+            self.assertEqual((qa / "feature-ledger.csv").read_text(), csv_edited)
+
+    def test_csv_exists_without_provenance_is_not_overwritten(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row, safe_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            qa = Path(tmp) / "qa"
+            prov = Path(tmp) / "prov"
+            qa.mkdir(parents=True)
+            (qa / "feature-ledger.csv").write_text("feature_id,area\nFL-x,auth\n", encoding="utf-8")
+
+            ledger = FeatureLedger()
+            ledger.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            result = safe_write(ledger, qa, prov)
+
+            self.assertFalse(result.written)
+            self.assertTrue(result.conflict)
+
+    def test_json_exists_without_csv_no_provenance_is_not_overwritten(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row, safe_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            qa = Path(tmp) / "qa"
+            prov = Path(tmp) / "prov"
+            qa.mkdir(parents=True)
+            (qa / "feature-ledger.json").write_text(
+                json.dumps({"schema_version": 1, "rows": []}), encoding="utf-8"
+            )
+
+            ledger = FeatureLedger()
+            ledger.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            result = safe_write(ledger, qa, prov)
+
+            self.assertFalse(result.written)
+            self.assertTrue(result.conflict)
+
+    def test_conflict_leaves_both_files_untouched(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row, safe_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            qa = Path(tmp) / "qa"
+            prov = Path(tmp) / "prov"
+            ledger0 = FeatureLedger()
+            ledger0.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            safe_write(ledger0, qa, prov)
+
+            # Edit JSON (provenance mismatch)
+            data = json.loads((qa / "feature-ledger.json").read_text())
+            data["rows"][0]["notes"] = "HUMAN"
+            (qa / "feature-ledger.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+            json_edited = (qa / "feature-ledger.json").read_text()
+            csv_before = (qa / "feature-ledger.csv").read_text()
+
+            ledger1 = FeatureLedger()
+            ledger1.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            result = safe_write(ledger1, qa, prov)
+
+            self.assertFalse(result.written)
+            self.assertEqual((qa / "feature-ledger.json").read_text(), json_edited)
+            self.assertEqual((qa / "feature-ledger.csv").read_text(), csv_before)
+
+    def test_both_scanner_written_files_regenerate(self) -> None:
+        from hldspec.feature_ledger import FeatureLedger, make_row, safe_write
+
+        with tempfile.TemporaryDirectory() as tmp:
+            qa = Path(tmp) / "qa"
+            prov = Path(tmp) / "prov"
+            ledger0 = FeatureLedger()
+            ledger0.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="x"))
+            safe_write(ledger0, qa, prov)
+
+            ledger1 = FeatureLedger()
+            ledger1.add_row(make_row("auth", "login", evidence_level="OBSERVED", evidence="y"))
+            result = safe_write(ledger1, qa, prov)
+            self.assertTrue(result.written)
+            self.assertFalse(result.conflict)
+            self.assertIn("y", (qa / "feature-ledger.json").read_text())
 
     def test_fresh_dir_writes_cleanly(self) -> None:
         from hldspec.feature_ledger import FeatureLedger, make_row, safe_write

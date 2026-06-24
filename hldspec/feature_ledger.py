@@ -273,7 +273,7 @@ def _merge_evidence(existing: LedgerRow, incoming: LedgerRow) -> None:
         else:
             existing.evidence = incoming.evidence
     # Strongest available evidence level wins (OBSERVED > REPRODUCED > HISTORICAL > INFERRED).
-    rank = {"OBSERVED": 3, "REPRODUCED": 2, "HISTORICAL": 1, "INFERRED": 0}
+    rank = {"REPRODUCED": 3, "OBSERVED": 2, "HISTORICAL": 1, "INFERRED": 0}
     if rank.get(incoming.evidence_level, -1) > rank.get(existing.evidence_level, -1):
         existing.evidence_level = incoming.evidence_level
 
@@ -307,14 +307,19 @@ def _existing_is_compatible(qa_dir: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _ledger_content_hash(qa_dir: Path) -> str | None:
-    json_path = qa_dir / LEDGER_JSON
-    if not json_path.is_file():
+def _file_hash(path: Path) -> str | None:
+    if not path.is_file():
         return None
-    return hashlib.sha256(json_path.read_bytes()).hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _read_provenance(provenance_dir: Path) -> str | None:
+@dataclass
+class _Provenance:
+    json_sha256: str | None = None
+    csv_sha256: str | None = None
+
+
+def _read_provenance(provenance_dir: Path) -> _Provenance | None:
     prov = provenance_dir / PROVENANCE_FILE
     if not prov.is_file():
         return None
@@ -322,14 +327,21 @@ def _read_provenance(provenance_dir: Path) -> str | None:
         data = json.loads(prov.read_text(encoding="utf-8"))
     except Exception:
         return None
-    value = data.get("ledger_sha256")
-    return value if isinstance(value, str) else None
+    if not isinstance(data, dict):
+        return None
+    return _Provenance(
+        json_sha256=data.get("feature_ledger_json_sha256"),
+        csv_sha256=data.get("feature_ledger_csv_sha256"),
+    )
 
 
-def _write_provenance(provenance_dir: Path, ledger_hash: str) -> None:
+def _write_provenance(provenance_dir: Path, json_hash: str | None, csv_hash: str | None) -> None:
     provenance_dir.mkdir(parents=True, exist_ok=True)
     (provenance_dir / PROVENANCE_FILE).write_text(
-        json.dumps({"ledger_sha256": ledger_hash}, indent=2, sort_keys=True) + "\n",
+        json.dumps({
+            "feature_ledger_json_sha256": json_hash,
+            "feature_ledger_csv_sha256": csv_hash,
+        }, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
@@ -337,44 +349,57 @@ def _write_provenance(provenance_dir: Path, ledger_hash: str) -> None:
 def safe_write(ledger: "FeatureLedger", qa_dir: Path, provenance_dir: Path) -> WriteResult:
     """Write the ledger unless an incompatible or externally-edited file exists.
 
-    Two conflict guards, both fail closed (never overwrite silently):
+    Both canonical files (JSON + CSV) are protected. Conflict guards fail
+    closed (never overwrite silently):
 
-    1. Format/schema: a malformed or unknown-schema-version existing ledger is
-       not overwritten.
-    2. Provenance: the scanner records the sha256 of every ledger it writes
-       under the control plane. On a later run, if an existing ledger's on-disk
-       hash differs from the last recorded hash, it was edited outside the
-       scanner (a human filled status/expected behavior/approval flags) — that
-       is a manual edit and must not be silently regenerated away. A
-       compatible existing ledger the scanner itself wrote (hash matches) is a
-       normal regeneration target.
+    1. Format/schema: a malformed or unknown-schema-version JSON is not
+       overwritten.
+    2. Provenance: the scanner records per-file sha256 hashes of every ledger
+       it writes. On a later run, if either on-disk file's hash differs from
+       the recorded hash, it was edited outside the scanner — manual edit, do
+       not overwrite. If either file exists but provenance is absent,
+       fail closed.
     """
     compatible, reason = _existing_is_compatible(qa_dir)
     if not compatible:
         return WriteResult(written=False, conflict=True, reason=reason)
 
-    existing_hash = _ledger_content_hash(qa_dir)
-    if existing_hash is not None:
+    json_path = qa_dir / LEDGER_JSON
+    csv_path = qa_dir / LEDGER_CSV
+    existing_json_hash = _file_hash(json_path)
+    existing_csv_hash = _file_hash(csv_path)
+    either_exists = existing_json_hash is not None or existing_csv_hash is not None
+
+    if either_exists:
         recorded = _read_provenance(provenance_dir)
         if recorded is None:
             return WriteResult(
                 written=False,
                 conflict=True,
-                reason="existing feature-ledger.json has no scanner provenance record "
+                reason="existing ledger file(s) have no scanner provenance record "
                 "(hand-created or from another tool); not overwriting",
             )
-        if existing_hash != recorded:
+        if existing_json_hash is not None and existing_json_hash != recorded.json_sha256:
             return WriteResult(
                 written=False,
                 conflict=True,
-                reason="existing feature-ledger.json was edited outside the scanner "
+                reason="feature-ledger.json was edited outside the scanner "
+                "(content hash differs from last recorded); not overwriting manual edits",
+            )
+        if existing_csv_hash is not None and existing_csv_hash != recorded.csv_sha256:
+            return WriteResult(
+                written=False,
+                conflict=True,
+                reason="feature-ledger.csv was edited outside the scanner "
                 "(content hash differs from last recorded); not overwriting manual edits",
             )
 
     ledger.write(qa_dir)
-    new_hash = _ledger_content_hash(qa_dir)
-    if new_hash is not None:
-        _write_provenance(provenance_dir, new_hash)
+    _write_provenance(
+        provenance_dir,
+        _file_hash(json_path),
+        _file_hash(csv_path),
+    )
     return WriteResult(written=True, conflict=False)
 
 
