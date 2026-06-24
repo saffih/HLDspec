@@ -191,7 +191,7 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
         artifact_name="feature-ledger",
         schema_version=1,
         producer="product-ledger scanner / Product QA Loop Driver Slice 1",
-        consumers=[],
+        consumers=["ledger_classifier"],
         required_fields=["schema_version", "rows"],
         optional_fields=[],
         input_artifacts=[],
@@ -204,6 +204,26 @@ ARTIFACT_CONTRACTS: dict[str, ArtifactContract] = {
             "(ledger-to-SpecKit workorder converter) must classify failing rows before creating "
             "work orders; future Slice 3 (browser/user retest loop) must provide reproduced "
             "evidence before setting PASS."
+        ),
+    ),
+    "product-ledger-classification": ArtifactContract(
+        artifact_name="product-ledger-classification",
+        schema_version=1,
+        producer="ledger_classifier / Product QA Loop Driver Slice 2A",
+        consumers=[],
+        required_fields=["schema_version", "source_ledger_sha256", "classifications"],
+        optional_fields=["classified_at", "total_rows", "summary"],
+        input_artifacts=[],
+        input_specs=[],
+        output_artifacts=[
+            "product_qa_loop/product-ledger-classification.json",
+            "product_qa_loop/product-ledger-classification.md",
+        ],
+        notes=(
+            "Control-plane classification of target-owned feature ledger rows. "
+            "A classification is NOT a work order and is NOT implementation approval. "
+            "Does not modify the ledger, invoke SpecKit, or touch product code. "
+            "Future Slice 2B (workorder generation) is the first consumer."
         ),
     ),
 }
