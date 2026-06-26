@@ -47,7 +47,7 @@ def validate_speckit_transition(
     *,
     speckit_available: bool,
     human_approval: bool,
-    now: float | None = None,
+    now: float,
 ) -> ValidationResult:
     if not speckit_available:
         return _stop("SKILL_UNAVAILABLE", "SpecKit is not available")
@@ -80,13 +80,12 @@ def validate_speckit_transition(
         return _stop(f"MISSING_{receipt_name}",
                       f"no {required_phase} receipt for target {request.target_id}")
 
-    if now is not None:
-        best = max(matching, key=lambda r: r.created_at)
-        age = now - best.created_at
-        if age > RECEIPT_MAX_AGE_SECONDS:
-            return _stop("STALE_RECEIPT",
-                          f"{required_phase} receipt is {age:.0f}s old "
-                          f"(max {RECEIPT_MAX_AGE_SECONDS}s)")
+    best = max(matching, key=lambda r: r.created_at)
+    age = now - best.created_at
+    if age > RECEIPT_MAX_AGE_SECONDS:
+        return _stop("STALE_RECEIPT",
+                      f"{required_phase} receipt is {age:.0f}s old "
+                      f"(max {RECEIPT_MAX_AGE_SECONDS}s)")
 
     if request.to_phase == "implementation" and not human_approval:
         return _stop("HUMAN_APPROVAL_REQUIRED",

@@ -197,6 +197,16 @@ class NoSideEffectTests(unittest.TestCase):
             self.assertNotIn(forbidden, source)
 
 
+class NowRequiredTests(unittest.TestCase):
+    def test_now_is_required_parameter(self) -> None:
+        """Staleness check must not be bypassable by omitting now."""
+        import inspect
+        sig = inspect.signature(validate_speckit_transition)
+        param = sig.parameters["now"]
+        self.assertEqual(param.default, inspect.Parameter.empty,
+                         "now must be required so staleness cannot be skipped")
+
+
 class ResultFieldTests(unittest.TestCase):
     def test_pass_result_has_reason(self) -> None:
         result = _validate(_request("specify", "plan"), [_receipt("specify")])
