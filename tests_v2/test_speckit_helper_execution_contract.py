@@ -24,17 +24,17 @@ class SpeckitHelperExecutionContractTests(unittest.TestCase):
         self.assertIn("At `GUIDE_ONLY`", self.text)
         self.assertIn("cannot execute SpecKit", self.text)
 
-    def test_specify_required_before_analyze(self) -> None:
-        self.assertIn("`/specify` to `/analyze` | `SPECIFY_RECEIPT`", self.text)
-
-    def test_analyze_required_before_plan(self) -> None:
-        self.assertIn("`/analyze` to `/plan` | `ANALYZE_RECEIPT`", self.text)
+    def test_specify_required_before_plan(self) -> None:
+        self.assertIn("`/specify` to `/plan` | `SPECIFY_RECEIPT`", self.text)
 
     def test_plan_required_before_tasks(self) -> None:
         self.assertIn("`/plan` to `/tasks` | `PLAN_RECEIPT`", self.text)
 
-    def test_tasks_required_before_implementation(self) -> None:
-        self.assertIn("`/tasks` to implementation/testing | `TASKS_RECEIPT` and human approval", self.text)
+    def test_tasks_required_before_analyze(self) -> None:
+        self.assertIn("`/tasks` to `/analyze` | `TASKS_RECEIPT`", self.text)
+
+    def test_analyze_required_before_implementation(self) -> None:
+        self.assertIn("`/analyze` to implementation/testing | `ANALYZE_RECEIPT` and human approval", self.text)
 
     def test_stale_receipt_rejected(self) -> None:
         self.assertIn("A stale receipt is rejected.", self.text)

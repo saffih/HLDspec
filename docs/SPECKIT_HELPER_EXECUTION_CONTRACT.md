@@ -13,19 +13,18 @@ the next safe action; the human owner retains protected approval.
 The phase notation in this document is:
 
 ```text
-/specify → /analyze → /plan → /tasks → implementation/testing
+/specify → /plan → /tasks → /analyze → implementation/testing
 ```
 
-It names contract phases, not concrete installed command spelling and not an
-instruction to execute a command. Concrete installed command identity remains
-the repository's `/speckit-*` form. This contract does not alter the existing
-Journey 3 lifecycle.
+It names contract phases in canonical order
+(`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`), not concrete installed command
+spelling and not an instruction to execute a command. Concrete installed
+command identity remains the repository's `/speckit-*` form. This contract
+does not alter the existing Journey 3 lifecycle.
 
-The current Journey 3 lifecycle has a different documented phase order. Before
-any runtime adopts this candidate sequence, the canonical lifecycle must be
-reconciled through an explicit human owner decision. Until then, a runtime must
-return `STOP / CANONICAL_SEQUENCE_RECONCILIATION_REQUIRED` rather than treating
-this document as an override.
+If a runtime's installed phase order diverges from the canonical lifecycle, it
+must return `STOP / CANONICAL_SEQUENCE_RECONCILIATION_REQUIRED` rather than
+proceeding with an unreconciled sequence.
 
 ## Transition Rules
 
@@ -39,10 +38,10 @@ No human approval for protected transition → STOP.
 
 | Requested transition | Required current receipt | Result when absent or invalid |
 |---|---|---|
-| `/specify` to `/analyze` | `SPECIFY_RECEIPT` | `STOP / MISSING_SPECIFY_RECEIPT` |
-| `/analyze` to `/plan` | `ANALYZE_RECEIPT` | `STOP / MISSING_ANALYZE_RECEIPT` |
+| `/specify` to `/plan` | `SPECIFY_RECEIPT` | `STOP / MISSING_SPECIFY_RECEIPT` |
 | `/plan` to `/tasks` | `PLAN_RECEIPT` | `STOP / MISSING_PLAN_RECEIPT` |
-| `/tasks` to implementation/testing | `TASKS_RECEIPT` and human approval | `STOP / MISSING_TASKS_RECEIPT` or `STOP / HUMAN_APPROVAL_REQUIRED` |
+| `/tasks` to `/analyze` | `TASKS_RECEIPT` | `STOP / MISSING_TASKS_RECEIPT` |
+| `/analyze` to implementation/testing | `ANALYZE_RECEIPT` and human approval | `STOP / MISSING_ANALYZE_RECEIPT` or `STOP / HUMAN_APPROVAL_REQUIRED` |
 
 Each receipt must identify the target, its source evidence identity, phase, and
 creation time. A stale receipt is rejected. A receipt for a different target is
@@ -65,10 +64,10 @@ transition requiring explicit human owner approval.
 
 The contract requires negative tests for every attempted phase bypass:
 
-- analyze without a current `SPECIFY_RECEIPT`;
-- plan without a current `ANALYZE_RECEIPT`;
+- plan without a current `SPECIFY_RECEIPT`;
 - tasks without a current `PLAN_RECEIPT`;
-- implementation/testing without a current `TASKS_RECEIPT`;
+- analyze without a current `TASKS_RECEIPT`;
+- implementation/testing without a current `ANALYZE_RECEIPT`;
 - stale receipt;
 - wrong-target receipt;
 - missing SpecKit availability; and
