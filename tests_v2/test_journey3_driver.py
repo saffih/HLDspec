@@ -238,6 +238,24 @@ class TransitionValidationInjectionTests(unittest.TestCase):
         self.assertIsNone(report["transition_validation_status"])
         self.assertIsNone(report["transition_validation_reason"])
 
+    def test_stop_flips_pass_baseline_to_action(self) -> None:
+        """Discriminating test: baseline is PASS, injected STOP must flip it."""
+        sel_path = hsel.selection_path(self.root)
+        sel_path.parent.mkdir(parents=True, exist_ok=True)
+        sel_path.write_text(
+            json.dumps({"schema_version": 1, "selected_helper_id": "speckit"}),
+            encoding="utf-8",
+        )
+        baseline = drv.build_journey3_status(self.root)
+        self.assertEqual(baseline["driver_status"], "PASS",
+                         "baseline must be PASS for this test to be discriminating")
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "STOP_STALE_RECEIPT",
+                                   "reason": "specify receipt is 90000s old"},
+        )
+        self.assertEqual(report["driver_status"], "ACTION")
+
     def test_validation_fields_are_json_serializable(self) -> None:
         report = drv.build_journey3_status(
             self.root,
