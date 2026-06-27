@@ -4,7 +4,7 @@
 and boundary* of a pre-HLD discovery journey for brownfield products. It is **not
 yet hardened or gated** the way Journeys 1–3 are (no RunSkeptic-tested gate, no
 schemas, no implementation). Those are explicit future steps (see
-[§8 Status and next steps](#8-status-and-next-steps)).
+[§9 Status and next steps](#9-status-and-next-steps)).
 
 > Relationship to the canonical doc:
 > [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) remains
