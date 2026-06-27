@@ -1966,7 +1966,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(func=command_start)
 
-    p = sub.add_parser("status", help="Show current HLDspec agent session status.")
+    p = sub.add_parser(
+        "status",
+        help=(
+            "Show session status. NOT read-only: writes/refreshes discovery, "
+            "git-lifecycle, and branch-gate reports into the target's .hldspec/ "
+            "control state on first touch. For a read-only first look at an "
+            "unfamiliar/brownfield target use journey3-status."
+        ),
+    )
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_status)
 
@@ -1991,7 +1999,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_diff)
 
-    p = sub.add_parser("doctor", help="Check agent-first docs and target session files.")
+    p = sub.add_parser(
+        "doctor",
+        help=(
+            "Diagnose agent docs and target session/layout files. NOT read-only "
+            "when --target is given: writes discovery reports into the target's "
+            ".hldspec/ control state."
+        ),
+    )
     p.add_argument("--target", default=None)
     p.set_defaults(func=command_doctor)
 
@@ -1999,11 +2014,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_speckit_doctor)
 
-    p = sub.add_parser("operator-state", aliases=["speckit-state"], help="Check target-level SpecKit Operator State.")
+    p = sub.add_parser(
+        "operator-state",
+        aliases=["speckit-state"],
+        help=(
+            "Report SpecKit Operator State and next safe action. NOT read-only: "
+            "writes discovery, git-lifecycle, and branch-gate reports into the "
+            "target's .hldspec/ control state."
+        ),
+    )
     p.add_argument("--target", default=None)
     p.set_defaults(func=command_operator_state)
 
-    p = sub.add_parser("git-lifecycle", help="Write/read the read-only Git lifecycle report and non-executing plan.")
+    p = sub.add_parser(
+        "git-lifecycle",
+        help=(
+            "Write the Git lifecycle evidence report and non-executing plan into "
+            "the target's .hldspec/ control state. 'Read-only' only in the git "
+            "sense: never branches, commits, pushes, or merges."
+        ),
+    )
     p.add_argument("--target", required=True)
     p.set_defaults(func=command_git_lifecycle)
 
