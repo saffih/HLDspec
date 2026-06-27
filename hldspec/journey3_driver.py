@@ -65,6 +65,7 @@ def build_journey3_status(
     target: str | Path,
     *,
     next_feature_report: dict[str, Any] | None = None,
+    transition_validation: dict[str, Any] | None = None,
     registry: dict | None = None,
 ) -> dict[str, Any]:
     """Read-only Journey 3 driver status for `target`. Pure & subprocess-free.
@@ -197,6 +198,18 @@ def build_journey3_status(
     else:
         actions.extend(phase_blockers)
 
+    # --- Transition validation (injected, never computed here) ---
+    if transition_validation is not None:
+        tv_status = transition_validation.get("status")
+        tv_reason = transition_validation.get("reason", "")
+        if tv_status and tv_status != "PASS":
+            actions.append(f"Transition validation: {tv_status} — {tv_reason}")
+        elif tv_status == "PASS":
+            evidence.append("transition validation PASS")
+    else:
+        tv_status = None
+        tv_reason = None
+
     # --- Verdict + single next safe action (BLOCKED > ACTION > PASS) ---
     if blockers:
         driver_status = STATUS_BLOCKED
@@ -231,6 +244,8 @@ def build_journey3_status(
         "forbidden_without_approval": list(toolchain_driver.FORBIDDEN_ACTIONS)
         + list(toolchain_driver.FORBIDDEN_WITHOUT_APPROVAL),
         "protected_approvals_required": list(toolchain_driver.PROTECTED_APPROVAL_BOUNDARIES),
+        "transition_validation_status": tv_status,
+        "transition_validation_reason": tv_reason,
         # The driver never mutates or executes; surfaced so callers can assert it.
         "mutated_target": False,
         "executed_anything": False,
@@ -257,6 +272,8 @@ def render_status_text(report: dict[str, Any]) -> str:
         f"effective_helper_mode:      {mode['effective_helper_id']} "
         f"(operational={mode['operational']}, authority={mode['authority_levels']}, {mode['execution']})",
         f"journey3_phase:             {report['journey3_phase']} (source={report['phase_source']})",
+        f"transition_validation:      {report['transition_validation_status'] or 'not_performed'}"
+        f"{' — ' + report['transition_validation_reason'] if report.get('transition_validation_reason') else ''}",
         "",
         "evidence_found:",
         *_bullets(report["evidence_found"]),
