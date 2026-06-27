@@ -58,6 +58,13 @@ devin | manual`). Code: `journey3_driver.py`, `toolchain_driver.py`,
 PASS_WITH_DEFERRED_WORK. Only `speckit` is operational. Deferred:
 bridge/command-envelope (P1-016), helper bootstrap lifecycle (docs-only).
 
+### Cross-Journey Rule
+
+Each journey consumes the prior journey's typed output: J2 consumes J1's
+SDD-ready HLD; J3 consumes J2's source package. If upstream output is wrong,
+the fix is to return to and correct the upstream journey — not to patch around
+the defect downstream.
+
 ---
 
 ## Authority Model
