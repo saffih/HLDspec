@@ -94,7 +94,8 @@ Key scripts:
 - `build_speckit_prework_plan.py` — builds invocation queue + dependency graph from same ordered_features
 - `build_speckit_constitution_from_contracts.py` — augments constitution with CONTRACT-*/DATA-* rules
 - `enrich_spec_build_plan_with_answer_context.py` — joins PM + Arch context by source_hld_sections
-- `hldspec_v2.py` — CLI entry point
+- `hldspec_v2.py` — low-level state-machine runner (`ProjectMachine`)
+- `hldspec_agent_session.py` — public agent command surface (`status`, `doctor`, `operator-state`, `git-lifecycle`, `journey3-status`, …). **Brownfield first-touch:** only `journey3-status` is read-only; `status`/`doctor`/`operator-state`/`git-lifecycle` write target `.hldspec/` control state on first touch.
 
 ### Tests
 

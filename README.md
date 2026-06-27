@@ -305,20 +305,27 @@ python3 scripts/hldspec_agent_session.py start --source /path/to/HLD.md --target
 python3 scripts/hldspec_agent_session.py operator-state --target /path/to/target
 ```
 
+**First-touch / brownfield safety:** On an unfamiliar or brownfield target,
+start with read-only `journey3-status` — it inspects without mutating the
+target. `status`, `doctor`, `operator-state`, and `git-lifecycle` write
+discovery / git-lifecycle / branch-gate reports into the target's `.hldspec/`
+control state on first touch; they are **not** read-only despite their
+inspection-style names.
+
 The full internal command/tool surface the agent may run:
 
 | Command | What it does |
 |---|---|
 | `help` | Show user-facing trigger help and status/next-action guidance. |
 | `start` | Prepare or resume a session: copy the HLD into the target, build the source package, record SpecKit init readiness, and mirror read-only context only when a real SpecKit workspace already validates. |
-| `status` | Show session status, blockers, open questions, and the next safe action. |
+| `status` | Show session status, blockers, open questions, and the next safe action. **Not read-only**: writes discovery / git-lifecycle / branch-gate reports into the target's `.hldspec/` control state on first touch. |
 | `review` | List the human review files and which blocking ones are missing. |
 | `continue` | Run the pipeline to the next safe checkpoint (gated). |
 | `diff` | Compare the source HLD hash to the recorded session hash. |
-| `doctor` | Check agent-first docs and target session/layout files. |
+| `doctor` | Check agent-first docs and target session/layout files. **Not read-only** when `--target` is given: writes discovery reports into the target's `.hldspec/` control state. |
 | `speckit-doctor` | Readiness/preflight only: is the target ready for real SpecKit work? Does not decide the lifecycle. |
-| `operator-state` (alias `speckit-state`) | Report readiness first, then SpecKit lifecycle state and the evidence-backed next safe action when phase artifacts exist. Consumes `speckit-doctor` facts; it does **not** replace the doctor. |
-| `git-lifecycle` | Read-only branch/commit/merge lifecycle evidence report. Records blockers and next safe action; does not create branches, commit, push, open PRs, merge, run SpecKit, or edit product code. |
+| `operator-state` (alias `speckit-state`) | Report readiness first, then SpecKit lifecycle state and the evidence-backed next safe action when phase artifacts exist. Consumes `speckit-doctor` facts; it does **not** replace the doctor. **Not read-only**: writes discovery / git-lifecycle / branch-gate reports into the target's `.hldspec/` control state. |
+| `git-lifecycle` | Branch/commit/merge lifecycle evidence report. **Read-only only in the git sense** — never branches, commits, pushes, opens PRs, merges, runs SpecKit, or edits product code — but it *does write* the report and non-executing plan into the target's `.hldspec/` control state. |
 | `select-helper` | Record the selected Journey 3 helper (toolchain driver) in `.hldspec/helper_selection.json`. Validates the helper id against the operational helper registry; rejects planned-but-not-implemented helpers. Never touches a toolchain-owned file. |
 | `journey3-status` | Read-only Journey 3 Driver "where are we?" status: package/binding state, selected/effective helper, phase, blockers, and the next safe human action. Composes existing read-only inspectors; never runs the helper, executes SpecKit, mutates the target, or selects/approves a helper. Supports `--json` and `--no-phase`. |
 
