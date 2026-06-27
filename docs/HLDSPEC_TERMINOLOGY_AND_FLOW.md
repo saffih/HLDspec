@@ -147,7 +147,11 @@ into `.specify/` in either mode. See
   phase from evidence instead of restarting.
 - **Arbitrary brownfield adoption** — adopting an existing codebase or SpecKit
   workspace that lacks trusted HLDspec lineage. This remains unsupported unless a
-  future explicit brownfield adoption flow is added.
+  future explicit brownfield adoption flow is added. A read-only pre-HLD
+  discovery / gap-assessment on-ramp for this case is defined (as product
+  direction, not yet gated) in
+  [`JOURNEY0_BROWNFIELD_DISCOVERY.md`](JOURNEY0_BROWNFIELD_DISCOVERY.md); Journey
+  0 only assesses and reports and does **not** lift this adoption restriction.
 - **HLDspec Control Plane** — the resolved `.hldspec/`: state, gates, validation,
   and sync. It is `target_root/.hldspec/` in default/no-pointer mode and
   `controller_root/.hldspec/` in external-controller mode.

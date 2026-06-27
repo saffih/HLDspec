@@ -278,3 +278,17 @@ This doc intentionally does **not**:
 
 It defines direction and contracts. Implementation follows the Prompt 1 → 2 → 3
 sequence, each gated, each returning to RunSkeptic.
+
+---
+
+## 8. Journey 0 — brownfield on-ramp (pointer)
+
+Brownfield products may have no single authoritative HLD to feed Journey 1, only
+partial/stale/contradictory sources. A **pre-HLD** discovery and HLD
+gap-assessment journey, **Journey 0**, is defined as product direction in
+[`JOURNEY0_BROWNFIELD_DISCOVERY.md`](JOURNEY0_BROWNFIELD_DISCOVERY.md). It is a
+read-only on-ramp that **precedes and feeds Journey 1** — **not a fourth peer
+journey and not a renumbering**: the product is still the three journeys above.
+Journey 0 surfaces evidence, gaps, conflicts, and required product decisions so
+Journey 1 can author/harden one authoritative HLD; it does not lift the
+brownfield-adoption restriction.
