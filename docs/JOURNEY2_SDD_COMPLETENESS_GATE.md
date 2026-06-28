@@ -248,9 +248,71 @@ SDD/package can be approved, it must answer:
 
 ---
 
-## 10. Non-goals
+## 10. Prior art and adopted control patterns
 
-This PR does **not**:
+HLDspec is not inventing this discipline from scratch. The coverage ledger and
+completeness gate borrow proven control ideas from requirements engineering,
+architecture documentation, design review, and security analysis — adapted to
+be lightweight, repo-native, typed, and testable.
+
+| Pattern | Adopted as | Purpose |
+|---|---|---|
+| **Requirements traceability matrix** | `HldCoverageLedger` | Every HLD item maps to SDD coverage, decision, research/clarification status, and test/acceptance mapping. |
+| **Architecture viewpoints / concern coverage** | `SddSectionCoverageMap` | Completeness is not only section count. Relevant design views must be covered: context, components, interfaces, data, state/lifecycle, security, observability, deployment, error handling, verification. |
+| **Design rationale / ADR-style thinking** | `DESIGN_DECISION`, `ASSUMPTION`, `RESEARCH_EVIDENCE` fields in the ledger | Important design choices record context, options/tradeoffs, chosen decision, assumptions, and consequences — not just the conclusion. |
+| **Formal inspection** | Completeness gate + gate rules (§6) | Detect defects before downstream implementation depends on the SDD. The gate is deterministic and structural, not a prose review. |
+| **Threat-model-style skeptical taxonomy** | Compact defect classes (below) | Name the failure modes that make output *look* complete while silently dropping requirements, hiding assumptions, or failing to map design to verification. |
+| **RunSkeptic** | Adversarial inspection layer | RunSkeptic attacks the coverage ledger and completeness report; it does not replace them. |
+
+### Defect classes
+
+These are the *failure modes* this capability is designed to catch. They are a
+different axis from coverage statuses (§5) and gap severities
+(BLOCKER/WARNING/NOTE in the inquiry ledger). Coverage statuses track *what
+state an item is in*; defect classes name *what went wrong* when the output
+looks complete but isn't:
+
+| Class | Meaning |
+|---|---|
+| `MISSING` | HLD item has no SDD treatment and no explicit exclusion. |
+| `VAGUE` | SDD section exists but lacks actionable design decisions. |
+| `GUESS` | Design decision made without evidence or research. |
+| `UNLINKED` | SDD section has no HLD grounding (potential invention). |
+| `UNRESEARCHED` | Research-required item has no evidence. |
+| `UNSAFE` | Security, reliability, or operational concern not designed for. |
+| `INCONSISTENT` | SDD treatment contradicts HLD requirement or another SDD section. |
+| `UNTESTABLE` | Item lacks acceptance criteria or test mapping where required. |
+
+### The RunSkeptic triangle
+
+```text
+Ledger         = evidence structure (typed, deterministic)
+Gate           = completeness rules (structural, pass/fail)
+RunSkeptic     = adversarial review (judgment, attacks both)
+```
+
+RunSkeptic reviews the ledger and gate output — it is the adversarial layer,
+not a replacement for the deterministic evidence and rules.
+
+### Design principle
+
+> HLDspec must optimize against **plausible incompleteness**: output that looks
+> complete but silently drops requirements, hides assumptions, or fails to map
+> design to verification.
+
+### What we copy / what we avoid
+
+**Copy:** stable IDs, trace links, statuses, relevant design views, rationale,
+research evidence, impact awareness, inspection gates.
+
+**Avoid:** heavy ALM bureaucracy, giant filler templates, stale manual
+matrices, tool lock-in, and document appearance as success metric.
+
+---
+
+## 11. Non-goals
+
+This doc does **not**:
 
 - implement SDD generation;
 - implement the coverage ledger or its schema;
@@ -269,7 +331,7 @@ clear target.
 
 ---
 
-## 11. Recommended next slices
+## 12. Recommended next slices
 
 Future implementation work, in suggested order:
 
