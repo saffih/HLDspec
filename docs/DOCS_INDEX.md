@@ -33,6 +33,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`SMOKE_SCENARIOS.md`](SMOKE_SCENARIOS.md) | Deterministic smoke scenarios, commands, target layout, and PASS/FAIL output contract. |
 | [`REPO_LAYOUT.md`](REPO_LAYOUT.md) | Compact map of root files: active V2 source, shared parser, V1 pipeline, root docs, and the three test roots. |
 | [`PRODUCT_READINESS.md`](PRODUCT_READINESS.md) | Readiness scorecard: tiers, gates, current status, evidence, path-safety summary, and what independent RunSkeptic must verify. |
+| [`HLDSPEC_CURRENT_STATE_CHECKPOINT.md`](HLDSPEC_CURRENT_STATE_CHECKPOINT.md) | Current-state checkpoint after PR #53/#54: what is on main, what is not implemented, candidate next tracks. |
 
 ---
 
