@@ -292,3 +292,35 @@ journey and not a renumbering**: the product is still the three journeys above.
 Journey 0 surfaces evidence, gaps, conflicts, and required product decisions so
 Journey 1 can author/harden one authoritative HLD; it does not lift the
 brownfield-adoption restriction.
+
+---
+
+## 9. Current implementation path
+
+Concise summary of the current direction per journey. Each step is gated;
+later steps do not start until earlier steps pass review.
+
+**Journey 0 path** (pre-HLD brownfield on-ramp):
+
+```text
+docs / direction                           [DONE: JOURNEY0_BROWNFIELD_DISCOVERY.md]
+ → artifact contracts                      [DONE: journey0_artifact_contracts.py]
+ → draftability gate                       [DONE: journey0_draftability_gate.py]
+ → synthetic brownfield scenarios          [DONE: test_journey0_brownfield_scenarios.py]
+ → synthetic evidence collector            [DONE: journey0_synthetic_evidence_collector.py]
+ → filesystem fixture collector            [DONE: journey0_filesystem_fixture_collector.py]
+ → bounded repo intake contract            [future]
+ → real repo collector                     [future]
+ → Baton Flow proof (~/code/flow)          [future, read-only only]
+```
+
+**Journey 2 path** (SDD / package completeness):
+
+```text
+SDD completeness direction                 [DONE: JOURNEY2_SDD_COMPLETENESS_GATE.md]
+ → HLD coverage ledger contracts           [next]
+ → SDD completeness gate                   [future]
+ → synthetic HLD-to-SDD coverage scenarios [future]
+ → research ledger integration             [future]
+ → SDD generation / package integration    [future]
+```
