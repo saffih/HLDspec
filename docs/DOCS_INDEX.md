@@ -34,6 +34,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`REPO_LAYOUT.md`](REPO_LAYOUT.md) | Compact map of root files: active V2 source, shared parser, V1 pipeline, root docs, and the three test roots. |
 | [`PRODUCT_READINESS.md`](PRODUCT_READINESS.md) | Readiness scorecard: tiers, gates, current status, evidence, path-safety summary, and what independent RunSkeptic must verify. |
 | [`HLDSPEC_CURRENT_STATE_CHECKPOINT.md`](HLDSPEC_CURRENT_STATE_CHECKPOINT.md) | Current-state checkpoint after PR #53/#54: what is on main, what is not implemented, candidate next tracks. |
+| [`HLDSPEC_BROWNFIELD_CONTEXT_SAFETY_AND_GAP_LEDGER.md`](HLDSPEC_BROWNFIELD_CONTEXT_SAFETY_AND_GAP_LEDGER.md) | Cross-journey brownfield context-safety contract: mandatory Gap Ledger, worker decomposition, compact receipts, evidence maps, RunSkeptic reconciliation, authority boundary. Backed by `hldspec/context_safety_gap_contracts.py`. |
 
 ---
 
