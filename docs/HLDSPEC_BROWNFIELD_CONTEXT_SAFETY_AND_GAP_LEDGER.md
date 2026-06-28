@@ -81,8 +81,12 @@ classified into a specific type before build planning proceeds.
 ### Worker decomposition
 
 When available, large-evidence tasks require worker/subagent decomposition.
+Decomposition means multiple bounded workers (`min_worker_count`, default 2),
+not a single worker relabeled. A single receipt is not decomposition.
 Workers inspect bounded evidence and return compact receipts. The lead
-synthesizes from receipts, not raw full context.
+synthesizes from receipts, not raw full context. Self-served tickets (lead
+inspects evidence directly instead of dispatching a worker) are process
+coverage gaps, not style issues — they must be recorded.
 
 ### Compact receipts
 
@@ -95,7 +99,8 @@ exceed the lead context limit (`max_lead_context_bytes`, default 200,000).
 - An evidence map is required.
 - Evidence not inspected must be explicitly recorded (not omitted).
 - Owner-declared non-required evidence may be `SAFE_TO_DEFER` but must remain
-  recorded in `owner_declared_not_required`.
+  recorded in `owner_declared_not_required` and traceable — either referenced
+  in a gap item description or in RunSkeptic reconciliation notes.
 
 ### RunSkeptic reconciliation
 
@@ -152,8 +157,11 @@ A final plan is unsafe if:
 6. `NEEDS_OWNER` lacks `blocking=True` or `owner_decision_scope`.
 7. Worker receipts exceed compactness limits.
 8. Lead ingests too much raw context.
-9. RunSkeptic reconciliation is missing.
-10. Evidence not inspected is not recorded.
-11. Any authority grant is `True`.
+9. Fewer than `min_worker_count` workers when decomposition is required.
+10. Gap ledger is empty when required.
+11. RunSkeptic reconciliation is missing or failed.
+12. Evidence not inspected is not recorded.
+13. Owner-declared non-required evidence is not traceable.
+14. Any authority grant is `True`.
 
 See `tests_v2/test_context_safety_gap_contracts.py` for the executable version.

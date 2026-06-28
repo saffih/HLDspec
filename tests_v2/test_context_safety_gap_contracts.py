@@ -81,7 +81,7 @@ def _safe_verdict(
     if gaps is None:
         gaps = (_gap(),)
     if receipts is None:
-        receipts = (_receipt(),)
+        receipts = (_receipt(worker_id="W-A"), _receipt(worker_id="W-B"))
     if reconciliation is _UNSET:
         reconciliation = _reconciliation()
     if evidence_map is _UNSET:
@@ -124,10 +124,11 @@ class ContextSafetyGapContractTests(unittest.TestCase):
 
     # 5. Missing worker gap in final ledger is detected.
     def test_missing_worker_gap_detected(self) -> None:
-        receipt = _receipt(gaps=("G-1", "G-DROPPED"))
+        r_a = _receipt(worker_id="W-A", gaps=("G-1", "G-DROPPED"))
+        r_b = _receipt(worker_id="W-B", gaps=("G-1",))
         v = _safe_verdict(
             gaps=(_gap(gap_id="G-1"),),
-            receipts=(receipt,),
+            receipts=(r_a, r_b),
         )
         self.assertFalse(v.safe)
         self.assertTrue(
@@ -207,8 +208,9 @@ class ContextSafetyGapContractTests(unittest.TestCase):
 
     # 10. Oversized worker receipt is detected.
     def test_oversized_receipt_detected(self) -> None:
-        big = _receipt(raw_size_bytes=100_000)
-        v = _safe_verdict(receipts=(big,))
+        big = _receipt(worker_id="W-A", raw_size_bytes=100_000)
+        normal = _receipt(worker_id="W-B")
+        v = _safe_verdict(receipts=(big, normal))
         self.assertFalse(v.safe)
         self.assertTrue(
             any("compactness" in b for b in v.blockers),
@@ -224,8 +226,9 @@ class ContextSafetyGapContractTests(unittest.TestCase):
         )
 
         # Worker with None evidence_not_inspected → blocker
-        receipt_none = _receipt(evidence_not_inspected=None)
-        v_worker = _safe_verdict(receipts=(receipt_none,))
+        receipt_none = _receipt(worker_id="W-A", evidence_not_inspected=None)
+        receipt_ok = _receipt(worker_id="W-B")
+        v_worker = _safe_verdict(receipts=(receipt_none, receipt_ok))
         self.assertFalse(v_worker.safe)
         self.assertTrue(
             any("evidence_not_inspected" in b for b in v_worker.blockers),
@@ -234,7 +237,10 @@ class ContextSafetyGapContractTests(unittest.TestCase):
         # Empty tuple = recorded as empty → OK
         v_ok = _safe_verdict(
             evidence_map=_evidence_map(not_inspected=()),
-            receipts=(_receipt(evidence_not_inspected=()),),
+            receipts=(
+                _receipt(worker_id="W-A", evidence_not_inspected=()),
+                _receipt(worker_id="W-B", evidence_not_inspected=()),
+            ),
         )
         self.assertTrue(v_ok.safe)
 
@@ -252,15 +258,18 @@ class ContextSafetyGapContractTests(unittest.TestCase):
             gap_id="G-OLD-DOC",
             gap_type=csg.GapType.PRODUCT_GAP,
             status=csg.GapStatus.SAFE_TO_DEFER,
-            description="313KB Devin doc owner-declared non-required",
+            description="313KB Devin doc old_devin_313k.md owner-declared non-required",
         )
-        receipt = _receipt(gaps=("G-OLD-DOC",))
+        r_a = _receipt(worker_id="W-A", gaps=("G-OLD-DOC",))
+        r_b = _receipt(worker_id="W-B", gaps=("G-OLD-DOC",))
         emap = csg.EvidenceMap(
             inspected=("HLD.md",),
             not_inspected=("skipped.md",),
             owner_declared_not_required=("old_devin_313k.md",),
         )
-        v = _safe_verdict(gaps=(gap,), receipts=(receipt,), evidence_map=emap)
+        v = _safe_verdict(
+            gaps=(gap,), receipts=(r_a, r_b), evidence_map=emap,
+        )
         self.assertTrue(v.safe)
         self.assertIn("old_devin_313k.md", emap.owner_declared_not_required)
 
@@ -300,12 +309,12 @@ class ContextSafetyGapContractTests(unittest.TestCase):
                 f"Contract module source contains forbidden token: {token}",
             )
 
-    # 16. Worker decomposition required but no receipts.
-    def test_worker_decomposition_required(self) -> None:
+    # 16. Worker decomposition requires min_worker_count (default 2).
+    def test_worker_decomposition_requires_min_count(self) -> None:
         v = _safe_verdict(receipts=())
         self.assertFalse(v.safe)
         self.assertTrue(
-            any("Worker decomposition" in b for b in v.blockers),
+            any("at least 2" in b for b in v.blockers),
         )
 
         v_ok = _safe_verdict(
@@ -313,6 +322,22 @@ class ContextSafetyGapContractTests(unittest.TestCase):
             rules=csg.ContextSafetyRules(require_worker_decomposition=False),
         )
         self.assertTrue(v_ok.safe)
+
+    # 16b. One worker receipt is insufficient when decomposition is required.
+    def test_single_worker_insufficient_for_decomposition(self) -> None:
+        v = _safe_verdict(receipts=(_receipt(),))
+        self.assertFalse(v.safe)
+        self.assertTrue(
+            any("at least 2" in b and "got 1" in b for b in v.blockers),
+        )
+
+    # 16c. Two worker receipts pass when all gaps are covered.
+    def test_two_workers_satisfy_decomposition(self) -> None:
+        r_a = _receipt(worker_id="W-A", gaps=("G-1",))
+        r_b = _receipt(worker_id="W-B", gaps=("G-2",))
+        gaps = (_gap(gap_id="G-1"), _gap(gap_id="G-2"))
+        v = _safe_verdict(gaps=gaps, receipts=(r_a, r_b))
+        self.assertTrue(v.safe)
 
     # 17. Empty gap ledger is rejected when required.
     def test_empty_gap_ledger_rejected(self) -> None:
@@ -333,6 +358,38 @@ class ContextSafetyGapContractTests(unittest.TestCase):
         self.assertTrue(
             any("reconciliation failed" in b.lower() for b in v.blockers),
         )
+
+    # 19. Owner-declared non-required evidence must be traceable.
+    def test_owner_declared_evidence_traceable(self) -> None:
+        # Not referenced in ledger or reconciliation → blocker
+        emap = csg.EvidenceMap(
+            inspected=("HLD.md",),
+            not_inspected=("skipped.md",),
+            owner_declared_not_required=("old_devin_313k.md",),
+        )
+        v = _safe_verdict(evidence_map=emap)
+        self.assertFalse(v.safe)
+        self.assertTrue(
+            any("old_devin_313k.md" in b and "not traceable" in b
+                for b in v.blockers),
+        )
+
+        # Referenced in gap description → OK
+        gap_traced = _gap(
+            description="313KB doc old_devin_313k.md owner-declared non-required",
+        )
+        v_ledger = _safe_verdict(gaps=(gap_traced,), evidence_map=emap)
+        self.assertTrue(v_ledger.safe)
+
+        # Referenced in reconciliation notes → OK
+        recon_traced = csg.RunSkepticGapReconciliation(
+            reconciled=True,
+            notes="old_devin_313k.md owner-declared non-required, recorded",
+        )
+        v_recon = _safe_verdict(
+            reconciliation=recon_traced, evidence_map=emap,
+        )
+        self.assertTrue(v_recon.safe)
 
     # -- Additional edge cases from Baton calibration --
 

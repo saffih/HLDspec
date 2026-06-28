@@ -109,6 +109,7 @@ class RunSkepticGapReconciliation:
 class ContextSafetyRules:
     max_worker_receipt_bytes: int = 50_000
     max_lead_context_bytes: int = 200_000
+    min_worker_count: int = 2
     require_worker_decomposition: bool = True
     require_evidence_map: bool = True
     require_gap_ledger: bool = True
@@ -212,11 +213,13 @@ def gap_ledger_blockers(
     for gap_id in sorted(all_worker_gaps - ledger_gap_ids):
         blockers.append(f"Worker gap {gap_id} missing from final ledger")
 
-    # Worker decomposition required
-    if rules.require_worker_decomposition and not worker_receipts:
-        blockers.append(
-            "Worker decomposition is required but no worker receipts provided"
-        )
+    # Worker decomposition requires multiple bounded workers
+    if rules.require_worker_decomposition:
+        if len(worker_receipts) < rules.min_worker_count:
+            blockers.append(
+                f"Worker decomposition requires at least {rules.min_worker_count} "
+                f"workers but got {len(worker_receipts)}"
+            )
 
     # Gap ledger must not be empty
     if rules.require_gap_ledger and not ledger.gaps:
@@ -242,6 +245,20 @@ def gap_ledger_blockers(
         blockers.append(
             "Evidence not inspected must be recorded in evidence map"
         )
+
+    # Owner-declared non-required evidence must be traceable
+    if evidence_map is not None and evidence_map.owner_declared_not_required:
+        recon_notes = reconciliation.notes if reconciliation is not None else ""
+        for item in evidence_map.owner_declared_not_required:
+            in_ledger = any(
+                item in g.description for g in ledger.gaps
+            )
+            in_recon = item in recon_notes
+            if not in_ledger and not in_recon:
+                blockers.append(
+                    f"Owner-declared non-required evidence '{item}' is not "
+                    f"traceable in gap ledger or reconciliation notes"
+                )
 
     # Worker receipt compactness
     for receipt in worker_receipts:
