@@ -300,6 +300,40 @@ class ContextSafetyGapContractTests(unittest.TestCase):
                 f"Contract module source contains forbidden token: {token}",
             )
 
+    # 16. Worker decomposition required but no receipts.
+    def test_worker_decomposition_required(self) -> None:
+        v = _safe_verdict(receipts=())
+        self.assertFalse(v.safe)
+        self.assertTrue(
+            any("Worker decomposition" in b for b in v.blockers),
+        )
+
+        v_ok = _safe_verdict(
+            receipts=(),
+            rules=csg.ContextSafetyRules(require_worker_decomposition=False),
+        )
+        self.assertTrue(v_ok.safe)
+
+    # 17. Empty gap ledger is rejected when required.
+    def test_empty_gap_ledger_rejected(self) -> None:
+        v = _safe_verdict(gaps=(), receipts=(_receipt(gaps=()),))
+        self.assertFalse(v.safe)
+        self.assertTrue(
+            any("ledger is required but empty" in b for b in v.blockers),
+        )
+
+    # 18. RunSkeptic reconciliation with reconciled=False blocks.
+    def test_skeptic_reconciliation_failed_blocks(self) -> None:
+        v = _safe_verdict(
+            reconciliation=csg.RunSkepticGapReconciliation(
+                reconciled=False, notes="gaps not covered",
+            ),
+        )
+        self.assertFalse(v.safe)
+        self.assertTrue(
+            any("reconciliation failed" in b.lower() for b in v.blockers),
+        )
+
     # -- Additional edge cases from Baton calibration --
 
     def test_lead_context_limit(self) -> None:

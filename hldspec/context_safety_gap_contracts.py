@@ -212,11 +212,26 @@ def gap_ledger_blockers(
     for gap_id in sorted(all_worker_gaps - ledger_gap_ids):
         blockers.append(f"Worker gap {gap_id} missing from final ledger")
 
-    # RunSkeptic reconciliation required
-    if rules.require_skeptic_reconciliation and reconciliation is None:
+    # Worker decomposition required
+    if rules.require_worker_decomposition and not worker_receipts:
         blockers.append(
-            "RunSkeptic reconciliation is required before final verdict"
+            "Worker decomposition is required but no worker receipts provided"
         )
+
+    # Gap ledger must not be empty
+    if rules.require_gap_ledger and not ledger.gaps:
+        blockers.append("Gap ledger is required but empty")
+
+    # RunSkeptic reconciliation required and must have passed
+    if rules.require_skeptic_reconciliation:
+        if reconciliation is None:
+            blockers.append(
+                "RunSkeptic reconciliation is required before final verdict"
+            )
+        elif not reconciliation.reconciled:
+            blockers.append(
+                "RunSkeptic reconciliation failed"
+            )
 
     # Evidence map required
     if rules.require_evidence_map and evidence_map is None:
