@@ -32,8 +32,8 @@ Consultant / human approval).** Everything else is either Journey 1 or not yet w
 
 | Artifact concept | Module | Test file | State |
 |---|---|---|---|
-| **HLD Coverage Ledger items** (item types, coverage statuses, risk levels) | `hldspec/journey2_hld_coverage_contracts.py` | `tests_v2/test_journey2_hld_coverage_contracts.py` | Contract + validation helpers only. Pure functions. **No producer, no pipeline caller.** |
-| **HLD Requirement Inventory** (list of HLD items with stable IDs) | `hldspec/journey2_hld_coverage_contracts.py::validate_requirement_inventory` | `tests_v2/test_journey2_hld_coverage_contracts.py` | Validator only. **No producer.** |
+| **HLD Coverage Ledger items** (item types, coverage statuses, risk levels) | `hldspec/journey2_hld_coverage_contracts.py`; producer in `hldspec/hld_source_package.py::build_initial_hld_coverage_ledger` | `tests_v2/test_journey2_hld_coverage_contracts.py`; `tests_v2/test_source_package.py` | Contract + validation helpers exist. **Producer emits `hld_coverage_ledger.json`; no gate caller yet.** |
+| **HLD Requirement Inventory** (list of HLD items with stable IDs) | `hldspec/journey2_hld_coverage_contracts.py::validate_requirement_inventory` | `tests_v2/test_journey2_hld_coverage_contracts.py` | Validator only. Initial producer emits one coverage-ledger item per executable HLD anchor; no separate inventory artifact yet. |
 | **SDD Completeness Report** | `hldspec/journey2_hld_coverage_contracts.py::build_completeness_report` | `tests_v2/test_journey2_hld_coverage_contracts.py` | Builder exists but **called only from tests**. Not wired into any gate or pipeline. |
 | **SDD Section Coverage Map** (reverse: SDD→HLD) | `hldspec/journey2_hld_coverage_contracts.py::build_sdd_section_coverage_map` | `tests_v2/test_journey2_hld_coverage_contracts.py` | Pure function, tests-only caller. |
 | **Context Safety Gap Ledger** (worker receipts, gap items, evidence map) | `hldspec/context_safety_gap_contracts.py` | `tests_v2/test_context_safety_gap_contracts.py` | Pure validation. Brownfield-decomposition flavor. **No pipeline caller outside tests.** |
@@ -51,7 +51,7 @@ source inventory is distributed across live source-package artifacts:
 | `hld_reference_map.json` | **Live** — HLD anchors, heading/title, role/risk/status, line range, and hashes. |
 | `source_manifest.json` / `source_package.json` | **Live** — package metadata, binding fields, and file hashes. |
 | `speckit_single_spec_input.md` | **Live** — SDD input surface; requirements cite `(HLD-NNN)` anchors. |
-| HLD Requirement Inventory | **Contract-only** — validator exists in `journey2_hld_coverage_contracts.py`, but no producer emits it from the source package yet. |
+| HLD Requirement Inventory | **Contract-only as a standalone artifact** — validator exists in `journey2_hld_coverage_contracts.py`; `hld_coverage_ledger.json` now emits one initial row per executable HLD anchor. |
 
 ### Docs-only (contracted but no code)
 
@@ -105,7 +105,7 @@ These block **today** via live pipeline callers:
 
 | Blocker | Where defined | Why not enforceable |
 |---|---|---|
-| **HLD item NOT_COVERED** | `journey2_hld_coverage_contracts.py::BLOCKING_STATUSES` | No producer populates the coverage ledger. `build_completeness_report` is called only from tests. Not wired into `SOURCE_PACKAGE_APPROVAL_GATE`. |
+| **HLD item NOT_COVERED** | `journey2_hld_coverage_contracts.py::BLOCKING_STATUSES` | Producer populates `hld_coverage_ledger.json`, but `build_completeness_report` is still called only from tests. Not wired into `SOURCE_PACKAGE_APPROVAL_GATE`. |
 | **NEEDS_CLARIFICATION without inquiry entry** | `JOURNEY2_SDD_COMPLETENESS_GATE.md` §6 | Inquiry ledger does not exist in code (P1-013). |
 | **RESEARCH_REQUIRED without evidence** | `JOURNEY2_SDD_COMPLETENESS_GATE.md` §6–§7 | Research ledger does not exist. |
 | **BLOCKED_BY_PRODUCT_DECISION unresolved** | `journey2_hld_coverage_contracts.py` | Defined as status; no producer or gate wiring. |
@@ -126,7 +126,7 @@ has validators, `build_completeness_report`, all 14 item types and 6 statuses,
 with full test coverage). The `JOURNEY2_SDD_COMPLETENESS_GATE.md` §12 item 1
 ("add coverage ledger contracts") is **already complete**.
 
-**Smallest next implementation slice:** Produce a coverage ledger from the HLD
+**Current implementation slice:** Produce a coverage ledger from the HLD
 reference map during source-package build.
 
 Concretely:
@@ -146,9 +146,10 @@ Concretely:
 This generates an initial coverage ledger where every HLD anchor gets an entry
 with status `NOT_COVERED` (or `COVERED_IN_SDD` if the spec input cites it).
 
-The follow-on slice can then wire `build_completeness_report` into
-`SOURCE_PACKAGE_APPROVAL_GATE` as an ACTION/BLOCKED enrichment. Without the
-producer slice first, gate wiring has no live data to check.
+**Smallest next implementation slice after the producer lands:** wire
+`build_completeness_report` into
+`SOURCE_PACKAGE_APPROVAL_GATE` as an ACTION/BLOCKED enrichment, using the live
+`hld_coverage_ledger.json` emitted by source-package build.
 
 ---
 

@@ -25,7 +25,13 @@ import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import agent_handoff_pack, control_paths, helper_registry, journey2_architecture_package
+from . import (
+    agent_handoff_pack,
+    control_paths,
+    helper_registry,
+    journey2_architecture_package,
+    journey2_hld_coverage_contracts,
+)
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
 from .workspace_adapter import TargetWorkspaceAdapter
@@ -74,6 +80,10 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     # Emitted as an honest ACTION typed slot until a human authors its fields
     # (see journey2_architecture_package.build_architecture_package).
     "architecture_package": "architecture_package.json",
+    # Journey 2 SDD-completeness producer seam. Hashed for drift and consumed by
+    # future gate wiring, but not mirrored into SpecKit runner context and not
+    # required for legacy package validation.
+    "hld_coverage_ledger": "hld_coverage_ledger.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -92,6 +102,8 @@ _MIRROR_EXCLUDED: frozenset[str] = frozenset({
     AUTHORITATIVE_FILES["helper_recommendations"],
     # J2 architecture-design slot — advisory, not SpecKit runner content.
     AUTHORITATIVE_FILES["architecture_package"],
+    # J2 completeness evidence — future gate input, not SpecKit runner content.
+    AUTHORITATIVE_FILES["hld_coverage_ledger"],
 })
 
 # The subset materialised into .specify/source/ for the runner. The constitution
@@ -451,6 +463,48 @@ def build_helper_recommendations(registry: dict | None = None) -> dict:
     }
 
 
+def build_initial_hld_coverage_ledger(
+    ref_map: dict,
+    spec_input_text: str,
+) -> list[dict]:
+    """Build the first live Journey 2 coverage ledger from package artifacts.
+
+    This is a producer only. It records source-package coverage evidence for a
+    future gate, but it does not approve or block anything itself.
+    """
+    anchors = ref_map.get("anchors", {}) if isinstance(ref_map, dict) else {}
+    ledger: list[dict] = []
+    for anchor_id in sorted(anchors):
+        meta = anchors.get(anchor_id) or {}
+        cited = f"({anchor_id})" in spec_input_text
+        risk = str(meta.get("risk") or "").upper() or None
+        if risk not in journey2_hld_coverage_contracts.VALID_RISK_LEVELS:
+            risk = None
+        item = {
+            "hld_item_id": anchor_id,
+            "source_section": anchor_id,
+            "source_text": str(meta.get("title") or meta.get("heading") or anchor_id),
+            "item_type": journey2_hld_coverage_contracts.ITEM_REQUIREMENT,
+            "status": (
+                journey2_hld_coverage_contracts.STATUS_COVERED_IN_SDD
+                if cited
+                else journey2_hld_coverage_contracts.STATUS_NOT_COVERED
+            ),
+            "sdd_section": "speckit_single_spec_input.md" if cited else None,
+            "design_decision": None,
+            "research_required": False,
+            "research_evidence": None,
+            "clarification_required": False,
+            "assumption": None,
+            "acceptance_criteria": None,
+            "test_mapping": None,
+            "risk": risk,
+        }
+        journey2_hld_coverage_contracts.validate_coverage_item(item)
+        ledger.append(item)
+    return ledger
+
+
 def build_source_package_content(
     target_root: Path,
     hld_text: str,
@@ -487,6 +541,11 @@ def build_source_package_content(
 
     spec_input = single_spec_input.build_single_spec_input(hld_text, project_name=project_name)
     (source_dir / AUTHORITATIVE_FILES["single_spec_input"]).write_text(spec_input, encoding="utf-8")
+
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["hld_coverage_ledger"],
+        build_initial_hld_coverage_ledger(ref_map, spec_input),
+    )
 
     for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
         (source_dir / filename).write_text(content, encoding="utf-8")

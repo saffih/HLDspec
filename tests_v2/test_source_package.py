@@ -1,9 +1,12 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from hldspec import gate_validator as gv
 from hldspec import hld_source_package as sp
 from hldspec import helper_registry as hr
+from hldspec import journey2_hld_coverage_contracts as cov
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
@@ -62,6 +65,19 @@ class SourcePackageContractTests(unittest.TestCase):
     def test_architecture_package_not_in_mirror_files(self):
         # J2 design-reasoning — must not be mirrored into .specify/source/ for the SpecKit runner.
         self.assertNotIn(sp.AUTHORITATIVE_FILES["architecture_package"], sp.MIRROR_FILES)
+
+    def test_hld_coverage_ledger_in_authoritative_files(self):
+        self.assertIn("hld_coverage_ledger", sp.AUTHORITATIVE_FILES)
+        self.assertEqual("hld_coverage_ledger.json", sp.AUTHORITATIVE_FILES["hld_coverage_ledger"])
+
+    def test_hld_coverage_ledger_not_required_yet(self):
+        # Producer-only slice: future gates consume the ledger, but existing
+        # package validation must not fail legacy or seeded packages without it.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["hld_coverage_ledger"], sp.REQUIRED_FILES)
+
+    def test_hld_coverage_ledger_not_mirrored(self):
+        # Journey 2 completeness evidence, not SpecKit runner context.
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["hld_coverage_ledger"], sp.MIRROR_FILES)
 
     def test_manifest_excludes_itself(self):
         # The manifest must not try to hash source_manifest.json/source_package.json.
@@ -260,6 +276,116 @@ class SourcePackageBuildTests(unittest.TestCase):
         self.assertIsNotNone(manifest["architecture_package"]["sha256"])
         mirror_art = self.mirror_dir / sp.AUTHORITATIVE_FILES["architecture_package"]
         self.assertFalse(mirror_art.exists(), msg="architecture_package.json must not be mirrored")
+
+    def test_build_emits_hld_coverage_ledger_from_reference_map_and_spec_input(self):
+        import json
+
+        hld_text = """# HLD
+
+## HLD-001 - Covered
+
+HLD-ID: HLD-001
+HLD-ROLE: api
+HLD-STATUS: active
+HLD-RISK: HIGH
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+HLD-VERIFY: covered behavior is testable
+
+Covered behavior.
+
+## HLD-002 - Uncovered
+
+HLD-ID: HLD-002
+HLD-ROLE: operations
+HLD-STATUS: active
+HLD-RISK: LOW
+HLD-SPECS: TBD
+HLD-RESOURCES: TBD
+
+Uncovered behavior.
+"""
+        spec_input = "# Single SpecKit Input\n\n## Requirements\n\n- (HLD-001) Covered behavior.\n"
+
+        with patch("hldspec.single_spec_input.build_single_spec_input", return_value=spec_input):
+            build = sp.build_source_package_content(
+                self.root,
+                hld_text,
+                hld_source_ref=str(self.root / "SourceHLD.md"),
+                layout="new",
+            )
+
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+        ledger_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        cov.validate_coverage_ledger(ledger)
+
+        self.assertEqual(["HLD-001", "HLD-002"], [item["hld_item_id"] for item in ledger])
+        by_id = {item["hld_item_id"]: item for item in ledger}
+        self.assertEqual(cov.STATUS_COVERED_IN_SDD, by_id["HLD-001"]["status"])
+        self.assertEqual("speckit_single_spec_input.md", by_id["HLD-001"]["sdd_section"])
+        self.assertEqual(cov.RISK_HIGH, by_id["HLD-001"]["risk"])
+        self.assertEqual(cov.STATUS_NOT_COVERED, by_id["HLD-002"]["status"])
+        self.assertIsNone(by_id["HLD-002"]["sdd_section"])
+        self.assertEqual(cov.RISK_LOW, by_id["HLD-002"]["risk"])
+
+    def test_hld_coverage_ledger_is_deterministic(self):
+        ref_map = {
+            "anchors": {
+                "HLD-002": {"title": "Second", "risk": "LOW"},
+                "HLD-001": {"title": "First", "risk": "HIGH"},
+            }
+        }
+        spec_input = "- (HLD-001) First\n"
+
+        first = sp.build_initial_hld_coverage_ledger(ref_map, spec_input)
+        second = sp.build_initial_hld_coverage_ledger(ref_map, spec_input)
+
+        self.assertEqual(first, second)
+        self.assertEqual(["HLD-001", "HLD-002"], [item["hld_item_id"] for item in first])
+
+    def test_manifest_tracks_hld_coverage_ledger(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+
+        manifest_data = json.loads((self.source_dir / sp.SOURCE_MANIFEST_FILE).read_text(encoding="utf-8"))
+        entry = manifest_data["files"].get("hld_coverage_ledger")
+        self.assertIsNotNone(entry, "manifest must include hld_coverage_ledger entry")
+        self.assertTrue(entry["present"])
+        self.assertIsNotNone(entry["sha256"])
+
+    def test_existing_validation_still_passes_without_hld_coverage_ledger(self):
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+
+        result = sp.validate_source_package(self.source_dir)
+
+        self.assertTrue(
+            result.ok,
+            msg=f"validation must not require producer-only hld_coverage_ledger: "
+            f"{result.missing} {result.hash_mismatches}",
+        )
+
+    def test_hld_coverage_ledger_does_not_change_gate_behavior(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+
+        self.assertFalse(result.passed)
+        self.assertFalse(any("coverage" in blocker.lower() for blocker in result.blockers))
 
 
 class SpecifyMirrorTests(unittest.TestCase):
