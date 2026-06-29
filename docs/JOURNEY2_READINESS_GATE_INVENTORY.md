@@ -41,6 +41,18 @@ Consultant / human approval).** Everything else is either Journey 1 or not yet w
 | **Source package manifest + metadata** | `hldspec/hld_source_package.py` | `tests_v2/test_source_package.py` | **Live** — written and validated during build + Journey 3 driver. |
 | **Helper recommendations** | `hldspec/hld_source_package.py::build_helper_recommendations` | `tests_v2/test_source_package.py` | **Live** — emitted during build, manifest-hashed, excluded from mirror/required. |
 
+### Source inventory
+
+There is no standalone artifact named `source_inventory` today. The current
+source inventory is distributed across live source-package artifacts:
+
+| Inventory surface | Current state |
+|---|---|
+| `hld_reference_map.json` | **Live** — HLD anchors, heading/title, role/risk/status, line range, and hashes. |
+| `source_manifest.json` / `source_package.json` | **Live** — package metadata, binding fields, and file hashes. |
+| `speckit_single_spec_input.md` | **Live** — SDD input surface; requirements cite `(HLD-NNN)` anchors. |
+| HLD Requirement Inventory | **Contract-only** — validator exists in `journey2_hld_coverage_contracts.py`, but no producer emits it from the source package yet. |
+
 ### Docs-only (contracted but no code)
 
 | Artifact concept | Contract doc | Notes |
@@ -50,6 +62,13 @@ Consultant / human approval).** Everything else is either Journey 1 or not yet w
 | **Lens registry** | `docs/JOURNEY2_INQUIRY_LEDGER_CONTRACT.md` | Inquiry frames (DOMAIN/ARCHITECTURE/QUALITY/TOOL_HELPER). Backlog P1-013, Slice A. |
 | **`open_questions.md`**, **`answered_assumptions.md`**, **`test_strategy.md`** | `docs/JOURNEY2_INQUIRY_LEDGER_CONTRACT.md` | Advisory views rendered from ledger. Backlog P1-013, Slice D. |
 | **Research Ledger** | `docs/JOURNEY2_SDD_COMPLETENESS_GATE.md` §4 | Research obligations tracking. No backlog slice yet. |
+
+### Assumptions and conflicts
+
+| Concept | Current state |
+|---|---|
+| **Assumptions** | Represented in docs-only inquiry artifacts (`answered_assumptions.md`) and contract fields such as coverage-ledger `assumption`; no live producer or gate wiring. |
+| **Conflicts** | Enforceable only where already represented by live fields (`RunSkeptic CONFLICT`, source-package split-brain, spec-build quality conflicts). Gap-ledger `CONFLICT` is validated in tests but not wired. |
 
 ### RunSkeptic receipt
 
@@ -107,31 +126,29 @@ has validators, `build_completeness_report`, all 14 item types and 6 statuses,
 with full test coverage). The `JOURNEY2_SDD_COMPLETENESS_GATE.md` §12 item 1
 ("add coverage ledger contracts") is **already complete**.
 
-**Smallest undone slice:** Wire `build_completeness_report` into
-`SOURCE_PACKAGE_APPROVAL_GATE` as an ACTION/BLOCKED enrichment.
+**Smallest next implementation slice:** Produce a coverage ledger from the HLD
+reference map during source-package build.
 
 Concretely:
 
-1. Add a `coverage_report` field to `GateContext` (or a parallel coverage check
-   alongside `validate_gate`).
-2. When a coverage ledger is present in the source package, call
-   `build_completeness_report` and surface:
-   - `NOT_COVERED` items → blocker (BLOCKED)
-   - incomplete items → action (ACTION)
-3. When no coverage ledger is present, skip (no regression — current behavior).
-4. Tests: synthetic fixture with known NOT_COVERED items → gate blocks.
-5. Update `session_control.py` preflight to pass coverage data into the gate
-   context.
-
-**Prerequisites:** A producer that populates the coverage ledger from the HLD
-reference map during `build_source_package_content`. Without a producer, the
-wiring has nothing to check. So the practical first slice is:
+1. Extend `build_source_package_content` to emit an initial coverage ledger from
+   `hld_reference_map.json`.
+2. For each HLD anchor, create one requirement-inventory / coverage-ledger entry.
+3. Mark entries conservatively:
+   - `COVERED_IN_SDD` only when the generated SDD/spec input cites the anchor.
+   - `NOT_COVERED` otherwise.
+4. Register the emitted artifact in source-package manifest/hash validation.
+5. Tests: source package with two anchors, one cited and one uncited, produces a
+   deterministic coverage ledger without changing gate behavior yet.
 
 > `feat(journey2): produce coverage ledger from HLD reference map during source-package build`
 
 This generates an initial coverage ledger where every HLD anchor gets an entry
 with status `NOT_COVERED` (or `COVERED_IN_SDD` if the spec input cites it).
-The wiring slice then has real data to gate on.
+
+The follow-on slice can then wire `build_completeness_report` into
+`SOURCE_PACKAGE_APPROVAL_GATE` as an ACTION/BLOCKED enrichment. Without the
+producer slice first, gate wiring has no live data to check.
 
 ---
 
