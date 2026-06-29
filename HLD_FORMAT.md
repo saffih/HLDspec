@@ -31,6 +31,33 @@ HLD-VERIFY: related specs preserve HLD anchors; feature graph includes dependenc
 ...
 ```
 
+## Grammar and column-0 rules
+
+Canonical HLD map generation recognizes only executable `HLD-NNN` section anchors:
+
+```md
+## HLD-009 - Title
+HLD-ID: HLD-009
+```
+
+Headings and metadata declarations must start at column 0. Metadata keys are
+exact, known `HLD-*` fields such as `HLD-ID`, `HLD-ROLE`, and `HLD-VERIFY`.
+
+These are not metadata declarations:
+
+```md
+- HLD-009: prose or a reference-list item
+  HLD-ID: indented prose or malformed metadata
+text HLD-ID: prose
+```
+
+Column-0 `HLD-*:` lines with unknown keys, such as `HLD-009:` or
+`HLD-ABC-009:`, are malformed metadata-like declarations and must be surfaced as
+validation errors instead of silently becoming accepted facts. Letter-suffixed
+or descriptive proposal labels may appear in planning notes, but they must be
+renumbered to executable `HLD-NNN` anchors before HLD map/source-package
+generation.
+
 ## Required metadata fields
 
 | Field | Required | Meaning |
@@ -119,6 +146,8 @@ The generated map should store calculated line ranges.
 
 The HLD format is valid only if:
 
+- Major section headings and metadata declarations start at column 0.
+- Column-0 `HLD-*:` metadata declarations use known metadata keys.
 - Every major section heading has a stable `HLD-xxx` ID.
 - Every section has exactly one `HLD-ID` line.
 - Heading ID and `HLD-ID` value match.

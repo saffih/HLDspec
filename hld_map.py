@@ -222,6 +222,15 @@ def validate_hld_map(hld_map: HldMap, *, lines: list[str], fence_mask: list[bool
             if not entries:
                 errors.append(f"{section.id}: missing {key}")
 
+        for idx in range(section.line_start, section.line_end + 1):
+            if fence_mask[idx - 1]:
+                continue
+            metadata_match = METADATA_RE.match(lines[idx - 1])
+            if metadata_match and metadata_match.group("key") not in KNOWN_METADATA:
+                errors.append(
+                    f"{section.id}: unknown HLD metadata key {metadata_match.group('key')} at line {idx}"
+                )
+
         if section.metadata_value("HLD-RISK").upper() == "HIGH" and not section.metadata_value("HLD-VERIFY"):
             errors.append(f"{section.id}: HIGH risk section missing HLD-VERIFY")
 

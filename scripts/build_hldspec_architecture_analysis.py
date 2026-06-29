@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import hld_map
 from hldspec.hld_canonical_line import EXCLUDED_SCOPES, parse_canonical_line
 from hldspec.script_io import load_json_dict, select_sync_dir, write_json_dict
 
@@ -67,9 +67,9 @@ def find_hld(workspace: Path, explicit_hld: str = "") -> Path:
 def parse_metadata(lines: list[str]) -> dict[str, str]:
     meta: dict[str, str] = {}
     for line in lines:
-        m = re.match(r"^\s*(HLD-[A-Z0-9_-]+)\s*:\s*(.*)\s*$", line)
-        if m:
-            meta[m.group(1).upper()] = m.group(2).strip()
+        m = hld_map.METADATA_RE.match(line)
+        if m and m.group("key") in hld_map.KNOWN_METADATA:
+            meta[m.group("key")] = m.group("value").strip()
     return meta
 
 
@@ -80,9 +80,9 @@ def parse_sections(hld_path: Path) -> list[dict[str, Any]]:
     lines = text.splitlines()
     starts: list[tuple[int, str, str]] = []
     for idx, line in enumerate(lines):
-        m = re.match(r"^##\s+(HLD-[0-9A-Za-z_-]+)\s*-\s*(.+?)\s*$", line)
+        m = hld_map.SECTION_HEADING_RE.match(line)
         if m:
-            starts.append((idx, m.group(1).strip(), m.group(2).strip()))
+            starts.append((idx, m.group("id").strip(), m.group("title").strip()))
 
     sections: list[dict[str, Any]] = []
     for i, (start, hld_id, title) in enumerate(starts):
