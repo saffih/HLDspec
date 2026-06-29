@@ -97,6 +97,8 @@ def collect_open_questions(target: Path) -> list[str]:
                 data = json_read(path)
             except Exception:
                 continue
+            if not isinstance(data, dict):
+                continue
             checkpoint = data.get("human_checkpoint")
             if isinstance(checkpoint, dict):
                 decision = str(checkpoint.get("human_decision", checkpoint.get("decision", "TBD"))).strip().upper()
