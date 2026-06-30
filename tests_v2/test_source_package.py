@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hldspec import gate_validator as gv
+from hldspec import hld_coverage_scope as hcs
 from hldspec import hld_source_package as sp
 from hldspec import helper_registry as hr
 from hldspec import journey2_hld_coverage_contracts as cov
@@ -512,6 +513,146 @@ Uncovered behavior.
         result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
         self.assertFalse(result.passed)
         self.assertFalse(any("backlog" in blocker.lower() for blocker in result.blockers))
+
+
+class HldCoverageScopeContractTests(unittest.TestCase):
+    def test_hld_coverage_scope_in_authoritative_files(self):
+        self.assertIn("hld_coverage_scope", sp.AUTHORITATIVE_FILES)
+        self.assertEqual("hld_coverage_scope.json", sp.AUTHORITATIVE_FILES["hld_coverage_scope"])
+
+    def test_hld_coverage_scope_not_in_required_files(self):
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["hld_coverage_scope"], sp.REQUIRED_FILES)
+
+    def test_hld_coverage_scope_not_in_mirror_files(self):
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["hld_coverage_scope"], sp.MIRROR_FILES)
+
+
+class HldCoverageScopeEmissionTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_build_emits_hld_coverage_scope(self):
+        import json
+
+        hld_text = "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n"
+        build = sp.build_source_package_content(
+            self.root,
+            hld_text,
+            hld_source_ref=str(self.root / "SourceHLD.md"),
+            layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        self.assertTrue(scope_path.is_file(), msg="hld_coverage_scope.json must be emitted by the builder")
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+
+        result = hcs.validate_hld_coverage_scope(scope)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_emitted_coverage_scope_is_full_hld(self):
+        import json
+
+        build = sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["coverage_scope"], "FULL_HLD")
+
+    def test_emitted_active_spec_id_is_none(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertIsNone(scope["active_spec_id"])
+
+    def test_emitted_sidecar_does_not_change_ledger_shape(self):
+        import json
+
+        hld_text = "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n"
+        sp.build_source_package_content(
+            self.root,
+            hld_text,
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        self.assertIsInstance(ledger, list)
+        cov.validate_coverage_ledger(ledger)
+
+    def test_hld_coverage_scope_not_in_mirror(self):
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        mirror_scope = self.mirror_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        self.assertFalse(
+            mirror_scope.exists(),
+            "hld_coverage_scope.json must not appear in the SpecKit runner mirror",
+        )
+
+    def test_manifest_tracks_hld_coverage_scope(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        manifest_data = json.loads(
+            (self.source_dir / sp.SOURCE_MANIFEST_FILE).read_text(encoding="utf-8")
+        )
+        entry = manifest_data["files"].get("hld_coverage_scope")
+        self.assertIsNotNone(entry, "manifest must include hld_coverage_scope entry")
+        self.assertTrue(entry["present"])
+        self.assertIsNotNone(entry["sha256"])
+
+    def test_existing_validation_still_passes_without_hld_coverage_scope(self):
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(
+            result.ok,
+            msg=f"validation must not require advisory hld_coverage_scope: "
+            f"{result.missing} {result.hash_mismatches}",
+        )
+
+    def test_absent_hld_coverage_scope_preserves_legacy_gate_behavior(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(result.passed)
+        self.assertFalse(any("coverage_scope" in blocker.lower() for blocker in result.blockers))
 
 
 class SpecifyMirrorTests(unittest.TestCase):

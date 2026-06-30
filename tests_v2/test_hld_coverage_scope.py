@@ -11,6 +11,7 @@ from hldspec.hld_coverage_scope import (
     ALLOWED_COVERAGE_SCOPES,
     HLD_COVERAGE_SCOPE_SCHEMA_VERSION,
     HldCoverageScopeValidation,
+    build_full_hld_coverage_scope,
     validate_hld_coverage_scope,
 )
 
@@ -248,6 +249,70 @@ class TestActiveSpecRules(unittest.TestCase):
         result = validate_hld_coverage_scope(data)
         self.assertFalse(result.ok)
         self.assertIn("selected_hld_anchor_ids must be non-empty for ACTIVE_SPEC", result.errors)
+
+
+class TestBuildFullHldCoverageScope(unittest.TestCase):
+    def test_returns_valid_full_hld(self):
+        data = build_full_hld_coverage_scope()
+        result = validate_hld_coverage_scope(data)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_schema_version(self):
+        self.assertEqual(build_full_hld_coverage_scope()["schema_version"], 1)
+
+    def test_coverage_scope_is_full_hld(self):
+        self.assertEqual(build_full_hld_coverage_scope()["coverage_scope"], "FULL_HLD")
+
+    def test_active_spec_id_is_none(self):
+        self.assertIsNone(build_full_hld_coverage_scope()["active_spec_id"])
+
+    def test_defaults_lists_to_empty(self):
+        data = build_full_hld_coverage_scope()
+        self.assertEqual(data["selected_hld_anchor_ids"], [])
+        self.assertEqual(data["source_refs"], [])
+        self.assertEqual(data["notes"], [])
+
+    def test_preserves_caller_anchor_ids(self):
+        ids = ["HLD-001", "HLD-002"]
+        data = build_full_hld_coverage_scope(selected_hld_anchor_ids=ids)
+        self.assertEqual(data["selected_hld_anchor_ids"], ids)
+
+    def test_preserves_caller_source_refs(self):
+        refs = ["ref1", "ref2"]
+        data = build_full_hld_coverage_scope(source_refs=refs)
+        self.assertEqual(data["source_refs"], refs)
+
+    def test_preserves_caller_notes(self):
+        notes = ["note1"]
+        data = build_full_hld_coverage_scope(notes=notes)
+        self.assertEqual(data["notes"], notes)
+
+    def test_returns_fresh_lists(self):
+        a = build_full_hld_coverage_scope()
+        b = build_full_hld_coverage_scope()
+        self.assertIsNot(a["selected_hld_anchor_ids"], b["selected_hld_anchor_ids"])
+        self.assertIsNot(a["source_refs"], b["source_refs"])
+        self.assertIsNot(a["notes"], b["notes"])
+
+    def test_does_not_alias_caller_list(self):
+        ids = ["HLD-001"]
+        data = build_full_hld_coverage_scope(selected_hld_anchor_ids=ids)
+        data["selected_hld_anchor_ids"].append("HLD-002")
+        self.assertEqual(ids, ["HLD-001"])
+
+    def test_validates_output(self):
+        data = build_full_hld_coverage_scope()
+        result = validate_hld_coverage_scope(data)
+        self.assertTrue(result.ok)
+
+    def test_raises_on_duplicate_anchor_ids(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_full_hld_coverage_scope(selected_hld_anchor_ids=["x", "x"])
+        self.assertIn("generated hld coverage scope is invalid", str(ctx.exception))
+
+    def test_raises_on_non_string_source_refs(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_full_hld_coverage_scope(source_refs=[1])
 
 
 class TestPurity(unittest.TestCase):

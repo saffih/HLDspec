@@ -28,6 +28,7 @@ from pathlib import Path
 from . import (
     agent_handoff_pack,
     control_paths,
+    hld_coverage_scope,
     helper_registry,
     journey2_architecture_package,
     journey2_hld_coverage_contracts,
@@ -88,6 +89,9 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     # Advisory spec backlog: candidate specs derived from HLD anchors. Not
     # required, not mirrored, not gating. Consumed by future selection slices.
     "spec_backlog": "spec_backlog.json",
+    # Coverage-scope sidecar: records FULL_HLD or ACTIVE_SPEC mode for
+    # coverage-ledger interpretation. Advisory, not required, not mirrored.
+    "hld_coverage_scope": "hld_coverage_scope.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -110,6 +114,8 @@ _MIRROR_EXCLUDED: frozenset[str] = frozenset({
     AUTHORITATIVE_FILES["hld_coverage_ledger"],
     # Advisory spec backlog — future selection input, not SpecKit runner content.
     AUTHORITATIVE_FILES["spec_backlog"],
+    # Coverage-scope sidecar — future gate interpretation input, not SpecKit runner content.
+    AUTHORITATIVE_FILES["hld_coverage_scope"],
 })
 
 # The subset materialised into .specify/source/ for the runner. The constitution
@@ -561,6 +567,14 @@ def build_source_package_content(
             created_at=now,
             updated_at=now,
             source_refs=[hld_source_ref],
+        ),
+    )
+
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["hld_coverage_scope"],
+        hld_coverage_scope.build_full_hld_coverage_scope(
+            source_refs=[hld_source_ref],
+            notes=["Full-HLD source-package coverage scope. Existing behavior preserved."],
         ),
     )
 
