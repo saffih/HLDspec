@@ -20,6 +20,7 @@ is owned by the main controller.
 """
 from __future__ import annotations
 
+import json
 import re
 import shlex
 import subprocess
@@ -27,6 +28,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from . import gate_validator as gv
+from . import journey2_hld_coverage_contracts as coverage_contracts
 from . import model_routing as mr
 from . import run_state
 from .script_io import load_json_dict, write_json_dict
@@ -713,6 +715,25 @@ def _receipt_present(source_dir: Path) -> bool:
     return bool(data) and all(k in data for k in CONTEXT_RECEIPT_REQUIRED_KEYS)
 
 
+def _load_uncovered_hld_ids(source_dir: Path) -> list[str]:
+    """Return HLD anchors blocked by the optional Journey 2 coverage ledger.
+
+    Legacy source packages do not have the ledger yet; absence preserves the
+    previous gate behavior until regeneration produces live coverage evidence.
+    """
+    ledger_path = source_dir / "hld_coverage_ledger.json"
+    if not ledger_path.is_file():
+        return []
+    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger = coverage_contracts.validate_coverage_ledger(ledger)
+    return sorted({
+        str(item.get("hld_item_id"))
+        for item in ledger
+        if item.get("status") == coverage_contracts.STATUS_NOT_COVERED
+        if item.get("hld_item_id")
+    })
+
+
 def session_continue_preflight(
     target_root: Path,
     *,
@@ -760,6 +781,12 @@ def session_continue_preflight(
         if dirty:
             blockers.append(f"unexpected dirty tree: {', '.join(dirty[:5])}")
 
+    try:
+        uncovered_hld_ids = _load_uncovered_hld_ids(source_dir)
+    except (TypeError, ValueError) as exc:
+        uncovered_hld_ids = []
+        blockers.append(f"invalid hld_coverage_ledger.json: {exc}")
+
     ctx = gv.GateContext(
         receipt_present=_receipt_present(source_dir),
         source_refs=list(report.get("source_anchors_used", []) or []),
@@ -767,6 +794,7 @@ def session_continue_preflight(
         consultant_status=str(report.get("consultant_result", gv.CONSULTANT_NOT_RUN) or gv.CONSULTANT_NOT_RUN),
         unsupported_claims=list(report.get("unsupported_claims", []) or []),
         stale_anchors=sorted(set(report.get("stale_anchors", []) or []) | set(impact_stale)),
+        uncovered_hld_ids=uncovered_hld_ids,
         validation_ok=str(report.get("validation_result", "")).upper() == "PASS",
         human_approved=bool(plan.get("approvals", {}).get(gate, False)),
     )

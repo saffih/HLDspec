@@ -96,6 +96,7 @@ These block **today** via live pipeline callers:
 | Missing human approval | `validate_gate(SOURCE_PACKAGE_APPROVAL_GATE)` | `session_control.py` preflight |
 | Stale anchors | `validate_gate(SOURCE_PACKAGE_APPROVAL_GATE)` | `session_control.py` preflight |
 | Unsupported claims in spec input | `validate_gate(SOURCE_PACKAGE_APPROVAL_GATE)` | `session_control.py` preflight |
+| HLD item `NOT_COVERED` in `hld_coverage_ledger.json` | `validate_gate(SOURCE_PACKAGE_APPROVAL_GATE)` | `session_control.py` preflight loads the live coverage ledger when present and blocks uncovered HLD IDs |
 | Failed validation | `validate_gate(SOURCE_PACKAGE_APPROVAL_GATE)` | `session_control.py` preflight |
 | Source-package split-brain (external mode) | `hld_source_package.py::source_package_split_brain` | Detects conflicting packages |
 
@@ -105,7 +106,6 @@ These block **today** via live pipeline callers:
 
 | Blocker | Where defined | Why not enforceable |
 |---|---|---|
-| **HLD item NOT_COVERED** | `journey2_hld_coverage_contracts.py::BLOCKING_STATUSES` | Producer populates `hld_coverage_ledger.json`, but `build_completeness_report` is still called only from tests. Not wired into `SOURCE_PACKAGE_APPROVAL_GATE`. |
 | **NEEDS_CLARIFICATION without inquiry entry** | `JOURNEY2_SDD_COMPLETENESS_GATE.md` §6 | Inquiry ledger does not exist in code (P1-013). |
 | **RESEARCH_REQUIRED without evidence** | `JOURNEY2_SDD_COMPLETENESS_GATE.md` §6–§7 | Research ledger does not exist. |
 | **BLOCKED_BY_PRODUCT_DECISION unresolved** | `journey2_hld_coverage_contracts.py` | Defined as status; no producer or gate wiring. |
@@ -126,30 +126,19 @@ has validators, `build_completeness_report`, all 14 item types and 6 statuses,
 with full test coverage). The `JOURNEY2_SDD_COMPLETENESS_GATE.md` §12 item 1
 ("add coverage ledger contracts") is **already complete**.
 
-**Current implementation slice:** Produce a coverage ledger from the HLD
-reference map during source-package build.
+The initial producer now emits `hld_coverage_ledger.json` from the HLD reference
+map during source-package build. It creates one row per HLD anchor and marks trace
+coverage as `COVERED_IN_SDD` only when the generated SDD/spec input cites the
+anchor; otherwise it marks `NOT_COVERED`.
 
-Concretely:
+**Current implementation slice:** wire live `NOT_COVERED` rows into
+`SOURCE_PACKAGE_APPROVAL_GATE` so source-package readiness cannot pass while the
+generated SDD/spec input omits HLD anchors.
 
-1. Extend `build_source_package_content` to emit an initial coverage ledger from
-   `hld_reference_map.json`.
-2. For each HLD anchor, create one requirement-inventory / coverage-ledger entry.
-3. Mark entries conservatively:
-   - `COVERED_IN_SDD` only when the generated SDD/spec input cites the anchor.
-   - `NOT_COVERED` otherwise.
-4. Register the emitted artifact in source-package manifest/hash validation.
-5. Tests: source package with two anchors, one cited and one uncited, produces a
-   deterministic coverage ledger without changing gate behavior yet.
-
-> `feat(journey2): produce coverage ledger from HLD reference map during source-package build`
-
-This generates an initial coverage ledger where every HLD anchor gets an entry
-with status `NOT_COVERED` (or `COVERED_IN_SDD` if the spec input cites it).
-
-**Smallest next implementation slice after the producer lands:** wire
-`build_completeness_report` into
-`SOURCE_PACKAGE_APPROVAL_GATE` as an ACTION/BLOCKED enrichment, using the live
-`hld_coverage_ledger.json` emitted by source-package build.
+**Smallest next implementation slice after initial gate wiring:** extend Journey 2
+completeness beyond trace coverage by adding the missing inquiry/research/gap
+ledgers before enforcing `NEEDS_CLARIFICATION`, `RESEARCH_REQUIRED`, or
+`BLOCKED_BY_PRODUCT_DECISION`.
 
 ---
 

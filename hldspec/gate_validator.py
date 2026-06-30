@@ -96,6 +96,7 @@ class GateContext:
     consultant_status: str = CONSULTANT_NOT_RUN
     unsupported_claims: list[str] = field(default_factory=list)
     stale_anchors: list[str] = field(default_factory=list)
+    uncovered_hld_ids: list[str] = field(default_factory=list)
     validation_ok: bool = True
     human_approved: bool = False
 
@@ -133,6 +134,9 @@ def validate_gate(gate: str, ctx: GateContext) -> GateResult:
 
     if ctx.unsupported_claims:
         blockers.append(f"unsupported claims: {', '.join(ctx.unsupported_claims)}")
+
+    if gate == SOURCE_PACKAGE_APPROVAL_GATE and ctx.uncovered_hld_ids:
+        blockers.append(f"uncovered HLD anchors: {', '.join(ctx.uncovered_hld_ids)}")
 
     # RunSkeptic: an explicit ACTION/CONFLICT always blocks. Where PASS is
     # required, anything other than PASS/NOT_REQUIRED blocks.

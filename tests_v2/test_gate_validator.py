@@ -73,6 +73,21 @@ class GateBlockingTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertTrue(any("unsupported claims" in b for b in result.blockers))
 
+    def test_source_package_gate_blocks_uncovered_hld_ids(self):
+        ctx = _full_pass_ctx()
+        ctx.uncovered_hld_ids = ["HLD-002"]
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(result.passed)
+        self.assertIn("uncovered HLD anchors: HLD-002", result.blockers)
+
+    def test_source_package_gate_all_trace_covered_preserves_pass(self):
+        # Empty uncovered_hld_ids means trace coverage has no NOT_COVERED rows.
+        # It does not imply semantic SDD approval.
+        ctx = _full_pass_ctx()
+        ctx.uncovered_hld_ids = []
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertTrue(result.passed, msg=result.blockers)
+
     def test_runskeptic_action_blocks_even_when_not_required(self):
         # SPECKIT_TASKS gate does not require RunSkeptic PASS, but an explicit
         # ACTION must still block.

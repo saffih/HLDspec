@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from hldspec import gate_validator as gv
+from hldspec import journey2_hld_coverage_contracts as cov
 from hldspec import model_routing as mr
 from hldspec import session_control as sc
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
@@ -241,11 +242,88 @@ class PreflightTests(unittest.TestCase):
         self.assertIn("missing Consultant PASS", result.blockers)
 
     def test_full_pass_allows_continuation(self):
+        # Legacy source packages without hld_coverage_ledger.json preserve the
+        # previous gate behavior until regenerated coverage evidence exists.
         self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
         self._full_receipt()
         self._full_pass_report()
         result = sc.session_continue_preflight(self.target, check_dirty=False)
         self.assertTrue(result.allowed, msg=result.blockers)
+
+    def test_not_covered_hld_coverage_ledger_blocks_continuation(self):
+        self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
+        self._full_receipt()
+        self._full_pass_report()
+        _write_json(self.source_dir / "hld_coverage_ledger.json", [
+            {
+                "hld_item_id": "HLD-001",
+                "source_section": "HLD-001",
+                "item_type": cov.ITEM_REQUIREMENT,
+                "status": cov.STATUS_COVERED_IN_SDD,
+            },
+            {
+                "hld_item_id": "HLD-002",
+                "source_section": "HLD-002",
+                "item_type": cov.ITEM_REQUIREMENT,
+                "status": cov.STATUS_NOT_COVERED,
+            },
+        ])
+
+        result = sc.session_continue_preflight(self.target, check_dirty=False)
+
+        self.assertFalse(result.allowed)
+        self.assertIn("uncovered HLD anchors: HLD-002", result.blockers)
+
+    def test_all_trace_covered_hld_coverage_ledger_allows_continuation(self):
+        # COVERED_IN_SDD is citation/trace coverage only, not semantic proof.
+        self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
+        self._full_receipt()
+        self._full_pass_report()
+        _write_json(self.source_dir / "hld_coverage_ledger.json", [
+            {
+                "hld_item_id": "HLD-001",
+                "source_section": "HLD-001",
+                "item_type": cov.ITEM_REQUIREMENT,
+                "status": cov.STATUS_COVERED_IN_SDD,
+            },
+        ])
+
+        result = sc.session_continue_preflight(self.target, check_dirty=False)
+
+        self.assertTrue(result.allowed, msg=result.blockers)
+
+    def test_malformed_hld_coverage_ledger_blocks_without_crashing(self):
+        self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
+        self._full_receipt()
+        self._full_pass_report()
+        (self.source_dir / "hld_coverage_ledger.json").write_text("{not json", encoding="utf-8")
+
+        result = sc.session_continue_preflight(self.target, check_dirty=False)
+
+        self.assertFalse(result.allowed)
+        self.assertTrue(any("invalid hld_coverage_ledger.json" in b for b in result.blockers))
+
+    def test_structurally_invalid_hld_coverage_ledger_blocks_without_crashing(self):
+        self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
+        self._full_receipt()
+        self._full_pass_report()
+        _write_json(self.source_dir / "hld_coverage_ledger.json", ["bad-item"])
+
+        result = sc.session_continue_preflight(self.target, check_dirty=False)
+
+        self.assertFalse(result.allowed)
+        self.assertTrue(any("invalid hld_coverage_ledger.json" in b for b in result.blockers))
+
+    def test_invalid_not_covered_hld_coverage_ledger_cannot_bypass_gate(self):
+        self._write_plan(approvals={gv.SOURCE_PACKAGE_APPROVAL_GATE: True})
+        self._full_receipt()
+        self._full_pass_report()
+        _write_json(self.source_dir / "hld_coverage_ledger.json", [{"status": cov.STATUS_NOT_COVERED}])
+
+        result = sc.session_continue_preflight(self.target, check_dirty=False)
+
+        self.assertFalse(result.allowed)
+        self.assertTrue(any("invalid hld_coverage_ledger.json" in b for b in result.blockers))
 
     def test_dirty_tree_reported_before_runner_phase(self):
         # A git target with an unrelated dirty file must surface in the blockers.
