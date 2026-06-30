@@ -353,6 +353,86 @@ def build_advisory_spec_backlog(
     return backlog
 
 
+def _format_list(items: list[str]) -> str:
+    if not items:
+        return "- None"
+    return "\n".join(f"- {item}" for item in items)
+
+
+def render_active_spec_to_single_spec_input(backlog: object) -> str:
+    validation = validate_spec_backlog(backlog)
+    if not validation.ok:
+        raise ValueError(
+            "input spec backlog is invalid: " + "; ".join(validation.errors)
+        )
+
+    active_spec_id = backlog["active_spec_id"]
+    if not isinstance(active_spec_id, str) or not active_spec_id:
+        raise ValueError("active_spec_id is required")
+
+    active_spec = None
+    for spec in backlog["specs"]:
+        if spec["spec_id"] == active_spec_id:
+            active_spec = spec
+            break
+
+    if active_spec is None:
+        raise ValueError(f"active spec not found: {active_spec_id}")
+
+    if active_spec["status"] != "SELECTED":
+        raise ValueError(
+            f"active spec must have status SELECTED: {active_spec_id}"
+        )
+
+    if active_spec["target_materialization"] != "NOT_MATERIALIZED":
+        raise ValueError(
+            f"active spec must not be materialized: {active_spec_id}"
+        )
+
+    source_refs = active_spec.get("source_refs", [])
+    if not isinstance(source_refs, list):
+        source_refs = []
+
+    lines = [
+        "# Active Spec Input",
+        "",
+        "<!-- Generated from spec_backlog.json active spec. Advisory planning artifact. -->",
+        "",
+        "## Selected Spec",
+        "",
+        f"- Spec ID: {active_spec['spec_id']}",
+        f"- Title: {active_spec['title']}",
+        f"- Capability: {active_spec['capability']}",
+        f"- Status: {active_spec['status']}",
+        f"- Target Materialization: {active_spec['target_materialization']}",
+        "",
+        "## HLD Anchors",
+        "",
+        _format_list(active_spec["hld_anchor_ids"]),
+        "",
+        "## Dependencies",
+        "",
+        _format_list(active_spec["dependencies"]),
+        "",
+        "## Validation Strategy",
+        "",
+        _format_list(active_spec["validation_strategy"]),
+        "",
+        "## Source References",
+        "",
+        _format_list(source_refs),
+        "",
+        "## Boundary",
+        "",
+        "This input represents one selected active spec only.",
+        "Do not implement unrelated backlog candidates.",
+        "Do not treat this as proof of semantic completeness.",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
 def select_active_spec(backlog: object, spec_id: str) -> dict:
     if not isinstance(spec_id, str):
         raise ValueError("spec_id must be string")
