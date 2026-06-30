@@ -13,6 +13,7 @@ from hldspec.spec_backlog import (
     ALLOWED_TARGET_MATERIALIZATION_STATES,
     SpecBacklogValidation,
     build_advisory_spec_backlog,
+    select_active_spec,
     validate_spec_backlog,
 )
 
@@ -633,6 +634,235 @@ class TestAdvisoryBuilderEdgeCases(unittest.TestCase):
         self.assertIsNot(backlog["specs"][0]["source_refs"], backlog["specs"][1]["source_refs"])
         backlog["specs"][0]["source_refs"].append("mutated")
         self.assertNotIn("mutated", backlog["specs"][1]["source_refs"])
+
+
+# --- Active spec selector: valid behavior ---
+
+class TestSelectActiveSpecValid(unittest.TestCase):
+    def test_select_planned_spec(self):
+        data = _valid_backlog(specs=[_valid_spec(status="PLANNED")])
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(validate_spec_backlog(result).ok, True)
+
+    def test_select_ready_for_selection_spec(self):
+        data = _valid_backlog(specs=[_valid_spec(status="READY_FOR_SELECTION")])
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(validate_spec_backlog(result).ok, True)
+
+    def test_active_spec_id_set(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["active_spec_id"], "SPEC-001")
+
+    def test_selected_spec_status_becomes_selected(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["specs"][0]["status"], "SELECTED")
+
+    def test_target_materialization_remains_not_materialized(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["specs"][0]["target_materialization"], "NOT_MATERIALIZED")
+
+    def test_non_selected_specs_unchanged(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="PLANNED")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED")
+        data = _valid_backlog(specs=[s1, s2])
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["specs"][1]["status"], "PLANNED")
+        self.assertEqual(result["specs"][1]["spec_id"], "SPEC-002")
+
+    def test_input_not_mutated(self):
+        data = _valid_backlog()
+        original = copy.deepcopy(data)
+        select_active_spec(data, "SPEC-001")
+        self.assertEqual(data, original)
+
+    def test_output_validates(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        validation = validate_spec_backlog(result)
+        self.assertTrue(validation.ok, validation.errors)
+
+
+# --- Active spec selector: error cases ---
+
+class TestSelectActiveSpecErrors(unittest.TestCase):
+    def test_non_string_spec_id_fails(self):
+        data = _valid_backlog()
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, 42)
+        self.assertIn("spec_id must be string", str(ctx.exception))
+
+    def test_invalid_input_backlog_fails(self):
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec({"bad": True}, "SPEC-001")
+        self.assertIn("input spec backlog is invalid", str(ctx.exception))
+
+    def test_unknown_spec_id_fails(self):
+        data = _valid_backlog()
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-999")
+        self.assertIn("spec_id not found: SPEC-999", str(ctx.exception))
+
+    def test_existing_active_spec_id_fails(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="SELECTED")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-002")
+        self.assertIn("another active spec already exists", str(ctx.exception))
+
+    def test_existing_selected_status_fails(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="SELECTED")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-002")
+        self.assertIn("another active spec already exists", str(ctx.exception))
+
+    def test_existing_materialized_to_target_status_fails(self):
+        s1 = _valid_spec(
+            spec_id="SPEC-001",
+            status="MATERIALIZED_TO_TARGET",
+            target_materialization="MATERIALIZED_TO_SINGLE_SPEC_INPUT",
+        )
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-002")
+        self.assertIn("another active spec already exists", str(ctx.exception))
+
+    def test_too_large_fails(self):
+        spec = _valid_spec(size_class="TOO_LARGE", status="PLANNED")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-001")
+        self.assertIn("cannot select TOO_LARGE spec: SPEC-001", str(ctx.exception))
+
+    def test_empty_validation_strategy_fails(self):
+        spec = _valid_spec(validation_strategy=[])
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-001")
+        self.assertIn("cannot select spec without validation_strategy: SPEC-001", str(ctx.exception))
+
+    def test_unknown_dependency_fails(self):
+        spec = _valid_spec(dependencies=["SPEC-999"])
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_self_dependency_fails(self):
+        spec = _valid_spec(dependencies=["SPEC-001"])
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_dependency_not_done_or_validated_fails(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="PLANNED")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED", dependencies=["SPEC-001"])
+        data = _valid_backlog(specs=[s1, s2])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-002")
+        self.assertIn("unresolved dependency: SPEC-002 -> SPEC-001", str(ctx.exception))
+
+    def test_dependency_done_passes(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="DONE")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED", dependencies=["SPEC-001"])
+        data = _valid_backlog(specs=[s1, s2])
+        result = select_active_spec(data, "SPEC-002")
+        self.assertEqual(result["active_spec_id"], "SPEC-002")
+
+    def test_dependency_validated_passes(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="VALIDATED")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED", dependencies=["SPEC-001"])
+        data = _valid_backlog(specs=[s1, s2])
+        result = select_active_spec(data, "SPEC-002")
+        self.assertEqual(result["active_spec_id"], "SPEC-002")
+
+    def test_non_not_materialized_target_fails(self):
+        spec = _valid_spec(target_materialization="SUPERSEDED_IN_TARGET")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError) as ctx:
+            select_active_spec(data, "SPEC-001")
+        self.assertIn("target_materialization", str(ctx.exception))
+
+    def test_status_blocked_fails(self):
+        spec = _valid_spec(status="BLOCKED")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_status_superseded_fails(self):
+        spec = _valid_spec(status="SUPERSEDED")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_status_in_implementation_fails(self):
+        spec = _valid_spec(status="IN_IMPLEMENTATION")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_status_validated_fails(self):
+        spec = _valid_spec(status="VALIDATED")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_status_done_fails(self):
+        spec = _valid_spec(status="DONE")
+        data = _valid_backlog(specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+    def test_status_materialized_to_target_fails(self):
+        spec = _valid_spec(
+            status="MATERIALIZED_TO_TARGET",
+            target_materialization="MATERIALIZED_TO_SINGLE_SPEC_INPUT",
+        )
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        with self.assertRaises(ValueError):
+            select_active_spec(data, "SPEC-001")
+
+
+# --- Active spec selector: scope/purity safety ---
+
+class TestSelectActiveSpecPurity(unittest.TestCase):
+    def test_does_not_change_target_materialization(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["specs"][0]["target_materialization"], "NOT_MATERIALIZED")
+
+    def test_does_not_produce_materialized_to_single_spec_input(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        for spec in result["specs"]:
+            self.assertNotEqual(spec["target_materialization"], "MATERIALIZED_TO_SINGLE_SPEC_INPUT")
+
+    def test_does_not_alter_source_refs(self):
+        spec = _valid_spec(source_refs=["docs/hld.md#HLD-010"])
+        data = _valid_backlog(specs=[spec])
+        original_refs = copy.deepcopy(data["source_refs"])
+        original_spec_refs = copy.deepcopy(spec["source_refs"])
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(result["source_refs"], original_refs)
+        self.assertEqual(result["specs"][0]["source_refs"], original_spec_refs)
+
+    def test_does_not_alter_dependencies(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="DONE")
+        s2 = _valid_spec(spec_id="SPEC-002", status="PLANNED", dependencies=["SPEC-001"])
+        data = _valid_backlog(specs=[s1, s2])
+        result = select_active_spec(data, "SPEC-002")
+        self.assertEqual(result["specs"][1]["dependencies"], ["SPEC-001"])
+
+    def test_does_not_call_builder(self):
+        data = _valid_backlog()
+        result = select_active_spec(data, "SPEC-001")
+        self.assertEqual(len(result["specs"]), len(data["specs"]))
+        self.assertEqual(result["schema_version"], data["schema_version"])
 
 
 if __name__ == "__main__":
