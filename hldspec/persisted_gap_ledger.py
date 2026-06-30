@@ -90,7 +90,7 @@ def validate_gap_ledger(data: object) -> GapLedgerValidation:
     if result.errors:
         return result
 
-    if not isinstance(data["schema_version"], int):
+    if not isinstance(data["schema_version"], int) or isinstance(data["schema_version"], bool):
         result.errors.append("schema_version must be integer")
 
     if not isinstance(data["created_at"], str):

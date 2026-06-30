@@ -78,6 +78,11 @@ class TestTopLevelShape(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("schema_version must be integer" in e for e in result.errors))
 
+    def test_schema_version_bool_fails(self):
+        result = validate_gap_ledger(_valid_ledger(schema_version=True))
+        self.assertFalse(result.ok)
+        self.assertTrue(any("schema_version must be integer" in e for e in result.errors))
+
     def test_created_at_not_string_fails(self):
         result = validate_gap_ledger(_valid_ledger(created_at=123))
         self.assertFalse(result.ok)
@@ -168,6 +173,31 @@ class TestGapEntryValidation(unittest.TestCase):
             gap = _valid_gap(category=cat)
             result = validate_gap_ledger(_valid_ledger(gaps=[gap]))
             self.assertTrue(result.ok, f"category {cat} should be valid: {result.errors}")
+
+    def test_allowed_states_exact_set(self):
+        expected = {
+            "OPEN", "BLOCKING", "CONFLICT", "NEEDS_OWNER",
+            "ASSUMED_FOR_NOW", "SAFE_TO_DEFER",
+            "RESOLVED_BY_EVIDENCE", "RESOLVED_BY_DECISION",
+            "PARTIAL", "KNOWN_LIMITATION",
+        }
+        self.assertEqual(ALLOWED_GAP_STATES, frozenset(expected))
+
+    def test_allowed_categories_exact_set(self):
+        expected = {
+            "context_safety_and_gap_continuity",
+            "spec_capability_decomposition",
+            "control_plane_isolation",
+            "journey2_sdd_completeness",
+            "validation_architecture",
+            "testing_discipline",
+            "driver_readiness",
+            "journey3_helper_execution",
+            "speckit_helper_scope",
+            "baton_external_workflow",
+            "docs_governance",
+        }
+        self.assertEqual(ALLOWED_GAP_CATEGORIES, frozenset(expected))
 
 
 class TestConditionalStateRules(unittest.TestCase):
