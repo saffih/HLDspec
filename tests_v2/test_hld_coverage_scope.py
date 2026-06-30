@@ -11,6 +11,8 @@ from hldspec.hld_coverage_scope import (
     ALLOWED_COVERAGE_SCOPES,
     HLD_COVERAGE_SCOPE_SCHEMA_VERSION,
     HldCoverageScopeValidation,
+    build_active_spec_coverage_scope,
+    build_active_spec_coverage_scope_from_selected_spec,
     build_full_hld_coverage_scope,
     validate_hld_coverage_scope,
 )
@@ -313,6 +315,256 @@ class TestBuildFullHldCoverageScope(unittest.TestCase):
     def test_raises_on_non_string_source_refs(self):
         with self.assertRaises((ValueError, TypeError)):
             build_full_hld_coverage_scope(source_refs=[1])
+
+
+class TestBuildActiveSpecCoverageScope(unittest.TestCase):
+    def test_returns_valid_object(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        result = validate_hld_coverage_scope(data)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_schema_version(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertEqual(data["schema_version"], 1)
+
+    def test_coverage_scope_is_active_spec(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertEqual(data["coverage_scope"], "ACTIVE_SPEC")
+
+    def test_preserves_active_spec_id(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-042",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertEqual(data["active_spec_id"], "SPEC-042")
+
+    def test_preserves_selected_hld_anchor_ids(self):
+        ids = ["HLD-010", "HLD-020", "HLD-030"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=ids,
+        )
+        self.assertEqual(data["selected_hld_anchor_ids"], ids)
+
+    def test_preserves_source_refs(self):
+        refs = ["ref1", "ref2"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+            source_refs=refs,
+        )
+        self.assertEqual(data["source_refs"], refs)
+
+    def test_preserves_notes(self):
+        notes = ["note1", "note2"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+            notes=notes,
+        )
+        self.assertEqual(data["notes"], notes)
+
+    def test_defaults_source_refs_to_empty(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertEqual(data["source_refs"], [])
+
+    def test_defaults_notes_to_empty(self):
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertEqual(data["notes"], [])
+
+    def test_returns_fresh_lists(self):
+        a = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        b = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertIsNot(a["selected_hld_anchor_ids"], b["selected_hld_anchor_ids"])
+        self.assertIsNot(a["source_refs"], b["source_refs"])
+        self.assertIsNot(a["notes"], b["notes"])
+
+    def test_does_not_alias_caller_anchor_ids(self):
+        ids = ["HLD-001"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=ids,
+        )
+        data["selected_hld_anchor_ids"].append("HLD-002")
+        self.assertEqual(ids, ["HLD-001"])
+
+    def test_does_not_alias_caller_source_refs(self):
+        refs = ["ref1"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+            source_refs=refs,
+        )
+        data["source_refs"].append("ref2")
+        self.assertEqual(refs, ["ref1"])
+
+    def test_does_not_alias_caller_notes(self):
+        notes = ["note1"]
+        data = build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+            notes=notes,
+        )
+        data["notes"].append("note2")
+        self.assertEqual(notes, ["note1"])
+
+    def test_does_not_mutate_input_anchor_ids(self):
+        ids = ["HLD-001", "HLD-002"]
+        original = list(ids)
+        build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=ids,
+        )
+        self.assertEqual(ids, original)
+
+
+class TestBuildActiveSpecCoverageScopeInvalid(unittest.TestCase):
+    def test_empty_active_spec_id_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_active_spec_coverage_scope(
+                active_spec_id="",
+                selected_hld_anchor_ids=["HLD-001"],
+            )
+        self.assertIn("generated active-spec hld coverage scope is invalid", str(ctx.exception))
+
+    def test_non_string_active_spec_id_raises(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_active_spec_coverage_scope(
+                active_spec_id=42,
+                selected_hld_anchor_ids=["HLD-001"],
+            )
+
+    def test_empty_anchor_ids_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids=[],
+            )
+        self.assertIn("generated active-spec hld coverage scope is invalid", str(ctx.exception))
+
+    def test_duplicate_anchors_raise(self):
+        with self.assertRaises(ValueError) as ctx:
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids=["HLD-001", "HLD-001"],
+            )
+        self.assertIn("generated active-spec hld coverage scope is invalid", str(ctx.exception))
+
+    def test_non_string_anchor_item_raises(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids=["HLD-001", 42],
+            )
+
+    def test_non_list_anchor_ids_raises(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids="HLD-001",
+            )
+
+    def test_non_string_source_refs_item_raises(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids=["HLD-001"],
+                source_refs=[1],
+            )
+
+    def test_non_string_notes_item_raises(self):
+        with self.assertRaises((ValueError, TypeError)):
+            build_active_spec_coverage_scope(
+                active_spec_id="SPEC-001",
+                selected_hld_anchor_ids=["HLD-001"],
+                notes=[True],
+            )
+
+
+class TestBuildActiveSpecFromSelectedSpec(unittest.TestCase):
+    def test_valid_selected_spec(self):
+        spec = {"hld_anchor_ids": ["HLD-010", "HLD-020"]}
+        data = build_active_spec_coverage_scope_from_selected_spec(
+            active_spec_id="SPEC-001",
+            selected_spec=spec,
+        )
+        result = validate_hld_coverage_scope(data)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(data["selected_hld_anchor_ids"], ["HLD-010", "HLD-020"])
+
+    def test_missing_hld_anchor_ids_fails(self):
+        spec = {"name": "some-spec"}
+        with self.assertRaises(ValueError):
+            build_active_spec_coverage_scope_from_selected_spec(
+                active_spec_id="SPEC-001",
+                selected_spec=spec,
+            )
+
+    def test_does_not_mutate_selected_spec(self):
+        spec = {"hld_anchor_ids": ["HLD-010"]}
+        original = copy.deepcopy(spec)
+        build_active_spec_coverage_scope_from_selected_spec(
+            active_spec_id="SPEC-001",
+            selected_spec=spec,
+        )
+        self.assertEqual(spec, original)
+
+    def test_passes_source_refs_and_notes(self):
+        spec = {"hld_anchor_ids": ["HLD-010"]}
+        data = build_active_spec_coverage_scope_from_selected_spec(
+            active_spec_id="SPEC-001",
+            selected_spec=spec,
+            source_refs=["ref1"],
+            notes=["note1"],
+        )
+        self.assertEqual(data["source_refs"], ["ref1"])
+        self.assertEqual(data["notes"], ["note1"])
+
+
+class TestActiveSpecBuilderPurity(unittest.TestCase):
+    def test_builder_does_not_read_or_write_files(self):
+        import os
+        scope_path = os.path.join(
+            ".hldspec", "source_package", "hld_coverage_scope.json"
+        )
+        build_active_spec_coverage_scope(
+            active_spec_id="SPEC-001",
+            selected_hld_anchor_ids=["HLD-001"],
+        )
+        self.assertFalse(os.path.exists(scope_path))
+
+    def test_no_renderer_imported(self):
+        import hldspec.hld_coverage_scope as mod
+        import inspect
+        source = inspect.getsource(mod)
+        self.assertNotIn("render_active_spec", source)
+
+    def test_no_source_package_import(self):
+        import hldspec.hld_coverage_scope as mod
+        import inspect
+        source = inspect.getsource(mod)
+        self.assertNotIn("hld_source_package", source)
 
 
 class TestPurity(unittest.TestCase):
