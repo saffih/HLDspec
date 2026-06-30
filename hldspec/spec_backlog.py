@@ -353,10 +353,15 @@ def build_advisory_spec_backlog(
     return backlog
 
 
+def _markdown_scalar(value: str) -> str:
+    sanitized = value.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    return " ".join(sanitized.split())
+
+
 def _format_list(items: list[str]) -> str:
     if not items:
         return "- None"
-    return "\n".join(f"- {item}" for item in items)
+    return "\n".join(f"- {_markdown_scalar(item)}" for item in items)
 
 
 def render_active_spec_to_single_spec_input(backlog: object) -> str:
@@ -400,11 +405,11 @@ def render_active_spec_to_single_spec_input(backlog: object) -> str:
         "",
         "## Selected Spec",
         "",
-        f"- Spec ID: {active_spec['spec_id']}",
-        f"- Title: {active_spec['title']}",
-        f"- Capability: {active_spec['capability']}",
-        f"- Status: {active_spec['status']}",
-        f"- Target Materialization: {active_spec['target_materialization']}",
+        f"- Spec ID: {_markdown_scalar(active_spec['spec_id'])}",
+        f"- Title: {_markdown_scalar(active_spec['title'])}",
+        f"- Capability: {_markdown_scalar(active_spec['capability'])}",
+        f"- Status: {_markdown_scalar(active_spec['status'])}",
+        f"- Target Materialization: {_markdown_scalar(active_spec['target_materialization'])}",
         "",
         "## HLD Anchors",
         "",
