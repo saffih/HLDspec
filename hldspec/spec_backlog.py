@@ -209,7 +209,9 @@ def _validate_relationships(
         if active_status_specs:
             result.errors.append("multiple active specs")
     elif isinstance(active_spec_id, str) and active_spec_id in seen_ids:
-        if len(active_status_specs) == 1:
+        if len(active_status_specs) == 0:
+            result.errors.append("active_spec_id set but no spec has active status")
+        elif len(active_status_specs) == 1:
             actual_id, _ = active_status_specs[0]
             if actual_id != active_spec_id:
                 result.errors.append("multiple active specs")

@@ -229,6 +229,13 @@ class TestRelationshipRules(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("multiple active specs" in e for e in result.errors))
 
+    def test_active_spec_id_set_but_no_active_status_fails(self):
+        spec = _valid_spec(spec_id="SPEC-001", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        result = validate_spec_backlog(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(any("active_spec_id set but no spec has active status" in e for e in result.errors))
+
     def test_active_spec_id_points_to_wrong_spec_fails(self):
         s1 = _valid_spec(spec_id="SPEC-001", status="PLANNED")
         s2 = _valid_spec(spec_id="SPEC-002", status="SELECTED")
