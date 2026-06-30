@@ -41,6 +41,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`PERSISTED_GAP_LEDGER_SCHEMA.md`](PERSISTED_GAP_LEDGER_SCHEMA.md) | Docs-only schema contract for future `.hldspec/source_package/gap_ledger.json`: top-level shape, gap entry fields, allowed states and categories, conditional field rules, compaction survival rules, and validation expectations. No code, no implementation. |
 | [`MULTI_SPEC_BACKLOG_AND_ACTIVE_SELECTION.md`](MULTI_SPEC_BACKLOG_AND_ACTIVE_SELECTION.md) | Docs-only contract for future optional `.hldspec/source_package/spec_backlog.json`: many-candidate / one-active-spec invariant, candidate spec fields, statuses, size classes, target materialization states, selection rules, and controlled future rendering into existing single SpecKit input path. No code, no implementation. |
 | [`ACTIVE_SPEC_SOURCE_PACKAGE_RENDERING_CONTRACT.md`](ACTIVE_SPEC_SOURCE_PACKAGE_RENDERING_CONTRACT.md) | Docs-only contract defining the active-spec rendering/source-package interaction: rendering preconditions, selected-active-spec vs full-HLD coverage-scope distinction, gate-risk explanation, and future implementation sequence. No runtime implementation. |
+| [`ACTIVE_SPEC_COVERAGE_SCOPE_SCHEMA.md`](ACTIVE_SPEC_COVERAGE_SCOPE_SCHEMA.md) | Docs-only schema for future `.hldspec/source_package/hld_coverage_scope.json`: distinguishes `FULL_HLD` vs `ACTIVE_SPEC` coverage scope, preserves existing coverage ledger compatibility, defines sidecar artifact shape and interpretation rules. No runtime implementation. |
 
 ---
 
