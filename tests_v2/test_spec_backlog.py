@@ -513,6 +513,55 @@ class TestAdvisoryBuilderAnchorMapping(unittest.TestCase):
         )
         self.assertEqual(backlog["specs"][0]["capability"], "Address HLD-010")
 
+    def test_uses_anchor_level_source_refs_when_present(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_refs": ["docs/hld.md#HLD-010"],
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(
+            refs,
+            created_at="t",
+            updated_at="t",
+            source_refs=["docs/fallback.md"],
+        )
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/hld.md#HLD-010"])
+
+    def test_uses_anchor_level_source_ref_string_when_present(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_ref": "docs/hld.md#HLD-010",
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(refs, created_at="t", updated_at="t")
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/hld.md#HLD-010"])
+
+    def test_invalid_anchor_source_refs_falls_back_to_top_level_source_refs(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_refs": [123],
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(
+            refs,
+            created_at="t",
+            updated_at="t",
+            source_refs=["docs/fallback.md"],
+        )
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/fallback.md"])
+
 
 class TestAdvisoryBuilderPurity(unittest.TestCase):
     def test_does_not_mutate_input(self):

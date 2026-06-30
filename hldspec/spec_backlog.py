@@ -265,6 +265,18 @@ def _validate_relationships(
                         result.errors.append(f"{prefix}.selected dependency not done or validated: {dep}")
 
 
+def _anchor_source_refs(meta: dict, fallback: list[str]) -> list[str]:
+    raw = meta.get("source_refs")
+    if isinstance(raw, list) and all(isinstance(s, str) for s in raw):
+        return list(raw)
+
+    raw = meta.get("source_ref")
+    if isinstance(raw, str):
+        return [raw]
+
+    return list(fallback)
+
+
 def build_advisory_spec_backlog(
     hld_references: object,
     *,
@@ -316,7 +328,7 @@ def build_advisory_spec_backlog(
             "dependencies": [],
             "validation_strategy": ["focused_tests", "contract_validation"],
             "target_materialization": "NOT_MATERIALIZED",
-            "source_refs": list(resolved_source_refs),
+            "source_refs": _anchor_source_refs(meta, resolved_source_refs),
             "reason": "Advisory candidate derived from HLD reference map.",
         })
 
