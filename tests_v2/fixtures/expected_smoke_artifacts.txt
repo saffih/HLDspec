@@ -13,6 +13,7 @@ targetHLD/raw/HLD.raw.md
 .hldspec/source_package/speckit_slice_execution_prompt.md
 .hldspec/source_package/anchor_coverage_schema.json
 .hldspec/source_package/hld_coverage_ledger.json
+.hldspec/source_package/spec_backlog.json
 .hldspec/mediator/mediator_packet.json
 prompts/mediator/START_MEDIATOR.md
 prompts/mediator/DEVIN_MEDIATOR_SKILL.md

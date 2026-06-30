@@ -31,6 +31,7 @@ from . import (
     helper_registry,
     journey2_architecture_package,
     journey2_hld_coverage_contracts,
+    spec_backlog,
 )
 from .script_io import load_json_dict, write_json_dict
 from .spec_bundles import utc_now
@@ -84,6 +85,9 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     # future gate wiring, but not mirrored into SpecKit runner context and not
     # required for legacy package validation.
     "hld_coverage_ledger": "hld_coverage_ledger.json",
+    # Advisory spec backlog: candidate specs derived from HLD anchors. Not
+    # required, not mirrored, not gating. Consumed by future selection slices.
+    "spec_backlog": "spec_backlog.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -104,6 +108,8 @@ _MIRROR_EXCLUDED: frozenset[str] = frozenset({
     AUTHORITATIVE_FILES["architecture_package"],
     # J2 completeness evidence — future gate input, not SpecKit runner content.
     AUTHORITATIVE_FILES["hld_coverage_ledger"],
+    # Advisory spec backlog — future selection input, not SpecKit runner content.
+    AUTHORITATIVE_FILES["spec_backlog"],
 })
 
 # The subset materialised into .specify/source/ for the runner. The constitution
@@ -545,6 +551,17 @@ def build_source_package_content(
     write_json_dict(
         source_dir / AUTHORITATIVE_FILES["hld_coverage_ledger"],
         build_initial_hld_coverage_ledger(ref_map, spec_input),
+    )
+
+    now = utc_now()
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["spec_backlog"],
+        spec_backlog.build_advisory_spec_backlog(
+            ref_map,
+            created_at=now,
+            updated_at=now,
+            source_refs=[hld_source_ref],
+        ),
     )
 
     for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
