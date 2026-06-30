@@ -28,8 +28,8 @@ from pathlib import Path
 from . import (
     agent_handoff_pack,
     control_paths,
-    hld_coverage_scope,
     helper_registry,
+    hld_coverage_scope,
     journey2_architecture_package,
     journey2_hld_coverage_contracts,
     spec_backlog,
