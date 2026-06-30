@@ -372,7 +372,9 @@ Uncovered behavior.
             f"{result.missing} {result.hash_mismatches}",
         )
 
-    def test_hld_coverage_ledger_does_not_change_gate_behavior(self):
+    def test_absent_hld_coverage_ledger_preserves_legacy_gate_behavior(self):
+        # Existing packages without a produced hld_coverage_ledger.json do not get
+        # an invented coverage blocker.
         ctx = gv.GateContext(
             receipt_present=False,
             source_refs=[],
