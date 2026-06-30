@@ -1103,5 +1103,150 @@ class TestRenderActiveSpecPurity(unittest.TestCase):
         self.assertNotIn("MATERIALIZED_TO_SINGLE_SPEC_INPUT", result)
 
 
+# --- Active spec renderer: markdown injection safety ---
+
+
+class TestRenderMarkdownInjectionSafety(unittest.TestCase):
+    """Verify that spec field values containing newlines or markdown structure
+    are sanitized to single-line text, preventing accidental heading/list injection."""
+
+    def test_title_with_injected_heading_renders_single_line(self):
+        data = _selected_backlog(title="Good title\n## Injected Section\n- fake item")
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- Title: Good title ## Injected Section - fake item", result)
+        heading_lines = [l for l in result.split("\n") if l.strip() == "## Injected Section"]
+        self.assertEqual(heading_lines, [])
+
+    def test_capability_with_crlf_bullet_renders_single_line(self):
+        data = _selected_backlog(capability="Real cap\r\n- fake bullet")
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- Capability: Real cap - fake bullet", result)
+
+    def test_source_ref_with_newline_renders_single_item(self):
+        data = _selected_backlog(source_refs=["docs/hld.md\n## Injected"])
+        result = render_active_spec_to_single_spec_input(data)
+        lines = result.split("\n")
+        ref_idx = lines.index("## Source References")
+        ref_items = []
+        for l in lines[ref_idx + 2:]:
+            if l.startswith("- "):
+                ref_items.append(l)
+            elif l.startswith("##") or l == "":
+                break
+        self.assertEqual(len(ref_items), 1)
+        self.assertIn("docs/hld.md ## Injected", ref_items[0])
+
+    def test_hld_anchor_with_newline_renders_single_item(self):
+        data = _selected_backlog(hld_anchor_ids=["HLD-001\n## Evil"])
+        result = render_active_spec_to_single_spec_input(data)
+        lines = result.split("\n")
+        anchor_idx = lines.index("## HLD Anchors")
+        anchor_items = []
+        for l in lines[anchor_idx + 2:]:
+            if l.startswith("- "):
+                anchor_items.append(l)
+            elif l.startswith("##") or l == "":
+                break
+        self.assertEqual(len(anchor_items), 1)
+        self.assertIn("HLD-001 ## Evil", anchor_items[0])
+
+    def test_repeated_whitespace_collapses(self):
+        data = _selected_backlog(title="lots   of\n\n\nspaces   here")
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- Title: lots of spaces here", result)
+
+    def test_cr_only_sanitized(self):
+        data = _selected_backlog(title="line1\rline2")
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- Title: line1 line2", result)
+
+
+class TestRenderStructuralSafety(unittest.TestCase):
+    """Verify rendered output structure is stable and injection-proof."""
+
+    def test_starts_with_active_spec_input(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertTrue(result.startswith("# Active Spec Input"))
+
+    def test_fixed_headings_appear_exactly_once(self):
+        data = _selected_backlog(
+            title="## Selected Spec\n## HLD Anchors",
+            capability="## Dependencies",
+        )
+        result = render_active_spec_to_single_spec_input(data)
+        expected_headings = [
+            "## Selected Spec",
+            "## HLD Anchors",
+            "## Dependencies",
+            "## Validation Strategy",
+            "## Source References",
+            "## Boundary",
+        ]
+        for heading in expected_headings:
+            heading_lines = [l for l in result.split("\n") if l.strip() == heading]
+            self.assertEqual(
+                len(heading_lines), 1,
+                f"heading '{heading}' should appear exactly once as standalone line, found {len(heading_lines)}",
+            )
+
+    def test_injected_heading_not_standalone(self):
+        data = _selected_backlog(title="safe\n## Fake Heading")
+        result = render_active_spec_to_single_spec_input(data)
+        standalone = [l for l in result.split("\n") if l.strip() == "## Fake Heading"]
+        self.assertEqual(standalone, [])
+
+    def test_injected_bullet_not_extra_item(self):
+        data = _selected_backlog(
+            hld_anchor_ids=["HLD-001\n- injected"],
+        )
+        result = render_active_spec_to_single_spec_input(data)
+        lines = result.split("\n")
+        anchor_idx = lines.index("## HLD Anchors")
+        bullet_lines = []
+        for l in lines[anchor_idx + 2:]:
+            if l.startswith("- "):
+                bullet_lines.append(l)
+            elif l.startswith("##") or l == "":
+                break
+        self.assertEqual(len(bullet_lines), 1)
+
+
+class TestRenderDeterminismCompatibility(unittest.TestCase):
+    """Safe strings must render unchanged; repeated calls must match."""
+
+    def test_safe_strings_unchanged(self):
+        data = _selected_backlog()
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- Title: Example title", result)
+        self.assertIn("- Capability: Example capability", result)
+        self.assertIn("- Spec ID: SPEC-001", result)
+
+    def test_repeated_renders_identical(self):
+        data = _selected_backlog(title="Test\ntitle")
+        r1 = render_active_spec_to_single_spec_input(data)
+        r2 = render_active_spec_to_single_spec_input(data)
+        self.assertEqual(r1, r2)
+
+    def test_renderer_does_not_mutate_input(self):
+        data = _selected_backlog(title="Inject\n## Heading")
+        original = copy.deepcopy(data)
+        render_active_spec_to_single_spec_input(data)
+        self.assertEqual(data, original)
+
+    def test_non_selected_specs_still_excluded(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="SELECTED",
+                         title="Evil\n## Heading", source_refs=["docs/hld.md"])
+        s2 = _valid_spec(spec_id="SPEC-002", title="Other", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertNotIn("SPEC-002", result)
+        self.assertNotIn("Other", result)
+
+    def test_renderer_does_not_write_files(self):
+        data = _selected_backlog()
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIsInstance(result, str)
+
+
 if __name__ == "__main__":
     unittest.main()
