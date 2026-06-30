@@ -18,6 +18,29 @@ subagents that return compact receipts.
 
 ---
 
+## Context failure modes
+
+Context safety addresses three distinct failure modes:
+
+1. **Hard context limits.** Required information falls out of the active context
+   window, retrieval quality degrades, or earlier requirements stop being
+   available to the model.
+
+2. **Context dilution.** Required information may still be present, but it is
+   buried among code, logs, plans, reviews, discussions, and tool output.
+   Signal-to-noise becomes poor, so critical requirements are under-weighted.
+
+3. **Reasoning scope explosion.** A single reasoning process is asked to
+   simultaneously hold source understanding, architecture, implementation,
+   validation, migration, operations, and approval criteria. Even with enough
+   context, local optimizations can break global goals.
+
+Context safety mitigates all three failure modes. Larger context windows reduce
+hard limits but do not by themselves solve context dilution or reasoning scope
+explosion.
+
+---
+
 ## Lead / worker model
 
 The lead owns:
@@ -43,6 +66,18 @@ cited excerpts only when needed for final decision or conflict resolution.
 
 ---
 
+## Context isolation
+
+Workers, bounded passes, and subagents are primarily a context-isolation
+mechanism, not a parallelism requirement. Their purpose is to give each task a
+smaller evidence set, a clearer objective, and fewer competing instructions.
+
+Where feasible, planner, implementer, and validator should be separate roles or
+passes. The validator should not rely only on the same reasoning path that
+produced the implementation.
+
+---
+
 ## Bounded decomposition
 
 For non-trivial repo work: one bounded pass answers one question; one
@@ -57,6 +92,51 @@ Sizing rules:
 - A worker task is too large if it must answer multiple independent questions.
 - A lead context is too large if it contains broad raw evidence that could have
   been summarized by a bounded pass.
+
+---
+
+## Validation-first decomposition
+
+The preferred decomposition flow is:
+
+```
+HLD → capabilities → deliverables → atomic tasks
+  → independent validation → integration validation
+```
+
+This explicitly replaces the unsafe shortcut of jumping directly from HLD to
+implementation. Every atomic task should define its proof of correctness before
+implementation begins.
+
+Acceptable validation evidence includes:
+
+- Build passes.
+- Unit tests pass.
+- Contract tests pass.
+- Static checks pass.
+- Required files exist.
+- Required symbols exist.
+- Expected behavior is observed.
+- Required artifact hashes or manifests are updated.
+
+---
+
+## Atomic-task criteria
+
+An atomic task should be:
+
+- **Independently verifiable** — its proof of correctness does not require
+  running unrelated tasks.
+- **Independently reviewable** — a reviewer can assess it without understanding
+  the full task graph.
+- **Independently revertible** — reverting the task does not break unrelated
+  completed work.
+
+Agent-facing deliverables are usually smaller than human-facing feature or
+component units. Prefer tasks such as adding an interface, implementing an
+adapter, adding validation, adding tests, updating a manifest, or updating
+documentation over broad tasks such as implementing an entire infrastructure
+layer.
 
 ---
 
