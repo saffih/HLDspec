@@ -37,6 +37,7 @@ Authoritative reference vs active guidance vs archive/history. When in doubt, st
 | [`HLDSPEC_CURRENT_STATE_CHECKPOINT.md`](HLDSPEC_CURRENT_STATE_CHECKPOINT.md) | Current-state checkpoint after PR #53/#54: what is on main, what is not implemented, candidate next tracks. |
 | [`CONTEXT_SAFETY_AND_GAP_CONTINUITY.md`](CONTEXT_SAFETY_AND_GAP_CONTINUITY.md) | Doctrine: context safety as a correctness requirement, context failure modes (hard limits, dilution, scope explosion), context isolation, bounded decomposition rules, validation-first decomposition, atomic-task criteria, gap continuity across session/handoff boundaries, and future persisted-artifact roadmap. Docs-only — no runtime enforcement. Complements the in-process contract below. |
 | [`HLDSPEC_BROWNFIELD_CONTEXT_SAFETY_AND_GAP_LEDGER.md`](HLDSPEC_BROWNFIELD_CONTEXT_SAFETY_AND_GAP_LEDGER.md) | In-process context-safety validation contract: mandatory Gap Ledger, worker decomposition, compact receipts, evidence maps, RunSkeptic reconciliation, authority boundary. Backed by `hldspec/context_safety_gap_contracts.py`. Complemented by the doctrine doc above. |
+| [`HLDSPEC_GAP_AND_OPEN_ISSUES_INVENTORY.md`](HLDSPEC_GAP_AND_OPEN_ISSUES_INVENTORY.md) | Stable inventory of known HLDspec gaps and open issues: context safety, spec decomposition, control-plane isolation, Journey 2 completeness, validation architecture, testing discipline, driver/readiness, and recommended next implementation sequence. Docs-only — no enforcement. |
 
 ---
 
