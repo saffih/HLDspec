@@ -7,6 +7,7 @@ Pure functions only: no filesystem, no child processes, no network, no CLI.
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 
 
@@ -80,6 +81,8 @@ _OPTIONAL_STRING_FIELDS = (
 _ACTIVE_STATUSES = frozenset({"SELECTED", "MATERIALIZED_TO_TARGET"})
 
 _SELECTION_STATUSES = frozenset({"READY_FOR_SELECTION", "SELECTED", "MATERIALIZED_TO_TARGET"})
+
+_SELECTABLE_STATUSES = frozenset({"PLANNED", "READY_FOR_SELECTION"})
 
 
 @dataclass
@@ -348,3 +351,75 @@ def build_advisory_spec_backlog(
         )
 
     return backlog
+
+
+def select_active_spec(backlog: object, spec_id: str) -> dict:
+    if not isinstance(spec_id, str):
+        raise ValueError("spec_id must be string")
+
+    validation = validate_spec_backlog(backlog)
+    if not validation.ok:
+        raise ValueError(
+            "input spec backlog is invalid: " + "; ".join(validation.errors)
+        )
+
+    if backlog["active_spec_id"] is not None:
+        raise ValueError(
+            "cannot select spec because another active spec already exists"
+        )
+
+    for spec in backlog["specs"]:
+        if spec["status"] in _ACTIVE_STATUSES:
+            raise ValueError(
+                "cannot select spec because another active spec already exists"
+            )
+
+    spec_map: dict[str, dict] = {s["spec_id"]: s for s in backlog["specs"]}
+
+    if spec_id not in spec_map:
+        raise ValueError(f"spec_id not found: {spec_id}")
+
+    candidate = spec_map[spec_id]
+
+    if candidate["status"] not in _SELECTABLE_STATUSES:
+        raise ValueError(
+            f"cannot select spec with status {candidate['status']}: {spec_id}"
+        )
+
+    if candidate["size_class"] == "TOO_LARGE":
+        raise ValueError(f"cannot select TOO_LARGE spec: {spec_id}")
+
+    if not candidate["validation_strategy"]:
+        raise ValueError(
+            f"cannot select spec without validation_strategy: {spec_id}"
+        )
+
+    if candidate["target_materialization"] != "NOT_MATERIALIZED":
+        raise ValueError(
+            f"cannot select spec with target_materialization "
+            f"{candidate['target_materialization']}: {spec_id}"
+        )
+
+    for dep in candidate["dependencies"]:
+        dep_status = spec_map[dep]["status"]
+        if dep_status not in ("DONE", "VALIDATED"):
+            raise ValueError(
+                f"cannot select spec with unresolved dependency: "
+                f"{spec_id} -> {dep}"
+            )
+
+    selected = copy.deepcopy(backlog)
+    selected["active_spec_id"] = spec_id
+    for spec in selected["specs"]:
+        if spec["spec_id"] == spec_id:
+            spec["status"] = "SELECTED"
+            break
+
+    output_validation = validate_spec_backlog(selected)
+    if not output_validation.ok:
+        raise ValueError(
+            "selected spec backlog is invalid: "
+            + "; ".join(output_validation.errors)
+        )
+
+    return selected
