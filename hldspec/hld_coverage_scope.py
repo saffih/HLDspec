@@ -102,6 +102,44 @@ def _validate_active_spec(errors: list[str], data: dict) -> None:
             errors.append("selected_hld_anchor_ids must be non-empty for ACTIVE_SPEC")
 
 
+def build_active_spec_coverage_scope(
+    *,
+    active_spec_id: str,
+    selected_hld_anchor_ids: list[str],
+    source_refs: list[str] | None = None,
+    notes: list[str] | None = None,
+) -> dict:
+    data = {
+        "schema_version": HLD_COVERAGE_SCOPE_SCHEMA_VERSION,
+        "coverage_scope": "ACTIVE_SPEC",
+        "active_spec_id": active_spec_id,
+        "selected_hld_anchor_ids": list(selected_hld_anchor_ids) if isinstance(selected_hld_anchor_ids, list) else selected_hld_anchor_ids,
+        "source_refs": list(source_refs) if isinstance(source_refs, list) else ([] if source_refs is None else source_refs),
+        "notes": list(notes) if isinstance(notes, list) else ([] if notes is None else notes),
+    }
+    result = validate_hld_coverage_scope(data)
+    if not result.ok:
+        raise ValueError(
+            f"generated active-spec hld coverage scope is invalid: {'; '.join(result.errors)}"
+        )
+    return data
+
+
+def build_active_spec_coverage_scope_from_selected_spec(
+    *,
+    active_spec_id: str,
+    selected_spec: dict,
+    source_refs: list[str] | None = None,
+    notes: list[str] | None = None,
+) -> dict:
+    return build_active_spec_coverage_scope(
+        active_spec_id=active_spec_id,
+        selected_hld_anchor_ids=selected_spec.get("hld_anchor_ids", []),
+        source_refs=source_refs,
+        notes=notes,
+    )
+
+
 def build_full_hld_coverage_scope(
     *,
     selected_hld_anchor_ids: list[str] | None = None,
