@@ -12,6 +12,7 @@ from hldspec.spec_backlog import (
     ALLOWED_SPEC_SIZE_CLASSES,
     ALLOWED_TARGET_MATERIALIZATION_STATES,
     SpecBacklogValidation,
+    build_advisory_spec_backlog,
     validate_spec_backlog,
 )
 
@@ -396,6 +397,242 @@ class TestNoInputMutation(unittest.TestCase):
         original = copy.deepcopy(data)
         validate_spec_backlog(data)
         self.assertEqual(data, original)
+
+
+# --- Advisory builder ---
+
+def _ref_map(*anchors):
+    """Build a minimal HLD reference map from (id, title) pairs."""
+    d = {}
+    for anchor_id, title in anchors:
+        d[anchor_id] = {"title": title, "heading": f"## {anchor_id} - {title}"}
+    return {"schema_version": 1, "anchors": d}
+
+
+class TestAdvisoryBuilderValid(unittest.TestCase):
+    def test_output_validates(self):
+        refs = _ref_map(("HLD-010", "Auth module"), ("HLD-020", "Data layer"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="2026-06-30T00:00:00Z", updated_at="2026-06-30T00:00:00Z",
+        )
+        result = validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_active_spec_id_is_none(self):
+        refs = _ref_map(("HLD-010", "Auth"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertIsNone(backlog["active_spec_id"])
+
+    def test_all_specs_planned(self):
+        refs = _ref_map(("HLD-010", "A"), ("HLD-020", "B"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        for spec in backlog["specs"]:
+            self.assertEqual(spec["status"], "PLANNED")
+
+    def test_all_specs_not_materialized(self):
+        refs = _ref_map(("HLD-010", "A"), ("HLD-020", "B"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        for spec in backlog["specs"]:
+            self.assertEqual(spec["target_materialization"], "NOT_MATERIALIZED")
+
+    def test_spec_ids_deterministic_and_zero_padded(self):
+        refs = _ref_map(("HLD-010", "A"), ("HLD-020", "B"), ("HLD-030", "C"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        ids = [s["spec_id"] for s in backlog["specs"]]
+        self.assertEqual(ids, ["SPEC-001", "SPEC-002", "SPEC-003"])
+
+    def test_input_order_preserved(self):
+        refs = _ref_map(("HLD-030", "Third"), ("HLD-010", "First"), ("HLD-020", "Second"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        anchor_ids = [s["hld_anchor_ids"][0] for s in backlog["specs"]]
+        self.assertEqual(anchor_ids, ["HLD-030", "HLD-010", "HLD-020"])
+
+    def test_top_level_fields_preserved(self):
+        refs = _ref_map(("HLD-010", "A"))
+        backlog = build_advisory_spec_backlog(
+            refs,
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-06-30T12:00:00Z",
+            source_refs=["docs/hld.md"],
+        )
+        self.assertEqual(backlog["created_at"], "2026-01-01T00:00:00Z")
+        self.assertEqual(backlog["updated_at"], "2026-06-30T12:00:00Z")
+        self.assertEqual(backlog["source_refs"], ["docs/hld.md"])
+
+    def test_omitted_source_refs_defaults_to_empty_list(self):
+        refs = _ref_map(("HLD-010", "A"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["source_refs"], [])
+
+
+class TestAdvisoryBuilderAnchorMapping(unittest.TestCase):
+    def test_hld_anchor_ids_contains_anchor_id(self):
+        refs = _ref_map(("HLD-010", "Auth"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["specs"][0]["hld_anchor_ids"], ["HLD-010"])
+
+    def test_title_uses_available_title(self):
+        refs = _ref_map(("HLD-010", "Auth module"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["specs"][0]["title"], "Auth module")
+
+    def test_title_fallback_when_no_title(self):
+        refs = {"schema_version": 1, "anchors": {"HLD-010": {}}}
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["specs"][0]["title"], "Candidate spec for HLD-010")
+
+    def test_capability_equals_title_when_present(self):
+        refs = _ref_map(("HLD-010", "Auth module"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["specs"][0]["capability"], "Auth module")
+
+    def test_capability_fallback_when_no_title(self):
+        refs = {"schema_version": 1, "anchors": {"HLD-010": {}}}
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        self.assertEqual(backlog["specs"][0]["capability"], "Address HLD-010")
+
+    def test_uses_anchor_level_source_refs_when_present(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_refs": ["docs/hld.md#HLD-010"],
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(
+            refs,
+            created_at="t",
+            updated_at="t",
+            source_refs=["docs/fallback.md"],
+        )
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/hld.md#HLD-010"])
+
+    def test_uses_anchor_level_source_ref_string_when_present(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_ref": "docs/hld.md#HLD-010",
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(refs, created_at="t", updated_at="t")
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/hld.md#HLD-010"])
+
+    def test_invalid_anchor_source_refs_falls_back_to_top_level_source_refs(self):
+        refs = {
+            "schema_version": 1,
+            "anchors": {
+                "HLD-010": {
+                    "title": "Auth",
+                    "source_refs": [123],
+                }
+            },
+        }
+        backlog = build_advisory_spec_backlog(
+            refs,
+            created_at="t",
+            updated_at="t",
+            source_refs=["docs/fallback.md"],
+        )
+        self.assertEqual(backlog["specs"][0]["source_refs"], ["docs/fallback.md"])
+
+
+class TestAdvisoryBuilderPurity(unittest.TestCase):
+    def test_does_not_mutate_input(self):
+        refs = _ref_map(("HLD-010", "A"), ("HLD-020", "B"))
+        original = copy.deepcopy(refs)
+        build_advisory_spec_backlog(refs, created_at="t", updated_at="t")
+        self.assertEqual(refs, original)
+
+    def test_no_selected_status(self):
+        refs = _ref_map(("HLD-010", "A"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        for spec in backlog["specs"]:
+            self.assertNotEqual(spec["status"], "SELECTED")
+            self.assertNotEqual(spec["status"], "READY_FOR_SELECTION")
+
+    def test_no_materialization(self):
+        refs = _ref_map(("HLD-010", "A"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        for spec in backlog["specs"]:
+            self.assertNotIn(spec["target_materialization"], (
+                "MATERIALIZED_TO_SINGLE_SPEC_INPUT", "SUPERSEDED_IN_TARGET",
+            ))
+
+
+class TestAdvisoryBuilderEdgeCases(unittest.TestCase):
+    def test_empty_anchors_produces_valid_empty_backlog(self):
+        refs = {"schema_version": 1, "anchors": {}}
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        result = validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(backlog["specs"], [])
+
+    def test_not_a_dict_input_returns_valid_empty_backlog(self):
+        backlog = build_advisory_spec_backlog(
+            "not a dict", created_at="t", updated_at="t",
+        )
+        result = validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(backlog["specs"], [])
+
+    def test_missing_anchors_key_returns_valid_empty_backlog(self):
+        backlog = build_advisory_spec_backlog(
+            {"schema_version": 1}, created_at="t", updated_at="t",
+        )
+        result = validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(backlog["specs"], [])
+
+    def test_anchor_with_none_meta_produces_fallback(self):
+        refs = {"schema_version": 1, "anchors": {"HLD-010": None}}
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t",
+        )
+        result = validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(backlog["specs"][0]["title"], "Candidate spec for HLD-010")
+
+    def test_source_refs_not_shared_across_specs(self):
+        refs = _ref_map(("HLD-010", "A"), ("HLD-020", "B"))
+        backlog = build_advisory_spec_backlog(
+            refs, created_at="t", updated_at="t", source_refs=["docs/hld.md"],
+        )
+        self.assertIsNot(backlog["specs"][0]["source_refs"], backlog["specs"][1]["source_refs"])
+        backlog["specs"][0]["source_refs"].append("mutated")
+        self.assertNotIn("mutated", backlog["specs"][1]["source_refs"])
 
 
 if __name__ == "__main__":

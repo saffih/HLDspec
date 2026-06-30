@@ -1,6 +1,6 @@
-"""Spec Backlog validator — pure validation of already-loaded data.
+"""Spec Backlog validator and advisory builder — pure functions on already-loaded data.
 
-Validates Python objects against the schema contract defined in
+Validates and builds Python objects against the schema contract defined in
 docs/MULTI_SPEC_BACKLOG_AND_ACTIVE_SELECTION.md.
 
 Pure functions only: no filesystem, no child processes, no network, no CLI.
@@ -263,3 +263,88 @@ def _validate_relationships(
                     dep_status = spec_map[dep].get("status")
                     if dep_status not in ("DONE", "VALIDATED"):
                         result.errors.append(f"{prefix}.selected dependency not done or validated: {dep}")
+
+
+def _anchor_source_refs(meta: dict, fallback: list[str]) -> list[str]:
+    raw = meta.get("source_refs")
+    if isinstance(raw, list) and all(isinstance(s, str) for s in raw):
+        return list(raw)
+
+    raw = meta.get("source_ref")
+    if isinstance(raw, str):
+        return [raw]
+
+    return list(fallback)
+
+
+def build_advisory_spec_backlog(
+    hld_references: object,
+    *,
+    created_at: str,
+    updated_at: str,
+    source_refs: list[str] | None = None,
+) -> dict:
+    """Build an advisory spec backlog from an already-loaded HLD reference map.
+
+    Accepted input shape (as produced by ``hld_marking.build_reference_map``):
+
+        {"schema_version": <int>, "anchors": {<anchor_id>: {"title": ..., ...}, ...}}
+
+    Each anchor becomes one advisory candidate spec with status ``PLANNED``.
+    No spec is selected, materialized, or marked ready.
+
+    If *hld_references* is not a dict or has no ``anchors`` dict, an empty
+    valid backlog is returned.
+
+    Raises ``ValueError`` if the generated backlog fails validation (should
+    not happen by construction).
+    """
+    resolved_source_refs = list(source_refs) if source_refs is not None else []
+
+    anchors: dict = {}
+    if isinstance(hld_references, dict):
+        raw = hld_references.get("anchors")
+        if isinstance(raw, dict):
+            anchors = raw
+
+    specs: list[dict] = []
+    for i, (anchor_id, meta) in enumerate(anchors.items(), start=1):
+        meta = meta if isinstance(meta, dict) else {}
+        title_raw = meta.get("title")
+        if isinstance(title_raw, str) and title_raw:
+            title = title_raw
+            capability = title_raw
+        else:
+            title = f"Candidate spec for {anchor_id}"
+            capability = f"Address {anchor_id}"
+
+        specs.append({
+            "spec_id": f"SPEC-{i:03d}",
+            "title": title,
+            "hld_anchor_ids": [anchor_id],
+            "capability": capability,
+            "status": "PLANNED",
+            "size_class": "BOUNDED_DELIVERABLE",
+            "dependencies": [],
+            "validation_strategy": ["focused_tests", "contract_validation"],
+            "target_materialization": "NOT_MATERIALIZED",
+            "source_refs": _anchor_source_refs(meta, resolved_source_refs),
+            "reason": "Advisory candidate derived from HLD reference map.",
+        })
+
+    backlog: dict = {
+        "schema_version": 1,
+        "created_at": created_at,
+        "updated_at": updated_at,
+        "source_refs": resolved_source_refs,
+        "active_spec_id": None,
+        "specs": specs,
+    }
+
+    validation = validate_spec_backlog(backlog)
+    if not validation.ok:
+        raise ValueError(
+            "generated spec backlog is invalid: " + "; ".join(validation.errors)
+        )
+
+    return backlog
