@@ -230,6 +230,14 @@ class TestInvalidInput(unittest.TestCase):
         self.assertTrue(len(scope_errors) >= 1)
         self.assertTrue(len(ledger_errors) >= 1)
 
+    def test_unknown_status_returns_ok_false(self):
+        ledger = [_ledger_item("HLD-001", "TOTALLY_UNKNOWN")]
+        result = interpret_coverage_ledger_for_scope(
+            coverage_ledger=ledger, coverage_scope=_valid_full_hld_scope(),
+        )
+        self.assertFalse(result.ok)
+        self.assertTrue(any("coverage_ledger invalid" in e for e in result.errors))
+
     def test_invalid_input_has_empty_classification(self):
         result = interpret_coverage_ledger_for_scope(
             coverage_ledger="bad", coverage_scope="bad",
