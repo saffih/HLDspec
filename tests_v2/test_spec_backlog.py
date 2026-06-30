@@ -13,6 +13,7 @@ from hldspec.spec_backlog import (
     ALLOWED_TARGET_MATERIALIZATION_STATES,
     SpecBacklogValidation,
     build_advisory_spec_backlog,
+    render_active_spec_to_single_spec_input,
     select_active_spec,
     validate_spec_backlog,
 )
@@ -863,6 +864,243 @@ class TestSelectActiveSpecPurity(unittest.TestCase):
         result = select_active_spec(data, "SPEC-001")
         self.assertEqual(len(result["specs"]), len(data["specs"]))
         self.assertEqual(result["schema_version"], data["schema_version"])
+
+
+# --- Active spec renderer: valid behavior ---
+
+
+def _selected_backlog(**spec_overrides):
+    """Build a valid backlog with one SELECTED active spec."""
+    spec_defaults = {
+        "spec_id": "SPEC-001",
+        "title": "Example title",
+        "hld_anchor_ids": ["HLD-001", "HLD-002"],
+        "capability": "Example capability",
+        "status": "SELECTED",
+        "size_class": "BOUNDED_DELIVERABLE",
+        "dependencies": [],
+        "validation_strategy": ["focused_tests", "contract_validation"],
+        "target_materialization": "NOT_MATERIALIZED",
+        "source_refs": ["docs/hld.md#HLD-001"],
+    }
+    spec_defaults.update(spec_overrides)
+    return {
+        "schema_version": 1,
+        "created_at": "2026-06-30T12:00:00Z",
+        "updated_at": "2026-06-30T12:00:00Z",
+        "source_refs": ["docs/example-hld.md"],
+        "active_spec_id": "SPEC-001",
+        "specs": [spec_defaults],
+    }
+
+
+class TestRenderActiveSpecValid(unittest.TestCase):
+    def test_render_succeeds_after_select(self):
+        data = _valid_backlog()
+        selected = select_active_spec(data, "SPEC-001")
+        result = render_active_spec_to_single_spec_input(selected)
+        self.assertIsInstance(result, str)
+
+    def test_output_is_string(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIsInstance(result, str)
+
+    def test_output_starts_with_heading(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertTrue(result.startswith("# Active Spec Input"))
+
+    def test_output_includes_spec_id(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("SPEC-001", result)
+
+    def test_output_includes_title(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("Example title", result)
+
+    def test_output_includes_capability(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("Example capability", result)
+
+    def test_output_includes_status_selected(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- Status: SELECTED", result)
+
+    def test_output_includes_target_materialization(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- Target Materialization: NOT_MATERIALIZED", result)
+
+    def test_output_includes_hld_anchors(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- HLD-001", result)
+        self.assertIn("- HLD-002", result)
+
+    def test_output_includes_dependencies(self):
+        s1 = _valid_spec(spec_id="SPEC-000", status="DONE")
+        spec = _valid_spec(
+            spec_id="SPEC-001",
+            status="SELECTED",
+            dependencies=["SPEC-000"],
+            source_refs=["docs/hld.md"],
+        )
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, spec])
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIn("- SPEC-000", result)
+
+    def test_output_includes_validation_strategy(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- focused_tests", result)
+        self.assertIn("- contract_validation", result)
+
+    def test_output_includes_source_refs(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- docs/hld.md#HLD-001", result)
+
+    def test_output_includes_boundary_text(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("one selected active spec only", result)
+
+    def test_output_excludes_non_selected_specs(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="SELECTED",
+                         source_refs=["docs/hld.md"])
+        s2 = _valid_spec(spec_id="SPEC-002", title="Other spec", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertNotIn("SPEC-002", result)
+        self.assertNotIn("Other spec", result)
+
+    def test_output_deterministic(self):
+        data = _selected_backlog()
+        r1 = render_active_spec_to_single_spec_input(data)
+        r2 = render_active_spec_to_single_spec_input(data)
+        self.assertEqual(r1, r2)
+
+    def test_does_not_mutate_input(self):
+        data = _selected_backlog()
+        original = copy.deepcopy(data)
+        render_active_spec_to_single_spec_input(data)
+        self.assertEqual(data, original)
+
+
+# --- Active spec renderer: empty-list formatting ---
+
+
+class TestRenderActiveSpecEmptyLists(unittest.TestCase):
+    def test_empty_dependencies_render_as_none(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog(dependencies=[]))
+        lines = result.split("\n")
+        dep_idx = lines.index("## Dependencies")
+        self.assertEqual(lines[dep_idx + 2], "- None")
+
+    def test_empty_source_refs_render_as_none(self):
+        data = _selected_backlog()
+        del data["specs"][0]["source_refs"]
+        result = render_active_spec_to_single_spec_input(data)
+        lines = result.split("\n")
+        ref_idx = lines.index("## Source References")
+        self.assertEqual(lines[ref_idx + 2], "- None")
+
+    def test_empty_hld_anchor_ids_render_as_none(self):
+        data = _selected_backlog(hld_anchor_ids=[])
+        result = render_active_spec_to_single_spec_input(data)
+        lines = result.split("\n")
+        anchor_idx = lines.index("## HLD Anchors")
+        self.assertEqual(lines[anchor_idx + 2], "- None")
+
+
+# --- Active spec renderer: error behavior ---
+
+
+class TestRenderActiveSpecErrors(unittest.TestCase):
+    def test_invalid_backlog_fails(self):
+        with self.assertRaises(ValueError) as ctx:
+            render_active_spec_to_single_spec_input({"bad": True})
+        self.assertIn("input spec backlog is invalid", str(ctx.exception))
+
+    def test_active_spec_id_none_fails(self):
+        data = _valid_backlog()
+        with self.assertRaises(ValueError) as ctx:
+            render_active_spec_to_single_spec_input(data)
+        self.assertIn("active_spec_id is required", str(ctx.exception))
+
+    def test_active_spec_id_not_matching_fails(self):
+        spec = _valid_spec(spec_id="SPEC-001", status="SELECTED")
+        data = _valid_backlog(active_spec_id="SPEC-999", specs=[spec])
+        with self.assertRaises(ValueError):
+            render_active_spec_to_single_spec_input(data)
+
+    def test_status_planned_fails(self):
+        spec = _valid_spec(spec_id="SPEC-001", status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        with self.assertRaises(ValueError):
+            render_active_spec_to_single_spec_input(data)
+
+    def test_status_ready_for_selection_fails(self):
+        spec = _valid_spec(spec_id="SPEC-001", status="READY_FOR_SELECTION")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        with self.assertRaises(ValueError):
+            render_active_spec_to_single_spec_input(data)
+
+    def test_status_materialized_to_target_fails(self):
+        spec = _valid_spec(
+            spec_id="SPEC-001",
+            status="MATERIALIZED_TO_TARGET",
+            target_materialization="MATERIALIZED_TO_SINGLE_SPEC_INPUT",
+        )
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        with self.assertRaises(ValueError) as ctx:
+            render_active_spec_to_single_spec_input(data)
+        self.assertIn("active spec must have status SELECTED", str(ctx.exception))
+
+    def test_target_materialization_materialized_fails(self):
+        spec = _valid_spec(
+            spec_id="SPEC-001",
+            status="MATERIALIZED_TO_TARGET",
+            target_materialization="MATERIALIZED_TO_SINGLE_SPEC_INPUT",
+        )
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[spec])
+        with self.assertRaises(ValueError):
+            render_active_spec_to_single_spec_input(data)
+
+
+# --- Active spec renderer: scope/purity safety ---
+
+
+class TestRenderActiveSpecPurity(unittest.TestCase):
+    def test_does_not_call_builder(self):
+        data = _selected_backlog()
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertIsInstance(result, str)
+        self.assertEqual(len(data["specs"]), 1)
+
+    def test_does_not_call_selector(self):
+        data = _selected_backlog()
+        original = copy.deepcopy(data)
+        render_active_spec_to_single_spec_input(data)
+        self.assertEqual(data, original)
+
+    def test_does_not_alter_target_materialization(self):
+        data = _selected_backlog()
+        render_active_spec_to_single_spec_input(data)
+        self.assertEqual(data["specs"][0]["target_materialization"], "NOT_MATERIALIZED")
+
+    def test_does_not_set_materialized_to_target_status(self):
+        data = _selected_backlog()
+        render_active_spec_to_single_spec_input(data)
+        self.assertNotEqual(data["specs"][0]["status"], "MATERIALIZED_TO_TARGET")
+
+    def test_does_not_include_all_backlog_candidates(self):
+        s1 = _valid_spec(spec_id="SPEC-001", status="SELECTED",
+                         source_refs=["docs/hld.md"])
+        s2 = _valid_spec(spec_id="SPEC-002", title="Unrelated candidate",
+                         status="PLANNED")
+        data = _valid_backlog(active_spec_id="SPEC-001", specs=[s1, s2])
+        result = render_active_spec_to_single_spec_input(data)
+        self.assertNotIn("SPEC-002", result)
+        self.assertNotIn("Unrelated candidate", result)
+
+    def test_output_does_not_mention_materialized_to_single_spec_input(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertNotIn("MATERIALIZED_TO_SINGLE_SPEC_INPUT", result)
 
 
 if __name__ == "__main__":
