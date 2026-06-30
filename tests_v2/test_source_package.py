@@ -7,6 +7,7 @@ from hldspec import gate_validator as gv
 from hldspec import hld_source_package as sp
 from hldspec import helper_registry as hr
 from hldspec import journey2_hld_coverage_contracts as cov
+from hldspec import spec_backlog as sb
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
@@ -78,6 +79,16 @@ class SourcePackageContractTests(unittest.TestCase):
     def test_hld_coverage_ledger_not_mirrored(self):
         # Journey 2 completeness evidence, not SpecKit runner context.
         self.assertNotIn(sp.AUTHORITATIVE_FILES["hld_coverage_ledger"], sp.MIRROR_FILES)
+
+    def test_spec_backlog_in_authoritative_files(self):
+        self.assertIn("spec_backlog", sp.AUTHORITATIVE_FILES)
+        self.assertEqual("spec_backlog.json", sp.AUTHORITATIVE_FILES["spec_backlog"])
+
+    def test_spec_backlog_not_in_required_files(self):
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["spec_backlog"], sp.REQUIRED_FILES)
+
+    def test_spec_backlog_not_in_mirror_files(self):
+        self.assertNotIn(sp.AUTHORITATIVE_FILES["spec_backlog"], sp.MIRROR_FILES)
 
     def test_manifest_excludes_itself(self):
         # The manifest must not try to hash source_manifest.json/source_package.json.
@@ -388,6 +399,119 @@ Uncovered behavior.
 
         self.assertFalse(result.passed)
         self.assertFalse(any("coverage" in blocker.lower() for blocker in result.blockers))
+
+    def test_build_emits_advisory_spec_backlog(self):
+        import json
+
+        hld_text = "# HLD\n\n## HLD-001 - Feature A\n\nHLD-ID: HLD-001\n\n## HLD-002 - Feature B\n\nHLD-ID: HLD-002\n"
+        build = sp.build_source_package_content(
+            self.root,
+            hld_text,
+            hld_source_ref=str(self.root / "SourceHLD.md"),
+            layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+
+        backlog_path = self.source_dir / sp.AUTHORITATIVE_FILES["spec_backlog"]
+        self.assertTrue(backlog_path.is_file(), msg="spec_backlog.json must be emitted by the builder")
+        backlog = json.loads(backlog_path.read_text(encoding="utf-8"))
+
+        result = sb.validate_spec_backlog(backlog)
+        self.assertTrue(result.ok, result.errors)
+
+        self.assertIsNone(backlog["active_spec_id"])
+        for spec in backlog["specs"]:
+            self.assertEqual(spec["status"], "PLANNED")
+            self.assertEqual(spec["target_materialization"], "NOT_MATERIALIZED")
+
+        anchor_ids = [s["hld_anchor_ids"][0] for s in backlog["specs"]]
+        self.assertIn("HLD-001", anchor_ids)
+        self.assertIn("HLD-002", anchor_ids)
+
+    def test_build_spec_backlog_deterministic_ordering(self):
+        import json
+
+        hld_text = "# HLD\n\n## HLD-003 - C\n\nHLD-ID: HLD-003\n\n## HLD-001 - A\n\nHLD-ID: HLD-001\n\n## HLD-002 - B\n\nHLD-ID: HLD-002\n"
+        build = sp.build_source_package_content(
+            self.root,
+            hld_text,
+            hld_source_ref=str(self.root / "SourceHLD.md"),
+            layout="new",
+        )
+        backlog = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["spec_backlog"]).read_text(encoding="utf-8")
+        )
+        ids = [s["spec_id"] for s in backlog["specs"]]
+        self.assertEqual(ids, [f"SPEC-{i:03d}" for i in range(1, len(ids) + 1)])
+
+    def test_build_spec_backlog_preserves_source_refs(self):
+        import json
+
+        hld_text = "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n"
+        ref = str(self.root / "SourceHLD.md")
+        build = sp.build_source_package_content(
+            self.root,
+            hld_text,
+            hld_source_ref=ref,
+            layout="new",
+        )
+        backlog = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["spec_backlog"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(backlog["source_refs"], [ref])
+
+    def test_manifest_tracks_spec_backlog(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        manifest_data = json.loads(
+            (self.source_dir / sp.SOURCE_MANIFEST_FILE).read_text(encoding="utf-8")
+        )
+        entry = manifest_data["files"].get("spec_backlog")
+        self.assertIsNotNone(entry, "manifest must include spec_backlog entry")
+        self.assertTrue(entry["present"])
+        self.assertIsNotNone(entry["sha256"])
+
+    def test_spec_backlog_not_in_mirror(self):
+        sp.build_source_package_content(
+            self.root,
+            "# HLD\n\n## HLD-001 - Feature\n\nHLD-ID: HLD-001\n",
+            hld_source_ref=str(self.root / "src.md"),
+            layout="new",
+        )
+        mirror_backlog = self.mirror_dir / sp.AUTHORITATIVE_FILES["spec_backlog"]
+        self.assertFalse(
+            mirror_backlog.exists(),
+            "spec_backlog.json must not appear in the SpecKit runner mirror",
+        )
+
+    def test_existing_validation_still_passes_without_spec_backlog(self):
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(
+            result.ok,
+            msg=f"validation must not require advisory spec_backlog: "
+            f"{result.missing} {result.hash_mismatches}",
+        )
+
+    def test_absent_spec_backlog_preserves_legacy_gate_behavior(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(result.passed)
+        self.assertFalse(any("backlog" in blocker.lower() for blocker in result.blockers))
 
 
 class SpecifyMirrorTests(unittest.TestCase):
