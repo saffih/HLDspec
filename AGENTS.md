@@ -1,3 +1,159 @@
+# HLDspec Agent Instructions
+
+## HLDspec control-plan loop aliases
+
+The canonical user-facing trigger remains `HLDspec ...`.
+
+The `HLD draft`, `HLD inspect`, `HLD improve`, `HLD backlog`, `HLD select`, `HLD
+handoff`, and `HLD speckit` phrases are convenience aliases for Codex/Claude
+agent sessions only.
+
+They are subordinate to `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` and
+`docs/HLDSPEC_MINIMAL_AGENT_UX.md`.
+
+On conflict, the canonical docs win.
+
+These aliases are agent instruction phrases only. They are not shell commands,
+CLI commands, runtime APIs, or implemented automation.
+
+Short aliases are allowed only when the missing context is unambiguous. If the
+current control plan, target repo, active spec, or required input cannot be
+resolved safely, do not guess. Return the safest explicit form the user should
+run, such as `HLD inspect plan <control-plan>` or
+`HLD draft target <target-repo> from <goal/context>`.
+
+HLDspec is the control-plan repo. The target repo is a brownfield implementation
+repo and may already contain code, docs, tests, partial features, or conflicting
+state.
+
+The control plan is the source of truth for:
+
+- HLD
+- TargetBinding
+- ToolchainBinding
+- spec backlog
+- active spec
+- dependency state
+- source package / handoff state
+- completion facts
+- next candidate facts
+
+The target repo is the implementation subject. Default toolchain: `speckit`.
+SpecKit runs in the target repo through a target-side agent/toolchain. HLDspec
+does not run SpecKit directly; HLDspec generates a handoff telling the user where
+to go, which agent/toolchain to open, what exact prompt to paste, and what result
+to return to HLDspec.
+
+If no control plan exists, `HLD draft target <target-repo> from <goal/context>`
+must propose a control-plan location and contents, then wait for human approval
+before writing.
+
+### `HLD draft target "<target-repo>" from "<goal/context/constraints>"`
+
+Meaning:
+
+- inspect the target repo read-only
+- treat the target as brownfield, not greenfield
+- draft an HLD grounded in existing target state and user goals
+- distinguish existing state, desired state, delta, preserve/do-not-touch areas, risks, unknowns, and later spec candidates
+- do not write files until human approval
+- do not create backlog
+- do not implement code
+- after explicit approval, write the HLD into the control plan by default, not the target repo
+- target-repo HLD copy is optional only if explicitly requested
+
+### `HLD inspect plan "<control-plan>"`
+
+Meaning:
+
+- read the control plan
+- read TargetBinding and ToolchainBinding
+- inspect the bound target repo only as needed
+- report current loop state, gaps, READY/BLOCKED specs, and next human-approved action
+- do not mutate anything
+
+Return only:
+
+```text
+CURRENT STATE:
+NEXT HUMAN ACTION:
+GAPS:
+```
+
+### `HLD improve plan "<control-plan>" from "<new context/changes/constraints>"`
+
+Meaning:
+
+- read existing HLD and current plan state
+- inspect target repo read-only as needed
+- propose an HLD update
+- report impact on backlog, active spec, source package/handoff, and implementation state
+- do not write until human approval
+
+### `HLD backlog plan "<control-plan>"`
+
+Meaning:
+
+- generate a proposed dependency-aware spec backlog from approved HLD, plan state, target repo state, gaps, risks, and constraints
+- do not write until human approval
+- do not select an active spec
+- do not implement code
+
+### `HLD select plan "<control-plan>" spec "<SPEC-ID>"`
+
+Meaning:
+
+- human-selected READY spec becomes active
+- refuse normal selection if dependencies are incomplete
+- allow blocked selection only with explicit human override
+- do not implement
+- do not select next spec
+
+### `HLD handoff plan "<control-plan>"`
+
+Meaning:
+
+- generate target-side handoff instructions for the selected active spec using the configured toolchain
+- do not run the target toolchain inside HLDspec
+- tell the user:
+  1. exact target directory to open
+  2. required agent/toolchain
+  3. exact prompt to paste
+  4. what result to return to HLDspec
+
+### `HLD speckit plan "<control-plan>"`
+
+Meaning:
+
+- SpecKit-specific specialization of `HLD handoff plan <control-plan>` when `ToolchainBinding` is `speckit`
+- generate a SpecKit-ready target-side prompt for the selected active spec only
+- do not execute SpecKit inside HLDspec
+
+## Loop
+
+HLD → spec backlog → human selects one active spec → render active spec source package → implement active spec only → check completion → show candidates → human selects next spec → repeat.
+
+## Rules
+
+The loop is human-approved. HLDspec may surface facts and candidates, but it must not automatically select, recommend, approve, or mutate the next active spec.
+
+Infer spec dependencies from the current HLD, plan state, and target repo state; mark each spec READY or BLOCKED; explain blockers; suggest only READY specs for human selection; never select automatically.
+
+When the next step requires a target-side toolchain, do not execute it inside HLDspec. Instead, generate a handoff that tells the user the exact target directory, the required agent/toolchain, and the exact prompt to paste. The handoff must be based on the current control-plan state, TargetBinding, ToolchainBinding, selected active spec, dependency state, current target repo state, and do-not-touch areas. Default toolchain is speckit unless the plan says otherwise.
+
+## Forbidden By Default
+
+Do not mutate files during HLD inspect.
+Do not select a spec automatically.
+Do not recommend a next spec unless explicitly asked.
+Do not implement code during inspect, draft, backlog, select, or handoff.
+Do not run broad repo scans.
+Do not change backlog/status without explicit human approval.
+Do not change source-package logic.
+Do not change Journey/gate/readiness behavior.
+
+---
+
 # Agent bootstrap for this repo
 
 > **Canonical system model:** for terminology, ownership boundaries, the full flow, and the SpecKit Run Card, read `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` — it is authoritative and wins on any conflict.
