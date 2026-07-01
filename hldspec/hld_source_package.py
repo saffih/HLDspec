@@ -210,6 +210,7 @@ class ManifestEntry:
 class SourcePackageValidation:
     missing: list[str] = field(default_factory=list)
     hash_mismatches: list[str] = field(default_factory=list)
+    semantic_errors: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -291,6 +292,165 @@ def write_source_package(
     return metadata
 
 
+def _validate_receipt_semantics(source_dir: Path) -> list[str]:
+    """Validate active-spec receipt consistency with scope, files, and ledger.
+
+    Returns a list of deterministic semantic error strings. Never raises.
+    """
+    import json
+
+    errors: list[str] = []
+    scope_path = source_dir / AUTHORITATIVE_FILES["hld_coverage_scope"]
+    receipt_path = source_dir / AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+
+    scope_present = scope_path.is_file()
+    receipt_present = receipt_path.is_file()
+
+    if not scope_present and not receipt_present:
+        return errors
+
+    if receipt_present and not scope_present:
+        errors.append("active_spec_materialization_receipt present but hld_coverage_scope.json missing")
+        return errors
+
+    try:
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        errors.append("hld_coverage_scope.json is malformed")
+        return errors
+
+    if not isinstance(scope, dict):
+        errors.append("hld_coverage_scope.json is not a JSON object")
+        return errors
+
+    scope_mode = scope.get("coverage_scope")
+
+    if scope_mode == "FULL_HLD":
+        if receipt_present:
+            errors.append("active_spec_materialization_receipt present in FULL_HLD mode")
+        return errors
+
+    if scope_mode != "ACTIVE_SPEC":
+        return errors
+
+    if not receipt_present:
+        errors.append("ACTIVE_SPEC scope requires active_spec_materialization_receipt.json")
+        return errors
+
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        errors.append("active_spec_materialization_receipt.json is malformed JSON")
+        return errors
+
+    if not isinstance(receipt, dict):
+        errors.append("active_spec_materialization_receipt.json is not a JSON object")
+        return errors
+
+    if receipt.get("schema_version") != 1:
+        errors.append("receipt schema_version must be 1")
+    if receipt.get("receipt_type") != "ACTIVE_SPEC_SOURCE_PACKAGE_RENDER":
+        errors.append("receipt receipt_type must be ACTIVE_SPEC_SOURCE_PACKAGE_RENDER")
+    if receipt.get("coverage_scope") != "ACTIVE_SPEC":
+        errors.append("receipt coverage_scope must be ACTIVE_SPEC")
+
+    receipt_spec_id = receipt.get("active_spec_id")
+    if not isinstance(receipt_spec_id, str) or not receipt_spec_id:
+        errors.append("receipt active_spec_id must be non-empty string")
+
+    receipt_anchors = receipt.get("selected_hld_anchor_ids")
+    if not isinstance(receipt_anchors, list) or not all(isinstance(s, str) for s in receipt_anchors):
+        errors.append("receipt selected_hld_anchor_ids must be list of strings")
+
+    if receipt.get("target_materialization") != "NOT_MATERIALIZED":
+        errors.append("receipt target_materialization must be NOT_MATERIALIZED")
+
+    rendered = receipt.get("rendered_file")
+    expected_rendered = AUTHORITATIVE_FILES["single_spec_input"]
+    if rendered != expected_rendered:
+        errors.append(f"receipt rendered_file must be {expected_rendered}")
+
+    scope_file = receipt.get("coverage_scope_file")
+    expected_scope_file = AUTHORITATIVE_FILES["hld_coverage_scope"]
+    if scope_file != expected_scope_file:
+        errors.append(f"receipt coverage_scope_file must be {expected_scope_file}")
+
+    ledger_file = receipt.get("coverage_ledger_file")
+    expected_ledger_file = AUTHORITATIVE_FILES["hld_coverage_ledger"]
+    if ledger_file != expected_ledger_file:
+        errors.append(f"receipt coverage_ledger_file must be {expected_ledger_file}")
+
+    created_at = receipt.get("created_at")
+    if not isinstance(created_at, str) or not created_at:
+        errors.append("receipt created_at must be non-empty string")
+
+    notes = receipt.get("notes")
+    if not isinstance(notes, list):
+        errors.append("receipt notes must be a list")
+
+    # --- Consistency: receipt vs scope ---
+    scope_spec_id = scope.get("active_spec_id")
+    if isinstance(receipt_spec_id, str) and receipt_spec_id and scope_spec_id != receipt_spec_id:
+        errors.append(
+            f"receipt active_spec_id ({receipt_spec_id}) differs from scope ({scope_spec_id})"
+        )
+
+    scope_anchors = scope.get("selected_hld_anchor_ids")
+    if (
+        isinstance(receipt_anchors, list)
+        and isinstance(scope_anchors, list)
+        and receipt_anchors != scope_anchors
+    ):
+        errors.append("receipt selected_hld_anchor_ids differs from scope")
+
+    if isinstance(receipt.get("coverage_scope"), str) and scope_mode != receipt.get("coverage_scope"):
+        errors.append("receipt coverage_scope differs from scope coverage_scope")
+
+    # --- File-ref existence ---
+    if isinstance(rendered, str) and rendered and not (source_dir / rendered).is_file():
+        errors.append(f"receipt rendered_file references missing file: {rendered}")
+
+    if isinstance(scope_file, str) and scope_file and not (source_dir / scope_file).is_file():
+        errors.append(f"receipt coverage_scope_file references missing file: {scope_file}")
+
+    if isinstance(ledger_file, str) and ledger_file and not (source_dir / ledger_file).is_file():
+        errors.append(f"receipt coverage_ledger_file references missing file: {ledger_file}")
+
+    # --- Manifest entry ---
+    manifest = load_json_dict(source_dir / SOURCE_MANIFEST_FILE).get("files", {})
+    manifest_entry = manifest.get("active_spec_materialization_receipt")
+    if not manifest_entry or not manifest_entry.get("present"):
+        errors.append("manifest must include present entry for active_spec_materialization_receipt")
+    elif not manifest_entry.get("sha256"):
+        errors.append("manifest entry for receipt must include sha256")
+
+    # --- Selected-anchor coverage via interpreter ---
+    ledger_path = source_dir / AUTHORITATIVE_FILES["hld_coverage_ledger"]
+    if ledger_path.is_file():
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            ledger = None
+
+        if ledger is not None:
+            from .hld_coverage_scope_interpretation import interpret_coverage_ledger_for_scope
+
+            interp = interpret_coverage_ledger_for_scope(
+                coverage_ledger=ledger, coverage_scope=scope,
+            )
+            if not interp.ok:
+                errors.append(
+                    f"coverage ledger interpretation failed: {'; '.join(interp.errors)}"
+                )
+            elif interp.blocking_items:
+                blocked_ids = [item.get("hld_item_id", "?") for item in interp.blocking_items]
+                errors.append(
+                    f"selected anchors not covered: {', '.join(blocked_ids)}"
+                )
+
+    return errors
+
+
 def validate_source_package(source_dir: Path) -> SourcePackageValidation:
     """Check required files are present and that any recorded manifest hashes
     still match the files on disk."""
@@ -310,6 +470,8 @@ def validate_source_package(source_dir: Path) -> SourcePackageValidation:
             result.missing.append(filename)
         elif _sha256(path) != recorded_hash:
             result.hash_mismatches.append(filename)
+
+    result.semantic_errors = _validate_receipt_semantics(source_dir)
     return result
 
 
