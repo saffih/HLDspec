@@ -141,14 +141,14 @@ Infer spec dependencies from the current HLD, plan state, and target repo state;
 
 When the next step requires a target-side toolchain, do not execute it inside HLDspec. Instead, generate a handoff that tells the user the exact target directory, the required agent/toolchain, and the exact prompt to paste. The handoff must be based on the current control-plan state, TargetBinding, ToolchainBinding, selected active spec, dependency state, current target repo state, and do-not-touch areas. Default toolchain is speckit unless the plan says otherwise.
 
-## Forbidden
+## Forbidden By Default
 
 Do not mutate files during HLD inspect.
-Do not select a spec.
+Do not select a spec automatically.
 Do not recommend a next spec unless explicitly asked.
-Do not implement code.
+Do not implement code during inspect, draft, backlog, select, or handoff.
 Do not run broad repo scans.
-Do not change backlog/status.
+Do not change backlog/status without explicit human approval.
 Do not change source-package logic.
 Do not change Journey/gate/readiness behavior.
 
