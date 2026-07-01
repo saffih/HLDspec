@@ -517,6 +517,39 @@ def build_initial_hld_coverage_ledger(
     return ledger
 
 
+def _resolve_active_spec(backlog: object) -> tuple[str, dict]:
+    """Validate an explicit active-spec backlog and return (spec_id, spec_dict).
+
+    Fails fast with ValueError on any invalid input. Never falls back to FULL_HLD.
+    """
+    validation = spec_backlog.validate_spec_backlog(backlog)
+    if not validation.ok:
+        raise ValueError(
+            "active_spec_backlog is invalid: " + "; ".join(validation.errors)
+        )
+
+    active_spec_id = backlog["active_spec_id"]  # type: ignore[index]
+    if not isinstance(active_spec_id, str) or not active_spec_id:
+        raise ValueError("active_spec_id is required for active-spec source-package mode")
+
+    active_spec = None
+    for s in backlog["specs"]:  # type: ignore[index]
+        if s["spec_id"] == active_spec_id:
+            active_spec = s
+            break
+
+    if active_spec is None:
+        raise ValueError(f"active spec not found: {active_spec_id}")
+
+    if active_spec["status"] != "SELECTED":
+        raise ValueError(f"active spec must have status SELECTED: {active_spec_id}")
+
+    if active_spec["target_materialization"] != "NOT_MATERIALIZED":
+        raise ValueError(f"active spec must not be materialized: {active_spec_id}")
+
+    return active_spec_id, active_spec
+
+
 def build_source_package_content(
     target_root: Path,
     hld_text: str,
@@ -527,6 +560,7 @@ def build_source_package_content(
     layout: str = "new",
     materialize_mirror: bool = True,
     source_sha256: str | None = None,
+    active_spec_backlog: object | None = None,
 ) -> SourcePackageBuild:
     """Real content flow: turn an HLD into the full source-package content.
 
@@ -535,9 +569,20 @@ def build_source_package_content(
     regenerates the .specify/source/ mirror. Returns a structured build result
     (does not raise on content findings — unsupported claims surface for the
     gate, matching the SourcePackageValidation pattern).
+
+    When *active_spec_backlog* is provided, the single_spec_input and coverage
+    scope are rendered for the selected active spec instead of the full HLD.
+    The coverage ledger is built from the actual written spec input (full-HLD
+    in FULL_HLD mode, active-spec rendered content in ACTIVE_SPEC mode) so
+    ledger evidence always matches the written file.
     """
     # Imported here to avoid an import cycle (those modules import this one).
     from . import hld_marking, single_spec_input, implementation_slicing, engineering_selection
+
+    active_spec_id: str | None = None
+    active_spec: dict | None = None
+    if active_spec_backlog is not None:
+        active_spec_id, active_spec = _resolve_active_spec(active_spec_backlog)
 
     # Resolve through the single pointer-aware resolver so write lands where the
     # driver reads (controller root in external mode, in-target otherwise).
@@ -551,12 +596,18 @@ def build_source_package_content(
     ref_map = hld_marking.build_reference_map(hld_text)
     write_json_dict(source_dir / AUTHORITATIVE_FILES["reference_map"], ref_map)
 
-    spec_input = single_spec_input.build_single_spec_input(hld_text, project_name=project_name)
-    (source_dir / AUTHORITATIVE_FILES["single_spec_input"]).write_text(spec_input, encoding="utf-8")
+    full_hld_spec_input = single_spec_input.build_single_spec_input(hld_text, project_name=project_name)
+
+    if active_spec_backlog is not None:
+        written_spec_input = spec_backlog.render_active_spec_to_single_spec_input(active_spec_backlog)
+    else:
+        written_spec_input = full_hld_spec_input
+
+    (source_dir / AUTHORITATIVE_FILES["single_spec_input"]).write_text(written_spec_input, encoding="utf-8")
 
     write_json_dict(
         source_dir / AUTHORITATIVE_FILES["hld_coverage_ledger"],
-        build_initial_hld_coverage_ledger(ref_map, spec_input),
+        build_initial_hld_coverage_ledger(ref_map, written_spec_input),
     )
 
     now = utc_now()
@@ -570,12 +621,22 @@ def build_source_package_content(
         ),
     )
 
-    write_json_dict(
-        source_dir / AUTHORITATIVE_FILES["hld_coverage_scope"],
-        hld_coverage_scope.build_full_hld_coverage_scope(
+    if active_spec_id is not None and active_spec is not None:
+        scope = hld_coverage_scope.build_active_spec_coverage_scope_from_selected_spec(
+            active_spec_id=active_spec_id,
+            selected_spec=active_spec,
+            source_refs=[hld_source_ref],
+            notes=["Explicit active-spec source-package mode."],
+        )
+    else:
+        scope = hld_coverage_scope.build_full_hld_coverage_scope(
             source_refs=[hld_source_ref],
             notes=["Full-HLD source-package coverage scope. Existing behavior preserved."],
-        ),
+        )
+
+    write_json_dict(
+        source_dir / AUTHORITATIVE_FILES["hld_coverage_scope"],
+        scope,
     )
 
     for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
@@ -602,7 +663,7 @@ def build_source_package_content(
     )
 
     valid_anchors = set(ref_map["anchors"].keys())
-    unsupported = single_spec_input.find_unsupported_claims(spec_input, valid_anchors)
+    unsupported = single_spec_input.find_unsupported_claims(full_hld_spec_input, valid_anchors)
     marking_errors = hld_marking.anchor_integrity_errors(hld_text)
 
     write_source_package(

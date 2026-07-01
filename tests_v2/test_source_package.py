@@ -886,5 +886,434 @@ class HelperRecommendationsTests(unittest.TestCase):
         )
 
 
+def _selected_backlog(**overrides) -> dict:
+    """A valid spec backlog with one SELECTED active spec."""
+    base = {
+        "schema_version": 1,
+        "created_at": "2026-07-01T00:00:00Z",
+        "updated_at": "2026-07-01T00:00:00Z",
+        "source_refs": ["docs/hld.md"],
+        "active_spec_id": "SPEC-001",
+        "specs": [
+            {
+                "spec_id": "SPEC-001",
+                "title": "Auth Module",
+                "hld_anchor_ids": ["HLD-001"],
+                "capability": "Authentication",
+                "status": "SELECTED",
+                "size_class": "BOUNDED_DELIVERABLE",
+                "dependencies": [],
+                "validation_strategy": ["integration_tests"],
+                "target_materialization": "NOT_MATERIALIZED",
+                "source_refs": ["docs/hld.md"],
+            },
+            {
+                "spec_id": "SPEC-002",
+                "title": "Logging Module",
+                "hld_anchor_ids": ["HLD-002"],
+                "capability": "Observability",
+                "status": "PLANNED",
+                "size_class": "BOUNDED_DELIVERABLE",
+                "dependencies": [],
+                "validation_strategy": ["unit_tests"],
+                "target_materialization": "NOT_MATERIALIZED",
+            },
+        ],
+    }
+    base.update(overrides)
+    return base
+
+
+_MULTI_ANCHOR_HLD = (
+    "# HLD\n\n"
+    "## HLD-001 - Auth\n\nHLD-ID: HLD-001\n\nAuth module.\n\n"
+    "## HLD-002 - Logging\n\nHLD-ID: HLD-002\n\nLogging module.\n"
+)
+
+
+class ActiveSpecSourcePackageDefaultCompatibilityTests(unittest.TestCase):
+    """Default (no active_spec_backlog) must be fully behavior-compatible."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_default_build_emits_full_hld_coverage_scope(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["coverage_scope"], "FULL_HLD")
+        self.assertIsNone(scope["active_spec_id"])
+
+    def test_default_build_single_spec_input_is_full_hld(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertNotIn("# Active Spec Input", text)
+
+    def test_default_build_does_not_require_active_spec_backlog(self):
+        build = sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+
+    def test_default_build_preserves_bare_list_ledger(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        self.assertIsInstance(ledger, list)
+        cov.validate_coverage_ledger(ledger)
+
+
+class ActiveSpecSourcePackageModeTests(unittest.TestCase):
+    """Explicit ACTIVE_SPEC mode via active_spec_backlog parameter."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_active_spec_single_spec_input_starts_with_header(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("# Active Spec Input"))
+
+    def test_active_spec_input_includes_selected_spec_details(self):
+        backlog = _selected_backlog()
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=backlog,
+        )
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertIn("SPEC-001", text)
+        self.assertIn("Auth Module", text)
+        self.assertIn("HLD-001", text)
+
+    def test_active_spec_input_excludes_non_selected_specs(self):
+        backlog = _selected_backlog()
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=backlog,
+        )
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertNotIn("SPEC-002", text)
+        self.assertNotIn("Logging Module", text)
+
+    def test_active_spec_coverage_scope_is_active_spec(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["coverage_scope"], "ACTIVE_SPEC")
+
+    def test_active_spec_coverage_scope_has_matching_spec_id(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["active_spec_id"], "SPEC-001")
+
+    def test_active_spec_selected_anchors_match_spec(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["selected_hld_anchor_ids"], ["HLD-001"])
+
+    def test_active_spec_coverage_scope_validates(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        result = hcs.validate_hld_coverage_scope(scope)
+        self.assertTrue(result.ok, result.errors)
+
+    def test_active_spec_ledger_remains_bare_list(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        self.assertIsInstance(ledger, list)
+        cov.validate_coverage_ledger(ledger)
+
+    def test_active_spec_ledger_evaluates_written_input(self):
+        """Ledger must be built from active-spec input, not full-HLD input."""
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertIn("(HLD-001)", text)
+        self.assertNotIn("(HLD-002)", text)
+
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        self.assertIsInstance(ledger, list)
+
+        hld001_row = next((item for item in ledger if item["hld_item_id"] == "HLD-001"), None)
+        hld002_row = next((item for item in ledger if item["hld_item_id"] == "HLD-002"), None)
+        self.assertIsNotNone(hld001_row)
+        self.assertIsNotNone(hld002_row)
+        self.assertEqual(hld001_row["status"], "COVERED_IN_SDD")
+        self.assertEqual(hld002_row["status"], "NOT_COVERED")
+
+    def test_active_spec_interpretation_classifies_non_selected_as_out_of_scope(self):
+        """NOT_COVERED anchors outside selected scope must appear in out_of_scope_items."""
+        import json
+        from hldspec.hld_coverage_scope_interpretation import interpret_coverage_ledger_for_scope
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+
+        result = interpret_coverage_ledger_for_scope(
+            coverage_ledger=ledger,
+            coverage_scope=scope,
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.blocking_items, [])
+        hld002_out = [item for item in result.out_of_scope_items if item["hld_item_id"] == "HLD-002"]
+        self.assertEqual(len(hld002_out), 1)
+
+    def test_active_spec_mirrored_single_spec_input_is_active(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        mirrored = (self.mirror_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertIn("# Active Spec Input", mirrored)
+
+    def test_active_spec_sidecar_not_mirrored(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        self.assertFalse(
+            (self.mirror_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).exists(),
+        )
+
+    def test_no_new_gate_blockers(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(any("active_spec" in b.lower() for b in result.blockers))
+
+
+class ActiveSpecSourcePackageInvalidInputTests(unittest.TestCase):
+    """Invalid explicit ACTIVE_SPEC input must fail fast, never fall back."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_invalid_backlog_raises(self):
+        with self.assertRaises(ValueError) as cm:
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog={"bad": "data"},
+            )
+        self.assertIn("invalid", str(cm.exception).lower())
+
+    def test_missing_active_spec_id_raises(self):
+        backlog = _selected_backlog(active_spec_id=None)
+        backlog["specs"][0]["status"] = "PLANNED"
+        with self.assertRaises(ValueError) as cm:
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=backlog,
+            )
+        self.assertIn("active_spec_id", str(cm.exception))
+
+    def test_active_spec_not_found_raises(self):
+        backlog = _selected_backlog(active_spec_id="SPEC-999")
+        with self.assertRaises(ValueError):
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=backlog,
+            )
+
+    def test_active_spec_not_selected_raises(self):
+        backlog = _selected_backlog()
+        backlog["specs"][0]["status"] = "PLANNED"
+        with self.assertRaises(ValueError):
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=backlog,
+            )
+
+    def test_materialized_spec_raises(self):
+        backlog = _selected_backlog()
+        backlog["specs"][0]["target_materialization"] = "SUPERSEDED_IN_TARGET"
+        with self.assertRaises(ValueError) as cm:
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=backlog,
+            )
+        self.assertIn("materialized", str(cm.exception).lower())
+
+    def test_no_silent_fallback_to_full_hld(self):
+        """Invalid active_spec_backlog must raise, never silently produce FULL_HLD."""
+        with self.assertRaises(ValueError):
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog={"not": "valid"},
+            )
+        scope_path = (
+            TargetWorkspaceAdapter(target_root=self.root, layout="new").source_package_dir
+            / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        )
+        self.assertFalse(scope_path.exists(), "must not write scope on invalid input")
+
+
+class ActiveSpecSourcePackageScopeTests(unittest.TestCase):
+    """Ensure no mutation, no auto-selection, no target/gate/driver leakage."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_input_backlog_not_mutated(self):
+        import copy
+
+        backlog = _selected_backlog()
+        frozen = copy.deepcopy(backlog)
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=backlog,
+        )
+        self.assertEqual(frozen, backlog)
+
+    def test_select_active_spec_not_called(self):
+        with patch("hldspec.spec_backlog.select_active_spec") as mock_select:
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=_selected_backlog(),
+            )
+            mock_select.assert_not_called()
+
+    def test_no_new_write_locations_vs_default(self):
+        """Active-spec mode must not introduce new file paths vs default."""
+        import tempfile
+
+        default_tmp = tempfile.TemporaryDirectory()
+        default_root = Path(default_tmp.name)
+        try:
+            sp.build_source_package_content(
+                default_root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+            )
+            default_paths = sorted(
+                p.relative_to(default_root) for p in default_root.rglob("*") if p.is_file()
+            )
+        finally:
+            default_tmp.cleanup()
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        active_paths = sorted(
+            p.relative_to(self.root) for p in self.root.rglob("*") if p.is_file()
+        )
+        self.assertEqual(default_paths, active_paths)
+
+
 if __name__ == "__main__":
     unittest.main()

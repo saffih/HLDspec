@@ -364,6 +364,12 @@ def _format_list(items: list[str]) -> str:
     return "\n".join(f"- {_markdown_scalar(item)}" for item in items)
 
 
+def _format_hld_anchor_list(items: list[str]) -> str:
+    if not items:
+        return "- None"
+    return "\n".join(f"- ({_markdown_scalar(item)})" for item in items)
+
+
 def render_active_spec_to_single_spec_input(backlog: object) -> str:
     validation = validate_spec_backlog(backlog)
     if not validation.ok:
@@ -413,7 +419,7 @@ def render_active_spec_to_single_spec_input(backlog: object) -> str:
         "",
         "## HLD Anchors",
         "",
-        _format_list(active_spec["hld_anchor_ids"]),
+        _format_hld_anchor_list(active_spec["hld_anchor_ids"]),
         "",
         "## Dependencies",
         "",
