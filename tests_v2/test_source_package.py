@@ -1546,5 +1546,421 @@ class ActiveSpecReceiptScopeTests(unittest.TestCase):
         )
 
 
+class ActiveSpecReceiptValidationCompatibilityTests(unittest.TestCase):
+    """Default / FULL_HLD packages validate OK without receipt — no regression."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_default_full_hld_no_receipt_no_semantic_errors(self):
+        build = sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        self.assertTrue(build.ok)
+        self.assertEqual(build.validation.semantic_errors, [])
+
+    def test_seeded_package_no_scope_no_receipt_no_semantic_errors(self):
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(result.ok)
+        self.assertEqual(result.semantic_errors, [])
+
+    def test_default_build_does_not_emit_receipt(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        receipt_path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertFalse(receipt_path.exists())
+
+    def test_default_mirror_unchanged(self):
+        build = sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        self.assertIn(sp.AUTHORITATIVE_FILES["hld"], build.mirrored)
+
+
+class ActiveSpecReceiptValidationPositiveTests(unittest.TestCase):
+    """ACTIVE_SPEC packages must validate receipt successfully."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _build_active(self):
+        return sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+
+    def test_valid_active_spec_ok_no_semantic_errors(self):
+        build = self._build_active()
+        self.assertTrue(build.ok)
+        self.assertEqual(build.validation.semantic_errors, [])
+
+    def test_receipt_manifest_entry_present_with_sha256(self):
+        import json
+
+        self._build_active()
+        manifest = json.loads(
+            (self.source_dir / sp.SOURCE_MANIFEST_FILE).read_text(encoding="utf-8")
+        )
+        entry = manifest["files"].get("active_spec_materialization_receipt")
+        self.assertIsNotNone(entry)
+        self.assertTrue(entry["present"])
+        self.assertIsNotNone(entry["sha256"])
+
+    def test_receipt_scope_active_spec_id_match(self):
+        import json
+
+        self._build_active()
+        receipt = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(receipt["active_spec_id"], scope["active_spec_id"])
+
+    def test_receipt_scope_selected_anchors_match(self):
+        import json
+
+        self._build_active()
+        receipt = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(receipt["selected_hld_anchor_ids"], scope["selected_hld_anchor_ids"])
+
+    def test_receipt_file_refs_exist(self):
+        import json
+
+        self._build_active()
+        receipt = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]).read_text(encoding="utf-8")
+        )
+        self.assertTrue((self.source_dir / receipt["rendered_file"]).is_file())
+        self.assertTrue((self.source_dir / receipt["coverage_scope_file"]).is_file())
+        self.assertTrue((self.source_dir / receipt["coverage_ledger_file"]).is_file())
+
+    def test_selected_anchors_covered_via_interpretation(self):
+        import json
+        from hldspec.hld_coverage_scope_interpretation import interpret_coverage_ledger_for_scope
+
+        self._build_active()
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        result = interpret_coverage_ledger_for_scope(
+            coverage_ledger=ledger, coverage_scope=scope,
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.blocking_items, [])
+
+    def test_non_selected_not_covered_is_out_of_scope(self):
+        import json
+        from hldspec.hld_coverage_scope_interpretation import interpret_coverage_ledger_for_scope
+
+        self._build_active()
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        result = interpret_coverage_ledger_for_scope(
+            coverage_ledger=ledger, coverage_scope=scope,
+        )
+        hld002_out = [i for i in result.out_of_scope_items if i["hld_item_id"] == "HLD-002"]
+        self.assertEqual(len(hld002_out), 1)
+
+
+class ActiveSpecReceiptValidationNegativeTests(unittest.TestCase):
+    """Negative tests: deterministic semantic errors on bad receipt state."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _build_active_then_validate(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+
+    def _mutate_receipt(self, **overrides):
+        """Mutate receipt fields then recompute manifest so hash stays valid."""
+        import json
+
+        receipt_path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt.update(overrides)
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+
+    def _mutate_scope(self, **overrides):
+        """Mutate scope fields then recompute manifest."""
+        import json
+
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope.update(overrides)
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+
+    def test_active_spec_scope_but_receipt_missing(self):
+        self._build_active_then_validate()
+        (self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]).unlink()
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("requires" in e for e in result.semantic_errors))
+
+    def test_receipt_present_but_scope_missing(self):
+        self._build_active_then_validate()
+        (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).unlink()
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("missing" in e.lower() for e in result.semantic_errors))
+
+    def test_receipt_in_full_hld_mode(self):
+        self._build_active_then_validate()
+        self._mutate_scope(coverage_scope="FULL_HLD", active_spec_id=None)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("FULL_HLD" in e for e in result.semantic_errors))
+
+    def test_wrong_receipt_type(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(receipt_type="WRONG_TYPE")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("receipt_type" in e for e in result.semantic_errors))
+
+    def test_wrong_schema_version(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(schema_version=99)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("schema_version" in e for e in result.semantic_errors))
+
+    def test_wrong_receipt_coverage_scope(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(coverage_scope="FULL_HLD")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("coverage_scope" in e for e in result.semantic_errors))
+
+    def test_receipt_spec_id_differs_from_scope(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(active_spec_id="SPEC-WRONG")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("active_spec_id" in e and "differs" in e for e in result.semantic_errors))
+
+    def test_receipt_anchors_differ_from_scope(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(selected_hld_anchor_ids=["HLD-999"])
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("selected_hld_anchor_ids" in e for e in result.semantic_errors))
+
+    def test_receipt_wrong_target_materialization(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(target_materialization="SUPERSEDED_IN_TARGET")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("target_materialization" in e for e in result.semantic_errors))
+
+    def test_receipt_rendered_file_ref_missing(self):
+        self._build_active_then_validate()
+        (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).unlink()
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("rendered_file" in e and "missing" in e for e in result.semantic_errors))
+
+    def test_receipt_rendered_file_ref_wrong(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(rendered_file="HLD.md")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("rendered_file" in e for e in result.semantic_errors))
+
+    def test_receipt_coverage_scope_file_ref_wrong(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(coverage_scope_file="HLD.md")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("coverage_scope_file" in e for e in result.semantic_errors))
+
+    def test_receipt_coverage_ledger_file_ref_wrong(self):
+        self._build_active_then_validate()
+        self._mutate_receipt(coverage_ledger_file="HLD.md")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("coverage_ledger_file" in e for e in result.semantic_errors))
+
+    def test_selected_anchor_not_covered_in_ledger(self):
+        """A selected anchor that is NOT_COVERED must produce a semantic error."""
+        import json
+
+        self._build_active_then_validate()
+        ledger_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        for item in ledger:
+            if item["hld_item_id"] == "HLD-001":
+                item["status"] = "NOT_COVERED"
+                item["sdd_section"] = None
+        ledger_path.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("not covered" in e.lower() for e in result.semantic_errors))
+
+    def test_receipt_tampering_causes_hash_mismatch(self):
+        """Mutating receipt after manifest → existing hash validation catches it."""
+        import json
+
+        self._build_active_then_validate()
+        receipt_path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        receipt["active_spec_id"] = "TAMPERED"
+        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        result = sp.validate_source_package(self.source_dir)
+        self.assertIn(
+            sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            result.hash_mismatches,
+        )
+
+    def test_malformed_receipt_json(self):
+        self._build_active_then_validate()
+        receipt_path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        receipt_path.write_text("not json{{{", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("malformed" in e.lower() for e in result.semantic_errors))
+
+    def test_malformed_scope_json(self):
+        self._build_active_then_validate()
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope_path.write_text("{bad json", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("malformed" in e.lower() for e in result.semantic_errors))
+
+    def test_invalid_coverage_scope_mode(self):
+        import json
+
+        self._build_active_then_validate()
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope["coverage_scope"] = "ACTIVE_SPCE"
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("FULL_HLD or ACTIVE_SPEC" in e for e in result.semantic_errors))
+
+    def test_receipt_present_with_invalid_scope_mode(self):
+        import json
+
+        self._build_active_then_validate()
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope["coverage_scope"] = "INVALID"
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("coverage_scope" in e for e in result.semantic_errors))
+
+    def test_malformed_ledger_json_in_active_spec(self):
+        self._build_active_then_validate()
+        ledger_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]
+        ledger_path.write_text("not json{{{", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("ledger" in e.lower() and "malformed" in e.lower() for e in result.semantic_errors))
+
+
+class ActiveSpecReceiptValidationScopeTests(unittest.TestCase):
+    """Validation scope: no gate/driver/readiness, no backlog mutation."""
+
+    def test_receipt_not_in_required_files(self):
+        self.assertNotIn(
+            sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            sp.REQUIRED_FILES,
+        )
+
+    def test_receipt_not_mirrored(self):
+        self.assertNotIn(
+            sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            sp.MIRROR_FILES,
+        )
+
+    def test_no_new_gate_blockers(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(any("materialization_receipt" in b.lower() for b in result.blockers))
+
+    def test_semantic_errors_not_in_ok(self):
+        """semantic_errors must NOT affect .ok — prevents driver behavior change."""
+        v = sp.SourcePackageValidation(semantic_errors=["some error"])
+        self.assertTrue(v.ok)
+
+    def test_input_backlog_not_mutated_after_validation(self):
+        import copy
+        import tempfile
+
+        tmp = tempfile.TemporaryDirectory()
+        root = Path(tmp.name)
+        try:
+            backlog = _selected_backlog()
+            frozen = copy.deepcopy(backlog)
+            sp.build_source_package_content(
+                root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=backlog,
+            )
+            self.assertEqual(frozen, backlog)
+        finally:
+            tmp.cleanup()
+
+    def test_select_active_spec_not_called_during_validation(self):
+        import tempfile
+
+        tmp = tempfile.TemporaryDirectory()
+        root = Path(tmp.name)
+        try:
+            with patch("hldspec.spec_backlog.select_active_spec") as mock_select:
+                sp.build_source_package_content(
+                    root, _MULTI_ANCHOR_HLD,
+                    hld_source_ref="src.md", layout="new",
+                    active_spec_backlog=_selected_backlog(),
+                )
+                mock_select.assert_not_called()
+        finally:
+            tmp.cleanup()
+
+
 if __name__ == "__main__":
     unittest.main()
