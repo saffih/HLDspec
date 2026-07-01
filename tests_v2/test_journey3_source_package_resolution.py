@@ -187,5 +187,115 @@ class SourcePackageResolutionTests(unittest.TestCase):
         self.assertIsNone(hld_source_package.source_package_split_brain(self.target))
 
 
+class SourcePackageGateFactsAdvisoryTests(unittest.TestCase):
+    """Advisory field source_package_gate_facts_advisory — purely additive, no gate changes."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="hldspec-j3-advisory-")
+        self.root = Path(self._tmp.name).resolve()
+        self.target = self.root / "target"
+        self.target.mkdir()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    # a) Advisory is a dict with expected keys when source package is present.
+    def test_advisory_present_when_package_exists(self) -> None:
+        _build_package(self.target)
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["source_package_gate_facts_advisory"]
+        self.assertIsInstance(advisory, dict)
+        for key in (
+            "coverage_scope",
+            "active_spec_id",
+            "selected_anchor_blocker_count",
+            "out_of_scope_advisory_count",
+            "semantic_errors",
+            "receipt_present",
+            "receipt_type",
+            "read_errors",
+        ):
+            self.assertIn(key, advisory, f"advisory missing key: {key}")
+
+    # b) Advisory is None when no source package.
+    def test_advisory_none_when_no_package(self) -> None:
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertIsNone(report["source_package_gate_facts_advisory"])
+
+    # c) Existing booleans and driver_status unchanged by advisory.
+    def test_existing_gate_behavior_unchanged(self) -> None:
+        _build_package(self.target)
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertFalse(report["mutated_target"])
+        self.assertFalse(report["executed_anything"])
+        # source_package_validation.ok must still reflect real validation state
+        self.assertTrue(report["source_package_validation"]["ok"])
+        # driver_status must NOT be changed to PASS just because advisory exists;
+        # no helper is selected so it should remain ACTION or BLOCKED, not PASS.
+        self.assertNotEqual(report["driver_status"], journey3_driver.STATUS_PASS)
+
+    # d) Advisory dict does not contain raw ledger rows.
+    def test_advisory_has_no_raw_ledger_rows(self) -> None:
+        _build_package(self.target)
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["source_package_gate_facts_advisory"]
+        for forbidden in ("rows", "raw_ledger", "ledger_rows"):
+            self.assertNotIn(forbidden, advisory, f"advisory must not expose raw rows via '{forbidden}'")
+
+    # e) render_status_text handles missing package without crash.
+    def test_render_handles_missing_package_no_crash(self) -> None:
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertIsNone(report["source_package_gate_facts_advisory"])
+        text = journey3_driver.render_status_text(report)  # must not raise
+        self.assertIsInstance(text, str)
+
+    # f) Render output contains gate facts line when advisory is present.
+    def test_render_includes_gate_facts_line(self) -> None:
+        _build_package(self.target)
+        report = journey3_driver.build_journey3_status(self.target)
+        text = journey3_driver.render_status_text(report)
+        self.assertIn("source_package_gate_facts", text)
+
+    # g) ACTIVE_SPEC scope values flow through the advisory field.
+    def test_advisory_active_spec_values(self) -> None:
+        multi_anchor_hld = (
+            "# HLD\n\n"
+            "## HLD-001 - Auth\n\nHLD-ID: HLD-001\n\nAuth module.\n\n"
+            "## HLD-002 - Logging\n\nHLD-ID: HLD-002\n\nLogging module.\n"
+        )
+        backlog = {
+            "schema_version": 1,
+            "created_at": "2026-07-01T00:00:00Z",
+            "updated_at": "2026-07-01T00:00:00Z",
+            "source_refs": ["docs/hld.md"],
+            "active_spec_id": "SPEC-001",
+            "specs": [
+                {
+                    "spec_id": "SPEC-001",
+                    "title": "Auth Module",
+                    "hld_anchor_ids": ["HLD-001"],
+                    "capability": "Authentication",
+                    "status": "SELECTED",
+                    "size_class": "BOUNDED_DELIVERABLE",
+                    "dependencies": [],
+                    "validation_strategy": ["integration_tests"],
+                    "target_materialization": "NOT_MATERIALIZED",
+                    "source_refs": ["docs/hld.md"],
+                },
+            ],
+        }
+        hld_source_package.build_source_package_content(
+            self.target, multi_anchor_hld,
+            hld_source_ref="test-ref", project_name="demo",
+            active_spec_backlog=backlog,
+        )
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["source_package_gate_facts_advisory"]
+        self.assertIsNotNone(advisory)
+        self.assertEqual(advisory["coverage_scope"], "ACTIVE_SPEC")
+        self.assertIsNotNone(advisory["active_spec_id"])
+        self.assertEqual(advisory["active_spec_id"], "SPEC-001")
+
+
 if __name__ == "__main__":
     unittest.main()

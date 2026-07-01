@@ -31,6 +31,7 @@ from . import (
     target_discovery,
     toolchain_driver,
 )
+from .source_package_gate_facts import build_source_package_gate_facts_report
 
 SCHEMA_VERSION = 1
 
@@ -211,12 +212,19 @@ def build_journey3_status(
             "recommended next command — run it yourself; the driver does not execute it."
         )
 
+    source_package_gate_facts_advisory = (
+        build_source_package_gate_facts_report(source_dir)
+        if source_package_present
+        else None
+    )
+
     return {
         "schema_version": SCHEMA_VERSION,
         "driver_status": driver_status,
         "target_root": str(target),
         "source_package_present": source_package_present,
         "source_package_validation": source_package_validation,
+        "source_package_gate_facts_advisory": source_package_gate_facts_advisory,
         "binding_status": binding_status,
         "helper_recommendations_present": helper_recommendations_present,
         "helper_selection_present": helper_selection_present,
@@ -241,6 +249,17 @@ def _bullets(items: list[str]) -> list[str]:
     return [f"  - {x}" for x in items] if items else ["  (none)"]
 
 
+def _render_advisory(advisory: dict[str, Any] | None) -> str:
+    if advisory is None:
+        return "unavailable (no source package)"
+    scope = advisory.get("coverage_scope", "?")
+    spec_id = advisory.get("active_spec_id", "—")
+    blockers = advisory.get("selected_anchor_blocker_count", 0)
+    oosa = advisory.get("out_of_scope_advisory_count", 0)
+    errors = len(advisory.get("semantic_errors", []))
+    return f"scope={scope} spec={spec_id} blockers={blockers} oos_advisory={oosa} errors={errors}"
+
+
 def render_status_text(report: dict[str, Any]) -> str:
     """Human-readable rendering of a driver status report."""
     mode = report["effective_helper_mode"]
@@ -250,6 +269,7 @@ def render_status_text(report: dict[str, Any]) -> str:
         f"target_root:                {report['target_root']}",
         f"source_package_present:     {report['source_package_present']}",
         f"source_package_validation:  ok={report['source_package_validation']['ok']}",
+        f"source_package_gate_facts:  {_render_advisory(report.get('source_package_gate_facts_advisory'))}",
         f"binding_status:             {report['binding_status']}",
         f"helper_recommendations:     present={report['helper_recommendations_present']}",
         f"helper_selection:           present={report['helper_selection_present']} "
