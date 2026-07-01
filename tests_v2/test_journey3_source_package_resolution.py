@@ -256,6 +256,46 @@ class SourcePackageGateFactsAdvisoryTests(unittest.TestCase):
         text = journey3_driver.render_status_text(report)
         self.assertIn("source_package_gate_facts", text)
 
+    # g) ACTIVE_SPEC scope values flow through the advisory field.
+    def test_advisory_active_spec_values(self) -> None:
+        multi_anchor_hld = (
+            "# HLD\n\n"
+            "## HLD-001 - Auth\n\nHLD-ID: HLD-001\n\nAuth module.\n\n"
+            "## HLD-002 - Logging\n\nHLD-ID: HLD-002\n\nLogging module.\n"
+        )
+        backlog = {
+            "schema_version": 1,
+            "created_at": "2026-07-01T00:00:00Z",
+            "updated_at": "2026-07-01T00:00:00Z",
+            "source_refs": ["docs/hld.md"],
+            "active_spec_id": "SPEC-001",
+            "specs": [
+                {
+                    "spec_id": "SPEC-001",
+                    "title": "Auth Module",
+                    "hld_anchor_ids": ["HLD-001"],
+                    "capability": "Authentication",
+                    "status": "SELECTED",
+                    "size_class": "BOUNDED_DELIVERABLE",
+                    "dependencies": [],
+                    "validation_strategy": ["integration_tests"],
+                    "target_materialization": "NOT_MATERIALIZED",
+                    "source_refs": ["docs/hld.md"],
+                },
+            ],
+        }
+        hld_source_package.build_source_package_content(
+            self.target, multi_anchor_hld,
+            hld_source_ref="test-ref", project_name="demo",
+            active_spec_backlog=backlog,
+        )
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["source_package_gate_facts_advisory"]
+        self.assertIsNotNone(advisory)
+        self.assertEqual(advisory["coverage_scope"], "ACTIVE_SPEC")
+        self.assertIsNotNone(advisory["active_spec_id"])
+        self.assertEqual(advisory["active_spec_id"], "SPEC-001")
+
 
 if __name__ == "__main__":
     unittest.main()
