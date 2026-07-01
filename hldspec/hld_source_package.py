@@ -92,6 +92,9 @@ AUTHORITATIVE_FILES: dict[str, str] = {
     # Coverage-scope sidecar: records FULL_HLD or ACTIVE_SPEC mode for
     # coverage-ledger interpretation. Advisory, not required, not mirrored.
     "hld_coverage_scope": "hld_coverage_scope.json",
+    # Active-spec source-package rendering receipt. Emitted only in explicit
+    # ACTIVE_SPEC mode. Advisory, not required, not mirrored, not gating.
+    "active_spec_materialization_receipt": "active_spec_materialization_receipt.json",
 }
 
 # Authored here but NOT mirrored into .specify/source/: the constitution is a
@@ -116,6 +119,8 @@ _MIRROR_EXCLUDED: frozenset[str] = frozenset({
     AUTHORITATIVE_FILES["spec_backlog"],
     # Coverage-scope sidecar — future gate interpretation input, not SpecKit runner content.
     AUTHORITATIVE_FILES["hld_coverage_scope"],
+    # Active-spec rendering receipt — source-package evidence, not SpecKit runner content.
+    AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
 })
 
 # The subset materialised into .specify/source/ for the runner. The constitution
@@ -550,6 +555,33 @@ def _resolve_active_spec(backlog: object) -> tuple[str, dict]:
     return active_spec_id, active_spec
 
 
+def _build_active_spec_source_package_receipt(
+    *,
+    active_spec_id: str,
+    active_spec: dict,
+    source_refs: list[str],
+    created_at: str,
+) -> dict:
+    return {
+        "schema_version": 1,
+        "receipt_type": "ACTIVE_SPEC_SOURCE_PACKAGE_RENDER",
+        "active_spec_id": active_spec_id,
+        "active_spec_title": active_spec.get("title", ""),
+        "coverage_scope": "ACTIVE_SPEC",
+        "selected_hld_anchor_ids": list(active_spec.get("hld_anchor_ids", [])),
+        "target_materialization": "NOT_MATERIALIZED",
+        "rendered_file": AUTHORITATIVE_FILES["single_spec_input"],
+        "coverage_scope_file": AUTHORITATIVE_FILES["hld_coverage_scope"],
+        "coverage_ledger_file": AUTHORITATIVE_FILES["hld_coverage_ledger"],
+        "source_refs": list(source_refs),
+        "created_at": created_at,
+        "notes": [
+            "Records active-spec rendering into the source package only.",
+            "Does not mark target materialization or mutate the spec backlog.",
+        ],
+    }
+
+
 def build_source_package_content(
     target_root: Path,
     hld_text: str,
@@ -638,6 +670,18 @@ def build_source_package_content(
         source_dir / AUTHORITATIVE_FILES["hld_coverage_scope"],
         scope,
     )
+
+    if active_spec_id is not None and active_spec is not None:
+        receipt = _build_active_spec_source_package_receipt(
+            active_spec_id=active_spec_id,
+            active_spec=active_spec,
+            source_refs=[hld_source_ref],
+            created_at=now,
+        )
+        write_json_dict(
+            source_dir / AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            receipt,
+        )
 
     for filename, content in implementation_slicing.build_implementation_slicing_artifacts().items():
         (source_dir / filename).write_text(content, encoding="utf-8")
