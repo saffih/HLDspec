@@ -1862,6 +1862,38 @@ class ActiveSpecReceiptValidationNegativeTests(unittest.TestCase):
         result = sp.validate_source_package(self.source_dir)
         self.assertTrue(any("malformed" in e.lower() for e in result.semantic_errors))
 
+    def test_invalid_coverage_scope_mode(self):
+        import json
+
+        self._build_active_then_validate()
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope["coverage_scope"] = "ACTIVE_SPCE"
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("FULL_HLD or ACTIVE_SPEC" in e for e in result.semantic_errors))
+
+    def test_receipt_present_with_invalid_scope_mode(self):
+        import json
+
+        self._build_active_then_validate()
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope["coverage_scope"] = "INVALID"
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("coverage_scope" in e for e in result.semantic_errors))
+
+    def test_malformed_ledger_json_in_active_spec(self):
+        self._build_active_then_validate()
+        ledger_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]
+        ledger_path.write_text("not json{{{", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+        result = sp.validate_source_package(self.source_dir)
+        self.assertTrue(any("ledger" in e.lower() and "malformed" in e.lower() for e in result.semantic_errors))
+
 
 class ActiveSpecReceiptValidationScopeTests(unittest.TestCase):
     """Validation scope: no gate/driver/readiness, no backlog mutation."""

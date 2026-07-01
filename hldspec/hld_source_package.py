@@ -330,7 +330,8 @@ def _validate_receipt_semantics(source_dir: Path) -> list[str]:
             errors.append("active_spec_materialization_receipt present in FULL_HLD mode")
         return errors
 
-    if scope_mode != "ACTIVE_SPEC":
+    if scope_mode not in {"FULL_HLD", "ACTIVE_SPEC"}:
+        errors.append("hld_coverage_scope.json coverage_scope must be FULL_HLD or ACTIVE_SPEC")
         return errors
 
     if not receipt_present:
@@ -430,6 +431,7 @@ def _validate_receipt_semantics(source_dir: Path) -> list[str]:
         try:
             ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
+            errors.append("hld_coverage_ledger.json is malformed JSON")
             ledger = None
 
         if ledger is not None:
