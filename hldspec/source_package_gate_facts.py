@@ -130,3 +130,26 @@ def build_source_package_gate_facts(source_dir: Path) -> SourcePackageGateFacts:
         target_materialization=target_materialization,
         read_errors=tuple(read_errors),
     )
+
+
+def build_source_package_gate_facts_report(source_dir: Path) -> dict:
+    """Advisory-only compact report of source-package gate facts.
+
+    Returns a dict with counts instead of raw ledger rows.
+    Never writes files, never changes gate/driver/readiness behavior.
+    """
+    facts = build_source_package_gate_facts(source_dir)
+    return {
+        "validation_ok": facts.validation_ok,
+        "semantic_errors": list(facts.semantic_errors),
+        "coverage_scope": facts.coverage_scope,
+        "active_spec_id": facts.active_spec_id,
+        "interpretation_ok": facts.interpretation_ok,
+        "interpretation_errors": list(facts.interpretation_errors),
+        "selected_anchor_blocker_count": facts.selected_anchor_blocker_count,
+        "out_of_scope_advisory_count": facts.out_of_scope_advisory_count,
+        "receipt_present": facts.receipt_present,
+        "receipt_type": facts.receipt_type,
+        "target_materialization": facts.target_materialization,
+        "read_errors": list(facts.read_errors),
+    }

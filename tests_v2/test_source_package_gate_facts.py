@@ -9,6 +9,7 @@ from hldspec import journey2_hld_coverage_contracts as cov
 from hldspec.source_package_gate_facts import (
     SourcePackageGateFacts,
     build_source_package_gate_facts,
+    build_source_package_gate_facts_report,
 )
 from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
@@ -437,6 +438,201 @@ class ValidationOkUnchangedTests(unittest.TestCase):
     def test_hash_mismatches_affect_ok(self):
         v = sp.SourcePackageValidation(hash_mismatches=["HLD.md"])
         self.assertFalse(v.ok)
+
+
+_REPORT_KEYS = {
+    "validation_ok", "semantic_errors", "coverage_scope", "active_spec_id",
+    "interpretation_ok", "interpretation_errors", "selected_anchor_blocker_count",
+    "out_of_scope_advisory_count", "receipt_present", "receipt_type",
+    "target_materialization", "read_errors",
+}
+
+_RAW_LEDGER_KEYS = {"blocking_items", "advisory_items", "out_of_scope_items"}
+
+
+class ReportFullHldTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_report_includes_coverage_scope_full_hld(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertEqual(report["coverage_scope"], "FULL_HLD")
+
+    def test_report_has_exactly_expected_keys(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertEqual(set(report.keys()), _REPORT_KEYS)
+
+    def test_report_excludes_raw_ledger_rows(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(_RAW_LEDGER_KEYS.isdisjoint(report.keys()))
+
+
+class ReportActiveSpecTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_report_includes_active_spec_id(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertEqual(report["active_spec_id"], "SPEC-001")
+
+    def test_report_includes_receipt_present(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(report["receipt_present"])
+
+    def test_report_includes_receipt_type(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertEqual(report["receipt_type"], "ACTIVE_SPEC_SOURCE_PACKAGE_RENDER")
+
+    def test_report_includes_selected_anchor_blocker_count(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertEqual(report["selected_anchor_blocker_count"], 0)
+
+    def test_report_includes_out_of_scope_advisory_count(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertGreaterEqual(report["out_of_scope_advisory_count"], 1)
+
+
+class ReportActiveSpecBlockerTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        ledger_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        for item in ledger:
+            if item["hld_item_id"] == "HLD-001":
+                item["status"] = "NOT_COVERED"
+                item["sdd_section"] = None
+        ledger_path.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_report_blocker_count_reflects_blocking_items(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertGreaterEqual(report["selected_anchor_blocker_count"], 1)
+
+
+class ReportSemanticErrorsTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope = json.loads(scope_path.read_text(encoding="utf-8"))
+        scope["coverage_scope"] = "FULL_HLD"
+        scope["active_spec_id"] = None
+        scope_path.write_text(json.dumps(scope, indent=2) + "\n", encoding="utf-8")
+        sp.write_source_manifest(self.source_dir)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_report_includes_semantic_errors(self):
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(len(report["semantic_errors"]) > 0)
+        self.assertTrue(any("FULL_HLD" in e for e in report["semantic_errors"]))
+
+
+class ReportReadErrorsTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.source_dir = self.root / ".hldspec" / "source_package"
+        _seed_min_package(self.source_dir)
+        sp.write_source_package(self.source_dir, hld_source_ref="/src/HLD.md", state="x")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_malformed_scope_surfaces_read_error_in_report(self):
+        (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).write_text(
+            "{bad json", encoding="utf-8"
+        )
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(len(report["read_errors"]) > 0)
+        self.assertTrue(any("malformed" in e.lower() for e in report["read_errors"]))
+
+    def test_malformed_ledger_surfaces_read_error_in_report(self):
+        scope_path = self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]
+        scope_path.write_text('{"coverage_scope": "FULL_HLD"}', encoding="utf-8")
+        (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).write_text(
+            "not json{{{", encoding="utf-8"
+        )
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(any("malformed" in e.lower() for e in report["read_errors"]))
+
+    def test_malformed_receipt_surfaces_read_error_in_report(self):
+        (self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]).write_text(
+            "not json{{{", encoding="utf-8"
+        )
+        report = build_source_package_gate_facts_report(self.source_dir)
+        self.assertTrue(any("malformed" in e.lower() for e in report["read_errors"]))
+
+
+class ReportNoWriteTests(unittest.TestCase):
+    def test_report_function_does_not_write_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_dir = root / ".hldspec" / "source_package"
+            _seed_min_package(source_dir)
+            sp.write_source_package(source_dir, hld_source_ref="/src/HLD.md", state="x")
+
+            before = sorted(
+                (p.relative_to(root), p.stat().st_mtime_ns) for p in root.rglob("*") if p.is_file()
+            )
+            build_source_package_gate_facts_report(source_dir)
+            after = sorted(
+                (p.relative_to(root), p.stat().st_mtime_ns) for p in root.rglob("*") if p.is_file()
+            )
+            self.assertEqual(before, after)
+
+
+class ReportNoGateCallTests(unittest.TestCase):
+    def test_report_does_not_call_gate_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_dir = root / ".hldspec" / "source_package"
+            _seed_min_package(source_dir)
+            sp.write_source_package(source_dir, hld_source_ref="/src/HLD.md", state="x")
+
+            with patch("hldspec.gate_validator.validate_gate") as mock_gate:
+                build_source_package_gate_facts_report(source_dir)
+                mock_gate.assert_not_called()
 
 
 if __name__ == "__main__":
