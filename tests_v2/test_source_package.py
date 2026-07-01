@@ -1287,8 +1287,8 @@ class ActiveSpecSourcePackageScopeTests(unittest.TestCase):
             )
             mock_select.assert_not_called()
 
-    def test_no_new_write_locations_vs_default(self):
-        """Active-spec mode must not introduce new file paths vs default."""
+    def test_no_unexpected_write_locations_vs_default(self):
+        """Active-spec mode adds only the receipt file vs default."""
         import tempfile
 
         default_tmp = tempfile.TemporaryDirectory()
@@ -1312,7 +1312,238 @@ class ActiveSpecSourcePackageScopeTests(unittest.TestCase):
         active_paths = sorted(
             p.relative_to(self.root) for p in self.root.rglob("*") if p.is_file()
         )
-        self.assertEqual(default_paths, active_paths)
+        receipt_rel = Path(".hldspec/source_package") / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertEqual(sorted(default_paths + [receipt_rel]), active_paths)
+
+
+class ActiveSpecReceiptEmissionTests(unittest.TestCase):
+    """Receipt is emitted in ACTIVE_SPEC mode with correct schema."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _build_active(self, **overrides):
+        import json
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(**overrides),
+        )
+        path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_receipt_emitted_in_active_spec_mode(self):
+        self._build_active()
+        path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertTrue(path.is_file())
+
+    def test_receipt_schema_version(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["schema_version"], 1)
+
+    def test_receipt_type(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["receipt_type"], "ACTIVE_SPEC_SOURCE_PACKAGE_RENDER")
+
+    def test_receipt_active_spec_id_matches(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["active_spec_id"], "SPEC-001")
+
+    def test_receipt_title_matches(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["active_spec_title"], "Auth Module")
+
+    def test_receipt_coverage_scope(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["coverage_scope"], "ACTIVE_SPEC")
+
+    def test_receipt_selected_hld_anchor_ids(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["selected_hld_anchor_ids"], ["HLD-001"])
+
+    def test_receipt_target_materialization(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["target_materialization"], "NOT_MATERIALIZED")
+
+    def test_receipt_rendered_file(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["rendered_file"], "speckit_single_spec_input.md")
+
+    def test_receipt_coverage_scope_file(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["coverage_scope_file"], "hld_coverage_scope.json")
+
+    def test_receipt_coverage_ledger_file(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["coverage_ledger_file"], "hld_coverage_ledger.json")
+
+    def test_receipt_source_refs(self):
+        receipt = self._build_active()
+        self.assertEqual(receipt["source_refs"], ["src.md"])
+
+    def test_receipt_created_at_present(self):
+        receipt = self._build_active()
+        self.assertIsInstance(receipt["created_at"], str)
+        self.assertTrue(len(receipt["created_at"]) > 0)
+
+    def test_receipt_notes_no_target_no_backlog(self):
+        receipt = self._build_active()
+        notes_text = " ".join(receipt["notes"]).lower()
+        self.assertIn("does not mark target materialization", notes_text)
+        self.assertIn("does not", notes_text)
+        self.assertIn("backlog", notes_text)
+
+
+class ActiveSpecReceiptDefaultModeTests(unittest.TestCase):
+    """Default FULL_HLD mode must NOT emit receipt."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_default_mode_no_receipt(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertFalse(path.exists())
+
+    def test_default_source_package_still_validates(self):
+        build = sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        self.assertTrue(build.ok, msg=f"{build.validation.missing} {build.validation.hash_mismatches}")
+
+    def test_default_mirror_behavior_unchanged(self):
+        build = sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+        )
+        self.assertIn(sp.AUTHORITATIVE_FILES["hld"], build.mirrored)
+        receipt_mirror = self.mirror_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertFalse(receipt_mirror.exists())
+
+
+class ActiveSpecReceiptScopeTests(unittest.TestCase):
+    """Receipt scope: not mirrored, not required, no gate/backlog/selection leakage."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.adapter = TargetWorkspaceAdapter(target_root=self.root, layout="new")
+        self.source_dir = self.adapter.source_package_dir
+        self.mirror_dir = self.adapter.specify_source_mirror_dir
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_receipt_not_mirrored(self):
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        mirror_receipt = self.mirror_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertFalse(mirror_receipt.exists())
+
+    def test_receipt_not_in_required_files(self):
+        self.assertNotIn(
+            sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            sp.REQUIRED_FILES,
+        )
+
+    def test_invalid_backlog_does_not_emit_receipt(self):
+        with self.assertRaises(ValueError):
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog={"bad": "data"},
+            )
+        path = self.source_dir / sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"]
+        self.assertFalse(path.exists())
+
+    def test_input_backlog_not_mutated_with_receipt(self):
+        import copy
+
+        backlog = _selected_backlog()
+        frozen = copy.deepcopy(backlog)
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=backlog,
+        )
+        self.assertEqual(frozen, backlog)
+
+    def test_select_active_spec_not_called_with_receipt(self):
+        with patch("hldspec.spec_backlog.select_active_spec") as mock_select:
+            sp.build_source_package_content(
+                self.root, _MULTI_ANCHOR_HLD,
+                hld_source_ref="src.md", layout="new",
+                active_spec_backlog=_selected_backlog(),
+            )
+            mock_select.assert_not_called()
+
+    def test_active_spec_still_emits_active_spec_coverage_scope(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(scope["coverage_scope"], "ACTIVE_SPEC")
+
+    def test_active_spec_ledger_still_evaluates_written_input(self):
+        import json
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        by_id = {item["hld_item_id"]: item for item in ledger}
+        self.assertEqual(by_id["HLD-001"]["status"], "COVERED_IN_SDD")
+        self.assertEqual(by_id["HLD-002"]["status"], "NOT_COVERED")
+
+    def test_no_new_gate_blockers_from_receipt(self):
+        ctx = gv.GateContext(
+            receipt_present=False,
+            source_refs=[],
+            runskeptic_status=gv.RUNSKEPTIC_NOT_RUN,
+            consultant_status=gv.CONSULTANT_NOT_RUN,
+            validation_ok=False,
+            human_approved=False,
+        )
+        result = gv.validate_gate(gv.SOURCE_PACKAGE_APPROVAL_GATE, ctx)
+        self.assertFalse(any("materialization_receipt" in b.lower() for b in result.blockers))
+
+    def test_receipt_in_authoritative_not_in_mirror_files(self):
+        self.assertIn("active_spec_materialization_receipt", sp.AUTHORITATIVE_FILES)
+        self.assertNotIn(
+            sp.AUTHORITATIVE_FILES["active_spec_materialization_receipt"],
+            sp.MIRROR_FILES,
+        )
 
 
 if __name__ == "__main__":
