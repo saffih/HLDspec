@@ -371,6 +371,9 @@ required test tools, RunSkeptic trigger conditions, evidence sources, open quest
 stop condition
 ```
 
+"Spec bite" is the user-facing sizing term for a right-sized Spec Package /
+implementation slice. It is not a new artifact type.
+
 Default start/output rule:
 
 ```text

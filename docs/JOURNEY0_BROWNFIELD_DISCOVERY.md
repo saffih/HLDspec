@@ -101,6 +101,46 @@ evidence:
 - prior `.hldspec/` state and discovery/classification output,
 - human knowledge offered during discovery.
 
+## Resource discovery trigger
+
+A user may start from mixed resources rather than a clean HLD.
+
+Convenience alias:
+
+```text
+HLD discover target <target-repo> from <resources/context>
+```
+
+This is Journey 0-style read-only discovery. It treats all resources as
+evidence, not authority.
+
+Resources may include old SpecKit specs, existing code/tests, docs, design
+notes, HLD fragments, prior `.specify` state, prior `.hldspec` state, and human
+context.
+
+Journey 0 classifies evidence, conflicts, stale parts, missing decisions, and
+whether an authoritative HLD can responsibly be drafted.
+
+Journey 0 must not create backlog, create SpecKit specs, mutate the target repo,
+invoke SpecKit, or implement.
+
+### Old SpecKit specs
+
+Old SpecKit specs are evidence, not authority.
+
+HLDspec must not preserve old SpecKit spec boundaries by default. Old specs may
+be stale, oversized, mixed, partially implemented, or inconsistent with the
+current target repo.
+
+Journey 0 should classify old spec content into product intent, existing
+behavior, desired behavior, implementation detail, stale assumption, dependency,
+acceptance criterion, test expectation, migration/compatibility concern, and
+open human decision.
+
+Old spec content may feed the Evidence Pack, Spec Inventory, Gap Report,
+Product Decision Register, and HLD Update Plan. It must not directly become the
+new backlog.
+
 ## 5. Outputs
 
 Journey 0 **may produce** the following artifacts. (Their schemas are
