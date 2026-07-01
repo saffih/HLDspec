@@ -297,5 +297,148 @@ class SourcePackageGateFactsAdvisoryTests(unittest.TestCase):
         self.assertEqual(advisory["active_spec_id"], "SPEC-001")
 
 
+class SourcePackageCompletionFactsTests(unittest.TestCase):
+    """Tests for active_spec_completion_facts_advisory in journey status."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.target = Path(self._tmp.name).resolve()
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def _build_active_spec_package(self) -> None:
+        multi_anchor_hld = (
+            "# HLD\n\n"
+            "## HLD-001 - Auth\n\nHLD-ID: HLD-001\n\nAuth module.\n\n"
+            "## HLD-002 - Logging\n\nHLD-ID: HLD-002\n\nLogging module.\n"
+        )
+        backlog = {
+            "schema_version": 1,
+            "created_at": "2026-07-01T00:00:00Z",
+            "updated_at": "2026-07-01T00:00:00Z",
+            "source_refs": ["docs/hld.md"],
+            "active_spec_id": "SPEC-001",
+            "specs": [
+                {
+                    "spec_id": "SPEC-001",
+                    "title": "Auth Module",
+                    "hld_anchor_ids": ["HLD-001"],
+                    "capability": "Authentication",
+                    "status": "SELECTED",
+                    "size_class": "BOUNDED_DELIVERABLE",
+                    "dependencies": [],
+                    "validation_strategy": ["integration_tests"],
+                    "target_materialization": "NOT_MATERIALIZED",
+                    "source_refs": ["docs/hld.md"],
+                },
+            ],
+        }
+        hld_source_package.build_source_package_content(
+            self.target, multi_anchor_hld,
+            hld_source_ref="test-ref", project_name="demo",
+            active_spec_backlog=backlog,
+        )
+
+    def _build_full_hld_package(self) -> None:
+        _build_package(self.target)
+
+    # a) Advisory present when source package exists.
+    def test_advisory_present_with_source_package(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertIsNotNone(report["active_spec_completion_facts_advisory"])
+
+    # b) Advisory includes completion_status.
+    def test_advisory_includes_completion_status(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertIn("completion_status", advisory)
+
+    # c) Advisory includes completion_applicable.
+    def test_advisory_includes_completion_applicable(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertIn("completion_applicable", advisory)
+
+    # d) FULL_HLD scope reports NOT_APPLICABLE.
+    def test_full_hld_not_applicable(self) -> None:
+        self._build_full_hld_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertIsNotNone(advisory)
+        self.assertEqual(advisory["completion_status"], "NOT_APPLICABLE")
+        self.assertFalse(advisory["completion_applicable"])
+
+    # e) ACTIVE_SPEC complete package reports COMPLETE_ADVISORY.
+    def test_active_spec_complete_advisory(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertEqual(advisory["completion_status"], "COMPLETE_ADVISORY")
+        self.assertTrue(advisory["completion_applicable"])
+
+    # f) ACTIVE_SPEC with tampered ledger reports INCOMPLETE_ADVISORY.
+    def test_active_spec_incomplete_advisory(self) -> None:
+        self._build_active_spec_package()
+        source_dir = hld_source_package.source_package_paths(self.target, layout="new")[0]
+        ledger_path = source_dir / "hld_coverage_ledger.json"
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        ledger.append({"hld_item_id": "HLD-001", "status": "NOT_COVERED"})
+        ledger_path.write_text(json.dumps(ledger), encoding="utf-8")
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertEqual(advisory["completion_status"], "INCOMPLETE_ADVISORY")
+        self.assertGreater(len(advisory["reasons"]), 0)
+
+    # g) Missing source package → advisory is None and render does not crash.
+    def test_missing_package_advisory_none_render_safe(self) -> None:
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertIsNone(report["active_spec_completion_facts_advisory"])
+        text = journey3_driver.render_status_text(report)
+        self.assertIsInstance(text, str)
+        self.assertIn("active_spec_completion", text)
+
+    # h) Render includes active_spec_completion line.
+    def test_render_includes_completion_line(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        text = journey3_driver.render_status_text(report)
+        self.assertIn("active_spec_completion", text)
+        self.assertIn("COMPLETE_ADVISORY", text)
+
+    # i) Advisory includes reasons as list.
+    def test_advisory_reasons_is_list(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        self.assertIsInstance(advisory["reasons"], list)
+
+    # j) Existing driver behavior unchanged.
+    def test_driver_status_unchanged(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        self.assertFalse(report["mutated_target"])
+        self.assertFalse(report["executed_anything"])
+
+    # k) No raw ledger rows in advisory.
+    def test_no_raw_ledger_rows(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        for key in ("blocking_items", "advisory_items", "out_of_scope_items"):
+            self.assertNotIn(key, advisory)
+
+    # l) No gate validation call — advisory doesn't add gate keys.
+    def test_no_gate_keys_in_advisory(self) -> None:
+        self._build_active_spec_package()
+        report = journey3_driver.build_journey3_status(self.target)
+        advisory = report["active_spec_completion_facts_advisory"]
+        for key in ("validation_ok", "validation_missing", "interpretation_ok"):
+            self.assertNotIn(key, advisory)
+
+
 if __name__ == "__main__":
     unittest.main()
