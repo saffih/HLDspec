@@ -31,6 +31,7 @@ from . import (
     target_discovery,
     toolchain_driver,
 )
+from .active_spec_completion_facts import build_active_spec_completion_facts
 from .source_package_gate_facts import build_source_package_gate_facts_report
 
 SCHEMA_VERSION = 1
@@ -218,6 +219,23 @@ def build_journey3_status(
         else None
     )
 
+    active_spec_completion_facts_advisory = None
+    if source_package_present:
+        cfacts = build_active_spec_completion_facts(source_dir)
+        active_spec_completion_facts_advisory = {
+            "completion_applicable": cfacts.completion_applicable,
+            "completion_status": cfacts.completion_status,
+            "coverage_scope": cfacts.coverage_scope,
+            "active_spec_id": cfacts.active_spec_id,
+            "selected_anchor_blocker_count": cfacts.selected_anchor_blocker_count,
+            "out_of_scope_advisory_count": cfacts.out_of_scope_advisory_count,
+            "receipt_present": cfacts.receipt_present,
+            "receipt_type": cfacts.receipt_type,
+            "semantic_error_count": cfacts.semantic_error_count,
+            "read_error_count": cfacts.read_error_count,
+            "reasons": list(cfacts.reasons),
+        }
+
     return {
         "schema_version": SCHEMA_VERSION,
         "driver_status": driver_status,
@@ -225,6 +243,7 @@ def build_journey3_status(
         "source_package_present": source_package_present,
         "source_package_validation": source_package_validation,
         "source_package_gate_facts_advisory": source_package_gate_facts_advisory,
+        "active_spec_completion_facts_advisory": active_spec_completion_facts_advisory,
         "binding_status": binding_status,
         "helper_recommendations_present": helper_recommendations_present,
         "helper_selection_present": helper_selection_present,
@@ -260,6 +279,17 @@ def _render_advisory(advisory: dict[str, Any] | None) -> str:
     return f"scope={scope} spec={spec_id} blockers={blockers} oos_advisory={oosa} errors={errors}"
 
 
+def _render_completion_advisory(advisory: dict[str, Any] | None) -> str:
+    if advisory is None:
+        return "unavailable (no source package)"
+    status = advisory.get("completion_status", "?")
+    spec_id = advisory.get("active_spec_id", "—")
+    blockers = advisory.get("selected_anchor_blocker_count", 0)
+    sem_err = advisory.get("semantic_error_count", 0)
+    read_err = advisory.get("read_error_count", 0)
+    return f"status={status} spec={spec_id} blockers={blockers} semantic_errors={sem_err} read_errors={read_err}"
+
+
 def render_status_text(report: dict[str, Any]) -> str:
     """Human-readable rendering of a driver status report."""
     mode = report["effective_helper_mode"]
@@ -270,6 +300,7 @@ def render_status_text(report: dict[str, Any]) -> str:
         f"source_package_present:     {report['source_package_present']}",
         f"source_package_validation:  ok={report['source_package_validation']['ok']}",
         f"source_package_gate_facts:  {_render_advisory(report.get('source_package_gate_facts_advisory'))}",
+        f"active_spec_completion:     {_render_completion_advisory(report.get('active_spec_completion_facts_advisory'))}",
         f"binding_status:             {report['binding_status']}",
         f"helper_recommendations:     present={report['helper_recommendations_present']}",
         f"helper_selection:           present={report['helper_selection_present']} "
