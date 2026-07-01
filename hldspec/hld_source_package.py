@@ -572,8 +572,9 @@ def build_source_package_content(
 
     When *active_spec_backlog* is provided, the single_spec_input and coverage
     scope are rendered for the selected active spec instead of the full HLD.
-    The coverage ledger is always built from the full-HLD spec input so its
-    content remains mode-independent.
+    The coverage ledger is built from the actual written spec input (full-HLD
+    in FULL_HLD mode, active-spec rendered content in ACTIVE_SPEC mode) so
+    ledger evidence always matches the written file.
     """
     # Imported here to avoid an import cycle (those modules import this one).
     from . import hld_marking, single_spec_input, implementation_slicing, engineering_selection
@@ -606,7 +607,7 @@ def build_source_package_content(
 
     write_json_dict(
         source_dir / AUTHORITATIVE_FILES["hld_coverage_ledger"],
-        build_initial_hld_coverage_ledger(ref_map, full_hld_spec_input),
+        build_initial_hld_coverage_ledger(ref_map, written_spec_input),
     )
 
     now = utc_now()

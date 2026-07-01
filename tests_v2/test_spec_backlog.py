@@ -931,8 +931,27 @@ class TestRenderActiveSpecValid(unittest.TestCase):
 
     def test_output_includes_hld_anchors(self):
         result = render_active_spec_to_single_spec_input(_selected_backlog())
-        self.assertIn("- HLD-001", result)
-        self.assertIn("- HLD-002", result)
+        self.assertIn("- (HLD-001)", result)
+        self.assertIn("- (HLD-002)", result)
+
+    def test_hld_anchor_list_uses_citation_form(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        lines = result.split("\n")
+        anchor_idx = lines.index("## HLD Anchors")
+        anchor_items = []
+        for l in lines[anchor_idx + 2:]:
+            if l.startswith("- "):
+                anchor_items.append(l)
+            elif l.startswith("##") or l == "":
+                break
+        self.assertTrue(all(l.startswith("- (") for l in anchor_items))
+
+    def test_non_anchor_lists_not_wrapped_as_citations(self):
+        result = render_active_spec_to_single_spec_input(_selected_backlog())
+        self.assertIn("- focused_tests", result)
+        self.assertNotIn("- (focused_tests)", result)
+        self.assertIn("- docs/hld.md#HLD-001", result)
+        self.assertNotIn("- (docs/hld.md#HLD-001)", result)
 
     def test_output_includes_dependencies(self):
         s1 = _valid_spec(spec_id="SPEC-000", status="DONE")

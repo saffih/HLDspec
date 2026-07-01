@@ -1098,35 +1098,56 @@ class ActiveSpecSourcePackageModeTests(unittest.TestCase):
         self.assertIsInstance(ledger, list)
         cov.validate_coverage_ledger(ledger)
 
-    def test_active_spec_ledger_equals_full_hld_ledger(self):
-        """Ledger must be mode-independent: built from full-HLD input always."""
+    def test_active_spec_ledger_evaluates_written_input(self):
+        """Ledger must be built from active-spec input, not full-HLD input."""
         import json
-        import tempfile
-
-        full_tmp = tempfile.TemporaryDirectory()
-        full_root = Path(full_tmp.name)
-        try:
-            sp.build_source_package_content(
-                full_root, _MULTI_ANCHOR_HLD,
-                hld_source_ref="src.md", layout="new",
-            )
-            full_source = TargetWorkspaceAdapter(target_root=full_root, layout="new").source_package_dir
-            full_ledger = json.loads(
-                (full_source / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
-            )
-        finally:
-            full_tmp.cleanup()
 
         sp.build_source_package_content(
             self.root, _MULTI_ANCHOR_HLD,
             hld_source_ref="src.md", layout="new",
             active_spec_backlog=_selected_backlog(),
         )
-        active_ledger = json.loads(
+        text = (self.source_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).read_text(encoding="utf-8")
+        self.assertIn("(HLD-001)", text)
+        self.assertNotIn("(HLD-002)", text)
+
+        ledger = json.loads(
             (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
         )
+        self.assertIsInstance(ledger, list)
 
-        self.assertEqual(full_ledger, active_ledger)
+        hld001_row = next((item for item in ledger if item["hld_item_id"] == "HLD-001"), None)
+        hld002_row = next((item for item in ledger if item["hld_item_id"] == "HLD-002"), None)
+        self.assertIsNotNone(hld001_row)
+        self.assertIsNotNone(hld002_row)
+        self.assertEqual(hld001_row["status"], "COVERED_IN_SDD")
+        self.assertEqual(hld002_row["status"], "NOT_COVERED")
+
+    def test_active_spec_interpretation_classifies_non_selected_as_out_of_scope(self):
+        """NOT_COVERED anchors outside selected scope must appear in out_of_scope_items."""
+        import json
+        from hldspec.hld_coverage_scope_interpretation import interpret_coverage_ledger_for_scope
+
+        sp.build_source_package_content(
+            self.root, _MULTI_ANCHOR_HLD,
+            hld_source_ref="src.md", layout="new",
+            active_spec_backlog=_selected_backlog(),
+        )
+        ledger = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_ledger"]).read_text(encoding="utf-8")
+        )
+        scope = json.loads(
+            (self.source_dir / sp.AUTHORITATIVE_FILES["hld_coverage_scope"]).read_text(encoding="utf-8")
+        )
+
+        result = interpret_coverage_ledger_for_scope(
+            coverage_ledger=ledger,
+            coverage_scope=scope,
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(result.blocking_items, [])
+        hld002_out = [item for item in result.out_of_scope_items if item["hld_item_id"] == "HLD-002"]
+        self.assertEqual(len(hld002_out), 1)
 
     def test_active_spec_mirrored_single_spec_input_is_active(self):
         sp.build_source_package_content(
