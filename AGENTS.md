@@ -1,9 +1,26 @@
 # HLDspec Agent Instructions
 
-## Trigger: HLD inspect
+## HLDspec control-plan loop aliases
 
-These are agent instruction phrases for Codex/Claude sessions only. They are not
-shell commands, CLI commands, runtime APIs, or implemented automation.
+The canonical user-facing trigger remains `HLDspec ...`.
+
+The `HLD draft`, `HLD inspect`, `HLD improve`, `HLD backlog`, `HLD select`, `HLD
+handoff`, and `HLD speckit` phrases are convenience aliases for Codex/Claude
+agent sessions only.
+
+They are subordinate to `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` and
+`docs/HLDSPEC_MINIMAL_AGENT_UX.md`.
+
+On conflict, the canonical docs win.
+
+These aliases are agent instruction phrases only. They are not shell commands,
+CLI commands, runtime APIs, or implemented automation.
+
+Short aliases are allowed only when the missing context is unambiguous. If the
+current control plan, target repo, active spec, or required input cannot be
+resolved safely, do not guess. Return the safest explicit form the user should
+run, such as `HLD inspect plan <control-plan>` or
+`HLD draft target <target-repo> from <goal/context>`.
 
 HLDspec is the control-plan repo. The target repo is a brownfield implementation
 repo and may already contain code, docs, tests, partial features, or conflicting

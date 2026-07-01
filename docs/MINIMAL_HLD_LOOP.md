@@ -1,29 +1,39 @@
 # Minimal HLD Loop
 
-These triggers are agent instructions for Codex/Claude sessions in the HLDspec
+This document describes convenience aliases for Codex/Claude sessions.
+
+The canonical public HLDspec UX remains documented in
+`docs/HLDSPEC_MINIMAL_AGENT_UX.md`.
+
+The canonical system model remains documented in
+`docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md`.
+
+On conflict, those canonical docs win.
+
+These aliases are agent instructions for Codex/Claude sessions in the HLDspec
 repo. They are not CLI commands, shell commands, runtime APIs, or automation.
 
 ## Workflow
 
 1. User opens Codex/Claude in the HLDspec repo.
-2. User runs: `HLD draft target <target-repo> from <goal/context>`.
+2. User may use the convenience alias: `HLD draft target <target-repo> from <goal/context>`.
 3. Agent drafts a brownfield HLD from target state and goals.
 4. Human approves writing the HLD into the control plan.
 5. Control plan stores TargetBinding and ToolchainBinding. Default toolchain: `speckit`.
-6. User runs: `HLD inspect plan <control-plan>`.
+6. User may use the convenience alias: `HLD inspect plan <control-plan>`.
 7. Agent reports the next human-approved action.
-8. User runs: `HLD backlog plan <control-plan>`.
+8. User may use the convenience alias: `HLD backlog plan <control-plan>`.
 9. Agent proposes a dependency-aware backlog.
 10. Human approves the backlog.
-11. User runs: `HLD select plan <control-plan> spec <SPEC-ID>`.
-12. User runs: `HLD speckit plan <control-plan>`.
+11. User may use the convenience alias: `HLD select plan <control-plan> spec <SPEC-ID>`.
+12. User may use the convenience alias: `HLD speckit plan <control-plan>`.
 13. Agent outputs exact target-side instructions:
     - `cd <target-repo>`
     - open an agent with the SpecKit skill/toolchain
     - paste the generated prompt
 14. Target-side agent creates SpecKit artifacts for the selected spec only.
 15. User returns to the HLDspec repo.
-16. User runs: `HLD inspect plan <control-plan>`.
+16. User may use the convenience alias: `HLD inspect plan <control-plan>`.
 17. Agent checks completion and next READY specs.
 18. Human selects the next READY spec.
 19. Repeat.
