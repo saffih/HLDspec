@@ -297,6 +297,10 @@ Journey 0 `PASS` means ready to enter Journey 1. It does not mean ready for
 Journey 2 packaging, Journey 3 helper handoff, SpecKit execution, or
 implementation.
 
+Journey 0's planned schema and wiring path is documented separately in
+[`JOURNEY0_SCHEMA_AND_WIRING_PLAN.md`](JOURNEY0_SCHEMA_AND_WIRING_PLAN.md) and
+remains read-only before Journey 1.
+
 ---
 
 ## 9. Current implementation path

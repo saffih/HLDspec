@@ -354,11 +354,13 @@ This doc is a **docs contract only**. It intentionally does **not**:
 - run against any target repo (including `~/code/flow`),
 - change Journeys 1–3 or their contracts.
 
+The planned machine-readable artifact semantics and read-only wiring path are
+defined in [`JOURNEY0_SCHEMA_AND_WIRING_PLAN.md`](JOURNEY0_SCHEMA_AND_WIRING_PLAN.md).
+
 Natural next steps, each a separate gated change:
 
-1. **Define schemas** for the Journey 0 artifacts (Evidence Pack, Gap Report,
-   Decision Register, Draftability Verdict, HLD Update Plan).
-2. **Wire to existing read-only primitives** (`target_discovery.py`,
+1. **Convert planned artifact semantics into actual schema/dataclass code.**
+2. **Wire read-only collectors** (`target_discovery.py`,
    `journey3_driver.py`) without granting any mutation or adoption authority.
-3. **First read-only proof** on a brownfield proving-ground (e.g. Baton Flow),
-   under explicit authorization, once the above are gated.
+3. **Run the first authorized read-only proof** on a brownfield proving-ground
+   (e.g. Baton Flow), once the above are gated.
