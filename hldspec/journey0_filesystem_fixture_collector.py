@@ -1,4 +1,8 @@
-"""Read-only Journey 0 collector for controlled filesystem fixtures.
+"""Legacy read-only Journey 0 collector for controlled filesystem fixtures.
+
+This module belongs to the frozen dict/contracts stack. It is NOT_CANONICAL /
+DO_NOT_WIRE for new Journey 0 work; use `journey0_collectors` and the typed
+Journey 0 artifact stack for current slices.
 
 This slice proves fixture-directory to Journey 0 artifact-contract conversion.
 It is intentionally not a real repository scanner: it reads only a small
@@ -15,6 +19,10 @@ from typing import Any, Mapping, Sequence
 
 from hldspec import journey0_artifact_contracts as j0
 from hldspec import journey0_draftability_gate as gate
+
+LEGACY_JOURNEY0_STACK_STATUS = j0.LEGACY_JOURNEY0_STACK_STATUS
+LEGACY_JOURNEY0_STACK_WIRING_STATUS = j0.LEGACY_JOURNEY0_STACK_WIRING_STATUS
+LEGACY_JOURNEY0_STACK_DISPOSITION = j0.LEGACY_JOURNEY0_STACK_DISPOSITION
 
 
 ALLOWED_RELATIVE_FILES: tuple[str, ...] = (

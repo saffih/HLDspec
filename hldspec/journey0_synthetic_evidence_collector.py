@@ -1,4 +1,8 @@
-"""Synthetic Journey 0 evidence collector.
+"""Legacy synthetic Journey 0 evidence collector.
+
+This module belongs to the frozen dict/contracts stack. It is NOT_CANONICAL /
+DO_NOT_WIRE for new Journey 0 work; use the typed Journey 0 collector and
+artifact stack for current slices.
 
 This module is a pre-scanner proof slice. It accepts controlled in-memory
 fixture data and produces Journey 0 artifact-contract data that can be handed to
@@ -12,6 +16,10 @@ from typing import Any, Mapping, Sequence
 
 from hldspec import journey0_artifact_contracts as j0
 from hldspec import journey0_draftability_gate as gate
+
+LEGACY_JOURNEY0_STACK_STATUS = j0.LEGACY_JOURNEY0_STACK_STATUS
+LEGACY_JOURNEY0_STACK_WIRING_STATUS = j0.LEGACY_JOURNEY0_STACK_WIRING_STATUS
+LEGACY_JOURNEY0_STACK_DISPOSITION = j0.LEGACY_JOURNEY0_STACK_DISPOSITION
 
 
 @dataclass(frozen=True)
