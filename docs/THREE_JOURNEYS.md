@@ -285,13 +285,17 @@ sequence, each gated, each returning to RunSkeptic.
 
 Brownfield products may have no single authoritative HLD to feed Journey 1, only
 partial/stale/contradictory sources. A **pre-HLD** discovery and HLD
-gap-assessment journey, **Journey 0**, is defined as product direction in
+gap-assessment journey, **Journey 0**, is defined as a docs contract in
 [`JOURNEY0_BROWNFIELD_DISCOVERY.md`](JOURNEY0_BROWNFIELD_DISCOVERY.md). It is a
 read-only on-ramp that **precedes and feeds Journey 1** — **not a fourth peer
 journey and not a renumbering**: the product is still the three journeys above.
 Journey 0 surfaces evidence, gaps, conflicts, and required product decisions so
 Journey 1 can author/harden one authoritative HLD; it does not lift the
 brownfield-adoption restriction.
+
+Journey 0 `PASS` means ready to enter Journey 1. It does not mean ready for
+Journey 2 packaging, Journey 3 helper handoff, SpecKit execution, or
+implementation.
 
 ---
 
