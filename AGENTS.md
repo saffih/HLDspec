@@ -1,5 +1,10 @@
 # HLDspec Agent Instructions
 
+> **HLDspec repo-development handoff:** before editing this repo or handing work
+> to another model/agent, read `docs/HLDSPEC_DEVELOPMENT_HANDOFF.md` and
+> `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`. Generated handoff packets are pointers;
+> the docs files are the source of truth.
+
 For HLDspec repo work, agents must follow
 `docs/AGENT_OPERATING_DOCTRINE.md`. That doctrine governs fixed baseline
 prompting, dispatch-first execution, context headroom, failure handling,
