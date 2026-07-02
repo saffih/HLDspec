@@ -312,15 +312,22 @@ later steps do not start until earlier steps pass review.
 
 ```text
 docs / direction                           [DONE: JOURNEY0_BROWNFIELD_DISCOVERY.md]
- → artifact contracts                      [DONE: journey0_artifact_contracts.py]
- → draftability gate                       [DONE: journey0_draftability_gate.py]
- → synthetic brownfield scenarios          [DONE: test_journey0_brownfield_scenarios.py]
- → synthetic evidence collector            [DONE: journey0_synthetic_evidence_collector.py]
- → filesystem fixture collector            [DONE: journey0_filesystem_fixture_collector.py]
- → bounded repo intake contract            [future]
- → real repo collector                     [future]
- → Baton Flow proof (~/code/flow)          [future, read-only only]
+ → schema and wiring plan                  [DONE: JOURNEY0_SCHEMA_AND_WIRING_PLAN.md]
+ → typed artifact models                   [DONE: journey0_artifacts.py]
+ → read-only collectors                    [DONE: journey0_collectors.py]
+ → conservative classifiers                [DONE: journey0_classifiers.py]
+ → ProductSurfaceMap builder               [DONE: journey0_product_surface.py]
+ → Draftability Verdict                    [DONE: journey0_draftability.py]
+ → HLD Update Plan                         [DONE: journey0_hld_update_plan.py]
+ → fixture dry-run proof                   [DONE: journey0_dry_run.py; fixture-only]
+ → stabilization blockers                  [current: do not wire / do not start J1]
+ → real-target proof                       [blocked: privacy/provenance/PASS path]
 ```
+
+The typed stack above is canonical for new Journey 0 work. Older dict/contracts
+Journey 0 artifacts are not the canonical path for new work and must not be used
+to claim Journey 0 readiness. PR #100's dry-run proof is fixture-only; it does
+not prove real-target readiness or authorize Journey 1.
 
 **Journey 2 path** (SDD / package completeness):
 

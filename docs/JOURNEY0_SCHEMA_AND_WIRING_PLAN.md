@@ -230,8 +230,28 @@ by this plan update:
 3. Snippet privacy before real-target dry run: the read-only collector may include bounded first-line metadata. Before Slice E or any real target proof, decide whether snippets must be disabled by default, redacted, or made opt-in.
 4. Boundary-token tests: current boundary tests should avoid incentivizing artificial string splitting such as avoiding a literal `.git` token. Later replace broad token bans with behavior/import/write-safety checks.
 5. Product-surface sufficiency: future draftability verdict must check product-surface sufficiency, not merely the existence of observed files.
-6. Status documentation: after Slice D1/D2/E stabilize, update Journey 0 status docs so implemented slices and planned slices are not confused.
+6. Status documentation: this PR records the current stabilization blockers; after J0 blockers close, update Journey 0 status docs again so implemented slices and planned slices are not confused.
 7. Agent doctrine enforcement helper: the agent operating doctrine exists, but compliance is currently process-only. Consider a later lightweight PR template, checklist, or prompt-template helper that checks for dispatch plan, compact receipts, RunSkeptic receipt, evidence/inference separation, checks run, uncertainty, and next action. Keep it advisory unless repeated failures justify stronger enforcement.
+
+## Current Stabilization Status
+
+This section records the state after the typed Journey 0 stack and fixture
+dry-run proof. It is tracker documentation only; it does not authorize command
+surface wiring, real target execution, Journey 1 start, SpecKit execution,
+target mutation, HLD writing, backlog creation, or implementation.
+
+| ID | Title | Status | Blocks | Owner/decision needed | Next PR shape |
+|---|---|---|---|---|---|
+| J0-4 | Typed Journey 0 stack is canonical | CANONICAL | None for new Journey 0 work | Use typed stack for new work | Keep using `hldspec/journey0_artifacts.py`, `journey0_collectors.py`, `journey0_classifiers.py`, `journey0_product_surface.py`, `journey0_draftability.py`, `journey0_hld_update_plan.py`, and `journey0_dry_run.py` |
+| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE | Journey 0 command-surface wiring and readiness claims | Decide whether to freeze, deprecate, adapt, or delete old dict/contracts path | Focused deprecation/adaptation PR; do not treat old path as canonical readiness |
+| J0-5 | Baseline tests and CI status | TRACKED_FOLLOW_UP | Repo-wide readiness claims | Verify full `tests_v2` baseline and CI status; add minimal CI if absent | CI/baseline PR; do not claim repo-wide green from focused Journey 0 tests |
+| J0-7 | Deferred ProductDecision semantics | NEEDS_DECISION | Journey 1 readiness from Journey 0 output | Decide whether `DEFERRED` blocks HLD writing or requires owner/rationale | Semantics PR with tests; do not let deferred decisions silently imply Journey 1 readiness |
+| J0-12 | Snippet privacy and provenance | BLOCKED | Real-target Slice E and real-target readiness claims | Decide snippet default, redaction/opt-in policy, and provenance hardening | Privacy/provenance PR before real target proof |
+| J0-13 | D2 section evidence traceability | CANONICAL | None after section-specific fix | Keep section refs source-type-specific | Preserve PR #101 behavior; do not regress to map-level refs as sole traceability |
+| J0-14 | PR #100 fixture dry-run proof | FIXTURE_ONLY | Real-target proof and Journey 1 start | Treat PASS/ACTION/BLOCKED examples as synthetic fixture proof only | Stabilization docs now; real-target proof later only after blockers resolve |
+| J0-15 | Real PASS path from collected evidence | BLOCKED | Real-target PASS and Journey 1 readiness | Add human-context/product-surface evidence adapter or equivalent explicit product-surface evidence path | Narrow adapter PR; real collectors currently may not produce product-surface source types |
+| J0-16 | Journey 0 command-surface wiring | DO_NOT_WIRE | Public/runtime use | Resolve J0-1, J0-5, J0-7, J0-12, and J0-15 first | Later wiring PR only after blockers are closed |
+| J0-17 | Journey 1 start from Journey 0 | BLOCKED | Journey 1 HLD authoring from Journey 0 outputs | Human/project approval after blockers and stabilization review | Do not start Journey 1 from Journey 0 yet |
 
 ## Dry-Run Proof Expectations
 

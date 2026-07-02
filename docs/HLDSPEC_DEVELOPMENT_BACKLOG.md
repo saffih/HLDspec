@@ -81,6 +81,49 @@ PR status at snapshot: #35/#36/#37/#38 merged; #29 closed/superseded; #26 merged
 (`add352c` — Journey 2 architecture authoring report; conclusion remains DO_NOT_PATCH
 for automated derivation, with future human-authoring stage deferred).
 
+## Journey 0 stabilization blockers — 2026-07-02
+
+This tracker reflects the state after PR #100 and PR #101. It records what is
+implemented, what is fixture-only, what is canonical, what is not canonical, and
+what must not be wired yet. It does not change runtime behavior.
+
+### Implemented and canonical for new Journey 0 work
+
+The typed Journey 0 stack is canonical for new Journey 0 work:
+
+- `hldspec/journey0_artifacts.py`
+- `hldspec/journey0_collectors.py`
+- `hldspec/journey0_classifiers.py`
+- `hldspec/journey0_product_surface.py`
+- `hldspec/journey0_draftability.py`
+- `hldspec/journey0_hld_update_plan.py`
+- `hldspec/journey0_dry_run.py`
+
+PR #100 is a fixture/local dry-run proof only. It validates harness composition
+and no-mutation snapshot behavior against controlled fixtures. It does not
+authorize real target execution, prove real-target privacy/provenance readiness,
+prove real collector PASS, or make Journey 1 ready.
+
+### Stabilization table
+
+| ID | Title | Status | Blocks | Owner/decision needed | Next PR shape |
+|---|---|---|---|---|---|
+| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE | Journey 0 command-surface wiring; readiness claims | Decide whether to delete, freeze, adapt, or explicitly deprecate the old dict/contracts path | Focused old-stack disposition PR; do not wire or claim readiness from it |
+| J0-4 | Typed stack supersession | CANONICAL | None for new Journey 0 work | Human/project decision recorded: typed stack is canonical | Preserve typed stack as source of truth for new Journey 0 slices |
+| J0-5 | Baseline tests and CI | TRACKED_FOLLOW_UP | Repo-wide readiness claims | Verify full `tests_v2` baseline and CI status; add minimal CI later if absent | CI/baseline PR; do not infer repo-wide green from focused Journey 0 tests |
+| J0-7 | Deferred decisions | NEEDS_DECISION | Journey 1 readiness from Journey 0 artifacts | Decide whether `DEFERRED` ProductDecision blocks HLD writing or requires owner/rationale | Semantics PR with tests; do not let deferred decisions silently imply readiness |
+| J0-12 | Snippet privacy and provenance | BLOCKED | Real-target Slice E; real-target readiness claims | Decide snippet capture default, redaction/opt-in, and provenance hardening | Privacy/provenance PR before any real-target proof |
+| J0-14 | PR #100 fixture dry-run | FIXTURE_ONLY | Real-target proof; Journey 1 start | Keep synthetic fixture evidence distinct from real evidence | Do not claim real-target readiness from fixture PASS/ACTION/BLOCKED examples |
+| J0-15 | Real PASS path | BLOCKED | Real-target PASS; Journey 1 start | Add a human-context/product-surface evidence adapter or equivalent explicit product-surface evidence path | Narrow adapter PR; real collectors may not yet produce product-surface source types |
+| J0-16 | Command surface wiring | DO_NOT_WIRE | Public/runtime use | Close or explicitly accept J0 blockers first | Later wiring PR only after stabilization blockers are triaged |
+| J0-17 | Journey 1 start from Journey 0 | BLOCKED | HLD authoring/hardening from Journey 0 output | Human/project approval after blockers resolve | Do not start Journey 1 from Journey 0 yet |
+
+### Stack disposition decision
+
+The old dict/contracts stack is not canonical for new Journey 0 work. It must
+not be used to claim Journey 0 readiness and must not be wired into the command
+surface. A future focused PR should freeze, deprecate, adapt, or delete it.
+
 ## Current implementation notes
 
 ### Context economy
