@@ -1,0 +1,11 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "BLOCK-001",
+      "source_type": "product_capability",
+      "summary": "Controller ownership conflicts with local state ownership.",
+      "label": "CONFLICT",
+      "confidence": "high"
+    }
+  ]
+}

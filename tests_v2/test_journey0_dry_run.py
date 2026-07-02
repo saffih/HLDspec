@@ -1,0 +1,160 @@
+"""Tests for the Journey 0 dry-run proof harness."""
+from __future__ import annotations
+
+import inspect
+import unittest
+from dataclasses import fields
+from pathlib import Path
+
+from hldspec import journey0_dry_run as dry_run
+from hldspec.journey0_artifacts import (
+    BrownfieldEvidencePack,
+    HldCodeSpecGapReport,
+    HldDraftabilityVerdict,
+    HldUpdatePlan,
+    Journey0Verdict,
+    ProductDecisionRegister,
+    ProductSurfaceMap,
+    SpecInventory,
+)
+
+FIXTURE_ROOT = (
+    Path(__file__).parent / "fixtures" / "journey0_brownfield_target"
+).resolve()
+
+
+def _run_fixture(name: str, *allowed: str) -> dry_run.Journey0DryRunResult:
+    return dry_run.run_journey0_dry_run(
+        target_root=FIXTURE_ROOT / name,
+        allowed_relative_paths=allowed or (".",),
+    )
+
+
+class Journey0DryRunTests(unittest.TestCase):
+    def test_dry_run_returns_all_expected_journey0_artifacts(self) -> None:
+        result = _run_fixture("pass")
+
+        self.assertIsInstance(result.evidence_pack, BrownfieldEvidencePack)
+        self.assertIsInstance(result.product_surface_map, ProductSurfaceMap)
+        self.assertIsInstance(result.spec_inventory, SpecInventory)
+        self.assertIsInstance(result.gap_report, HldCodeSpecGapReport)
+        self.assertIsInstance(result.decision_register, ProductDecisionRegister)
+        self.assertIsInstance(result.draftability_verdict, HldDraftabilityVerdict)
+        self.assertIsInstance(result.hld_update_plan, HldUpdatePlan)
+
+    def test_dry_run_output_is_artifact_only(self) -> None:
+        result_fields = {field.name for field in fields(dry_run.Journey0DryRunResult)}
+
+        self.assertEqual(
+            result_fields,
+            {
+                "evidence_pack",
+                "product_surface_map",
+                "spec_inventory",
+                "gap_report",
+                "decision_register",
+                "draftability_verdict",
+                "hld_update_plan",
+                "before_snapshot",
+                "after_snapshot",
+            },
+        )
+
+    def test_fixture_before_after_snapshot_is_identical(self) -> None:
+        result = _run_fixture("pass")
+
+        self.assertTrue(result.target_unchanged)
+        self.assertEqual(result.before_snapshot, result.after_snapshot)
+
+    def test_explicit_allowed_paths_are_required(self) -> None:
+        with self.assertRaises(ValueError):
+            dry_run.run_journey0_dry_run(
+                target_root=FIXTURE_ROOT / "pass",
+                allowed_relative_paths=(),
+            )
+
+    def test_path_traversal_is_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            dry_run.run_journey0_dry_run(
+                target_root=FIXTURE_ROOT / "pass",
+                allowed_relative_paths=("../action",),
+            )
+
+    def test_unlisted_paths_are_not_collected(self) -> None:
+        result = _run_fixture("action", "README.md")
+
+        source_refs = {item.source_ref for item in result.evidence_pack.evidence}
+        self.assertIn("README.md", source_refs)
+        self.assertNotIn("unlisted/secret.md", source_refs)
+
+    def test_collected_evidence_ids_are_deterministic_and_unique(self) -> None:
+        result = _run_fixture("action", "README.md", "unlisted/secret.md")
+
+        collected_ids = tuple(
+            item.evidence_id
+            for item in result.evidence_pack.evidence
+            if item.evidence_id.startswith("COLLECTED-")
+        )
+        self.assertEqual(collected_ids, ("COLLECTED-001", "COLLECTED-002"))
+
+    def test_pass_example_remains_journey1_only(self) -> None:
+        result = _run_fixture("pass")
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.PASS)
+        self.assertTrue(result.draftability_verdict.journey1_only)
+        self.assertFalse(result.draftability_verdict.implementation_ready)
+
+    def test_action_example_does_not_imply_approval(self) -> None:
+        result = _run_fixture("action")
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.ACTION)
+        self.assertNotIn("Proceed", result.draftability_verdict.safe_next_action)
+
+    def test_blocked_example_preserves_conflict(self) -> None:
+        result = _run_fixture("blocked")
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.BLOCKED)
+        self.assertIn("BLOCK-001", result.draftability_verdict.blocking_items)
+        self.assertTrue(result.gap_report.gaps)
+
+    def test_hld_update_plan_is_plan_artifact_only(self) -> None:
+        result = _run_fixture("pass")
+
+        self.assertIsInstance(result.hld_update_plan, HldUpdatePlan)
+        self.assertFalse(result.hld_update_plan.contains_backlog)
+        self.assertFalse(result.hld_update_plan.contains_helper_handoff)
+
+    def test_no_forbidden_boundary_tokens_in_module(self) -> None:
+        source = inspect.getsource(dry_run)
+
+        forbidden_tokens = (
+            "subprocess",
+            "argparse",
+            "click",
+            "SpecKit",
+            "speckit",
+            "git",
+            "write_text",
+            'open("',
+            "open('",
+            "backlog creation",
+            "implementation",
+        )
+        for token in forbidden_tokens:
+            self.assertNotIn(token, source)
+
+    def test_no_target_mutation(self) -> None:
+        result = _run_fixture("blocked")
+
+        self.assertTrue(result.target_unchanged)
+
+    def test_no_journey_progression_behavior_is_exposed(self) -> None:
+        result = _run_fixture("pass")
+
+        self.assertFalse(hasattr(result, "journey1_output"))
+        self.assertFalse(hasattr(result, "journey2_output"))
+        self.assertFalse(hasattr(result, "journey3_output"))
+
+
+if __name__ == "__main__":
+    unittest.main()
