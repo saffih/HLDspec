@@ -60,9 +60,9 @@ schema files and does not create these JSON artifacts.
 - Consumer: HLD Update Plan and Journey 1
 - Required fields: `observed_capabilities`, `observed_users_or_actors`, `observed_inputs_outputs`, `observed_workflows`, `known_limits`, `unknowns`, `source_refs`
 - Field semantics: summarizes currently observed product behavior and known uncertainty without creating new requirements.
-- Allowed labels/status values: referenced evidence keeps its original labels; map entries may be `observed`, `inferred`, or `unknown`.
+- Allowed labels/status values: referenced evidence keeps its original labels in the Evidence Pack; map entries are concise strings and do not carry independent authority labels.
 - Must not contain: feature prioritization, new requirements, unapproved target behavior, implementation slices.
-- PASS/ACTION/BLOCKED relevance: enough observed product shape may support PASS to Journey 1; critical unknowns remain ACTION or BLOCKED depending on ownership.
+- PASS/ACTION/BLOCKED relevance: enough explicit observed product shape may support PASS to Journey 1; critical unknowns remain ACTION or BLOCKED depending on ownership. PASS must not be based merely on the existence of observed files.
 
 ### Spec Inventory
 
@@ -146,6 +146,7 @@ handoff, or make automatic product decisions.
 mixed target resources
   -> read-only collectors
   -> labeled evidence
+  -> product surface mapping
   -> gap / spec / decision classification
   -> HLD Draftability Verdict
   -> HLD Update Plan
@@ -186,12 +187,31 @@ slice.
 - Forbidden behavior: silent conflict resolution, product decisions, implementation planning
 - Validation/check: tests for `INFERRED`, `CONFLICT`, `UNKNOWN`, and `PRODUCT_DECISION_REQUIRED` preservation
 
-### Slice D: draftability verdict computation
+### Slice C2: Product Surface Map builder/classifier
 
-- Input: labeled artifacts and decision register
-- Output: HLD Draftability Verdict and HLD Update Plan
-- Forbidden behavior: Journey 2 package readiness, Journey 3 helper readiness, implementation approval
-- Validation/check: PASS/ACTION/BLOCKED tests including blocked human-owned decisions
+- Input: typed Evidence Pack with explicit product-surface evidence
+- Output: Product Surface Map
+- Forbidden behavior: product inference from arbitrary file presence, authority claims from old specs/HLD fragments, draftability verdicts, HLD Update Plan generation
+- Validation/check: tests that only explicit `OBSERVED` product-surface evidence populates observed product fields
+
+### Slice D1: draftability verdict computation
+
+- Input: Product Surface Map, Gap Report, Product Decision Register, and accepted evidence
+- Output: HLD Draftability Verdict only
+- Forbidden behavior: HLD Update Plan generation, Journey 2 package readiness, Journey 3 helper readiness, implementation approval
+- Validation/check: PASS/ACTION/BLOCKED tests including blocked human-owned decisions and product-surface sufficiency
+
+Draftability PASS requires enough explicit product-surface evidence, no unresolved
+human-owned decisions, and no blocking gaps. PASS means ready for Journey 1 only;
+it does not mean Journey 2, Journey 3, SpecKit, implementation, or target
+mutation readiness.
+
+### Slice D2: HLD Update Plan generation
+
+- Input: PASS/ACTION draftability result, Product Surface Map, accepted evidence, explicit decisions, and labeled stale/superseded material
+- Output: HLD Update Plan
+- Forbidden behavior: backlog creation, SpecKit spec generation, implementation slices, helper handoff
+- Validation/check: plan sections are evidence-referenced and do not hide conflicts or unresolved human-owned decisions
 
 ### Slice E: dry-run proof on authorized brownfield target
 
@@ -199,6 +219,19 @@ slice.
 - Output: Journey 0 artifacts only
 - Forbidden behavior: target mutation, backlog creation, HLD writing, SpecKit execution, implementation
 - Validation/check: before/after target snapshot, artifact-only output, and at least one PASS/ACTION/BLOCKED example backed by labeled evidence
+
+## Context-Aware Follow-Up Issues
+
+These issues are recorded so they are not dropped, but they are not implemented
+by this plan update:
+
+1. Human context evidence adapter: Journey 0 inputs include human-provided context, but current collectors only read filesystem paths. Add a later read-only adapter that turns explicit human notes into typed EvidenceItem rows.
+2. Bounded EvidenceSourceType: EvidenceItem.source_type is currently a plain string. Consider a bounded enum or central constants after the ProductSurfaceMap and verdict path stabilize.
+3. Snippet privacy before real-target dry run: the read-only collector may include bounded first-line metadata. Before Slice E or any real target proof, decide whether snippets must be disabled by default, redacted, or made opt-in.
+4. Boundary-token tests: current boundary tests should avoid incentivizing artificial string splitting such as avoiding a literal `.git` token. Later replace broad token bans with behavior/import/write-safety checks.
+5. Product-surface sufficiency: future draftability verdict must check product-surface sufficiency, not merely the existence of observed files.
+6. Status documentation: after Slice D1/D2/E stabilize, update Journey 0 status docs so implemented slices and planned slices are not confused.
+7. Agent doctrine enforcement helper: the agent operating doctrine exists, but compliance is currently process-only. Consider a later lightweight PR template, checklist, or prompt-template helper that checks for dispatch plan, compact receipts, RunSkeptic receipt, evidence/inference separation, checks run, uncertainty, and next action. Keep it advisory unless repeated failures justify stronger enforcement.
 
 ## Dry-Run Proof Expectations
 
