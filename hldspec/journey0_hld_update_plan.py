@@ -118,7 +118,7 @@ def _decisions_required_before_writing(
     for decision_id in draftability_verdict.required_human_decisions:
         _append_unique(required, decision_id)
     for decision in decision_register.decisions:
-        if decision.decision_status == DecisionStatus.OPEN:
+        if decision.decision_status in {DecisionStatus.OPEN, DecisionStatus.DEFERRED}:
             _append_unique(required, decision.decision_id)
     for gap in gap_report.gaps:
         if _blocking_gap(gap.gap_type, gap.disposition, gap.required_decision_or_next_action):
@@ -150,9 +150,6 @@ def _open_questions(
     questions: list[str] = []
     for unknown in product_surface_map.unknowns:
         _append_unique(questions, unknown)
-    for decision in decision_register.decisions:
-        if decision.decision_status == DecisionStatus.DEFERRED:
-            _append_unique(questions, decision.decision_id or decision.question)
     for item in spec_inventory.specs:
         if item.status in {SpecStatus.UNKNOWN, SpecStatus.PARTIAL}:
             _append_unique(questions, item.spec_id)

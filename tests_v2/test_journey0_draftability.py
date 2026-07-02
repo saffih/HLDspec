@@ -60,6 +60,19 @@ def _surface() -> ProductSurfaceMap:
     )
 
 
+def _decision(status: DecisionStatus, *, decision_id: str = "PD-1") -> ProductDecision:
+    return ProductDecision(
+        decision_id=decision_id,
+        question="Which source of truth wins?",
+        why_human_owned="source of truth decision",
+        options=("hld", "code"),
+        evidence_refs=("E-1",),
+        recommended_default_if_any=None,
+        decision_status=status,
+        owner="human",
+    )
+
+
 class Journey0DraftabilityTests(unittest.TestCase):
     def test_empty_evidence_returns_action(self) -> None:
         result = _verdict()
@@ -102,24 +115,78 @@ class Journey0DraftabilityTests(unittest.TestCase):
             evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
             product_surface_map=_surface(),
             decision_register=ProductDecisionRegister(
-                decisions=(
-                    ProductDecision(
-                        decision_id="PD-1",
-                        question="Which source of truth wins?",
-                        why_human_owned="source of truth decision",
-                        options=("hld", "code"),
-                        evidence_refs=("E-1",),
-                        recommended_default_if_any=None,
-                        decision_status=DecisionStatus.OPEN,
-                        owner="human",
-                    ),
-                )
+                decisions=(_decision(DecisionStatus.OPEN),)
             ),
         )
 
         self.assertEqual(result.verdict, Journey0Verdict.BLOCKED)
         self.assertIn("PD-1", result.blocking_items)
         self.assertIn("PD-1", result.required_human_decisions)
+
+    def test_deferred_product_decision_blocks(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
+            product_surface_map=_surface(),
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DEFERRED),)
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.BLOCKED)
+        self.assertIn("PD-1", result.blocking_items)
+
+    def test_deferred_product_decision_is_required_human_decision(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
+            product_surface_map=_surface(),
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DEFERRED),)
+            ),
+        )
+
+        self.assertIn("PD-1", result.required_human_decisions)
+
+    def test_decided_product_decision_does_not_block_by_itself(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
+            product_surface_map=_surface(),
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DECIDED),)
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.PASS)
+        self.assertNotIn("PD-1", result.blocking_items)
+        self.assertNotIn("PD-1", result.required_human_decisions)
+
+    def test_deferred_cannot_turn_otherwise_pass_case_into_pass(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
+            product_surface_map=_surface(),
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DEFERRED),)
+            ),
+        )
+
+        self.assertNotEqual(result.verdict, Journey0Verdict.PASS)
+        self.assertEqual(result.verdict, Journey0Verdict.BLOCKED)
+
+    def test_deferred_cannot_turn_action_case_into_journey1_readiness(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="doc_file"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                source_refs=("E-1",),
+            ),
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DEFERRED),)
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.BLOCKED)
+        self.assertTrue(result.journey1_only)
 
     def test_hld_code_conflict_gap_blocks(self) -> None:
         result = _verdict(

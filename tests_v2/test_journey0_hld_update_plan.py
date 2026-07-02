@@ -82,6 +82,19 @@ def _plan(
     )
 
 
+def _decision(status: DecisionStatus, *, decision_id: str = "PD-1") -> ProductDecision:
+    return ProductDecision(
+        decision_id=decision_id,
+        question="Which behavior is canonical?",
+        why_human_owned="product meaning",
+        options=("a", "b"),
+        evidence_refs=("E-1",),
+        recommended_default_if_any=None,
+        decision_status=status,
+        owner="human",
+    )
+
+
 class Journey0HldUpdatePlanTests(unittest.TestCase):
     def test_pass_with_product_capability_creates_product_capabilities_section(self) -> None:
         plan = _plan()
@@ -359,42 +372,41 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
     def test_open_product_decisions_are_required_before_writing(self) -> None:
         plan = _plan(
             decision_register=ProductDecisionRegister(
-                decisions=(
-                    ProductDecision(
-                        decision_id="PD-1",
-                        question="Which behavior is canonical?",
-                        why_human_owned="product meaning",
-                        options=("a", "b"),
-                        evidence_refs=("E-1",),
-                        recommended_default_if_any=None,
-                        decision_status=DecisionStatus.OPEN,
-                        owner="human",
-                    ),
-                )
+                decisions=(_decision(DecisionStatus.OPEN),)
             )
         )
 
         self.assertIn("PD-1", plan.decisions_required_before_writing)
 
-    def test_deferred_product_decision_is_carried_as_open_question(self) -> None:
+    def test_deferred_product_decisions_are_required_before_writing(self) -> None:
         plan = _plan(
             decision_register=ProductDecisionRegister(
-                decisions=(
-                    ProductDecision(
-                        decision_id="PD-1",
-                        question="Which behavior is canonical?",
-                        why_human_owned="product meaning",
-                        options=("a", "b"),
-                        evidence_refs=("E-1",),
-                        recommended_default_if_any=None,
-                        decision_status=DecisionStatus.DEFERRED,
-                        owner="human",
-                    ),
-                )
+                decisions=(_decision(DecisionStatus.DEFERRED),)
             )
         )
 
-        self.assertIn("PD-1", plan.open_questions_to_carry_forward)
+        self.assertIn("PD-1", plan.decisions_required_before_writing)
+
+    def test_deferred_product_decision_is_not_only_non_blocking_open_question(self) -> None:
+        plan = _plan(
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DEFERRED),)
+            )
+        )
+
+        self.assertIn("PD-1", plan.decisions_required_before_writing)
+        self.assertNotIn("PD-1", plan.open_questions_to_carry_forward)
+
+    def test_decided_product_decision_does_not_create_backlog_or_scope(self) -> None:
+        plan = _plan(
+            decision_register=ProductDecisionRegister(
+                decisions=(_decision(DecisionStatus.DECIDED),)
+            )
+        )
+
+        self.assertFalse(plan.contains_backlog)
+        self.assertNotIn("PD-1", plan.decisions_required_before_writing)
+        self.assertNotIn("PD-1", plan.open_questions_to_carry_forward)
 
     def test_stale_superseded_conflicting_specs_are_known_stale_material(self) -> None:
         plan = _plan(
