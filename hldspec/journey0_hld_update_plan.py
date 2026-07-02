@@ -20,12 +20,12 @@ from hldspec.journey0_artifacts import (
     SpecStatus,
 )
 
-_SECTION_FIELDS = (
-    ("Product capabilities", "observed_capabilities"),
-    ("Users and actors", "observed_users_or_actors"),
-    ("Inputs and outputs", "observed_inputs_outputs"),
-    ("Workflows", "observed_workflows"),
-    ("Known limits", "known_limits"),
+_SECTION_SOURCE_TYPES = (
+    ("Product capabilities", "observed_capabilities", "product_capability"),
+    ("Users and actors", "observed_users_or_actors", "product_actor"),
+    ("Inputs and outputs", "observed_inputs_outputs", "product_input_output"),
+    ("Workflows", "observed_workflows", "product_workflow"),
+    ("Known limits", "known_limits", "product_limit"),
 )
 
 
@@ -40,20 +40,12 @@ def build_journey0_hld_update_plan(
 ) -> HldUpdatePlan:
     """Build a conservative HLD update plan from typed Journey 0 artifacts."""
 
-    accepted_product_refs = _accepted_product_surface_refs(
-        draftability_verdict,
-        product_surface_map,
+    evidence_refs_per_section = _evidence_refs_per_section(
+        draftability_verdict=draftability_verdict,
+        product_surface_map=product_surface_map,
+        evidence_pack=evidence_pack,
     )
-    sections: tuple[str, ...] = ()
-    evidence_refs_per_section: dict[str, tuple[str, ...]] = {}
-    if (
-        draftability_verdict.verdict != Journey0Verdict.BLOCKED
-        and accepted_product_refs
-    ):
-        sections = _planned_sections(product_surface_map)
-        evidence_refs_per_section = {
-            section: accepted_product_refs for section in sections
-        }
+    sections = tuple(evidence_refs_per_section)
 
     return HldUpdatePlan(
         hld_sections_to_create_or_update=sections,
@@ -75,19 +67,45 @@ def build_journey0_hld_update_plan(
     )
 
 
-def _accepted_product_surface_refs(
+def _evidence_refs_per_section(
+    *,
     draftability_verdict: HldDraftabilityVerdict,
     product_surface_map: ProductSurfaceMap,
+    evidence_pack: BrownfieldEvidencePack,
+) -> dict[str, tuple[str, ...]]:
+    if draftability_verdict.verdict == Journey0Verdict.BLOCKED:
+        return {}
+
+    refs_per_section: dict[str, tuple[str, ...]] = {}
+    for section, field_name, source_type in _SECTION_SOURCE_TYPES:
+        if not getattr(product_surface_map, field_name):
+            continue
+        section_refs = _section_evidence_refs(
+            section_source_type=source_type,
+            draftability_verdict=draftability_verdict,
+            product_surface_map=product_surface_map,
+            evidence_pack=evidence_pack,
+        )
+        if section_refs:
+            refs_per_section[section] = section_refs
+    return refs_per_section
+
+
+def _section_evidence_refs(
+    *,
+    section_source_type: str,
+    draftability_verdict: HldDraftabilityVerdict,
+    product_surface_map: ProductSurfaceMap,
+    evidence_pack: BrownfieldEvidencePack,
 ) -> tuple[str, ...]:
     accepted = set(draftability_verdict.accepted_evidence_refs)
-    return tuple(ref for ref in product_surface_map.source_refs if ref in accepted)
-
-
-def _planned_sections(product_surface_map: ProductSurfaceMap) -> tuple[str, ...]:
+    map_refs = set(product_surface_map.source_refs)
     return tuple(
-        section
-        for section, field_name in _SECTION_FIELDS
-        if getattr(product_surface_map, field_name)
+        item.evidence_id
+        for item in evidence_pack.evidence
+        if item.evidence_id in accepted
+        and item.evidence_id in map_refs
+        and item.source_type == section_source_type
     )
 
 
