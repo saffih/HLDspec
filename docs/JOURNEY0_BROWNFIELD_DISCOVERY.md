@@ -1,10 +1,11 @@
 # Journey 0 — Brownfield Product Discovery / HLD Gap Assessment
 
-**Status:** product direction / design proposal. This doc defines the *contract
-and boundary* of a pre-HLD discovery journey for brownfield products. It is **not
-yet hardened or gated** the way Journeys 1–3 are (no RunSkeptic-tested gate, no
-schemas, no implementation). Those are explicit future steps (see
-[§9 Status and next steps](#9-status-and-next-steps)).
+**Status:** docs contract. This doc defines the *contract and boundary* of a
+pre-HLD discovery journey for brownfield products. It defines gate states,
+artifact shapes, handoff rules, and disconfirming checks, but it does **not**
+add runtime validators, schemas, target mutation, SpecKit execution, or
+implementation behavior. Those are explicit future steps (see
+[§12 Status and next steps](#12-status-and-next-steps)).
 
 > Relationship to the canonical doc:
 > [`HLDSPEC_TERMINOLOGY_AND_FLOW.md`](HLDSPEC_TERMINOLOGY_AND_FLOW.md) remains
@@ -141,22 +142,151 @@ Old spec content may feed the Evidence Pack, Spec Inventory, Gap Report,
 Product Decision Register, and HLD Update Plan. It must not directly become the
 new backlog.
 
-## 5. Outputs
+## 5. Gate states
 
-Journey 0 **may produce** the following artifacts. (Their schemas are
-deliberately **not** defined here — that is a later hardening step.)
+Journey 0 emits one of three gate states:
 
-| Artifact | Purpose |
+| State | Meaning |
 |---|---|
-| **Brownfield Evidence Pack** | The collected, labeled evidence from all inputs. |
-| **Product Surface Map** | What the product appears to be/do, derived from evidence. |
-| **Spec Inventory** | Existing specs/spec-fragments and their status (current / stale / superseded). |
-| **HLD-Code-Spec Gap Report** | Where HLD, code, and specs agree, diverge, or are silent. |
-| **Product Decision Register** | The explicit product decisions discovery surfaced as required. |
-| **HLD Draftability Verdict** | Whether an authoritative HLD can responsibly be written yet. |
-| **HLD Update Plan** | What Journey 1 should author/harden, from accepted evidence + decisions. |
+| **PASS** | Enough accepted evidence and explicit product decisions exist to responsibly draft or harden an authoritative HLD in Journey 1. |
+| **ACTION** | Specific fixable discovery gaps remain, but no unresolved human-owned product/authority conflict blocks progress. Journey 0 may continue read-only discovery or ask for specific missing evidence. |
+| **BLOCKED** | An authoritative HLD cannot responsibly be drafted because product intent, source of truth, authority, HLD-code-spec conflicts, safety boundary, or ownership decisions are unresolved. |
 
-## 6. Evidence labels
+**PASS does not mean implementation-ready.** PASS only means Journey 1 may
+author or harden the HLD from accepted evidence and explicit decisions. It does
+not mean Journey 2 package readiness, Journey 3 helper readiness, SpecKit
+readiness, or implementation approval.
+
+## 6. What may pass to Journey 1
+
+Journey 0 may pass to Journey 1 only:
+
+- accepted evidence,
+- explicit product decisions,
+- unresolved questions clearly labeled,
+- stale/superseded material clearly labeled,
+- HLD Update Plan,
+- HLD Draftability Verdict.
+
+Journey 0 must not pass raw mixed resources as authority. Journey 0 must not
+pass old SpecKit specs as new backlog. Journey 0 must not pass inferred product
+truth without labeling it `INFERRED`. Journey 0 must not hide conflicts inside a
+draft HLD.
+
+Journey 0 does not create right-sized spec bites. Journey 0 prepares the
+accepted evidence and HLD Update Plan. Journey 1 creates or hardens the HLD.
+Journey 2 creates right-sized spec bites.
+
+## 7. Artifact shapes
+
+Journey 0 **may produce** the following artifacts. These are lightweight docs
+contract shapes, not JSON schemas or runtime validators.
+
+### Brownfield Evidence Pack
+
+Purpose: collect and label evidence from all inputs.
+
+Required fields: `evidence_id`, `source_type`, `source_location`, `summary`,
+`label` (`OBSERVED` / `INFERRED` / `UNKNOWN` / `CONFLICT` /
+`PRODUCT_DECISION_REQUIRED`), `confidence`, `related_items`.
+
+Must not contain: unlabeled assumptions, implementation instructions, authority
+claims not supported by evidence.
+
+Gate relevance: supports PASS only when material claims are accepted evidence or
+explicit decisions; `CONFLICT`, `UNKNOWN`, and `PRODUCT_DECISION_REQUIRED` drive
+ACTION or BLOCKED.
+
+### Product Surface Map
+
+Purpose: summarize what the product appears to do from accepted evidence.
+
+Required fields: `observed_capabilities`, `observed_users_or_actors`,
+`observed_inputs_outputs`, `observed_workflows`, `known_limits`, `unknowns`,
+`source_refs`.
+
+Must not contain: new product requirements, feature prioritization, unapproved
+target behavior.
+
+Gate relevance: identifies whether Journey 1 has enough observed product shape
+to draft or harden the HLD.
+
+### Spec Inventory
+
+Purpose: classify existing specs/spec-fragments and their relationship to the
+current target.
+
+Required fields: `spec_id`, `location`, `status` (`current` / `stale` /
+`superseded` / `partial` / `conflicting` / `unknown`), `summary`,
+`covered_intent`, `implementation_overlap`, `conflicts`, `source_refs`.
+
+Must not contain: new backlog order, automatic preservation of old spec
+boundaries, implementation approval.
+
+Gate relevance: stale, superseded, partial, conflicting, or unknown specs must
+not become authority or backlog without Journey 1/2 processing and human
+approval.
+
+### HLD-Code-Spec Gap Report
+
+Purpose: show where HLD, code, and specs agree, diverge, or are silent.
+
+Required fields: `gap_id`, `gap_type` (`HLD_gap` / `code_gap` /
+`HLD_code_conflict` / `stale_spec_residue` / `safety_authority_gap`),
+`description`, `evidence_refs`, `disposition`,
+`required_decision_or_next_action`.
+
+Must not contain: silent conflict resolution, implementation plan, spec
+generation.
+
+Gate relevance: fixable evidence gaps may be ACTION; unresolved conflicts or
+safety/authority gaps are BLOCKED.
+
+### Product Decision Register
+
+Purpose: list product, authority, source-of-truth, safety, data, and ownership
+questions that require a human decision.
+
+Required fields: `decision_id`, `question`, `why_human_owned`, `options`,
+`evidence_refs`, `recommended_default_if_any`, `status` (`open` / `decided` /
+`deferred`), `owner`.
+
+Must not contain: agent-approved product decisions, hidden defaults for
+architecture/source-of-truth/security/data/user-visible scope.
+
+Gate relevance: open human-owned decisions that affect authoritative HLD content
+are BLOCKED; decided items may feed Journey 1 as explicit product decisions.
+
+### HLD Draftability Verdict
+
+Purpose: state whether an authoritative HLD can responsibly be drafted or
+hardened yet.
+
+Required fields: `verdict` (`PASS` / `ACTION` / `BLOCKED`), `reason`,
+`blocking_items`, `accepted_evidence_refs`, `required_human_decisions`,
+`safe_next_action`.
+
+Must not contain: implementation readiness claim, Journey 2 package readiness
+claim, Journey 3 helper readiness claim.
+
+Gate relevance: this is the Journey 0 gate output. PASS means ready to enter
+Journey 1 only.
+
+### HLD Update Plan
+
+Purpose: tell Journey 1 what to author or harden from accepted evidence and
+explicit decisions.
+
+Required fields: `hld_sections_to_create_or_update`,
+`evidence_refs_per_section`, `decisions_required_before_writing`,
+`known_stale_material_to_exclude`, `open_questions_to_carry_forward`.
+
+Must not contain: backlog, SpecKit specs, implementation slices, helper handoff.
+
+Gate relevance: PASS requires a bounded update plan whose inputs are accepted
+evidence, explicit decisions, and clearly labeled unknowns.
+
+## 8. Evidence labels
 
 Every material finding in Journey 0 is classified:
 
@@ -166,7 +296,7 @@ Every material finding in Journey 0 is classified:
 - **CONFLICT** — sources disagree; no silent winner.
 - **PRODUCT_DECISION_REQUIRED** — resolving it needs a human product decision, not more inspection.
 
-## 7. Gap handling rules
+## 9. Gap handling rules
 
 Journey 0 routes each gap; it does not resolve product or authority conflicts
 itself:
@@ -179,7 +309,26 @@ itself:
 | **Stale spec residue** | → mark **stale / superseded** in the Spec Inventory; do not treat as authority. |
 | **Safety / authority gap** | → **block before implementation**; a missing owner/authority is not auto-resolved. |
 
-## 8. Non-goals (hard boundaries)
+## 10. Disconfirming checks
+
+Journey 0 must fail safely on these cases:
+
+- **BLOCKED case:** code, docs, and old specs disagree about the source of truth
+  for run state, and no human decision resolves it.
+- **Stale SpecKit case:** an old SpecKit spec describes an oversized or partially
+  implemented feature; it is classified as stale/partial evidence and must not
+  become the new backlog.
+- **HLD-only readiness case:** observed evidence and decisions are enough to
+  draft an HLD, but no right-sized package, tests, or helper handoff exists;
+  Journey 0 may PASS to Journey 1 but must not claim implementation readiness.
+- **Contradiction case:** code behavior contradicts docs; Journey 0 records an
+  `HLD_code_conflict` and asks for a product decision instead of choosing a
+  winner.
+- **Inference case:** a plausible product claim is derived from naming or
+  structure only; it remains `INFERRED` and cannot become authority without
+  evidence or decision.
+
+## 11. Non-goals (hard boundaries)
 
 Journey 0 **must not**:
 
@@ -196,23 +345,20 @@ stale inputs, conflicts, and required product decisions, then **hands off to
 Journey 1** — which may author or harden the authoritative HLD from accepted
 evidence and explicit decisions.
 
-## 9. Status and next steps
+## 12. Status and next steps
 
-This doc is **direction only**. It intentionally does **not**:
+This doc is a **docs contract only**. It intentionally does **not**:
 
 - implement code or a discovery machine,
-- define artifact schemas,
+- define JSON schemas or runtime validators,
 - run against any target repo (including `~/code/flow`),
 - change Journeys 1–3 or their contracts.
 
 Natural next steps, each a separate gated change:
 
-1. **RunSkeptic-harden** this contract into a testable Journey 0 gate (the way
-   Journeys 1–3 were hardened), defining PASS/ACTION/BLOCKED and the disconfirming
-   checks for "can an authoritative HLD responsibly be written?".
-2. **Define schemas** for the Journey 0 artifacts (Evidence Pack, Gap Report,
+1. **Define schemas** for the Journey 0 artifacts (Evidence Pack, Gap Report,
    Decision Register, Draftability Verdict, HLD Update Plan).
-3. **Wire to existing read-only primitives** (`target_discovery.py`,
+2. **Wire to existing read-only primitives** (`target_discovery.py`,
    `journey3_driver.py`) without granting any mutation or adoption authority.
-4. **First read-only proof** on a brownfield proving-ground (e.g. Baton Flow),
+3. **First read-only proof** on a brownfield proving-ground (e.g. Baton Flow),
    under explicit authorization, once the above are gated.
