@@ -231,6 +231,7 @@ by this plan update:
 4. Boundary-token tests: current boundary tests should avoid incentivizing artificial string splitting such as avoiding a literal `.git` token. Later replace broad token bans with behavior/import/write-safety checks.
 5. Product-surface sufficiency: future draftability verdict must check product-surface sufficiency, not merely the existence of observed files.
 6. Status documentation: after Slice D1/D2/E stabilize, update Journey 0 status docs so implemented slices and planned slices are not confused.
+7. Agent doctrine enforcement helper: the agent operating doctrine exists, but compliance is currently process-only. Consider a later lightweight PR template, checklist, or prompt-template helper that checks for dispatch plan, compact receipts, RunSkeptic receipt, evidence/inference separation, checks run, uncertainty, and next action. Keep it advisory unless repeated failures justify stronger enforcement.
 
 ## Dry-Run Proof Expectations
 
