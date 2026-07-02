@@ -124,6 +124,7 @@ layers in `ARCHITECTURE_LAYERS.md`.
 | `HLD_GENERATION.md` | docs — reference | How to author/convert an HLD into that format. |
 | `LICENSE` | repo meta | License. |
 | `.gitattributes`, `.gitignore` | repo meta | Git config. |
+| `.github/` | repo meta — CI | GitHub Actions workflows; currently runs the `tests_v2` baseline. |
 | `pytest.ini` | repo meta — test config | Pytest discovery config for active `tests/` and `tests_v2/`; excludes reference-only `tests_legacy/`. |
 | `hld_map.py` | active core — shared parser | Shared HLD parser; imported by V2 (`hldspec/hld_marking.py`) and V1. Not legacy. |
 | `hld_spec_sync.py` | compatibility/V1 | V1 pipeline; still wired (`first_run_readonly.sh`, `tests/`). Not active V2 core. |
