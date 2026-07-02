@@ -25,10 +25,14 @@ from hldspec.journey0_artifacts import (
 )
 
 
-def _evidence(evidence_id: str) -> EvidenceItem:
+def _evidence(
+    evidence_id: str,
+    *,
+    source_type: str = "product_capability",
+) -> EvidenceItem:
     return EvidenceItem(
         evidence_id=evidence_id,
-        source_type="product_capability",
+        source_type=source_type,
         source_ref=f"{evidence_id}.md",
         source_location=f"{evidence_id}.md:1",
         summary=f"{evidence_id} observed",
@@ -86,6 +90,10 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
 
     def test_pass_with_actor_creates_users_and_actors_section(self) -> None:
         plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_actor"),)
+            ),
             product_surface_map=ProductSurfaceMap(
                 observed_users_or_actors=("Operator",),
                 source_refs=("E-1",),
@@ -96,6 +104,10 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
 
     def test_pass_with_input_output_creates_inputs_and_outputs_section(self) -> None:
         plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_input_output"),)
+            ),
             product_surface_map=ProductSurfaceMap(
                 observed_inputs_outputs=("CLI input -> task row",),
                 source_refs=("E-1",),
@@ -106,6 +118,10 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
 
     def test_pass_with_workflow_creates_workflows_section(self) -> None:
         plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_workflow"),)
+            ),
             product_surface_map=ProductSurfaceMap(
                 observed_workflows=("claim then complete",),
                 source_refs=("E-1",),
@@ -116,6 +132,10 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
 
     def test_pass_with_known_limit_creates_known_limits_section(self) -> None:
         plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_limit"),)
+            ),
             product_surface_map=ProductSurfaceMap(
                 known_limits=("single local store",),
                 source_refs=("E-1",),
@@ -124,23 +144,15 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
 
         self.assertEqual(plan.hld_sections_to_create_or_update, ("Known limits",))
 
-    def test_section_evidence_refs_use_accepted_refs_intersecting_surface_refs(self) -> None:
+    def test_product_capabilities_section_gets_only_product_capability_refs(self) -> None:
         plan = _plan(
             draftability_verdict=_verdict(accepted=("E-1", "E-2")),
-            product_surface_map=ProductSurfaceMap(
-                observed_capabilities=("User can claim work",),
-                source_refs=("E-2", "E-3"),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_capability"),
+                    _evidence("E-2", source_type="product_actor"),
+                )
             ),
-        )
-
-        self.assertEqual(
-            plan.evidence_refs_per_section["Product capabilities"],
-            ("E-2",),
-        )
-
-    def test_unaccepted_refs_are_excluded_from_evidence_refs_per_section(self) -> None:
-        plan = _plan(
-            draftability_verdict=_verdict(accepted=("E-1",)),
             product_surface_map=ProductSurfaceMap(
                 observed_capabilities=("User can claim work",),
                 source_refs=("E-1", "E-2"),
@@ -151,6 +163,148 @@ class Journey0HldUpdatePlanTests(unittest.TestCase):
             plan.evidence_refs_per_section["Product capabilities"],
             ("E-1",),
         )
+
+    def test_users_and_actors_section_gets_only_product_actor_refs(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-2")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_capability"),
+                    _evidence("E-2", source_type="product_actor"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_users_or_actors=("Operator",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(plan.evidence_refs_per_section["Users and actors"], ("E-2",))
+
+    def test_inputs_and_outputs_section_gets_only_product_input_output_refs(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-2")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_actor"),
+                    _evidence("E-2", source_type="product_input_output"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_inputs_outputs=("CLI input -> task row",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(plan.evidence_refs_per_section["Inputs and outputs"], ("E-2",))
+
+    def test_workflows_section_gets_only_product_workflow_refs(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-2")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_limit"),
+                    _evidence("E-2", source_type="product_workflow"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_workflows=("claim then complete",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(plan.evidence_refs_per_section["Workflows"], ("E-2",))
+
+    def test_known_limits_section_gets_only_product_limit_refs(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-2")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_workflow"),
+                    _evidence("E-2", source_type="product_limit"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                known_limits=("single local store",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(plan.evidence_refs_per_section["Known limits"], ("E-2",))
+
+    def test_two_fields_with_different_refs_get_section_specific_refs(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-2")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_capability"),
+                    _evidence("E-2", source_type="product_actor"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                observed_users_or_actors=("Operator",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(
+            plan.evidence_refs_per_section,
+            {
+                "Product capabilities": ("E-1",),
+                "Users and actors": ("E-2",),
+            },
+        )
+
+    def test_section_with_only_wrong_source_type_refs_is_not_created(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_actor"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                source_refs=("E-1",),
+            ),
+        )
+
+        self.assertEqual(plan.hld_sections_to_create_or_update, ())
+        self.assertEqual(plan.evidence_refs_per_section, {})
+
+    def test_unaccepted_refs_are_excluded_from_evidence_refs_per_section(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1",)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(
+                    _evidence("E-1", source_type="product_capability"),
+                    _evidence("E-2", source_type="product_capability"),
+                )
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                source_refs=("E-1", "E-2"),
+            ),
+        )
+
+        self.assertEqual(
+            plan.evidence_refs_per_section["Product capabilities"],
+            ("E-1",),
+        )
+
+    def test_surface_refs_not_backed_by_matching_evidence_are_excluded(self) -> None:
+        plan = _plan(
+            draftability_verdict=_verdict(accepted=("E-1", "E-MISSING")),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_capability"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                source_refs=("E-MISSING",),
+            ),
+        )
+
+        self.assertEqual(plan.hld_sections_to_create_or_update, ())
+        self.assertEqual(plan.evidence_refs_per_section, {})
 
     def test_no_product_surface_refs_creates_no_sections(self) -> None:
         plan = _plan(
