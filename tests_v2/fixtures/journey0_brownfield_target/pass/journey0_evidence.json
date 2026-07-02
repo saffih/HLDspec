@@ -1,0 +1,11 @@
+{
+  "evidence": [
+    {
+      "evidence_id": "PASS-001",
+      "source_type": "product_capability",
+      "summary": "User can claim work from the queue.",
+      "label": "OBSERVED",
+      "confidence": "high"
+    }
+  ]
+}
