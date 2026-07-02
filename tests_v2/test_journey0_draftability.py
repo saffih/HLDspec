@@ -25,10 +25,11 @@ def _evidence(
     evidence_id: str,
     *,
     label: EvidenceLabel = EvidenceLabel.OBSERVED,
+    source_type: str = "product_capability",
 ) -> EvidenceItem:
     return EvidenceItem(
         evidence_id=evidence_id,
-        source_type="product_capability",
+        source_type=source_type,
         source_ref=f"{evidence_id}.md",
         source_location=f"{evidence_id}.md:1",
         summary=f"{evidence_id} observed",
@@ -270,9 +271,63 @@ class Journey0DraftabilityTests(unittest.TestCase):
 
         self.assertEqual(result.verdict, Journey0Verdict.PASS)
 
+    def test_doc_file_evidence_cannot_back_product_surface_pass(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="doc_file"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_capabilities=("User can claim work",),
+                source_refs=("E-1",),
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.ACTION)
+
+    def test_observed_product_actor_can_support_pass(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_actor"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_users_or_actors=("Operator",),
+                source_refs=("E-1",),
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.PASS)
+
+    def test_observed_product_input_output_can_support_pass(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_input_output"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_inputs_outputs=("CLI input -> task row",),
+                source_refs=("E-1",),
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.PASS)
+
+    def test_observed_product_workflow_can_support_pass(self) -> None:
+        result = _verdict(
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_workflow"),)
+            ),
+            product_surface_map=ProductSurfaceMap(
+                observed_workflows=("claim then complete",),
+                source_refs=("E-1",),
+            ),
+        )
+
+        self.assertEqual(result.verdict, Journey0Verdict.PASS)
+
     def test_known_limit_can_support_pass_when_linked_to_observed_evidence(self) -> None:
         result = _verdict(
-            evidence_pack=BrownfieldEvidencePack(evidence=(_evidence("E-1"),)),
+            evidence_pack=BrownfieldEvidencePack(
+                evidence=(_evidence("E-1", source_type="product_limit"),)
+            ),
             product_surface_map=ProductSurfaceMap(
                 known_limits=("single local store",),
                 source_refs=("E-1",),

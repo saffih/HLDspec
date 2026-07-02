@@ -29,6 +29,15 @@ _PASS_NEXT_ACTION = (
     "Proceed to Journey 1 HLD authoring/hardening using accepted Journey 0 "
     "evidence and explicit product-surface evidence only."
 )
+_PRODUCT_SURFACE_SOURCE_TYPES = frozenset(
+    {
+        "product_capability",
+        "product_actor",
+        "product_input_output",
+        "product_workflow",
+        "product_limit",
+    }
+)
 
 
 def compute_journey0_draftability_verdict(
@@ -62,7 +71,6 @@ def compute_journey0_draftability_verdict(
         evidence_pack,
         product_surface_map,
         gap_report,
-        accepted_refs,
     ):
         return HldDraftabilityVerdict(
             verdict=Journey0Verdict.ACTION,
@@ -120,13 +128,13 @@ def _requires_more_action(
     evidence_pack: BrownfieldEvidencePack,
     product_surface_map: ProductSurfaceMap,
     gap_report: HldCodeSpecGapReport,
-    accepted_refs: tuple[str, ...],
 ) -> bool:
+    accepted_refs = _observed_evidence_refs(evidence_pack)
     if not evidence_pack.evidence:
         return True
     if not accepted_refs:
         return True
-    if not _has_explicit_product_surface(product_surface_map, accepted_refs):
+    if not _has_explicit_product_surface(product_surface_map, evidence_pack):
         return True
     if gap_report.gaps:
         return True
@@ -143,9 +151,20 @@ def _observed_evidence_refs(evidence_pack: BrownfieldEvidencePack) -> tuple[str,
 
 def _has_explicit_product_surface(
     product_surface_map: ProductSurfaceMap,
-    accepted_refs: tuple[str, ...],
+    evidence_pack: BrownfieldEvidencePack,
 ) -> bool:
-    has_surface_field = any(
+    if not _has_surface_field(product_surface_map):
+        return False
+    return any(
+        item.evidence_id in product_surface_map.source_refs
+        and item.label == EvidenceLabel.OBSERVED
+        and item.source_type in _PRODUCT_SURFACE_SOURCE_TYPES
+        for item in evidence_pack.evidence
+    )
+
+
+def _has_surface_field(product_surface_map: ProductSurfaceMap) -> bool:
+    return any(
         (
             product_surface_map.observed_capabilities,
             product_surface_map.observed_users_or_actors,
@@ -154,10 +173,6 @@ def _has_explicit_product_surface(
             product_surface_map.known_limits,
         )
     )
-    has_accepted_source_ref = any(
-        ref in accepted_refs for ref in product_surface_map.source_refs
-    )
-    return has_surface_field and has_accepted_source_ref
 
 
 def _only_inferred_or_unknown(evidence_pack: BrownfieldEvidencePack) -> bool:
