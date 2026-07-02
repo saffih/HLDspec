@@ -1,5 +1,12 @@
 # HLDspec Agent Instructions
 
+For HLDspec repo work, agents must follow
+`docs/AGENT_OPERATING_DOCTRINE.md`. That doctrine governs fixed baseline
+prompting, dispatch-first execution, context headroom, failure handling,
+evidence-based reports, and the short ponytail reminder. On conflict with
+task-specific prompts, doctrine boundaries win unless a human explicitly
+approves an exception.
+
 ## HLDspec control-plan loop aliases
 
 The canonical user-facing trigger remains `HLDspec ...`.
