@@ -61,7 +61,7 @@ class Journey0CollectorTests(unittest.TestCase):
             item = collectors.collect_journey0_observed_evidence(root).evidence[0]
 
         self.assertEqual(item.source_ref, "docs/notes.md")
-        self.assertEqual(item.source_location, "docs/notes.md:1")
+        self.assertEqual(item.source_location, "docs/notes.md")
         self.assertIn("docs/notes.md", item.summary)
 
     def test_collector_is_read_only_for_fixture_tree(self) -> None:
@@ -140,6 +140,58 @@ class Journey0CollectorTests(unittest.TestCase):
             "toolchain",
         ):
             self.assertNotIn(forbidden_key, serialized)
+
+    def test_secret_like_content_does_not_leak_into_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _put(root, "config.yaml", "api_key: FAKE-EXAMPLE-123\nother: value\n")
+            _put(root, ".env.toml", 'DATABASE_URL = "postgres://secret@host/db"\n')
+            _put(root, "settings.json", '{"token": "ghp_secret_token_value"}\n')
+
+            pack = collectors.collect_journey0_observed_evidence(root)
+
+        for item in pack.evidence:
+            self.assertNotIn("FAKE-EXAMPLE-123", item.summary)
+            self.assertNotIn("secret", item.summary)
+            self.assertNotIn("ghp_", item.summary)
+            self.assertNotIn("DATABASE_URL", item.summary)
+            self.assertNotIn("api_key", item.summary)
+            self.assertNotIn("token", item.summary)
+
+    def test_config_files_still_recorded_as_structural_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _put(root, "config.yaml", "api_key: FAKE-EXAMPLE-123\n")
+            _put(root, "src/app.py", "import os\n")
+
+            pack = collectors.collect_journey0_observed_evidence(root)
+
+        refs = [item.source_ref for item in pack.evidence]
+        self.assertIn("config.yaml", refs)
+        self.assertIn("src/app.py", refs)
+        types = [item.source_type for item in pack.evidence]
+        self.assertIn("resource_file", types)
+        self.assertIn("code_file", types)
+
+    def test_no_file_content_in_any_evidence_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _put(root, "README.md", "# My Product Title\n")
+            _put(root, "src/main.py", "print('hello world')\n")
+            _put(root, "data.json", '{"key": "value"}\n')
+
+            pack = collectors.collect_journey0_observed_evidence(root)
+
+        for item in pack.evidence:
+            self.assertNotIn("My Product Title", item.summary)
+            self.assertNotIn("hello world", item.summary)
+            self.assertNotIn('"key"', item.summary)
+
+    def test_collector_does_not_read_file_content(self) -> None:
+        source = inspect.getsource(collectors)
+        self.assertNotIn("read_text", source)
+        self.assertNotIn("read_bytes", source)
+        self.assertNotIn("open(", source)
 
     def test_boundary_tokens_do_not_appear_in_collector_module(self) -> None:
         source = inspect.getsource(collectors)
