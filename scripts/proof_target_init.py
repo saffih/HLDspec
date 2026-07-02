@@ -46,6 +46,9 @@ project; it is recreated from scratch by `scripts/proof_target_init.py`.
 # this in the seed keeps the target clean across repeated runs, so a second smoke run
 # is never falsely BLOCKED merely because a prior report exists.
 GITIGNORE = """.hldspec-proof/
+.pytest_cache/
+__pycache__/
+*.py[cod]
 """
 
 HLD = """# proof-target HLD

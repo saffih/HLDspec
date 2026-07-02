@@ -1,0 +1,26 @@
+name: tests-v2
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  tests-v2:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: python3 -m pip install pytest
+
+      - name: Run tests_v2
+        run: python3 -m pytest tests_v2
