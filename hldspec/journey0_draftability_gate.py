@@ -1,4 +1,8 @@
-"""Pure Journey 0 draftability gate.
+"""Legacy Journey 0 draftability gate.
+
+This module belongs to the frozen dict/contracts stack. It is NOT_CANONICAL /
+DO_NOT_WIRE for new Journey 0 work; use `journey0_draftability` for the typed
+Journey 0 draftability verdict path.
 
 This module evaluates already-collected Journey 0 artifact summaries and
 decides whether they are safe to hand to Journey 1 as evidence/gap input. It
@@ -11,6 +15,10 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
 from hldspec import journey0_artifact_contracts as j0
+
+LEGACY_JOURNEY0_STACK_STATUS = j0.LEGACY_JOURNEY0_STACK_STATUS
+LEGACY_JOURNEY0_STACK_WIRING_STATUS = j0.LEGACY_JOURNEY0_STACK_WIRING_STATUS
+LEGACY_JOURNEY0_STACK_DISPOSITION = j0.LEGACY_JOURNEY0_STACK_DISPOSITION
 
 
 @dataclass(frozen=True)

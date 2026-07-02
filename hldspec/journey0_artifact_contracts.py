@@ -1,4 +1,9 @@
-"""Journey 0 Brownfield Discovery artifact contracts v0 -- pure validation helpers.
+"""Legacy Journey 0 dict/contracts stack -- pure validation helpers.
+
+This module is frozen for compatibility with historical tests only. It is
+NOT_CANONICAL / DO_NOT_WIRE for new Journey 0 work; use the typed Journey 0
+stack (`journey0_artifacts`, collectors, classifiers, product surface,
+draftability, HLD update plan, dry run) for current Journey 0 slices.
 
 Journey 0 (`docs/JOURNEY0_BROWNFIELD_DISCOVERY.md`) is the read-only PRE-HLD
 on-ramp for brownfield products: it inspects existing evidence, classifies gaps
@@ -27,6 +32,10 @@ Load-bearing product rules encoded here:
 from __future__ import annotations
 
 from typing import Any
+
+LEGACY_JOURNEY0_STACK_STATUS = "NOT_CANONICAL"
+LEGACY_JOURNEY0_STACK_WIRING_STATUS = "DO_NOT_WIRE"
+LEGACY_JOURNEY0_STACK_DISPOSITION = "FROZEN_FOR_COMPATIBILITY_PENDING_DEPRECATION"
 
 # --- Evidence labels --------------------------------------------------------
 
