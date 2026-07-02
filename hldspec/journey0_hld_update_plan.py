@@ -1,0 +1,172 @@
+"""Journey 0 HLD update plan generation.
+
+Slice D2 only: build a typed HldUpdatePlan from existing typed Journey 0
+artifacts. This module is pure and does not write an HLD or perform downstream
+workflow actions.
+"""
+from __future__ import annotations
+
+from hldspec.journey0_artifacts import (
+    BrownfieldEvidencePack,
+    DecisionStatus,
+    GapType,
+    HldCodeSpecGapReport,
+    HldDraftabilityVerdict,
+    HldUpdatePlan,
+    Journey0Verdict,
+    ProductDecisionRegister,
+    ProductSurfaceMap,
+    SpecInventory,
+    SpecStatus,
+)
+
+_SECTION_FIELDS = (
+    ("Product capabilities", "observed_capabilities"),
+    ("Users and actors", "observed_users_or_actors"),
+    ("Inputs and outputs", "observed_inputs_outputs"),
+    ("Workflows", "observed_workflows"),
+    ("Known limits", "known_limits"),
+)
+
+
+def build_journey0_hld_update_plan(
+    *,
+    draftability_verdict: HldDraftabilityVerdict,
+    evidence_pack: BrownfieldEvidencePack,
+    product_surface_map: ProductSurfaceMap,
+    spec_inventory: SpecInventory,
+    gap_report: HldCodeSpecGapReport,
+    decision_register: ProductDecisionRegister,
+) -> HldUpdatePlan:
+    """Build a conservative HLD update plan from typed Journey 0 artifacts."""
+
+    accepted_product_refs = _accepted_product_surface_refs(
+        draftability_verdict,
+        product_surface_map,
+    )
+    sections: tuple[str, ...] = ()
+    evidence_refs_per_section: dict[str, tuple[str, ...]] = {}
+    if (
+        draftability_verdict.verdict != Journey0Verdict.BLOCKED
+        and accepted_product_refs
+    ):
+        sections = _planned_sections(product_surface_map)
+        evidence_refs_per_section = {
+            section: accepted_product_refs for section in sections
+        }
+
+    return HldUpdatePlan(
+        hld_sections_to_create_or_update=sections,
+        evidence_refs_per_section=evidence_refs_per_section,
+        decisions_required_before_writing=_decisions_required_before_writing(
+            draftability_verdict,
+            gap_report,
+            decision_register,
+        ),
+        known_stale_material_to_exclude=_known_stale_material(spec_inventory),
+        open_questions_to_carry_forward=_open_questions(
+            draftability_verdict,
+            product_surface_map,
+            spec_inventory,
+            gap_report,
+            decision_register,
+            evidence_pack,
+        ),
+    )
+
+
+def _accepted_product_surface_refs(
+    draftability_verdict: HldDraftabilityVerdict,
+    product_surface_map: ProductSurfaceMap,
+) -> tuple[str, ...]:
+    accepted = set(draftability_verdict.accepted_evidence_refs)
+    return tuple(ref for ref in product_surface_map.source_refs if ref in accepted)
+
+
+def _planned_sections(product_surface_map: ProductSurfaceMap) -> tuple[str, ...]:
+    return tuple(
+        section
+        for section, field_name in _SECTION_FIELDS
+        if getattr(product_surface_map, field_name)
+    )
+
+
+def _decisions_required_before_writing(
+    draftability_verdict: HldDraftabilityVerdict,
+    gap_report: HldCodeSpecGapReport,
+    decision_register: ProductDecisionRegister,
+) -> tuple[str, ...]:
+    required: list[str] = []
+    for decision_id in draftability_verdict.required_human_decisions:
+        _append_unique(required, decision_id)
+    for decision in decision_register.decisions:
+        if decision.decision_status == DecisionStatus.OPEN:
+            _append_unique(required, decision.decision_id)
+    for gap in gap_report.gaps:
+        if _blocking_gap(gap.gap_type, gap.disposition, gap.required_decision_or_next_action):
+            _append_unique(required, gap.gap_id)
+    return tuple(required)
+
+
+def _known_stale_material(spec_inventory: SpecInventory) -> tuple[str, ...]:
+    stale_statuses = {
+        SpecStatus.STALE,
+        SpecStatus.SUPERSEDED,
+        SpecStatus.CONFLICTING,
+    }
+    return tuple(
+        item.spec_id
+        for item in spec_inventory.specs
+        if item.status in stale_statuses
+    )
+
+
+def _open_questions(
+    draftability_verdict: HldDraftabilityVerdict,
+    product_surface_map: ProductSurfaceMap,
+    spec_inventory: SpecInventory,
+    gap_report: HldCodeSpecGapReport,
+    decision_register: ProductDecisionRegister,
+    evidence_pack: BrownfieldEvidencePack,
+) -> tuple[str, ...]:
+    questions: list[str] = []
+    for unknown in product_surface_map.unknowns:
+        _append_unique(questions, unknown)
+    for decision in decision_register.decisions:
+        if decision.decision_status == DecisionStatus.DEFERRED:
+            _append_unique(questions, decision.decision_id or decision.question)
+    for item in spec_inventory.specs:
+        if item.status in {SpecStatus.UNKNOWN, SpecStatus.PARTIAL}:
+            _append_unique(questions, item.spec_id)
+    for gap in gap_report.gaps:
+        if _blocking_gap(gap.gap_type, gap.disposition, gap.required_decision_or_next_action):
+            _append_unique(
+                questions,
+                gap.required_decision_or_next_action or gap.description or gap.gap_id,
+            )
+        else:
+            _append_unique(questions, gap.gap_id)
+    if draftability_verdict.verdict in {Journey0Verdict.ACTION, Journey0Verdict.BLOCKED}:
+        for item in draftability_verdict.blocking_items:
+            _append_unique(questions, item)
+    if not evidence_pack.evidence and draftability_verdict.verdict != Journey0Verdict.PASS:
+        _append_unique(questions, "No accepted Journey 0 evidence is available.")
+    return tuple(questions)
+
+
+def _blocking_gap(
+    gap_type: GapType,
+    disposition: str,
+    next_action: str,
+) -> bool:
+    if gap_type in {GapType.HLD_CODE_CONFLICT, GapType.SAFETY_AUTHORITY_GAP}:
+        return True
+    text = f"{disposition} {next_action}".lower()
+    has_owner_word = any(token in text for token in ("human", "product", "authority"))
+    has_decision_word = "decision" in text or "required" in text
+    return has_owner_word and has_decision_word
+
+
+def _append_unique(values: list[str], value: str) -> None:
+    if value and value not in values:
+        values.append(value)
