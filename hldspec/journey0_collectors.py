@@ -50,33 +50,27 @@ IGNORED_DIR_NAMES: frozenset[str] = frozenset(
     }
 )
 
-DEFAULT_MAX_FILE_BYTES = 64 * 1024
-
-
 def collect_journey0_observed_evidence(
     root: str | Path,
     *,
     include_file_globs: tuple[str, ...] | None = None,
-    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
 ) -> BrownfieldEvidencePack:
     """Collect observed file evidence from an explicit root/path.
 
     The collector is intentionally shallow: each included file becomes one
-    OBSERVED evidence row. It records file presence, rough source type, relative
-    path, and optional bounded title/first-line metadata. It does not infer
-    product behavior or resolve conflicts.
+    OBSERVED evidence row. It records file presence, rough source type, and
+    relative path. It does not read file content, infer product behavior, or
+    resolve conflicts.
     """
 
     root_path = Path(root)
     if not root_path.exists():
         raise FileNotFoundError(root_path)
-    if max_file_bytes < 0:
-        raise ValueError("max_file_bytes must be non-negative")
 
     globs = include_file_globs or DEFAULT_INCLUDE_FILE_GLOBS
     files = _iter_included_files(root_path, globs)
     evidence = tuple(
-        _evidence_for_file(idx, path, root_path, max_file_bytes)
+        _evidence_for_file(idx, path, root_path)
         for idx, path in enumerate(files, start=1)
     )
     return BrownfieldEvidencePack(evidence=evidence)
@@ -110,19 +104,15 @@ def _evidence_for_file(
     index: int,
     path: Path,
     root: Path,
-    max_file_bytes: int,
 ) -> EvidenceItem:
     rel = _source_ref(path, root)
     source_type = _source_type(path, rel)
     summary = f"{source_type} file observed: {rel}"
-    first_line = _first_line(path, max_file_bytes)
-    if first_line:
-        summary = f"{summary} ({first_line})"
     return EvidenceItem(
         evidence_id=f"EVIDENCE-{index:03d}",
         source_type=source_type,
         source_ref=rel,
-        source_location=f"{rel}:1" if first_line else rel,
+        source_location=rel,
         summary=summary,
         label=EvidenceLabel.OBSERVED,
         confidence="high",
@@ -152,17 +142,3 @@ def _source_type(path: Path, rel: str) -> str:
     if suffix in {".md", ".txt", ".rst"}:
         return "doc_file"
     return "resource_file"
-
-
-def _first_line(path: Path, max_file_bytes: int) -> str | None:
-    try:
-        if path.stat().st_size > max_file_bytes:
-            return None
-        text = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped:
-            return stripped[:120]
-    return None

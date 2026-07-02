@@ -155,6 +155,21 @@ class Journey0DryRunTests(unittest.TestCase):
         self.assertFalse(hasattr(result, "journey2_output"))
         self.assertFalse(hasattr(result, "journey3_output"))
 
+    def test_fixture_evidence_is_not_real_target_evidence(self) -> None:
+        result = _run_fixture("pass")
+
+        for item in result.evidence_pack.evidence:
+            self.assertNotIn("real_target", item.source_type)
+            self.assertNotIn("production", item.source_type)
+            self.assertFalse(item.is_authority)
+
+    def test_evidence_summaries_contain_no_file_content(self) -> None:
+        result = _run_fixture("action", "README.md", "unlisted/secret.md")
+
+        for item in result.evidence_pack.evidence:
+            if item.evidence_id.startswith("COLLECTED-"):
+                self.assertNotIn("(", item.summary.split("observed:")[-1])
+
 
 if __name__ == "__main__":
     unittest.main()
