@@ -27,6 +27,8 @@ REQUIRED_FIELDS = (
     "next_safe_action",
     "forbidden_without_approval",
     "protected_approvals_required",
+    "transition_validation_status",
+    "transition_validation_reason",
 )
 
 HLD = "# HLD\n\n## HLD-001 - Demo\n\nHLD-ID: HLD-001\n\nText.\n"
@@ -187,6 +189,88 @@ class Journey3DriverTests(unittest.TestCase):
         self.assertEqual(report["journey3_phase"], "READY_FOR_PLAN")
         self.assertEqual(report["phase_source"], "injected")
         self.assertIn("spec_md", report["evidence_found"])
+
+
+class TransitionValidationInjectionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        _build_package(self.root)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def test_stop_validation_makes_driver_non_pass(self) -> None:
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "STOP_MISSING_SPECIFY_RECEIPT",
+                                   "reason": "no specify receipt for target"},
+        )
+        self.assertNotEqual(report["driver_status"], "PASS")
+        self.assertEqual(report["transition_validation_status"],
+                         "STOP_MISSING_SPECIFY_RECEIPT")
+
+    def test_pass_validation_does_not_degrade_status(self) -> None:
+        report_without = drv.build_journey3_status(self.root)
+        report_with = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "PASS",
+                                   "reason": "transition specify -> plan validated"},
+        )
+        self.assertEqual(report_with["transition_validation_status"], "PASS")
+        self.assertIn(report_with["driver_status"],
+                      (report_without["driver_status"], "PASS", "ACTION"))
+
+    def test_stop_validation_surfaces_in_report(self) -> None:
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "STOP_HUMAN_APPROVAL_REQUIRED",
+                                   "reason": "implementation requires approval"},
+        )
+        self.assertEqual(report["transition_validation_status"],
+                         "STOP_HUMAN_APPROVAL_REQUIRED")
+        self.assertEqual(report["transition_validation_reason"],
+                         "implementation requires approval")
+        self.assertNotEqual(report["driver_status"], "PASS")
+
+    def test_no_validation_defaults_to_not_performed(self) -> None:
+        report = drv.build_journey3_status(self.root)
+        self.assertIsNone(report["transition_validation_status"])
+        self.assertIsNone(report["transition_validation_reason"])
+
+    def test_stop_flips_pass_baseline_to_action(self) -> None:
+        """Discriminating test: baseline is PASS, injected STOP must flip it."""
+        sel_path = hsel.selection_path(self.root)
+        sel_path.parent.mkdir(parents=True, exist_ok=True)
+        sel_path.write_text(
+            json.dumps({"schema_version": 1, "selected_helper_id": "speckit"}),
+            encoding="utf-8",
+        )
+        baseline = drv.build_journey3_status(self.root)
+        self.assertEqual(baseline["driver_status"], "PASS",
+                         "baseline must be PASS for this test to be discriminating")
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "STOP_STALE_RECEIPT",
+                                   "reason": "specify receipt is 90000s old"},
+        )
+        self.assertEqual(report["driver_status"], "ACTION")
+
+    def test_validation_fields_are_json_serializable(self) -> None:
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "PASS", "reason": "ok"},
+        )
+        self.assertEqual(json.loads(json.dumps(report)), report)
+
+    def test_render_includes_validation_status(self) -> None:
+        report = drv.build_journey3_status(
+            self.root,
+            transition_validation={"status": "STOP_STALE_RECEIPT",
+                                   "reason": "specify receipt is 90000s old"},
+        )
+        text = drv.render_status_text(report)
+        self.assertIn("STOP_STALE_RECEIPT", text)
 
 
 if __name__ == "__main__":
