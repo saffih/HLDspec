@@ -51,10 +51,11 @@ def compute_journey0_draftability_verdict(
 
     blocking_items = _blocking_items(evidence_pack, gap_report, decision_register)
     accepted_refs = _observed_evidence_refs(evidence_pack)
-    open_decisions = tuple(
+    required_decisions = tuple(
         decision.decision_id
         for decision in decision_register.decisions
-        if decision.decision_status == DecisionStatus.OPEN
+        if decision.decision_status
+        in {DecisionStatus.OPEN, DecisionStatus.DEFERRED}
     )
 
     if blocking_items:
@@ -63,7 +64,7 @@ def compute_journey0_draftability_verdict(
             reason="Journey 0 has unresolved human-owned decisions, conflicts, or authority gaps.",
             blocking_items=blocking_items,
             accepted_evidence_refs=accepted_refs,
-            required_human_decisions=open_decisions,
+            required_human_decisions=required_decisions,
             safe_next_action=_BLOCKED_NEXT_ACTION,
         )
 
@@ -96,7 +97,8 @@ def _blocking_items(
     blockers.extend(
         decision.decision_id
         for decision in decision_register.decisions
-        if decision.decision_status == DecisionStatus.OPEN
+        if decision.decision_status
+        in {DecisionStatus.OPEN, DecisionStatus.DEFERRED}
     )
     blockers.extend(
         gap.gap_id
