@@ -4,9 +4,9 @@
 
 The canonical user-facing trigger remains `HLDspec ...`.
 
-The `HLD draft`, `HLD inspect`, `HLD improve`, `HLD backlog`, `HLD select`, `HLD
-handoff`, and `HLD speckit` phrases are convenience aliases for Codex/Claude
-agent sessions only.
+The `HLD discover`, `HLD draft`, `HLD inspect`, `HLD improve`, `HLD backlog`,
+`HLD select`, `HLD handoff`, and `HLD speckit` phrases are convenience aliases
+for Codex/Claude agent sessions only.
 
 They are subordinate to `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` and
 `docs/HLDSPEC_MINIMAL_AGENT_UX.md`.
@@ -25,6 +25,10 @@ run, such as `HLD inspect plan <control-plan>` or
 HLDspec is the control-plan repo. The target repo is a brownfield implementation
 repo and may already contain code, docs, tests, partial features, or conflicting
 state.
+
+Minimum flow: mixed resources / old SpecKit specs / code / notes -> Journey 0
+discovery -> Journey 1 HLD hardening -> Journey 2 right-sized spec bites ->
+Journey 3 helper handoff.
 
 The control plan is the source of truth for:
 
@@ -47,6 +51,28 @@ to return to HLDspec.
 If no control plan exists, `HLD draft target <target-repo> from <goal/context>`
 must propose a control-plan location and contents, then wait for human approval
 before writing.
+
+### `HLD discover target "<target-repo>" from "<resources/context>"`
+
+Meaning:
+
+- inspect mixed resources and the target repo read-only
+- treat resources as evidence, not authority
+- classify old SpecKit specs, existing code/tests, docs, design notes, HLD fragments, prior `.specify` / `.hldspec` state, and human context
+- report current evidence, conflicts, stale/superseded parts, missing decisions, whether an authoritative HLD can be drafted, a proposed HLD update plan, and next human action
+- do not create backlog, create SpecKit specs, mutate the target repo, invoke SpecKit, or implement
+
+Return only:
+
+```text
+CURRENT EVIDENCE:
+CONFLICTS:
+STALE / SUPERSEDED PARTS:
+MISSING DECISIONS:
+CAN AN AUTHORITATIVE HLD BE DRAFTED? yes/no/blocked
+PROPOSED HLD UPDATE PLAN:
+NEXT HUMAN ACTION:
+```
 
 ### `HLD draft target "<target-repo>" from "<goal/context/constraints>"`
 

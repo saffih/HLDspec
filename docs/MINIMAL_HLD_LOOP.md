@@ -13,6 +13,38 @@ On conflict, those canonical docs win.
 These aliases are agent instructions for Codex/Claude sessions in the HLDspec
 repo. They are not CLI commands, shell commands, runtime APIs, or automation.
 
+Minimum flow: mixed resources / old SpecKit specs / code / notes -> Journey 0
+discovery -> Journey 1 HLD hardening -> Journey 2 right-sized spec bites ->
+Journey 3 helper handoff.
+
+## Resource Discovery Alias
+
+User may use the convenience alias:
+
+```text
+HLD discover target <target-repo> from <resources/context>
+```
+
+Use this when the starting point is mixed resources rather than a clean HLD:
+old SpecKit specs, existing code/tests, docs, design notes, HLD fragments, prior
+`.specify` state, prior `.hldspec` state, or human context.
+
+This alias is read-only. It treats resources as evidence, not authority. It
+creates no backlog, mutates no target repo, does not invoke SpecKit, and does
+not implement.
+
+Return only:
+
+```text
+CURRENT EVIDENCE:
+CONFLICTS:
+STALE / SUPERSEDED PARTS:
+MISSING DECISIONS:
+CAN AN AUTHORITATIVE HLD BE DRAFTED? yes/no/blocked
+PROPOSED HLD UPDATE PLAN:
+NEXT HUMAN ACTION:
+```
+
 ## Workflow
 
 1. User opens Codex/Claude in the HLDspec repo.

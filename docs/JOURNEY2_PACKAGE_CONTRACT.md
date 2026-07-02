@@ -88,6 +88,32 @@ Feature boundaries come from HLD groups → spec package map → bundles, groupe
 **meaning** (source of truth, architecture, interface/data ownership, dependency
 order, testability) — never by line count.
 
+### 5.1.1 Right-sized spec bites
+
+A spec bite is one coherent context load: one main purpose, one main output, one
+verification path, one stable checkpoint, clear dependencies, and a stop
+condition.
+
+A bite is too large if it requires whole-system context or mixes product
+interpretation, decomposition, implementation, migration, validation, UX, and
+contract changes in one unit.
+
+A bite is too small if it cannot be tested, reviewed, or reported as a
+meaningful behavior.
+
+Journey 2 should split by context burden, product responsibility, dependency
+order, testability, and stable checkpoints - not by HLD headings, old SpecKit
+headings, or line count.
+
+Hard rule: if a task requires both deciding what the product should mean and
+implementing that meaning, split it.
+
+Sizing check:
+
+- Green: one purpose, one output, one verification path, one stable checkpoint.
+- Yellow: multiple responsibilities, unclear old behavior, or growing acceptance criteria; consider split.
+- Red: whole-system context, mixed interpretation + implementation, or no stable checkpoint; split before handoff.
+
 ### 5.2 Spec-input schema (`single_spec_input.py`)
 
 `speckit_single_spec_input.md` is **one** input for one coherent HLD. Every claim
