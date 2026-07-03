@@ -21,6 +21,10 @@ from hldspec.journey0_artifacts import (
 )
 from hldspec.journey0_classifiers import build_journey0_conservative_artifacts
 from hldspec.journey0_collectors import collect_journey0_observed_evidence
+from hldspec.journey0_declared_evidence import (
+    DeclaredProductSurfaceItem,
+    build_declared_evidence,
+)
 from hldspec.journey0_draftability import compute_journey0_draftability_verdict
 from hldspec.journey0_hld_update_plan import build_journey0_hld_update_plan
 from hldspec.journey0_product_surface import build_journey0_product_surface_map
@@ -55,6 +59,7 @@ def run_journey0_dry_run(
     *,
     target_root: Path,
     allowed_relative_paths: tuple[str, ...],
+    declared_product_surface_evidence: tuple[DeclaredProductSurfaceItem, ...] = (),
 ) -> Journey0DryRunResult:
     root = Path(target_root).resolve()
     allowed_paths = _resolve_allowed_paths(root, allowed_relative_paths)
@@ -62,8 +67,9 @@ def run_journey0_dry_run(
     before_snapshot = _snapshot_allowed_paths(root, allowed_paths)
     collected_pack = _collect_allowed_evidence(allowed_paths)
     marker_pack = _collect_marker_evidence(root, allowed_paths)
+    declared_pack = build_declared_evidence(declared_product_surface_evidence)
     evidence_pack = BrownfieldEvidencePack(
-        evidence=collected_pack.evidence + marker_pack.evidence
+        evidence=collected_pack.evidence + marker_pack.evidence + declared_pack.evidence
     )
 
     product_surface_map = build_journey0_product_surface_map(evidence_pack)
