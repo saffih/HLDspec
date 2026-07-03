@@ -49,8 +49,8 @@ The future prompt must include:
 - explicit run intent
 - the forbidden actions
 
-If the target, paths, or run intent are missing or ambiguous, stop before reading
-target evidence.
+If `target_root`, `allowed_relative_paths`, or run intent are missing or
+ambiguous, stop before reading target evidence.
 
 ## Target/allowed-path gate
 
@@ -136,7 +136,7 @@ executed, verified, and reviewed.
 Stop if any of these occur:
 
 - dirty target
-- missing or ambiguous authorization
+- missing or ambiguous `target_root`, `allowed_relative_paths`, or run intent
 - unexpected path escape
 - absolute allowed path
 - unbounded evidence request
@@ -154,7 +154,7 @@ Stop if any of these occur:
 
 The future report must include:
 
-- target authorization receipt
+- target/run context (`target_root`, `allowed_relative_paths`, run intent)
 - target path
 - allowed path list
 - evidence collected
