@@ -116,6 +116,11 @@ justification for flow is `docs/FLOW_JOURNEY1_PLANNING_JUSTIFICATION.md`; it
 justifies planning consideration only and does not lift J0-17. The bounded
 planning scope and 10-item human confirmation checklist are in
 `docs/FLOW_JOURNEY1_PLANNING_SCOPE.md`; that doc also does not lift J0-17.
+The human confirmation pass is recorded in
+`docs/FLOW_DECLARED_EVIDENCE_CONFIRMATION.md` (7 CONFIRM, 2 AMEND
+(DECLARED-005, DECLARED-009), 1 REJECT (DECLARED-010)); amended/rejected
+items require Journey 0 declared-evidence re-review, and that doc also does
+not lift J0-17.
 
 ### Stabilization table
 
