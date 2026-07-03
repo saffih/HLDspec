@@ -225,7 +225,7 @@ mutation readiness.
 These issues are recorded so they are not dropped, but they are not implemented
 by this plan update:
 
-1. Human context evidence adapter: Journey 0 inputs include human-provided context, but current collectors only read filesystem paths. Add a later read-only adapter that turns explicit human notes into typed EvidenceItem rows.
+1. ~~Human context evidence adapter~~: Addressed by `journey0_declared_evidence.py`. Converts explicit human declarations into typed product-surface EvidenceItems. Not yet wired into command surface or real-target dry-run.
 2. Bounded EvidenceSourceType: EvidenceItem.source_type is currently a plain string. Consider a bounded enum or central constants after the ProductSurfaceMap and verdict path stabilize.
 3. Snippet privacy before real-target dry run: resolved. Collectors now emit structural metadata only (path, type, existence) and never read file content. Remaining provenance model work (distinguishing fixture/synthetic from real-target evidence) is tracked under J0-12.
 4. Boundary-token tests: current boundary tests should avoid incentivizing artificial string splitting such as avoiding a literal `.git` token. Later replace broad token bans with behavior/import/write-safety checks.
@@ -249,7 +249,7 @@ target mutation, HLD writing, backlog creation, or implementation.
 | J0-12 | Snippet privacy and provenance | SNIPPET_PRIVACY_RESOLVED / PROVENANCE_OPEN | Real-target Slice E (provenance model); real-target readiness claims | Snippet privacy default resolved: collectors emit structural metadata only, no file content. Full provenance model and real-target readiness remain open. | Provenance model PR if needed before real-target proof |
 | J0-13 | D2 section evidence traceability | CANONICAL | None after section-specific fix | Keep section refs source-type-specific | Preserve PR #101 behavior; do not regress to map-level refs as sole traceability |
 | J0-14 | PR #100 fixture dry-run proof | FIXTURE_ONLY | Real-target proof and Journey 1 start | Treat PASS/ACTION/BLOCKED examples as synthetic fixture proof only | Stabilization docs now; real-target proof later only after blockers resolve |
-| J0-15 | Real PASS path from collected evidence | BLOCKED | Real-target PASS and Journey 1 readiness | Add human-context/product-surface evidence adapter or equivalent explicit product-surface evidence path | Narrow adapter PR; real collectors currently may not produce product-surface source types |
+| J0-15 | Real PASS path from collected evidence | PASS_PATH_EXISTS | Real-target PASS and Journey 1 readiness | `journey0_declared_evidence.py` added: converts explicit human declarations into typed product-surface EvidenceItems. Real-target readiness not yet claimed; command-surface wiring still blocked. | Real-target dry-run proof PR; do not claim readiness from adapter alone |
 | J0-16 | Journey 0 command-surface wiring | DO_NOT_WIRE | Public/runtime use | Resolve J0-1, J0-5, J0-12, and J0-15 first | Later wiring PR only after blockers are closed |
 | J0-17 | Journey 1 start from Journey 0 | BLOCKED | Journey 1 HLD authoring from Journey 0 outputs | Human/project approval after blockers and stabilization review | Do not start Journey 1 from Journey 0 yet |
 
