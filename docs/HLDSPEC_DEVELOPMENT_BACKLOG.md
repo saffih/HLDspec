@@ -113,7 +113,9 @@ implementation.
 Flow real-target dry runs RT-1 (ACTION) and RT-2 (PASS) are recorded under
 `docs/journey0_real_target_dry_runs/`. The resulting Journey 1 planning
 justification for flow is `docs/FLOW_JOURNEY1_PLANNING_JUSTIFICATION.md`; it
-justifies planning consideration only and does not lift J0-17.
+justifies planning consideration only and does not lift J0-17. The bounded
+planning scope and 10-item human confirmation checklist are in
+`docs/FLOW_JOURNEY1_PLANNING_SCOPE.md`; that doc also does not lift J0-17.
 
 ### Stabilization table
 
