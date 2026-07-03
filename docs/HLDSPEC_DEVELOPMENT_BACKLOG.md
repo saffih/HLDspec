@@ -110,6 +110,11 @@ only and does not authorize real-target execution, Journey 1, command-surface
 wiring, SpecKit, target mutation, HLD writing, backlog creation, or
 implementation.
 
+Flow real-target dry runs RT-1 (ACTION) and RT-2 (PASS) are recorded under
+`docs/journey0_real_target_dry_runs/`. The resulting Journey 1 planning
+justification for flow is `docs/FLOW_JOURNEY1_PLANNING_JUSTIFICATION.md`; it
+justifies planning consideration only and does not lift J0-17.
+
 ### Stabilization table
 
 | ID | Title | Status | Blocks | Owner/decision needed | Next PR shape |
