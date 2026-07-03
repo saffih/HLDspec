@@ -94,60 +94,71 @@ The readiness report (PR #119) identified the formal gate counts:
 
 | # | Item | Owner decision | Status |
 |---|---|---|---|
-| 1 | Escalation concurrency: HLD-005/007/009/014/015 encode one-open-escalation invariant; DECLARED-009 ratifies concurrent escalations | Q2: Multiple concurrent escalations with stable ID, owner, routing, status, context | Decided; HLD text not yet patched |
-| 2 | Out-of-scope list: HLD-011 asserts exclusion list as product limits; DECLARED-010 rejected as slicing residue | Q3: Exclusion list becomes current implementation status + candidate capabilities under replacement boundary rule | Decided; HLD text not yet patched |
+| 1 | Escalation concurrency: HLD-005/007/009/014/015 encode one-open-escalation invariant; DECLARED-009 ratifies concurrent escalations | Q2: Multiple concurrent escalations with stable ID, owner, routing, status, context | **Resolved in v2 HLD** — HLD-005 encodes concurrent escalations; invariant text removed |
+| 2 | Out-of-scope list: HLD-011 asserts exclusion list as product limits; DECLARED-010 rejected as slicing residue | Q3: Exclusion list becomes current implementation status + candidate capabilities under replacement boundary rule | **Resolved in v2 HLD** — HLD-011 retires exclusion list; boundary rule stated |
 
 ### Provisional items (ACTION class)
 
 | # | Item | Owner decision | Status |
 |---|---|---|---|
-| 3 | `HLD-SPECS: TBD` on HLD-001/002/006/011/012; `HLD-RESOURCES: TBD` on HLD-011 | Q4: Replace with real intent where evidence exists; mark explicitly provisional with revisit trigger where insufficient | Decided; HLD metadata not yet updated |
-| 4 | Markdown projection roles not stated; HLD says "never an input" | Q1: Three product-surface roles (agent integration, context state, user-facing reporting); remove "never an input" | Decided; HLD text not yet patched |
-| 5 | Transition gaps (answer/feedback naming, anonymous-path policy C) | Covered by Q2/Q3 scope; already honest in HLD as provisional by design | Decided; disposition set by owner decisions |
-| 6 | Structural completeness: no explicit requirements/feature-candidate section | Q5: Add explicit requirements/feature-candidate section | Decided; HLD section not yet added |
+| 3 | `HLD-SPECS: TBD` on HLD-001/002/006/011/012; `HLD-RESOURCES: TBD` on HLD-011 | Q4: Replace with real intent where evidence exists; mark explicitly provisional with revisit trigger where insufficient | **Resolved in v2 HLD** — all say "provisional (...revisit at the next SDD-gate assessment)"; HLD-RESOURCES on HLD-011 filled |
+| 4 | Markdown projection roles not stated; HLD says "never an input" | Q1: Three product-surface roles (agent integration, context state, user-facing reporting); remove "never an input" | **Resolved in v2 HLD** — HLD-003 states three roles |
+| 5 | Transition gaps (answer/feedback naming, anonymous-path policy C) | Covered by Q2/Q3 scope; already honest in HLD as provisional by design | **Resolved in v2 HLD** — HLD-017 records implementation gaps truthfully |
+| 6 | Structural completeness: no explicit requirements/feature-candidate section | Q5: Add explicit requirements/feature-candidate section | **Resolved in v2 HLD** — HLD-017 added |
 
-## Remaining blocker
+## HLD v2 already addresses all seven items
 
-All formal unresolved and provisional items have owner decisions. The gate
-remains BLOCKED because the decisions have not been applied to the Flow HLD
-text. The HLD still contains the contradictions and TBD metadata.
+Verified 2026-07-03: Flow HLD v2 (promoted in Flow PR #13) already
+incorporates all owner decisions and drift dispositions. No additional target
+HLD patch is required.
 
-Resolution requires a separately approved target HLD patch to
-`/Users/saffi/code/flow/HLD.md` (and the README mirror), scoped per the
-`flow-hld-hardening-owner-decisions.md` §"Future target HLD patch scope."
+| # | Item | Where resolved in v2 HLD |
+|---|---|---|
+| 1 | Remove one-open-escalation invariant (Q2) | HLD-005 encodes concurrent escalations; invariant text removed from HLD-005/007/009/014/015 |
+| 2 | Rework exclusion list (Q3) | HLD-011: "There is no exclusion list"; boundary rule stated; README mirror updated |
+| 3 | State markdown projection roles (Q1) | HLD-003: three roles stated; "never an input" removed |
+| 4 | Resolve TBD metadata (Q4) | All HLD-SPECS: "provisional (...revisit at the next SDD-gate assessment)" — explicitly provisional with revisit trigger (§8 acceptable) |
+| 5 | Add feature-candidate section (Q5) | HLD-017 added: committed design vs candidates vs implementation status |
+| 6 | Session enforcement: distinguish design from implementation (item 2) | HLD-017: "optional session naming (not yet the mandatory named sessions of HLD-009/010)"; global header: "This document states the target design" |
+| 7 | Reclaim: distinguish design from implementation (item 3) | HLD-017: "lease-based reclaim with escalate-on-repeat (not yet the see-and-act reclaim verb of HLD-014)" |
 
-## HLD patch scope (consolidated)
+The v2 HLD uses a centralized gap-tracking pattern:
+- Sections HLD-001..016 state the **target design** (authoritative)
+- HLD-017 records the **design-vs-implementation gap**
+- The document header declares this separation explicitly
+- The README usage section notes the gap in plain language
 
-The target HLD patch must address all seven decided items:
+This satisfies the owner's general rule: the HLD is truthful — no overstated
+current-behavior claims. Design sections state intent; HLD-017 records what
+the implementation does not yet match.
 
-From PR #120 owner decisions (Q1–Q5):
-1. Remove one-open-escalation invariant; encode concurrent escalations (Q2)
-2. Rework HLD-011 exclusion list and README mirror (Q3)
-3. State three markdown projection roles; remove "never an input" (Q1)
-4. Resolve TBD metadata with real intent or explicit provisional + trigger (Q4)
-5. Add requirements/feature-candidate section (Q5)
+## Remaining action
 
-From this disposition (items 2–3):
-6. HLD-009/010: distinguish required session-enforcement invariant from
-   current implementation status — no overstatement
-7. HLD-014: distinguish required reclaim semantics from current
-   implementation status — no overstatement
+No target HLD patch needed. Re-run the SDD-ready gate against the current v2
+HLD with a fresh formal assessment.
+
+Expected formal counts:
+- `unresolved = 0` (both contradictions resolved in v2: escalation concurrency
+  and exclusion list)
+- `provisional > 0` (HLD-SPECS metadata is explicitly provisional with
+  revisit triggers on five sections)
+- Expected verdict: **ACTION** (per gate §10: `unresolved == 0` and
+  `provisional > 0` → `HLD_READY_WITH_ACTIONS`)
+
+ACTION promotes to PASS after the human explicitly accepts the listed risks
+(gate §10 promotion rule).
 
 ## Required next steps
 
-1. **Explicit approval** to write to `/Users/saffi/code/flow/HLD.md` and
-   `/Users/saffi/code/flow/README.md`, naming those as exact target write paths.
-2. **Apply the HLD patch** per the seven items above.
-3. **Re-run the SDD-ready gate** with the fixed snapshot provenance path.
-4. **Do not** start Journey 2 or Journey 3 regardless of the re-run verdict.
+1. **Re-run the SDD-ready gate** against the current v2 HLD.
+2. **Do not** start Journey 2 or Journey 3 regardless of the re-run verdict.
 
 ## Boundaries
 
-- No target mutation by this record.
+- No target mutation needed or performed.
 - No SpecKit invocation.
 - No Journey 2 or Journey 3.
 - No backlog or implementation scope.
 - No J0-12 global closure.
-- No implementation changes forced for items 2/3 — HLD truthfulness only.
-- Implementation gaps are recorded, not resolved — they are downstream of the
-  HLD patch and are not SDD-ready gate criteria.
+- Implementation gaps are recorded in HLD-017, not resolved — they are
+  downstream of the SDD-ready gate and are not gate criteria (§5).
