@@ -5,7 +5,8 @@ import inspect
 import json
 import tempfile
 import unittest
-from dataclasses import fields
+import hashlib
+from dataclasses import fields, replace
 from pathlib import Path
 
 from hldspec import journey0_dry_run as dry_run
@@ -53,6 +54,7 @@ class Journey0DryRunTests(unittest.TestCase):
         self.assertEqual(
             result_fields,
             {
+                "target_root",
                 "evidence_pack",
                 "product_surface_map",
                 "spec_inventory",
@@ -254,6 +256,166 @@ class Journey0DryRunTests(unittest.TestCase):
         result = _run_fixture("blocked")
 
         self.assertTrue(result.target_unchanged)
+
+    def test_no_mutation_proof_hashes_exact_approved_target_file_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "README.md"
+            target.write_text("approved target bytes\n", encoding="utf-8")
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            rows = dry_run.build_target_no_mutation_proof_rows(
+                target_root=root,
+                dry_run_result=result,
+            )
+
+        expected_sha = hashlib.sha256("approved target bytes\n".encode()).hexdigest()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].relative_path, "README.md")
+        self.assertEqual(rows[0].before_sha256, expected_sha)
+        self.assertEqual(rows[0].after_sha256, expected_sha)
+        self.assertEqual(len(rows[0].after_sha256), 64)
+        self.assertFalse(rows[0].bytes_changed)
+
+    def test_no_mutation_proof_identifies_target_source_and_resolved_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("approved target bytes\n", encoding="utf-8")
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            rows = dry_run.build_target_no_mutation_proof_rows(
+                target_root=root,
+                dry_run_result=result,
+            )
+
+            self.assertEqual(rows[0].source_kind, "approved_target_file")
+            self.assertEqual(rows[0].hash_source, "approved_target_path")
+            self.assertEqual(rows[0].resolved_path, str((root / "README.md").resolve()))
+            self.assertEqual(result.target_root, str(root.resolve()))
+
+    def test_derived_copy_with_different_bytes_does_not_affect_target_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("approved target bytes\n", encoding="utf-8")
+            derived = root / "source_package"
+            derived.mkdir()
+            (derived / "README.md").write_text("derived copy bytes\n", encoding="utf-8")
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            rows = dry_run.build_target_no_mutation_proof_rows(
+                target_root=root,
+                dry_run_result=result,
+            )
+
+        target_sha = hashlib.sha256("approved target bytes\n".encode()).hexdigest()
+        derived_sha = hashlib.sha256("derived copy bytes\n".encode()).hexdigest()
+        self.assertEqual(rows[0].after_sha256, target_sha)
+        self.assertNotEqual(rows[0].after_sha256, derived_sha)
+
+    def test_stale_hashes_cannot_be_rendered_as_fresh_target_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("current target bytes\n", encoding="utf-8")
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            stale = dry_run.FileSnapshotEntry(
+                relative_path="README.md",
+                sha256=hashlib.sha256("stale report bytes\n".encode()).hexdigest(),
+            )
+            stale_result = replace(
+                result,
+                before_snapshot=(stale,),
+                after_snapshot=(stale,),
+            )
+
+            with self.assertRaises(RuntimeError):
+                dry_run.build_target_no_mutation_proof_rows(
+                    target_root=root,
+                    dry_run_result=stale_result,
+                )
+
+    def test_snapshot_proof_rejects_before_after_path_identity_change(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("readme\n", encoding="utf-8")
+            (root / "HLD.md").write_text("hld\n", encoding="utf-8")
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            changed_result = replace(
+                result,
+                after_snapshot=(
+                    dry_run.FileSnapshotEntry(
+                        relative_path="HLD.md",
+                        sha256=hashlib.sha256("hld\n".encode()).hexdigest(),
+                    ),
+                ),
+            )
+
+            with self.assertRaises(RuntimeError):
+                dry_run.build_target_no_mutation_proof_rows(
+                    target_root=root,
+                    dry_run_result=changed_result,
+                )
+
+    def test_snapshot_proof_rejects_cross_target_same_bytes_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_root = root / "source"
+            other_root = root / "other"
+            source_root.mkdir()
+            other_root.mkdir()
+            (source_root / "README.md").write_text("same bytes\n", encoding="utf-8")
+            (other_root / "README.md").write_text("same bytes\n", encoding="utf-8")
+
+            source_result = dry_run.run_journey0_dry_run(
+                target_root=source_root,
+                allowed_relative_paths=("README.md",),
+            )
+
+            with self.assertRaises(RuntimeError):
+                dry_run.build_target_no_mutation_proof_rows(
+                    target_root=other_root,
+                    dry_run_result=source_result,
+                )
+
+    def test_snapshot_proof_rejects_path_escape_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("readme\n", encoding="utf-8")
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=("README.md",),
+            )
+            escaped = dry_run.FileSnapshotEntry(
+                relative_path="../README.md",
+                sha256=hashlib.sha256("readme\n".encode()).hexdigest(),
+            )
+            escaped_result = replace(
+                result,
+                before_snapshot=(escaped,),
+                after_snapshot=(escaped,),
+            )
+
+            with self.assertRaises(ValueError):
+                dry_run.build_target_no_mutation_proof_rows(
+                    target_root=root,
+                    dry_run_result=escaped_result,
+                )
 
     def test_declared_evidence_preserves_no_mutation_snapshot(self) -> None:
         result = dry_run.run_journey0_dry_run(

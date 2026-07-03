@@ -39,7 +39,19 @@ class FileSnapshotEntry:
 
 
 @dataclass(frozen=True)
+class TargetSnapshotProofRow:
+    relative_path: str
+    resolved_path: str
+    source_kind: str
+    before_sha256: str
+    after_sha256: str
+    bytes_changed: bool
+    hash_source: str
+
+
+@dataclass(frozen=True)
 class Journey0DryRunResult:
+    target_root: str
     evidence_pack: BrownfieldEvidencePack
     product_surface_map: ProductSurfaceMap
     spec_inventory: SpecInventory
@@ -53,6 +65,42 @@ class Journey0DryRunResult:
     @property
     def target_unchanged(self) -> bool:
         return self.before_snapshot == self.after_snapshot
+
+
+def build_target_no_mutation_proof_rows(
+    *,
+    target_root: Path,
+    dry_run_result: Journey0DryRunResult,
+) -> tuple[TargetSnapshotProofRow, ...]:
+    root = Path(target_root).resolve()
+    if dry_run_result.target_root != str(root):
+        raise RuntimeError("Journey 0 snapshot proof target_root does not match run.")
+    before = _snapshot_index(dry_run_result.before_snapshot, "before")
+    after = _snapshot_index(dry_run_result.after_snapshot, "after")
+    if before.keys() != after.keys():
+        raise RuntimeError("Journey 0 snapshot proof paths changed.")
+
+    rows: list[TargetSnapshotProofRow] = []
+    for relative_path in sorted(before):
+        resolved_path = _resolve_snapshot_relative_path(root, relative_path)
+        current_sha256 = hashlib.sha256(resolved_path.read_bytes()).hexdigest()
+        if current_sha256 != after[relative_path].sha256:
+            raise RuntimeError(
+                "Journey 0 snapshot proof does not match current target bytes."
+            )
+        rows.append(
+            TargetSnapshotProofRow(
+                relative_path=relative_path,
+                resolved_path=str(resolved_path),
+                source_kind="approved_target_file",
+                before_sha256=before[relative_path].sha256,
+                after_sha256=after[relative_path].sha256,
+                bytes_changed=before[relative_path].sha256
+                != after[relative_path].sha256,
+                hash_source="approved_target_path",
+            )
+        )
+    return tuple(rows)
 
 
 def run_journey0_dry_run(
@@ -95,6 +143,7 @@ def run_journey0_dry_run(
         raise RuntimeError("Journey 0 dry run changed the authorized fixture scope.")
 
     return Journey0DryRunResult(
+        target_root=str(root),
         evidence_pack=evidence_pack,
         product_surface_map=product_surface_map,
         spec_inventory=spec_inventory,
@@ -223,3 +272,27 @@ def _snapshot_files(path: Path) -> tuple[Path, ...]:
         if file_path.is_file() and not file_path.is_symlink()
     )
     return tuple(sorted(files, key=lambda file_path: file_path.as_posix()))
+
+
+def _snapshot_index(
+    snapshot: tuple[FileSnapshotEntry, ...],
+    phase: str,
+) -> dict[str, FileSnapshotEntry]:
+    entries: dict[str, FileSnapshotEntry] = {}
+    for entry in snapshot:
+        if entry.relative_path in entries:
+            raise RuntimeError(f"Journey 0 {phase} snapshot has duplicate paths.")
+        entries[entry.relative_path] = entry
+    return entries
+
+
+def _resolve_snapshot_relative_path(root: Path, relative_path: str) -> Path:
+    path = Path(relative_path)
+    if path.is_absolute():
+        raise ValueError("snapshot relative_path must be relative")
+    resolved_path = (root / path).resolve()
+    if os.path.commonpath((str(root), str(resolved_path))) != str(root):
+        raise ValueError("snapshot relative_path must stay under target_root")
+    if not resolved_path.is_file():
+        raise FileNotFoundError(resolved_path)
+    return resolved_path
