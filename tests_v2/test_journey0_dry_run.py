@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import inspect
+import json
+import tempfile
 import unittest
 from dataclasses import fields
 from pathlib import Path
@@ -9,14 +11,17 @@ from pathlib import Path
 from hldspec import journey0_dry_run as dry_run
 from hldspec.journey0_artifacts import (
     BrownfieldEvidencePack,
+    DecisionStatus,
     HldCodeSpecGapReport,
     HldDraftabilityVerdict,
     HldUpdatePlan,
     Journey0Verdict,
+    ProductDecision,
     ProductDecisionRegister,
     ProductSurfaceMap,
     SpecInventory,
 )
+from hldspec.journey0_declared_evidence import DeclaredProductSurfaceItem
 
 FIXTURE_ROOT = (
     Path(__file__).parent / "fixtures" / "journey0_brownfield_target"
@@ -110,12 +115,114 @@ class Journey0DryRunTests(unittest.TestCase):
         self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.ACTION)
         self.assertNotIn("Proceed", result.draftability_verdict.safe_next_action)
 
+    def test_structural_file_evidence_only_does_not_pass(self) -> None:
+        result = _run_fixture("action", "README.md")
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.ACTION)
+
     def test_blocked_example_preserves_conflict(self) -> None:
         result = _run_fixture("blocked")
 
         self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.BLOCKED)
         self.assertIn("BLOCK-001", result.draftability_verdict.blocking_items)
         self.assertTrue(result.gap_report.gaps)
+
+    def test_declared_product_surface_evidence_can_make_dry_run_pass(self) -> None:
+        result = dry_run.run_journey0_dry_run(
+            target_root=FIXTURE_ROOT / "action",
+            allowed_relative_paths=("README.md",),
+            declared_product_surface_evidence=(
+                DeclaredProductSurfaceItem(
+                    source_type="product_capability",
+                    summary="Users can claim work from the queue.",
+                    provenance="explicit run intent: user supplied capability",
+                ),
+            ),
+        )
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.PASS)
+        refs = [item.evidence_id for item in result.evidence_pack.evidence]
+        self.assertEqual(refs, ["COLLECTED-001", "DECLARED-001"])
+        self.assertEqual(
+            result.product_surface_map.observed_capabilities,
+            ("Users can claim work from the queue.",),
+        )
+
+    def test_conflict_marker_still_blocks_declared_pass(self) -> None:
+        result = dry_run.run_journey0_dry_run(
+            target_root=FIXTURE_ROOT / "blocked",
+            allowed_relative_paths=(".",),
+            declared_product_surface_evidence=(
+                DeclaredProductSurfaceItem(
+                    source_type="product_capability",
+                    summary="Users can claim work from the queue.",
+                    provenance="explicit run intent: user supplied capability",
+                ),
+            ),
+        )
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.BLOCKED)
+
+    def test_product_decision_required_marker_still_blocks_declared_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("Observed only\n", encoding="utf-8")
+            (root / "journey0_evidence.json").write_text(
+                json.dumps(
+                    {
+                        "evidence": [
+                            {
+                                "evidence_id": "DECISION-001",
+                                "source_type": "product_capability",
+                                "summary": "Human must choose the product behavior.",
+                                "label": "PRODUCT_DECISION_REQUIRED",
+                                "confidence": "high",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            result = dry_run.run_journey0_dry_run(
+                target_root=root,
+                allowed_relative_paths=(".",),
+                declared_product_surface_evidence=(
+                    DeclaredProductSurfaceItem(
+                        source_type="product_capability",
+                        summary="Users can claim work from the queue.",
+                        provenance="explicit run intent: user supplied capability",
+                    ),
+                ),
+            )
+
+        self.assertEqual(result.draftability_verdict.verdict, Journey0Verdict.BLOCKED)
+        self.assertEqual(
+            result.decision_register.decisions[0].decision_status,
+            DecisionStatus.OPEN,
+        )
+
+    def test_deferred_product_decision_still_blocks_draftability(self) -> None:
+        result = _run_fixture("pass")
+        deferred = ProductDecision(
+            decision_id="PD-DEFERRED",
+            question="Which product behavior is authoritative?",
+            why_human_owned="source of truth decision",
+            options=("hld", "code"),
+            evidence_refs=result.draftability_verdict.accepted_evidence_refs,
+            recommended_default_if_any=None,
+            decision_status=DecisionStatus.DEFERRED,
+            owner="human",
+        )
+
+        blocked = dry_run.compute_journey0_draftability_verdict(
+            evidence_pack=result.evidence_pack,
+            product_surface_map=result.product_surface_map,
+            gap_report=result.gap_report,
+            decision_register=ProductDecisionRegister(decisions=(deferred,)),
+        )
+
+        self.assertEqual(blocked.verdict, Journey0Verdict.BLOCKED)
 
     def test_hld_update_plan_is_plan_artifact_only(self) -> None:
         result = _run_fixture("pass")
@@ -148,6 +255,22 @@ class Journey0DryRunTests(unittest.TestCase):
 
         self.assertTrue(result.target_unchanged)
 
+    def test_declared_evidence_preserves_no_mutation_snapshot(self) -> None:
+        result = dry_run.run_journey0_dry_run(
+            target_root=FIXTURE_ROOT / "action",
+            allowed_relative_paths=("README.md",),
+            declared_product_surface_evidence=(
+                DeclaredProductSurfaceItem(
+                    source_type="product_actor",
+                    summary="Operator reviews queued work.",
+                    provenance="explicit run intent: user supplied actor",
+                ),
+            ),
+        )
+
+        self.assertTrue(result.target_unchanged)
+        self.assertEqual(result.before_snapshot, result.after_snapshot)
+
     def test_no_journey_progression_behavior_is_exposed(self) -> None:
         result = _run_fixture("pass")
 
@@ -169,6 +292,24 @@ class Journey0DryRunTests(unittest.TestCase):
         for item in result.evidence_pack.evidence:
             if item.evidence_id.startswith("COLLECTED-"):
                 self.assertNotIn("(", item.summary.split("observed:")[-1])
+
+    def test_declared_evidence_does_not_require_reading_target_file_contents(self) -> None:
+        result = dry_run.run_journey0_dry_run(
+            target_root=FIXTURE_ROOT / "action",
+            allowed_relative_paths=("README.md",),
+            declared_product_surface_evidence=(
+                DeclaredProductSurfaceItem(
+                    source_type="product_workflow",
+                    summary="Claim then complete work.",
+                    provenance="explicit run intent: user supplied workflow",
+                ),
+            ),
+        )
+
+        for item in result.evidence_pack.evidence:
+            if item.evidence_id.startswith("COLLECTED-"):
+                self.assertNotIn("Action Fixture", item.summary)
+                self.assertNotIn("secret", item.summary)
 
 
 if __name__ == "__main__":

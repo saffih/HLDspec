@@ -28,29 +28,29 @@ Non-goals:
 - no backlog creation
 - no implementation planning or implementation
 
-## Preconditions for future authorized dry run
+## Preconditions for future controlled dry run
 
 A future real-target dry run may be prepared only after all of these are present:
 
-- explicit human authorization for the named target
-- exact target repo/path
+- exact `target_root`
 - exact `allowed_relative_paths`
+- explicit run intent
 - clean target snapshot before the run
 - explicit acknowledgement that fixture proof is not real-target proof
 - explicit acknowledgement that provenance remains a caveat
 - explicit acknowledgement that the run cannot start Journey 1 or wire commands
 
-## Authorization gate
+## Run-intent gate
 
-The future prompt must include a target authorization receipt naming:
+The future prompt must include:
 
-- the human approver
-- the exact target path
-- the exact purpose of the dry run
-- the exact allowed paths
+- exact `target_root`
+- exact `allowed_relative_paths`
+- explicit run intent
 - the forbidden actions
 
-If authorization is missing or ambiguous, stop before reading target evidence.
+If the target, paths, or run intent are missing or ambiguous, stop before reading
+target evidence.
 
 ## Target/allowed-path gate
 

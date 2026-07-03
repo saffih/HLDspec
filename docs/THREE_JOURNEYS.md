@@ -320,14 +320,17 @@ docs / direction                           [DONE: JOURNEY0_BROWNFIELD_DISCOVERY.
  → Draftability Verdict                    [DONE: journey0_draftability.py]
  → HLD Update Plan                         [DONE: journey0_hld_update_plan.py]
  → fixture dry-run proof                   [DONE: journey0_dry_run.py; fixture-only]
+ → declared product-surface PASS path      [DONE: journey0_declared_evidence.py]
  → stabilization blockers                  [current: do not wire / do not start J1]
- → real-target proof                       [blocked: privacy/provenance/PASS path]
+ → controlled real-target dry-run          [next: exact target_root + allowed_relative_paths + explicit run intent; provenance caveat remains]
 ```
 
 The typed stack above is canonical for new Journey 0 work. Older dict/contracts
 Journey 0 artifacts are not the canonical path for new work and must not be used
-to claim Journey 0 readiness. PR #100's dry-run proof is fixture-only; it does
-not prove real-target readiness or authorize Journey 1.
+to claim Journey 0 readiness. PR #100's dry-run proof is fixture-only. Snippet
+privacy is resolved by structural-only collection, and declared product-surface
+evidence can make the typed PASS path reachable, but real-target proof and
+provenance review still do not authorize Journey 1.
 
 **Journey 2 path** (SDD / package completeness):
 
