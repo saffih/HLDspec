@@ -220,6 +220,11 @@ mutation readiness.
 - Forbidden behavior: target mutation, backlog creation, HLD writing, SpecKit execution, implementation
 - Validation/check: before/after target snapshot, artifact-only output, and at least one PASS/ACTION/BLOCKED example backed by labeled evidence
 
+Controlled real-target dry-run planning is defined in
+`docs/JOURNEY0_CONTROLLED_REAL_TARGET_DRY_RUN_PLAN.md`. That plan is gates-only:
+it does not authorize execution, Journey 1, command-surface wiring, SpecKit,
+target mutation, HLD writing, backlog creation, or implementation.
+
 ## Context-Aware Follow-Up Issues
 
 These issues are recorded so they are not dropped, but they are not implemented
@@ -243,13 +248,13 @@ target mutation, HLD writing, backlog creation, or implementation.
 | ID | Title | Status | Blocks | Owner/decision needed | Next PR shape |
 |---|---|---|---|---|---|
 | J0-4 | Typed Journey 0 stack is canonical | CANONICAL | None for new Journey 0 work | Use typed stack for new work | Keep using `hldspec/journey0_artifacts.py`, `journey0_collectors.py`, `journey0_classifiers.py`, `journey0_product_surface.py`, `journey0_draftability.py`, `journey0_hld_update_plan.py`, and `journey0_dry_run.py` |
-| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE | Journey 0 command-surface wiring and readiness claims | Decide whether to freeze, deprecate, adapt, or delete old dict/contracts path | Focused deprecation/adaptation PR; do not treat old path as canonical readiness |
-| J0-5 | Baseline tests and CI status | TRACKED_FOLLOW_UP | Repo-wide readiness claims | Verify full `tests_v2` baseline and CI status; add minimal CI if absent | CI/baseline PR; do not claim repo-wide green from focused Journey 0 tests |
+| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE / FROZEN_FOR_COMPATIBILITY_PENDING_DEPRECATION | Journey 0 command-surface wiring and readiness claims | Old dict/contracts path is frozen for compatibility, not canonical readiness | Focused deprecation/adaptation/deletion PR; do not treat old path as canonical readiness |
+| J0-5 | Baseline tests and CI status | BASELINE_CI_PRESENT | Repo-wide readiness claims | PR #104 restored `tests_v2` baseline and added minimal CI; keep verifying before readiness claims | Do not infer product or real-target readiness from CI alone |
 | J0-7 | Deferred ProductDecision semantics | CANONICAL | None for typed Journey 0 stack after default blocking semantics | `DEFERRED` blocks HLD writing unless a future safe deferral contract defines owner/rationale requirements | Preserve tests: `DEFERRED` is required before writing, not a non-blocking open question |
 | J0-12 | Snippet privacy and provenance | SNIPPET_PRIVACY_RESOLVED / PROVENANCE_OPEN | Real-target Slice E (provenance model); real-target readiness claims | Snippet privacy default resolved: collectors emit structural metadata only, no file content. Full provenance model and real-target readiness remain open. | Provenance model PR if needed before real-target proof |
 | J0-13 | D2 section evidence traceability | CANONICAL | None after section-specific fix | Keep section refs source-type-specific | Preserve PR #101 behavior; do not regress to map-level refs as sole traceability |
 | J0-14 | PR #100 fixture dry-run proof | FIXTURE_ONLY | Real-target proof and Journey 1 start | Treat PASS/ACTION/BLOCKED examples as synthetic fixture proof only | Stabilization docs now; real-target proof later only after blockers resolve |
-| J0-15 | Real PASS path from collected evidence | PASS_PATH_EXISTS | Real-target PASS and Journey 1 readiness | `journey0_declared_evidence.py` added: converts explicit human declarations into typed product-surface EvidenceItems. Real-target readiness not yet claimed; command-surface wiring still blocked. | Real-target dry-run proof PR; do not claim readiness from adapter alone |
+| J0-15 | Real PASS path from declared product-surface evidence | PASS_PATH_EXISTS | Real-target PASS and Journey 1 readiness | `journey0_declared_evidence.py` added: converts explicit human declarations into typed product-surface EvidenceItems. Generic file/doc/code evidence still cannot PASS alone. Real-target readiness not yet claimed; command-surface wiring still blocked. | Controlled real-target dry-run planning now; later authorized proof only after gates are accepted |
 | J0-16 | Journey 0 command-surface wiring | DO_NOT_WIRE | Public/runtime use | Resolve J0-1, J0-5, J0-12, and J0-15 first | Later wiring PR only after blockers are closed |
 | J0-17 | Journey 1 start from Journey 0 | BLOCKED | Journey 1 HLD authoring from Journey 0 outputs | Human/project approval after blockers and stabilization review | Do not start Journey 1 from Journey 0 yet |
 
