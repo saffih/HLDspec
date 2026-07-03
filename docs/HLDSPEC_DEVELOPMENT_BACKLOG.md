@@ -121,6 +121,13 @@ The human confirmation pass is recorded in
 (DECLARED-005, DECLARED-009), 1 REJECT (DECLARED-010)); amended/rejected
 items require Journey 0 declared-evidence re-review, and that doc also does
 not lift J0-17.
+The Journey 1 hardening run for flow (PR #119,
+`docs/flow_journey1_hld_hardening/`) returned verdict BLOCKED (two
+contradictions with ratified owner decisions); the owner's answers to its
+five open questions are recorded in
+`docs/flow_journey1_hld_hardening/flow-hld-hardening-owner-decisions.md`.
+A specific target HLD patch still requires separate explicit approval, and
+none of this lifts J0-17 or closes J0-12 globally.
 
 ### Stabilization table
 
