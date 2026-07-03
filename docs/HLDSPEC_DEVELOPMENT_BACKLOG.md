@@ -104,17 +104,23 @@ and no-mutation snapshot behavior against controlled fixtures. It does not
 authorize real target execution, prove real-target privacy/provenance readiness,
 prove real collector PASS, or make Journey 1 ready.
 
+Controlled real-target dry-run planning is documented in
+`docs/JOURNEY0_CONTROLLED_REAL_TARGET_DRY_RUN_PLAN.md`. It is planning/gates
+only and does not authorize real-target execution, Journey 1, command-surface
+wiring, SpecKit, target mutation, HLD writing, backlog creation, or
+implementation.
+
 ### Stabilization table
 
 | ID | Title | Status | Blocks | Owner/decision needed | Next PR shape |
 |---|---|---|---|---|---|
-| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE | Journey 0 command-surface wiring; readiness claims | Decide whether to delete, freeze, adapt, or explicitly deprecate the old dict/contracts path | Focused old-stack disposition PR; do not wire or claim readiness from it |
+| J0-1 | Old permissive draftability/handoff path | NOT_CANONICAL / DO_NOT_WIRE / FROZEN_FOR_COMPATIBILITY_PENDING_DEPRECATION | Journey 0 command-surface wiring; readiness claims | Old dict/contracts path is frozen for compatibility, not canonical readiness | Focused old-stack deprecation/adaptation/deletion PR; do not wire or claim readiness from it |
 | J0-4 | Typed stack supersession | CANONICAL | None for new Journey 0 work | Human/project decision recorded: typed stack is canonical | Preserve typed stack as source of truth for new Journey 0 slices |
-| J0-5 | Baseline tests and CI | TRACKED_FOLLOW_UP | Repo-wide readiness claims | Verify full `tests_v2` baseline and CI status; add minimal CI later if absent | CI/baseline PR; do not infer repo-wide green from focused Journey 0 tests |
+| J0-5 | Baseline tests and CI | BASELINE_CI_PRESENT | Repo-wide readiness claims | PR #104 restored `tests_v2` baseline and added minimal CI; keep verifying before readiness claims | Do not infer product or real-target readiness from CI alone |
 | J0-7 | Deferred decisions | CANONICAL | None for typed Journey 0 stack after default blocking semantics | `DEFERRED` ProductDecision blocks HLD writing until a future safe deferral contract exists | Preserve tests: `DEFERRED` is required before writing, not a non-blocking open question |
 | J0-12 | Snippet privacy and provenance | SNIPPET_PRIVACY_RESOLVED / PROVENANCE_OPEN | Real-target Slice E (provenance model); real-target readiness claims | Snippet privacy default resolved: collectors emit structural metadata only, no file content. Full provenance model and real-target readiness remain open. | Provenance model PR if needed before real-target proof |
 | J0-14 | PR #100 fixture dry-run | FIXTURE_ONLY | Real-target proof; Journey 1 start | Keep synthetic fixture evidence distinct from real evidence | Do not claim real-target readiness from fixture PASS/ACTION/BLOCKED examples |
-| J0-15 | Real PASS path | PASS_PATH_EXISTS | Real-target PASS; Journey 1 start | `journey0_declared_evidence.py` added: converts explicit human declarations into typed product-surface EvidenceItems. Real-target readiness not yet claimed; command-surface wiring still blocked. | Real-target dry-run proof PR; do not claim readiness from adapter alone |
+| J0-15 | Real PASS path from declared product-surface evidence | PASS_PATH_EXISTS | Real-target PASS; Journey 1 start | `journey0_declared_evidence.py` added: converts explicit human declarations into typed product-surface EvidenceItems. Generic file/doc/code evidence still cannot PASS alone. Real-target readiness not yet claimed; command-surface wiring still blocked. | Controlled real-target dry-run planning now; later authorized proof only after gates are accepted |
 | J0-16 | Command surface wiring | DO_NOT_WIRE | Public/runtime use | Close or explicitly accept J0 blockers first | Later wiring PR only after stabilization blockers are triaged |
 | J0-17 | Journey 1 start from Journey 0 | BLOCKED | HLD authoring/hardening from Journey 0 output | Human/project approval after blockers resolve | Do not start Journey 1 from Journey 0 yet |
 
@@ -122,7 +128,8 @@ prove real collector PASS, or make Journey 1 ready.
 
 The old dict/contracts stack is not canonical for new Journey 0 work. It must
 not be used to claim Journey 0 readiness and must not be wired into the command
-surface. A future focused PR should freeze, deprecate, adapt, or delete it.
+surface. It is frozen for compatibility pending a future focused deprecation,
+adaptation, or deletion PR.
 
 ## Current implementation notes
 
