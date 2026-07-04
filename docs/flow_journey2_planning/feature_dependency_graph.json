@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-04T00:00:00Z",
+  "source": "docs/flow_journey2_planning/feature_decomposition.md",
+  "parity_source": "ordered_features",
+  "ordered_features": [
+    "FLOW-F01",
+    "FLOW-F02",
+    "FLOW-F03",
+    "FLOW-F04",
+    "FLOW-F05",
+    "FLOW-F06",
+    "FLOW-F07",
+    "FLOW-F08"
+  ],
+  "nodes": {
+    "FLOW-F01": {
+      "feature_id": "FLOW-F01",
+      "name": "Store & Transaction Foundation",
+      "source_hld_sections": ["HLD-003", "HLD-013"],
+      "dependencies": []
+    },
+    "FLOW-F02": {
+      "feature_id": "FLOW-F02",
+      "name": "Task Lifecycle & Invariant Discipline",
+      "source_hld_sections": ["HLD-004", "HLD-015"],
+      "dependencies": ["FLOW-F01"]
+    },
+    "FLOW-F03": {
+      "feature_id": "FLOW-F03",
+      "name": "Named Sessions, CLI Entry & Work Routing",
+      "source_hld_sections": ["HLD-009", "HLD-010", "HLD-015"],
+      "dependencies": ["FLOW-F02"]
+    },
+    "FLOW-F04": {
+      "feature_id": "FLOW-F04",
+      "name": "Fork-Join & Concurrent Escalations",
+      "source_hld_sections": ["HLD-005", "HLD-004", "HLD-015"],
+      "dependencies": ["FLOW-F02", "FLOW-F03"]
+    },
+    "FLOW-F05": {
+      "feature_id": "FLOW-F05",
+      "name": "Human-in-the-Loop — Answer & Feedback",
+      "source_hld_sections": ["HLD-007", "HLD-005"],
+      "dependencies": ["FLOW-F04"]
+    },
+    "FLOW-F06": {
+      "feature_id": "FLOW-F06",
+      "name": "Baton — Context Substrate",
+      "source_hld_sections": ["HLD-008", "HLD-003", "HLD-013"],
+      "dependencies": ["FLOW-F02", "FLOW-F03"]
+    },
+    "FLOW-F07": {
+      "feature_id": "FLOW-F07",
+      "name": "Recovery — Lease, Reclaim, Fence, Flaky-mark",
+      "source_hld_sections": ["HLD-014", "HLD-015"],
+      "dependencies": ["FLOW-F03", "FLOW-F04"]
+    },
+    "FLOW-F08": {
+      "feature_id": "FLOW-F08",
+      "name": "Output Layer — Outcome & Report",
+      "source_hld_sections": ["HLD-016", "HLD-003", "HLD-015"],
+      "dependencies": ["FLOW-F02", "FLOW-F05", "FLOW-F06"]
+    }
+  },
+  "edges": [
+    {"from": "FLOW-F01", "to": "FLOW-F02"},
+    {"from": "FLOW-F02", "to": "FLOW-F03"},
+    {"from": "FLOW-F02", "to": "FLOW-F04"},
+    {"from": "FLOW-F03", "to": "FLOW-F04"},
+    {"from": "FLOW-F04", "to": "FLOW-F05"},
+    {"from": "FLOW-F02", "to": "FLOW-F06"},
+    {"from": "FLOW-F03", "to": "FLOW-F06"},
+    {"from": "FLOW-F03", "to": "FLOW-F07"},
+    {"from": "FLOW-F04", "to": "FLOW-F07"},
+    {"from": "FLOW-F02", "to": "FLOW-F08"},
+    {"from": "FLOW-F05", "to": "FLOW-F08"},
+    {"from": "FLOW-F06", "to": "FLOW-F08"}
+  ]
+}

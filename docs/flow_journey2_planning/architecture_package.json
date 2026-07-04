@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-04T00:00:00Z",
+  "product_goal_summary": "Baton Flow produces trustworthy outputs across AI-assisted sessions. Tasks carry context (batons) across handoffs so reports — the valuable output — accumulate quality under human steering. The system kills context loss, opacity, and steering inability between AI sessions.",
+
+  "architecture_intent": "A single-store, CLI-gated, projection-derived architecture. One SQLite database holds all truth; markdown projections are derived product surface (never canonical). The CLI is the sole write path. Five invariants (dependency, identity, ownership, lifecycle, existence) constrain the engine; everything above that floor is agent judgment. The architecture separates the means (baton/context) from the output (report) and makes each independently specifiable.",
+
+  "source_of_truth_map": {
+    "task_state": "SQLite database (single durable store, HLD-003)",
+    "baton_context": "SQLite database, per-task append-log (HLD-008)",
+    "report_content": "SQLite database, per-subject deliverable (HLD-016)",
+    "session_identity": "SQLite database, session rows (HLD-010)",
+    "escalation_state": "SQLite database, per-escalation rows with stable IDs (HLD-005)",
+    "markdown_projections": "Derived from store — product surface, never canonical (HLD-003)",
+    "invariant_discipline": "flow.py FlowError tags — the closed set (HLD-015)"
+  },
+
+  "ownership_boundaries": {
+    "store_layer": "Owns atomic transactions, WAL, crash-safety (FLOW-F01)",
+    "lifecycle_layer": "Owns state machine transitions and dependency guards (FLOW-F02)",
+    "routing_layer": "Owns session enforcement, affinity binding, verb dispatch (FLOW-F03)",
+    "fork_join_layer": "Owns escalation/split primitives and wake semantics (FLOW-F04)",
+    "human_interface_layer": "Owns answer/feedback discrimination and routing (FLOW-F05)",
+    "context_layer": "Owns baton read/write contract, append-log, multi-writer (FLOW-F06)",
+    "recovery_layer": "Owns lease, reclaim, fence, flaky-mark (FLOW-F07)",
+    "output_layer": "Owns outcome/report distinction, report lifecycle, supersession (FLOW-F08)"
+  },
+
+  "contracts_and_seams": [
+    "CLI entry gate: session enforcement (all verbs, reads included) — seam between external callers and internal state",
+    "Transaction boundary: every verb = one BEGIN IMMEDIATE…COMMIT — seam between CLI and store",
+    "Projection derivation: store commits → projection re-derives — seam between canonical and derived",
+    "Invariant boundary: five tagged invariants separate engine constraints from agent judgment",
+    "Fork-join contract: escalation ID stability, per-escalation resolution, all-resolved wake",
+    "Ownership fence: hold-by-session check at done/escalate/split — seam between concurrent sessions",
+    "Report lifecycle contract: active→deprecated boundary, immutability, reference forwarding"
+  ],
+
+  "brownfield_constraints": [
+    "Existing flow.py implements a subset: single reply verb (not answer/feedback split), optional sessions (not mandatory), single escalation slot (not concurrent), no report layer",
+    "HLD-017 records design-vs-implementation gap — the design is authoritative, the gap is implementation status",
+    "Existing test_flow.py has 66 passing tests that must not regress",
+    "SQLite database schema already exists with tasks, batons — schema migration needed for multi-escalation and reports",
+    "core.md loop document already defines the runner contract — spec must align with existing runner behavior where it matches the HLD"
+  ],
+
+  "expert_lenses_applied": {
+    "software_architecture": "Single-store architecture with derived projections eliminates split-brain. Five-invariant boundary is a clean separation of concerns between engine constraints and agent policy. The layered decomposition (store→lifecycle→routing→fork-join→answer→context→recovery→output) respects dependency order.",
+    "brownfield_integration": "Implementation extends existing flow.py (66 tests, single file). Migration path: concurrent escalations require schema extension; answer/feedback replace reply; reports are net-new. Each feature is specifiable against the existing codebase with clear test expectations.",
+    "contracts_and_seams": "Seven contracts identified above. The critical one is the CLI-entry session gate — it establishes identity before any operation. The transaction boundary (one tx per verb) is the crash-safety seam. The invariant boundary separates what the engine enforces from what agents decide.",
+    "ai_agent_toolchain_safety": "Agents operate through CLI only (no direct DB). The identity invariant means every action is attributable. The ownership fence prevents session-theft. The autonomy contract (HLD-015) explicitly delegates judgment to agents within invariant bounds — agents cannot violate invariants but can make any judgment call above them.",
+    "test_and_evidence": "Each feature has a named verification path. Store: crash/concurrency tests. Lifecycle: state-transition coverage + tagging audit. Sessions: enforcement tests. Fork-join: multi-escalation tests. Answer/feedback: routing tests. Baton: multi-writer tests. Recovery: lease/fence tests. Output: lifecycle/immutability tests.",
+    "git_worktree_pr_lifecycle": "8 features = 8 reviewable units. Dependency order gives a natural PR sequence. Each feature is testable in isolation (mocking only upstream features that are not yet implemented in the same branch).",
+    "slice_quality": "Each feature is one purpose, one verification path, one stable checkpoint. No feature requires whole-system context — each can be specified and tested against its declared dependencies only."
+  },
+
+  "domain_assumptions": [
+    "ASSUMPTION-1: SQLite is the store (HLD-012 implementation detail). The spec treats it as given brownfield reality, not a decision to make.",
+    "ASSUMPTION-2: Python 3.10+ (HLD-012). Brownfield constraint, not a choice.",
+    "ASSUMPTION-3: AI runners (Claude, Devin, Codex) are the primary runners (HLD-012). The CLI contract is runner-agnostic by design.",
+    "ASSUMPTION-4: The existing flow.py single-file architecture continues — specs add to it rather than restructuring into multiple modules.",
+    "ASSUMPTION-5: Reports are net-new (not yet implemented). The spec defines them from scratch within the existing architecture."
+  ],
+
+  "slice_roadmap": [
+    {
+      "id": "FLOW-F01",
+      "name": "Store & Transaction Foundation",
+      "purpose": "Establish the single-store contract, transaction guarantees, and projection derivation boundary as the foundation everything else builds on.",
+      "layer": "store",
+      "allowed_changes": ["Transaction semantics specification", "WAL/concurrency contract", "Projection derivation rules"],
+      "forbidden_changes": ["Task state schema", "CLI verbs", "Report schema", "Any provisional-section content"],
+      "expected_files_or_areas": ["flow.py (store initialization, connection settings)", "test_flow.py (transaction tests)"],
+      "required_tests": ["Concurrent flow next claims each task at most once", "Crash mid-operation leaves no partial state", "Projection re-derivable after delete"],
+      "dependency_ids": [],
+      "risk_level": "HIGH",
+      "rollback_story": "Store contract is foundational — rollback means reverting the spec, not the code (existing code already implements most of this).",
+      "architecture_value": "Establishes the single-source-of-truth property that every other feature depends on."
+    },
+    {
+      "id": "FLOW-F02",
+      "name": "Task Lifecycle & Invariant Discipline",
+      "purpose": "Define the four-state machine and the closed invariant set that bounds what the engine may constrain.",
+      "layer": "lifecycle",
+      "allowed_changes": ["State machine specification", "Transition rules", "Invariant tagging discipline", "Overreach detection"],
+      "forbidden_changes": ["Store internals", "Session enforcement", "Escalation concurrency", "Report lifecycle"],
+      "expected_files_or_areas": ["flow.py (state transitions, FlowError raises)", "test_flow.py (lifecycle tests)"],
+      "required_tests": ["Four states only (CHECK constraint)", "Dependency guard blocks done with open deps", "Every FlowError tagged from closed set", "Untaggable guard flagged"],
+      "dependency_ids": ["FLOW-F01"],
+      "risk_level": "HIGH",
+      "rollback_story": "Revert spec to existing lifecycle behavior (already implemented). The invariant-tagging audit is additive and independently revertible.",
+      "architecture_value": "Establishes the state machine and the boundary between engine constraints and agent judgment."
+    },
+    {
+      "id": "FLOW-F03",
+      "name": "Named Sessions, CLI Entry & Work Routing",
+      "purpose": "Define mandatory session enforcement and soft-affinity routing as the identity and dispatch layer.",
+      "layer": "routing",
+      "allowed_changes": ["Session enforcement spec", "Affinity binding rules", "Verb surface enumeration", "Identity invariant details"],
+      "forbidden_changes": ["Store internals", "Task state transitions", "Escalation semantics", "Report semantics"],
+      "expected_files_or_areas": ["flow.py (CLI entry, session check, next routing)", "test_flow.py (session tests, routing tests)"],
+      "required_tests": ["Missing session rejected on all verbs including reads", "First labeled claim binds session", "Fallback to any when no label-match", "None only when no runnable work"],
+      "dependency_ids": ["FLOW-F02"],
+      "risk_level": "HIGH",
+      "rollback_story": "Session enforcement is a gate — revert to optional sessions (existing behavior) by removing the entry check. Routing is additive.",
+      "architecture_value": "Establishes identity (no anonymous path) and work distribution. Prerequisite for ownership fence and recovery."
+    },
+    {
+      "id": "FLOW-F04",
+      "name": "Fork-Join & Concurrent Escalations",
+      "purpose": "Define the unified fork-join primitive with concurrent escalation support.",
+      "layer": "fork-join",
+      "allowed_changes": ["Multi-escalation schema", "Per-escalation stable IDs", "Wake-all-resolved semantics", "Split/children semantics"],
+      "forbidden_changes": ["Store internals", "Session enforcement", "Answer/feedback routing", "Report semantics"],
+      "expected_files_or_areas": ["flow.py (escalate, split, escalation tracking)", "test_flow.py (multi-escalation tests)"],
+      "required_tests": ["Multiple escalations coexist on one task", "Per-escalation resolution independent", "Task wakes only when ALL resolved", "Split creates children and parks parent"],
+      "dependency_ids": ["FLOW-F02", "FLOW-F03"],
+      "risk_level": "HIGH",
+      "rollback_story": "Revert to single-escalation slot (existing behavior). Multi-escalation is a schema extension — revert = drop the extension.",
+      "architecture_value": "Establishes the fork-join primitive that answer/feedback and recovery both depend on."
+    },
+    {
+      "id": "FLOW-F05",
+      "name": "Human-in-the-Loop — Answer & Feedback",
+      "purpose": "Define the answer/feedback discrimination that replaces the overloaded v1 reply verb.",
+      "layer": "human-interface",
+      "allowed_changes": ["Answer verb spec (routes to specific escalation)", "Feedback verb spec (steers or creates)", "Rejection behavior"],
+      "forbidden_changes": ["Store internals", "Escalation creation (that is F04)", "Report lifecycle (that is F08)", "Routing/sessions"],
+      "expected_files_or_areas": ["flow.py (answer, feedback verbs)", "test_flow.py (answer/feedback tests)"],
+      "required_tests": ["Answer resolves specific escalation by ID", "Answer rejected when no matching open escalation", "Feedback on report defers to agent judgment", "Feedback as new scope creates referenced task"],
+      "dependency_ids": ["FLOW-F04"],
+      "risk_level": "MEDIUM",
+      "rollback_story": "Revert to single reply verb (existing behavior). Answer/feedback is a verb split — revert = keep reply.",
+      "architecture_value": "Establishes the human→system channel discrimination. Prerequisite for report feedback (F08)."
+    },
+    {
+      "id": "FLOW-F06",
+      "name": "Baton — Context Substrate",
+      "purpose": "Define the per-task context blackboard, its append-log semantics, and its distinction from outcome/report.",
+      "layer": "context",
+      "allowed_changes": ["Baton read/write contract", "Append-log semantics", "Multi-writer rules", "Claim-on-baton within transaction"],
+      "forbidden_changes": ["Store transaction semantics (that is F01)", "Session enforcement (that is F03)", "Report semantics (that is F08)"],
+      "expected_files_or_areas": ["flow.py (context, note, decide, claim-writes-baton)", "test_flow.py (baton tests)"],
+      "required_tests": ["Claimed-by recorded on baton within claim transaction", "note/decide are multi-writer (no fence)", "Baton is distinct from outcome (test both exist on done)", "Projection derivable from DB baton"],
+      "dependency_ids": ["FLOW-F02", "FLOW-F03"],
+      "risk_level": "MEDIUM",
+      "rollback_story": "Baton is already implemented — spec codifies existing behavior. Rollback = revert spec only.",
+      "architecture_value": "Establishes the context mechanism. Prerequisite for outcome (F08) since outcome is distinct from baton."
+    },
+    {
+      "id": "FLOW-F07",
+      "name": "Recovery — Lease, Reclaim, Fence, Flaky-mark",
+      "purpose": "Define liveness recovery without corrupting state: lease, reclaim, fence, and permanent flaky-mark.",
+      "layer": "recovery",
+      "allowed_changes": ["Lease TTL contract", "Reclaim verb spec", "Ownership fence rules", "Flaky-mark escalation at ceiling"],
+      "forbidden_changes": ["Store internals", "Task state machine (beyond reclaim→pending)", "Escalation creation semantics (uses F04 API)", "Report semantics"],
+      "expected_files_or_areas": ["flow.py (reclaim, lease refresh, fence checks, flaky_mark)", "test_flow.py (recovery tests)"],
+      "required_tests": ["Lease-expired task reclaimed in flow next", "Explicit reclaim returns to pending immediately", "Fence rejects done/escalate/split by non-holder", "At RECLAIM_MAX further orphaning escalates with scoped escalation"],
+      "dependency_ids": ["FLOW-F03", "FLOW-F04"],
+      "risk_level": "HIGH",
+      "rollback_story": "Revert to lease-only reclaim (existing behavior). Explicit reclaim verb and flaky-mark are additive.",
+      "architecture_value": "Establishes liveness guarantees without weakening correctness invariants."
+    },
+    {
+      "id": "FLOW-F08",
+      "name": "Output Layer — Outcome & Report",
+      "purpose": "Define the three-level output stack: mandatory outcome at done, reports as transcendent deliverables with independent lifecycle.",
+      "layer": "output",
+      "allowed_changes": ["Mandatory outcome spec", "Report schema", "Report lifecycle (active→deprecated)", "Supersession/immutability", "Many-to-many task↔report", "Attribution"],
+      "forbidden_changes": ["Baton semantics (that is F06)", "Answer/feedback routing (that is F05, though feedback triggers updates here)", "Store internals"],
+      "expected_files_or_areas": ["flow.py (done with outcome, report creation/update/deprecate)", "test_flow.py (outcome+report tests)"],
+      "required_tests": ["done requires outcome (mandatory)", "Long outcome is still outcome not report", "Report lifecycle transitions", "Deprecated report is immutable", "References resolve to live successor", "Every update attributed"],
+      "dependency_ids": ["FLOW-F02", "FLOW-F05", "FLOW-F06"],
+      "risk_level": "HIGH",
+      "rollback_story": "Reports are net-new — rollback = don't add them. Mandatory outcome is a tightening of done — rollback = keep optional.",
+      "architecture_value": "Establishes the output layer that is the system's reason to exist — separating context (baton) from result (outcome) from deliverable (report)."
+    }
+  ],
+
+  "next_slice_packet": {
+    "slice_id": "FLOW-F01",
+    "name": "Store & Transaction Foundation",
+    "reason_next": "Root of the dependency graph — no feature can be specified without first establishing the single-store contract and transaction semantics. Also the lowest-risk starting point: existing code already implements most of this; the spec codifies proven behavior.",
+    "entry_point": "Specify the SQLite store contract, WAL settings, one-transaction-per-verb rule, and projection-after-commit boundary against existing flow.py implementation.",
+    "stop_condition": "Store contract specified with all three HLD-013 verification points testable."
+  },
+
+  "test_strategy": "Each feature carries required_tests (specific, named). Tests prove invariants, not implementation details. Cross-feature integration tested bottom-up: each slice assumes its dependencies pass. Final integration: all 8 features compose without regression against the existing 66-test suite.",
+
+  "forbidden_shortcuts": [
+    "TRAP: Implementing reports before the baton/outcome distinction is specified — risks conflating context with output.",
+    "TRAP: Making sessions optional 'for now' — the identity invariant (HLD-015) requires mandatory sessions from the start.",
+    "TRAP: Single-escalation slot 'extended later' — concurrent escalations are a schema decision that must be in the first fork-join spec.",
+    "TRAP: Treating projections as source of truth — every test must prove re-derivability.",
+    "TRAP: Skipping the overreach-detection audit — without it, new guards accumulate silently outside the invariant boundary."
+  ],
+
+  "growth_and_change_notes": "The architecture absorbs growth through: (1) new CLI verbs add behind the same session-enforcement gate; (2) new state or entities add to the single store; (3) the invariant boundary is closed — new constraints must justify tagging or be rejected as overreach. The candidate capabilities in HLD-017 (Web UI, HTTP API, etc.) would add interfaces above the CLI but never below the invariant floor — the boundary rule (HLD-011) governs their adoption.",
+
+  "helper_recommendation": {
+    "recommended_helper": "speckit",
+    "rationale": "Single-file Python target with clear brownfield constraints, well-defined feature boundaries, and strong dependency ordering. SpecKit's constitution-backed spec workflow matches the invariant-driven architecture. Alternative: claude-code for rapid iteration on the existing flow.py.",
+    "registry_note": "Advisory only — helper selection is a Journey 3 decision."
+  }
+}
