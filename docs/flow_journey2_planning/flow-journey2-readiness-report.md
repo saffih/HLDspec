@@ -68,8 +68,10 @@ edges; Kahn acyclicity check; deps-precede-dependents check.
    `flow-journey2-package-approval.md`.
 2. Authorization of a materialization/machine-build slice into the target
    (currently forbidden). — SATISFIED 2026-07-04 (authorized and executed);
-   see `flow-journey2-materialization-record.md`. Open follow-up: pointer
-   BOUND_MISMATCH fix requires separate authorization.
+   see `flow-journey2-materialization-record.md`. Pointer BOUND_MISMATCH
+   fixed 2026-07-04 (binding now BOUND_MATCH) — see
+   `flow-journey2-pointer-fix-record.md`; open follow-up there:
+   `agent_session.json` recurrence vector.
 3. CONSTITUTION_APPROVAL_GATE before `constitution.proposed.md` is applied.
 4. SPECKIT_PREWORK_APPROVAL_GATE before any SpecKit invocation.
 5. RunSkeptic + Consultant review of the package at materialization.
