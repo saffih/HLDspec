@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-04
 **Authorization:** `AUTHORIZE_EXECUTING_JOURNEY_2_PLANNING_PROMPT: yes`
-**Approval status:** Package approval is PENDING. Prior gate sign-offs (SDD-ready gate v2 acceptance, planning-prompt authorization) were recorded as Hadas (project owner).
+**Approval status:** Package-level approval recorded 2026-07-04 — Hadas (project owner); see `flow-journey2-package-approval.md`. Materialization, SOURCE_PACKAGE_APPROVAL_GATE, SpecKit, and Journey 3 remain not authorized.
 **Target:** `/Users/saffi/code/flow`
 **HLD SHA-256:** `3c376ae9917b05d09d71fd73037b41a800eecbe51eaa5167481f1db11cf7e5d0`
 **Output path:** `docs/flow_journey2_planning/` (HLDspec-side only)

@@ -64,7 +64,8 @@ edges; Kahn acyclicity check; deps-precede-dependents check.
 ## Required Next Approvals
 
 1. Owner package-level approval of this planning package (NOT
-   SOURCE_PACKAGE_APPROVAL_GATE).
+   SOURCE_PACKAGE_APPROVAL_GATE). — SATISFIED 2026-07-04, see
+   `flow-journey2-package-approval.md`.
 2. Authorization of a materialization/machine-build slice into the target
    (currently forbidden).
 3. CONSTITUTION_APPROVAL_GATE before `constitution.proposed.md` is applied.
@@ -76,4 +77,6 @@ edges; Kahn acyclicity check; deps-precede-dependents check.
 
 ## Verdict
 
-**PLANNING_COMPLETE**, pending owner package approval.
+**PLANNING_COMPLETE**, package-level approved (2026-07-04, Hadas / project
+owner — see `flow-journey2-package-approval.md`). Approvals 2–6 above remain
+open; each requires its own separate explicit authorization.
