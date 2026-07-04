@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-04T00:00:00Z",
+  "source": "docs/flow_journey2_planning/feature_decomposition.md",
+  "parity_source": "ordered_features",
+  "parity_note": "Derived from the same ordered_features list as feature_dependency_graph.json. Divergence is CONFLICT.",
+  "ordered_features": [
+    "FLOW-F01",
+    "FLOW-F02",
+    "FLOW-F03",
+    "FLOW-F04",
+    "FLOW-F05",
+    "FLOW-F06",
+    "FLOW-F07",
+    "FLOW-F08"
+  ],
+  "queue": [
+    {
+      "position": 1,
+      "feature_id": "FLOW-F01",
+      "name": "Store & Transaction Foundation",
+      "ready_when": "always (root — no dependencies)",
+      "blocks": ["FLOW-F02"]
+    },
+    {
+      "position": 2,
+      "feature_id": "FLOW-F02",
+      "name": "Task Lifecycle & Invariant Discipline",
+      "ready_when": "FLOW-F01 complete",
+      "blocks": ["FLOW-F03", "FLOW-F04", "FLOW-F06", "FLOW-F08"]
+    },
+    {
+      "position": 3,
+      "feature_id": "FLOW-F03",
+      "name": "Named Sessions, CLI Entry & Work Routing",
+      "ready_when": "FLOW-F02 complete",
+      "blocks": ["FLOW-F04", "FLOW-F06", "FLOW-F07"]
+    },
+    {
+      "position": 4,
+      "feature_id": "FLOW-F04",
+      "name": "Fork-Join & Concurrent Escalations",
+      "ready_when": "FLOW-F02 and FLOW-F03 complete",
+      "blocks": ["FLOW-F05", "FLOW-F07"]
+    },
+    {
+      "position": 5,
+      "feature_id": "FLOW-F05",
+      "name": "Human-in-the-Loop — Answer & Feedback",
+      "ready_when": "FLOW-F04 complete",
+      "blocks": ["FLOW-F08"]
+    },
+    {
+      "position": 6,
+      "feature_id": "FLOW-F06",
+      "name": "Baton — Context Substrate",
+      "ready_when": "FLOW-F02 and FLOW-F03 complete",
+      "blocks": ["FLOW-F08"]
+    },
+    {
+      "position": 7,
+      "feature_id": "FLOW-F07",
+      "name": "Recovery — Lease, Reclaim, Fence, Flaky-mark",
+      "ready_when": "FLOW-F03 and FLOW-F04 complete",
+      "blocks": []
+    },
+    {
+      "position": 8,
+      "feature_id": "FLOW-F08",
+      "name": "Output Layer — Outcome & Report",
+      "ready_when": "FLOW-F02, FLOW-F05, and FLOW-F06 complete",
+      "blocks": []
+    }
+  ]
+}
