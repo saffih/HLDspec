@@ -26,6 +26,7 @@ from typing import Any, Callable
 
 from . import control_paths
 from . import git_lifecycle as gl
+from . import hld_source_package as hsp
 from . import model_routing as mr
 from . import refresh_target as rt
 from . import speckit_branch_gate as bg
@@ -62,6 +63,7 @@ PHASE_MERGE_BLOCKED_PENDING_CI_OR_APPROVAL = "MERGE_BLOCKED_PENDING_CI_OR_APPROV
 # Not part of the SpecKit ritual phases above; surfaced separately so callers
 # can distinguish "binding conflict" from "ritual phase".
 PHASE_BRANCH_BINDING_BLOCKED = "BRANCH_BINDING_BLOCKED"
+PHASE_SOURCE_MIRROR_STALE = "SOURCE_MIRROR_STALE"
 
 SAFETY_PASS = "PASS"
 SAFETY_ACTION = "ACTION"
@@ -409,6 +411,18 @@ def _agent_model_guidance(
     }
 
 
+def _specify_mirror_blockers(target_path: Path) -> list[str]:
+    """Stale-mirror blockers for the pre-specify gate.
+
+    Only a target with an authoritative source package carries the mirror
+    contract, so package-less targets are never blocked here.
+    """
+    source_dir, mirror_dir = hsp.source_package_paths(target_path, layout="new")
+    if not (source_dir / hsp.SOURCE_PACKAGE_FILE).is_file():
+        return []
+    return hsp.mirror_freshness_blockers(source_dir, mirror_dir)
+
+
 def build_next_feature_readiness_report(
     target: Path | str,
     *,
@@ -647,6 +661,30 @@ def build_next_feature_readiness_report(
             why_now="The current branch and its bound spec directory disagree; proceeding would risk writing the wrong feature's artifacts.",
             blockers=list(branch_gate.get("blockers") or []),
         )
+
+    # The two READY_FOR_SPECKIT_SPECIFY exits below hand the target to SpecKit,
+    # which reads the derived .specify/source/ mirror. A mirror that drifted
+    # from the authoritative source package must block the specify offer; a
+    # target with no source package carries no mirror contract and is exempt.
+    if not branch_gate.get("is_feature_branch") or not branch_gate.get("spec_md_exists"):
+        mirror_blockers = _specify_mirror_blockers(target_path)
+        if mirror_blockers:
+            return finish(
+                phase=PHASE_SOURCE_MIRROR_STALE,
+                safety=SAFETY_BLOCKED,
+                speckit_next_action=None,
+                git_next_action="No git operation is needed; re-materialise the specify mirror first.",
+                next_safe_action=(
+                    "Re-materialise .specify/source/ from the approved source package "
+                    "(hld_source_package.materialize_specify_mirror), then re-run readiness."
+                ),
+                recommended_model=mr.MODEL_DEFAULT,
+                why_now=(
+                    "The derived .specify/source/ mirror does not match the approved source "
+                    "package; /speckit.specify would consume stale inputs."
+                ),
+                blockers=mirror_blockers,
+            )
 
     if not branch_gate.get("is_feature_branch"):
         return finish(

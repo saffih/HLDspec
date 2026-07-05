@@ -81,20 +81,24 @@ def build_journey3_status(
     reg = helper_registry.build_registry() if registry is None else registry
 
     # --- Package + binding (subprocess-free, never throws on an absent package) ---
-    source_dir, _mirror = hld_source_package.source_package_paths(target, layout="new")
+    source_dir, mirror_dir = hld_source_package.source_package_paths(target, layout="new")
     source_package_present = (source_dir / hld_source_package.SOURCE_PACKAGE_FILE).is_file()
     if source_package_present:
         validation = hld_source_package.validate_source_package(source_dir)
+        mirror_blockers = hld_source_package.mirror_freshness_blockers(source_dir, mirror_dir)
         source_package_validation = {
             "ok": validation.ok,
             "missing": list(validation.missing),
             "hash_mismatches": list(validation.hash_mismatches),
+            "mirror_stale": list(mirror_blockers),
         }
     else:
+        mirror_blockers = []
         source_package_validation = {
             "ok": False,
             "missing": ["source_package.json (package not present)"],
             "hash_mismatches": [],
+            "mirror_stale": [],
         }
 
     discovery = target_discovery.build_target_discovery(target)
@@ -160,6 +164,14 @@ def build_journey3_status(
     elif source_package_present:
         evidence.append("source_package validation ok")
 
+    # A stale derived mirror fails closed here: SpecKit reads .specify/source/,
+    # so drift from the authoritative package must block, not warn.
+    if source_package_present:
+        if mirror_blockers:
+            blockers.extend(mirror_blockers)
+        else:
+            evidence.append("specify mirror fresh")
+
     if binding_status in target_discovery.SUSPECT_BINDING_STATES:
         blockers.append(
             f"Source-package binding is {binding_status} — the package does not trust this "
@@ -198,6 +210,10 @@ def build_journey3_status(
         blockers.extend(phase_blockers)
     else:
         actions.extend(phase_blockers)
+
+    # The phase engine may re-derive a blocker the driver already found (e.g.
+    # mirror freshness); keep first occurrence only so nothing is reported twice.
+    blockers = list(dict.fromkeys(blockers))
 
     # --- Verdict + single next safe action (BLOCKED > ACTION > PASS) ---
     if blockers:
