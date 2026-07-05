@@ -2,7 +2,8 @@
 
 Date: 2026-07-05
 Feature: FLOW-F01 — `specs/025-store-transaction-foundation/`
-Status: **EXECUTED — PASSED** (Flow PR #18 open, pending owner merge)
+Status: **EXECUTED — PASSED** (Flow PR #18 open at `24fd1e5` after plan review fixes,
+pending owner ratification + merge)
 
 ## Authorization
 
@@ -64,8 +65,35 @@ ratification** at plan review.
 
 - Commit `5eab707` "plan: add SpecKit plan for store transaction foundation" on branch
   `025-store-transaction-foundation`
+- Fix commit `24fd1e5` "docs: fix plan review issues for store transaction foundation"
+  (2026-07-05 clean-room review session) — current PR head
 - PR: https://github.com/saffih/baton-flow/pull/18 — OPEN, MERGEABLE/CLEAN, no repo checks
   configured. Self-merge was denied by the session policy (two-party review); **owner merges**.
+
+## Plan review fixes (2026-07-05, clean-room session)
+
+Two documentation defects confirmed from current repo evidence and fixed in `24fd1e5`
+(quickstart.md + plan.md only; the other 4 artifacts untouched):
+
+1. **quickstart unsupported `--session` usage — FIXED.** quickstart showed `--session`
+   on `add`, `context`, and `note`, which the current CLI parser rejects (REPRODUCED:
+   `flow: error: unrecognized arguments: --session me`; parser accepts `--session` only
+   on `next`/`done`/`escalate`/`split`, flow.py 497/509/514/519). Commands now match the
+   current CLI; a note distinguishes HLD-009 mandatory-sessions target design from
+   current CLI reality. `--session` kept where supported (`flow next`).
+2. **Python target mismatch — FIXED.** plan.md said "Python 3.9"; authoritative HLD.md
+   (line 363) says Python 3.10+. plan.md now states Python 3.10+ as project target, with
+   the local 3.9.6 runner noted as execution-environment evidence only. Stdlib-only
+   framing preserved.
+
+Validation after fix: Flow tests 66 passed; hidden/bidi scan on all plan artifacts
+CLEAN; PR #18 files still exactly the 6 plan artifacts; no implementation/tasks/
+checklist/wiring changes; no SpecKit command run; T1/T2/T3 readings intact in plan.md;
+journey3-status on the feature branch: `READY_FOR_TASKS`, `BOUND_MATCH`, 0 blockers.
+RunSkeptic (fresh `saffih/skeptic/main/skeptic.md`): **HANDLED**, no blockers.
+
+Merge gate at review time: T1/T2/T3 owner ratification **pending** and
+AUTHORIZE_MERGE_FLOW_PR_18_AFTER_FIX = no → PR #18 **not merged**; owner action required.
 
 ## Validation
 
@@ -99,6 +127,7 @@ speckit phases may assume the marker exists).
 
 ## Next action
 
-Owner: merge Flow PR #18, ratify the three tension readings, decide the CLAUDE.md-marker
-disposition, then authorize the next controlled gate. `/speckit.tasks`, implementation,
-and command wiring require separate owner authorization.
+Owner: ratify the three tension readings (T1/T2/T3 — **pending**), merge Flow PR #18
+(head `24fd1e5`), decide the CLAUDE.md-marker disposition (**pending owner decision**),
+then authorize the next controlled gate. `/speckit.tasks`, implementation, and command
+wiring require separate owner authorization.
