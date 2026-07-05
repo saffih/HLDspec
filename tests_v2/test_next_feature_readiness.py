@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from hldspec import hld_source_package as sp
 from hldspec import model_routing as mr
 from hldspec import next_feature_readiness as nfr
 
@@ -229,6 +230,50 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertEqual(nfr.HOOKS_MISSING, report["setup_readiness"]["hooks_status"])
         self.assertTrue(any("HOOKS_MISSING" in item for item in report["advisory_actions"]))
         # Still advisory -- does not block the normal next SpecKit action.
+        self.assertEqual(nfr.PHASE_READY_FOR_SPECKIT_SPECIFY, report["phase"])
+        self.assertEqual("/speckit.specify", report["speckit_next_action"])
+
+    # ------------------------------------------------------------------
+    # Specify mirror freshness (pre-specify gate)
+    # ------------------------------------------------------------------
+
+    _MIRROR_HLD = "# HLD\n\n## HLD-001 - Demo\n\nHLD-ID: HLD-001\n\nText.\n"
+
+    def _build_package(self, target: Path) -> None:
+        src = target / "SourceHLD.md"
+        src.write_text(self._MIRROR_HLD, encoding="utf-8")
+        sp.build_source_package_content(
+            target, self._MIRROR_HLD, hld_source_ref=str(src), layout="new"
+        )
+
+    def test_stale_specify_mirror_blocks_specify_phase(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._build_package(target)
+        _, mirror_dir = sp.source_package_paths(target, layout="new")
+        (mirror_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).write_text(
+            "stale\n", encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="main")
+        )
+
+        self.assertEqual(nfr.PHASE_SOURCE_MIRROR_STALE, report["phase"])
+        self.assertEqual(nfr.SAFETY_BLOCKED, report["safety_status"])
+        self.assertIsNone(report["speckit_next_action"])
+        self.assertTrue(any("mirror" in b.lower() for b in report["blockers"]))
+        self.assertNotIn("/speckit.specify", report["next_safe_action"])
+
+    def test_fresh_specify_mirror_still_ready_for_specify(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._build_package(target)
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="main")
+        )
+
         self.assertEqual(nfr.PHASE_READY_FOR_SPECKIT_SPECIFY, report["phase"])
         self.assertEqual("/speckit.specify", report["speckit_next_action"])
 

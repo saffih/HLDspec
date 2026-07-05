@@ -501,12 +501,57 @@ def materialize_specify_mirror(
         if not src.is_file():
             continue
         dest = mirror_dir / filename
-        data = src.read_text(encoding="utf-8")
-        if filename.endswith(".md"):
-            data = f"{GENERATED_BANNER}\n\n{data}"
-        dest.write_text(data, encoding="utf-8")
+        dest.write_text(
+            _expected_mirror_text(filename, src.read_text(encoding="utf-8")),
+            encoding="utf-8",
+        )
         written.append(filename)
     return written
+
+
+def _expected_mirror_text(filename: str, source_text: str) -> str:
+    """The exact text materialize_specify_mirror writes for a mirror file."""
+    if filename.endswith(".md"):
+        return f"{GENERATED_BANNER}\n\n{source_text}"
+    return source_text
+
+
+def mirror_freshness_blockers(source_dir: Path, mirror_dir: Path) -> list[str]:
+    """Drift check for the derived .specify/source/ mirror.
+
+    A mirror file is judged only against what materialize_specify_mirror would
+    write today: every MIRROR_FILES entry present in the source package must
+    exist in the mirror with exactly that content, and no other HLDspec-managed
+    name may linger there (an orphan proves a stale materialisation). Files
+    HLDspec does not manage are never judged.
+    """
+    blockers: list[str] = []
+    expected: set[str] = set()
+    for filename in MIRROR_FILES:
+        src = source_dir / filename
+        if not src.is_file():
+            continue
+        expected.add(filename)
+        dest = mirror_dir / filename
+        if not dest.is_file():
+            blockers.append(
+                f"Specify mirror is missing {filename} ({dest}) — "
+                "re-materialise the mirror from the source package."
+            )
+        elif dest.read_text(encoding="utf-8") != _expected_mirror_text(
+            filename, src.read_text(encoding="utf-8")
+        ):
+            blockers.append(
+                f"Specify mirror is stale: {filename} ({dest}) does not match the "
+                "source package — re-materialise the mirror; do not edit it."
+            )
+    for name in sorted(HLDSPEC_MANAGED_MIRROR_NAMES - expected):
+        if (mirror_dir / name).exists():
+            blockers.append(
+                f"Specify mirror has orphan {name} ({mirror_dir / name}) from an "
+                "older materialisation — re-materialise the mirror."
+            )
+    return blockers
 
 
 def source_package_paths(target_root: Path, layout: str = "new") -> tuple[Path, Path]:

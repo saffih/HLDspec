@@ -712,6 +712,38 @@ class SpecifyMirrorTests(unittest.TestCase):
         self.assertTrue(keep.is_file())
         self.assertEqual(keep.read_text(encoding="utf-8"), "human notes\n")
 
+    def test_fresh_mirror_has_no_freshness_blockers(self):
+        sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
+        self.assertEqual(sp.mirror_freshness_blockers(self.source_dir, self.mirror_dir), [])
+
+    def test_stale_mirror_file_blocks(self):
+        sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
+        filename = sp.AUTHORITATIVE_FILES["single_spec_input"]
+        (self.mirror_dir / filename).write_text("edited by hand\n", encoding="utf-8")
+        blockers = sp.mirror_freshness_blockers(self.source_dir, self.mirror_dir)
+        self.assertTrue(any(filename in b and "stale" in b for b in blockers), blockers)
+
+    def test_missing_mirror_file_blocks(self):
+        sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
+        filename = sp.AUTHORITATIVE_FILES["hld"]
+        (self.mirror_dir / filename).unlink()
+        blockers = sp.mirror_freshness_blockers(self.source_dir, self.mirror_dir)
+        self.assertTrue(any("missing" in b and filename in b for b in blockers), blockers)
+
+    def test_unrelated_mirror_file_is_not_judged(self):
+        sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
+        (self.mirror_dir / "user_notes.md").write_text("human notes\n", encoding="utf-8")
+        self.assertEqual(sp.mirror_freshness_blockers(self.source_dir, self.mirror_dir), [])
+
+    def test_orphan_managed_file_blocks(self):
+        sp.materialize_specify_mirror(self.source_dir, self.mirror_dir)
+        # Managed name that is never part of the mirror set -> orphan if present.
+        (self.mirror_dir / sp.CONSTITUTION_PROPOSAL_FILE).write_text("stale\n", encoding="utf-8")
+        blockers = sp.mirror_freshness_blockers(self.source_dir, self.mirror_dir)
+        self.assertTrue(
+            any("orphan" in b and sp.CONSTITUTION_PROPOSAL_FILE in b for b in blockers), blockers
+        )
+
 
 class HelperRecommendationsTests(unittest.TestCase):
     """Tests for the Journey 2 → Journey 3 advisory seam."""

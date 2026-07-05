@@ -71,6 +71,26 @@ class Journey3DriverTests(unittest.TestCase):
         self.assertTrue(report["source_package_validation"]["ok"])
         self.assertFalse(report["helper_selection_present"])
 
+    # 2b. stale specify mirror -> BLOCKED with a re-materialise blocker.
+    def test_stale_specify_mirror_is_blocked(self) -> None:
+        _build_package(self.root)
+        _, mirror_dir = sp.source_package_paths(self.root, layout="new")
+        (mirror_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).write_text(
+            "stale\n", encoding="utf-8"
+        )
+        report = drv.build_journey3_status(self.root)
+        self.assertEqual(report["driver_status"], "BLOCKED")
+        self.assertTrue(report["source_package_validation"]["mirror_stale"])
+        self.assertTrue(any("mirror" in b.lower() for b in report["blockers"]))
+
+    # 2c. fresh specify mirror -> recorded as evidence, no mirror blockers.
+    def test_fresh_specify_mirror_reports_evidence(self) -> None:
+        _build_package(self.root)
+        report = drv.build_journey3_status(self.root)
+        self.assertEqual(report["source_package_validation"]["mirror_stale"], [])
+        self.assertIn("specify mirror fresh", report["evidence_found"])
+        self.assertFalse(any("mirror" in b.lower() for b in report["blockers"]))
+
     # 3. recommendation present but no selection -> driver does NOT auto-select.
     def test_recommendation_present_does_not_autoselect(self) -> None:
         _build_package(self.root)  # emits helper_recommendations.json
@@ -187,6 +207,27 @@ class Journey3DriverTests(unittest.TestCase):
         self.assertEqual(report["journey3_phase"], "READY_FOR_PLAN")
         self.assertEqual(report["phase_source"], "injected")
         self.assertIn("spec_md", report["evidence_found"])
+
+    def test_blocker_rederived_by_phase_engine_reported_once(self) -> None:
+        _build_package(self.root)
+        _, mirror_dir = sp.source_package_paths(self.root, layout="new")
+        (mirror_dir / sp.AUTHORITATIVE_FILES["single_spec_input"]).write_text(
+            "stale\n", encoding="utf-8"
+        )
+        src_dir, _ = sp.source_package_paths(self.root, layout="new")
+        mirror_blockers = sp.mirror_freshness_blockers(src_dir, mirror_dir)
+        fake_report = {
+            "phase": "SOURCE_MIRROR_STALE",
+            "verified_evidence": {},
+            "missing_evidence": [],
+            "blockers": list(mirror_blockers),
+            "safety_status": "BLOCKED",
+            "next_safe_action": "Re-materialise the specify mirror.",
+        }
+        report = drv.build_journey3_status(self.root, next_feature_report=fake_report)
+        self.assertEqual(report["driver_status"], "BLOCKED")
+        for blocker in mirror_blockers:
+            self.assertEqual(report["blockers"].count(blocker), 1, report["blockers"])
 
 
 if __name__ == "__main__":
