@@ -2,8 +2,8 @@
 
 Date: 2026-07-05
 Feature: FLOW-F01 — `specs/025-store-transaction-foundation/`
-Status: **EXECUTED — PASSED** (Flow PR #18 open at `24fd1e5` after plan review fixes,
-pending owner ratification + merge)
+Status: **EXECUTED — PASSED — MERGED** (Flow PR #18 merged 2026-07-05 at head `24fd1e5`,
+merge commit `5a9b8db`, after owner ratification of T1/T2/T3)
 
 ## Authorization
 
@@ -58,17 +58,27 @@ competing branch created. Current branch verified non-main before first write.
 | T2 projection read-surface vs CLI canonical read path (absent from spec.md — injected verbatim, HLD-008) | plan.md 71–73, data-model.md 108–111, contracts/projection.md 7–8 |
 | T3 crash wording vs `synchronous=NORMAL` (atomicity vs durability) | plan.md 79–87, research.md Decision 3, contracts/store-transaction.md 37–63 |
 
-T1/T3 reconciled readings and injected T2 are plan-authored interpretations **pending owner
-ratification** at plan review.
+T1/T3 reconciled readings and injected T2 were plan-authored interpretations pending owner
+ratification. **Owner-ratified 2026-07-05** (Hadas / project owner):
+
+- **T1**: SQLite is the chosen implementation for this feature; the contract remains
+  engine-agnostic by required properties.
+- **T2**: The CLI/store is canonical for authoritative reads. Markdown projections are
+  derived product/integration read surfaces when complete/fresh, never a write path.
+- **T3**: FR-007 is an atomicity/no-partial-state guarantee. `synchronous=NORMAL` does not
+  promise power-loss durability of the latest committed transaction, but the store must
+  remain consistent and never partial/corrupt.
 
 ## Flow PR / commit
 
 - Commit `5eab707` "plan: add SpecKit plan for store transaction foundation" on branch
   `025-store-transaction-foundation`
 - Fix commit `24fd1e5` "docs: fix plan review issues for store transaction foundation"
-  (2026-07-05 clean-room review session) — current PR head
-- PR: https://github.com/saffih/baton-flow/pull/18 — OPEN, MERGEABLE/CLEAN, no repo checks
-  configured. Self-merge was denied by the session policy (two-party review); **owner merges**.
+  (2026-07-05 clean-room review session) — final PR head
+- PR: https://github.com/saffih/baton-flow/pull/18 — **MERGED** 2026-07-05, merge commit
+  `5a9b8dbdeadf596d425a960386eda6b40bd9943a`, Flow main fast-forwarded `edb5614` → `5a9b8db`.
+  No repo checks configured. Merged at explicit owner instruction after T1/T2/T3
+  ratification, with `--match-head-commit 24fd1e5` (two-party review satisfied).
 
 ## Plan review fixes (2026-07-05, clean-room session)
 
@@ -92,8 +102,9 @@ checklist/wiring changes; no SpecKit command run; T1/T2/T3 readings intact in pl
 journey3-status on the feature branch: `READY_FOR_TASKS`, `BOUND_MATCH`, 0 blockers.
 RunSkeptic (fresh `saffih/skeptic/main/skeptic.md`): **HANDLED**, no blockers.
 
-Merge gate at review time: T1/T2/T3 owner ratification **pending** and
-AUTHORIZE_MERGE_FLOW_PR_18_AFTER_FIX = no → PR #18 **not merged**; owner action required.
+Merge gate at review time: T1/T2/T3 owner ratification pending and
+AUTHORIZE_MERGE_FLOW_PR_18_AFTER_FIX = no → PR #18 not merged at review. The owner then
+ratified T1/T2/T3 and authorized merge at head `24fd1e5`; merged 2026-07-05 (see above).
 
 ## Validation
 
@@ -111,10 +122,13 @@ AUTHORIZE_MERGE_FLOW_PR_18_AFTER_FIX = no → PR #18 **not merged**; owner actio
 ## RunSkeptic
 
 Fresh `saffih/skeptic/main/skeptic.md` fetched and applied. Verdict: **HANDLED** — evidence
-ledger accurate, boundaries held, no blockers for the run as executed. Open owner items:
-ratify T1/T3/T2 readings; decide disposition of the deliberately skipped SKILL Phase-1
-CLAUDE.md agent-context marker update (outside authorized write paths this run — later
-speckit phases may assume the marker exists).
+ledger accurate, boundaries held, no blockers for the run as executed. Open owner items at
+run time — both since resolved 2026-07-05: T1/T2/T3 readings **ratified** (see Inherited
+tensions above); CLAUDE.md agent-context marker (skipped SKILL Phase-1 step, outside
+authorized write paths that run) — **owner disposition: do not block Flow PR #18 on the
+marker; it is a pre-`/speckit.tasks` gate item.** Before `/speckit.tasks`, verify whether
+the current skill requires the marker and, if required, handle it under separate minimal
+authorization.
 
 ## Boundaries preserved
 
@@ -127,7 +141,7 @@ speckit phases may assume the marker exists).
 
 ## Next action
 
-Owner: ratify the three tension readings (T1/T2/T3 — **pending**), merge Flow PR #18
-(head `24fd1e5`), decide the CLAUDE.md-marker disposition (**pending owner decision**),
-then authorize the next controlled gate. `/speckit.tasks`, implementation, and command
-wiring require separate owner authorization.
+Flow PR #18 is merged; T1/T2/T3 are ratified; the CLAUDE.md-marker is dispositioned as a
+pre-`/speckit.tasks` gate item (verify whether the current skill requires it; if required,
+handle under separate minimal authorization). `/speckit.tasks`, implementation, and command
+wiring still require fresh, separate owner authorization — not granted by this record.
