@@ -2,7 +2,7 @@
 
 Feature: `025-store-transaction-foundation` (Flow target repo)
 Date: 2026-07-05 (invocation) / 2026-07-06 (record)
-Status: **EXECUTED — PASSED** (Flow PR #19 open, pending owner review; not merged from the originating authorization)
+Status: **EXECUTED — PASSED — Flow PR #19 MERGED** (2026-07-06, separate owner-authorized clean-room review; see Merge review below)
 
 ---
 
@@ -102,7 +102,35 @@ completeness) — no task modifies `flow.py` runtime behavior.
 
 - Commit `dcce6712e49e30faac1014a8ec698eff43970472`
   ("tasks: add SpecKit tasks for store transaction foundation"), single file, +197 lines.
-- Flow PR **#19**: https://github.com/saffih/baton-flow/pull/19 — OPEN, not merged.
+- Flow PR **#19**: https://github.com/saffih/baton-flow/pull/19 — **MERGED** (see Merge review).
+
+## Merge review (2026-07-06, separate authorization)
+
+Owner-authorized clean-room review-and-merge session (TOUGHNESS HIGH). All facts
+re-derived from current git/GitHub state, fresh skeptic.md, and local commands.
+
+- Flow PR #19 final head: `dcce6712e49e30faac1014a8ec698eff43970472` (unchanged since review;
+  merged with `--match-head-commit` protection).
+- Flow PR #19 merge commit: `90113e0b06d6680252d6f833a241e65ba4ebc16b`
+  (merged 2026-07-06T06:19:10Z) = Flow main head after ff pull.
+- Changed files: exactly `specs/025-store-transaction-foundation/tasks.md`
+  (+197, ADDED; sha256 re-verified `5044288a303f…` at merge time).
+- Validation at review time:
+  - Flow tests: `python3 -m pytest` — **66 passed, 0 failed**.
+  - Hidden/bidi scan on tasks.md: **CLEAN** (no bidi/zero-width/hidden control chars).
+  - Readiness (`journey3-status`, read-only): driver PASS, `READY_FOR_ANALYZE`,
+    `BOUND_MATCH`, 0 blockers; next_safe_action = run `/speckit.analyze` (not run).
+  - Traceability spot-checks: all 5 named existing tests present in `test_flow.py`;
+    all prerequisite artifacts present; HLD-017 / J0-12 have 0 mentions in feature docs;
+    task scoping consistent with ratified T1/T2/T3 readings.
+  - RunSkeptic (fresh `saffih/skeptic/main/skeptic.md`): **PASS / HANDLED**, no blockers.
+- No repo checks configured on Flow; merged at explicit owner authorization.
+- This session made **no** Flow edits, ran **no** SpecKit command
+  (`/speckit.analyze` NOT run), and performed no implementation, command wiring,
+  checklist generation, or source-package/product mutation.
+- CLAUDE.md marker: still STALE (points at `specs/001-what-it-is/plan.md`), left
+  untouched; remains a pre-`/speckit.analyze` gate item requiring separate minimal
+  authorization.
 
 ## Tests
 
