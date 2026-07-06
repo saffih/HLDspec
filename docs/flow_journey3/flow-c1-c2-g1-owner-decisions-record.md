@@ -2,7 +2,7 @@
 
 Feature: `025-store-transaction-foundation` (Flow target repo)
 Date: 2026-07-06 (decision slice)
-Status: **RECORDED** — C1 phasing decided, C2 header fixed (minimal), G1 T011 extension applied, analyze phase evidence accepted. `/speckit.implement` was NOT run.
+Status: **RECORDED** — C1 phasing decided, C2 header fixed (minimal), G1 T011 extension applied, analyze phase evidence accepted. `/speckit.implement` was NOT run. Update 2026-07-06: Flow decision PR #20 **MERGED** (see Changes / PRs).
 
 ---
 
@@ -97,7 +97,7 @@ gate record: HLDspec `docs/flow_journey2_planning/flow-constitution-approval-gat
 SpecKit owns this applied constitution." No constitutional substance changed
 (Source line, Identity, and all rules byte-identical).
 
-- **C2 no longer blocks `/speckit.implement`** once the Flow PR is merged.
+- **C2 no longer blocks `/speckit.implement`** — the Flow decision PR (#20) is merged.
 - Residual (out of this slice's scope): `plan.md:94` cites "PROPOSAL status — honored
   here as the gating input" — a point-in-time statement that was accurate when plan.md
   passed its Constitution Check; `plan.md` is on this slice's forbidden list and was
@@ -140,8 +140,9 @@ Flow output.
   (e.g. tracked analyze output, injected phase via HLDspec record reference, or a manual
   phase gate before implement) — the driver currently cannot observe stdout-only analyze
   completion from Flow artifacts.
-- `/speckit.implement` may be considered only after this record and the Flow decision PR
-  are merged and current gates pass — under a separate explicit authorization.
+- The Flow decision PR (#20) is merged; `/speckit.implement` may be considered only
+  after this record is also merged and current gates pass — under a separate explicit
+  authorization (not yet given).
 
 ## Boundaries preserved
 
@@ -156,8 +157,11 @@ Flow output.
 
 ## Changes / PRs
 
-- Flow branch `docs/feature-025-pre-implement-decisions`: exactly 2 files —
-  `.specify/memory/constitution.md` (C2 header/status label only) and
+- Flow decision PR #20 (https://github.com/saffih/baton-flow/pull/20, branch
+  `docs/feature-025-pre-implement-decisions`): **MERGED** 2026-07-06T13:36:52Z with
+  expected-head protection; final head `2248a179b1746dcce7a15151a54cae3589f70f96`,
+  merge commit `4f616c698f790f69943719d63fb8d973ba533ef9` = Flow main head after merge.
+  Exactly 2 files — `.specify/memory/constitution.md` (C2 header/status label only) and
   `specs/025-store-transaction-foundation/tasks.md` (G1 T011 extension only).
 - HLDspec branch `docs/record-c1-c2-g1-owner-decisions`: this record only.
 - Tests: Flow `python3 -m pytest` green; HLDspec `tests_v2` green (see PR receipts).
@@ -165,8 +169,8 @@ Flow output.
 
 ## Next action
 
-1. Owner reviews and merges the Flow decision PR and this HLDspec record PR.
-2. After merge: C1 (phased), C2 (header fixed), G1 (T011 extended) no longer block
+1. Flow decision PR #20: merged (done). Owner reviews and merges this HLDspec record PR.
+2. After this record PR merges: C1 (phased), C2 (header fixed), G1 (T011 extended) no longer block
    feature 025; the analyze phase is evidenced by the merged PR #139 record.
 3. Only then prepare a **separate** `/speckit.implement` authorization.
 4. Open follow-ups: HLD-009 session-enforcement feature; analyze phase-evidencing
