@@ -131,8 +131,34 @@ log; (b) the escalation-ID delta is documented but unguarded by an asserting tes
 
 - **Flow commit:** `f75c79f` — `implement: apply store transaction foundation tasks`
   (3 files, +319/−16), on `025-store-transaction-foundation`, pushed.
-- **Flow PR:** https://github.com/saffih/baton-flow/pull/21 — **not merged**.
+- **Flow PR:** https://github.com/saffih/baton-flow/pull/21 — **MERGED** 2026-07-06,
+  merge commit `fa9c0aa` (expected-head-protected merge of reviewed head `f75c79f`);
+  Flow main HEAD after merge: `fa9c0aa`.
 - **HLDspec record:** this file, via record PR — **not merged**.
+
+## Merge-gate review residuals (Flow PR #21, 2026-07-06)
+
+A separate clean-room merge gate re-reviewed PR #21 at `f75c79f` before merging:
+exactly the 3 allowed files changed; `python3 -m pytest` 73 passed; the
+timing-sensitive tests (crash-injection, busy-timeout) stable across 3 repeat runs;
+hidden/bidi scan CLEAN; fresh RunSkeptic PASS/HANDLED, no ACTION/CONFLICT.
+Two non-blocking residuals were adjudicated and are recorded here:
+
+- **T005 (FR-004 projection completeness):** the test covers every required element
+  class except stable per-escalation row IDs. Stable escalation IDs / addressable
+  escalation routing remain candidate-only deferred design (HLD-005/HLD-017),
+  because the current runtime does not expose escalation row IDs; this
+  implementation does not promote or close that design delta (disclosed in the
+  test docstring, restated here so the record — not only the test — carries it).
+- **T007 (post-commit-only ordering):** the test asserts both required halves —
+  a failed (rolled-back) operation leaves the projection untouched at its prior
+  committed content, and a successful operation regenerates it only after commit.
+  Failure injection uses the internal `_tx` helper directly (disclosed in the test
+  comment) because public operations cannot fail on demand. Accepted for this
+  verification-only ratification, with a residual guard-strength limitation
+  recorded: the failure half characterizes rollback but would not by itself catch
+  a future regression that moved projection writing inside a real operation's
+  transaction — future stronger regression design is a follow-up, not a blocker.
 
 ## Boundaries preserved
 
@@ -144,8 +170,10 @@ HLD-017 candidate-only preserved; J0-12 not globally closed; T1/T2/T3 preserved.
 
 ## Next action
 
-Owner reviews and decides on Flow PR #21 (implement changes) and this HLDspec
-record PR. No merge without separate authorization. Open follow-ups unchanged:
-HLD-009/session enforcement; escalation-ID projection/reply addressability
-(deferred design); journey3 driver phase-evidence for stdout-only analyze;
-`plan.md:94` cosmetic label.
+Flow PR #21 merged 2026-07-06 (`fa9c0aa`). Owner decides on this HLDspec record
+PR. No further SpecKit command runs without separate authorization. Open
+follow-ups unchanged: HLD-009/session enforcement; escalation-ID projection/reply
+addressability (deferred design); T007 post-commit-ordering regression guard
+strength (see merge-gate residuals); journey3 driver phase-evidence for
+stdout-only analyze; `plan.md:94` cosmetic label; durable one-line invocation
+log for future implement runs.
