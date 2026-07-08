@@ -182,7 +182,23 @@ def _analyze_evidence_path(spec_dir: Path) -> Path | None:
     return None
 
 
-def _read_execution_evidence(target_path: Path, *, current_branch: str | None) -> dict[str, Any]:
+def _is_commit_reachable(commit_sha: str, repo_path: Path) -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", commit_sha, "HEAD"],
+            cwd=repo_path, capture_output=True, timeout=5,
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return False
+
+
+def _read_execution_evidence(
+    target_path: Path,
+    *,
+    current_branch: str | None,
+    current_spec_dir: str | None = None,
+) -> dict[str, Any]:
     sync = control_paths.resolve_control_sync_dir(target_path, create=False)
     path = sync / EXECUTION_EVIDENCE_FILE
     if not path.is_file():
@@ -197,6 +213,17 @@ def _read_execution_evidence(target_path: Path, *, current_branch: str | None) -
     # recorded for a different branch must not be read as current.
     evidence_branch = str(data.get("branch") or "").strip()
     if current_branch and evidence_branch and evidence_branch != current_branch:
+        return {}
+    if current_spec_dir is not None:
+        evidence_spec_dir = data.get("spec_dir")
+        if evidence_spec_dir is None:
+            return {}
+        if Path(evidence_spec_dir).name != Path(current_spec_dir).name:
+            return {}
+    evidence_sha = data.get("commit_sha")
+    if evidence_sha is None:
+        return {}
+    if not _is_commit_reachable(evidence_sha, target_path):
         return {}
     return data
 
@@ -789,7 +816,7 @@ def build_next_feature_readiness_report(
     }
     product_dirty = list(git_lifecycle.get("product_dirty_files") or [])
     phase_dirty = list(git_lifecycle.get("phase_dirty_files") or [])
-    evidence = _read_execution_evidence(target_path, current_branch=branch_gate.get("current_branch"))
+    evidence = _read_execution_evidence(target_path, current_branch=branch_gate.get("current_branch"), current_spec_dir=str(spec_dir))
     evidence_status = str(evidence.get("status") or "")
 
     if product_dirty:
