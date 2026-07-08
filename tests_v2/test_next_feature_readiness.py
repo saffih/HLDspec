@@ -497,6 +497,143 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertEqual(nfr.SAFETY_ACTION, report["safety_status"])
 
     # ------------------------------------------------------------------
+    # Analyze evidence from execution evidence (stdout-only analyze gap)
+    # ------------------------------------------------------------------
+
+    def _write_execution_evidence(self, target: Path, evidence: dict) -> None:
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps(evidence), encoding="utf-8"
+        )
+
+    def test_execution_evidence_analyze_status_unblocks_analyze_phase(self) -> None:
+        """Stdout-only analyze records analyze_status in execution evidence;
+        driver must accept it as analyze evidence when no file exists."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "analyze_status": nfr.EVIDENCE_ANALYZE_PASSED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_IMPLEMENT, report["phase"])
+        self.assertEqual("execution_evidence:analyze_status=PASSED",
+                         report["verified_evidence"]["analyze_evidence"])
+
+    def test_execution_evidence_analyze_and_implement_reaches_push_phase(self) -> None:
+        """End-to-end: analyze_status + IMPLEMENTED_COMMITTED in execution
+        evidence → READY_FOR_PUSH_OR_PR (not stuck at READY_FOR_ANALYZE)."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "analyze_status": nfr.EVIDENCE_ANALYZE_PASSED,
+            "status": nfr.EVIDENCE_IMPLEMENTED_COMMITTED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_PUSH_OR_PR, report["phase"])
+
+    def test_execution_evidence_wrong_branch_does_not_unblock_analyze(self) -> None:
+        """analyze_status for a different branch is stale; must not unblock."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        self._write_execution_evidence(target, {
+            "branch": "002-other",
+            "analyze_status": nfr.EVIDENCE_ANALYZE_PASSED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+        self.assertNotIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+
+    def test_execution_evidence_missing_analyze_status_does_not_unblock(self) -> None:
+        """Execution evidence without analyze_status → still READY_FOR_ANALYZE."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "status": nfr.EVIDENCE_IMPLEMENTED_COMMITTED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    def test_execution_evidence_non_passed_analyze_status_does_not_unblock(self) -> None:
+        """analyze_status with a value other than PASSED → still READY_FOR_ANALYZE."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "analyze_status": "FAILED",
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    def test_malformed_execution_evidence_does_not_unblock_analyze(self) -> None:
+        """Malformed JSON in execution evidence → still READY_FOR_ANALYZE."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            "not valid json{{{", encoding="utf-8"
+        )
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    def test_file_analyze_evidence_takes_precedence_over_execution_evidence(self) -> None:
+        """When analyze_report.md exists, it is the reported evidence source
+        even if execution evidence also has analyze_status."""
+        target = self._target()
+        self._init_speckit(target)
+        spec_dir = self._write_spec(
+            target, "001-feature", plan="plan body", tasks="tasks body", analyze="report"
+        )
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "analyze_status": nfr.EVIDENCE_ANALYZE_PASSED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertIn("analyze_report.md",
+                       report["verified_evidence"]["analyze_evidence"])
+
+    # ------------------------------------------------------------------
     # Branch/spec binding conflicts
     # ------------------------------------------------------------------
 

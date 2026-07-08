@@ -99,10 +99,13 @@ ANALYZE_EVIDENCE_NAMES = ("analyze_report.md", "analysis.md")
 # state beyond what is recorded. An optional top-level "branch" field is
 # checked against the current branch; evidence recorded for a different
 # branch is treated as stale (ignored), same as manual_branch_equivalent.json.
+# An optional "analyze_status" field records whether /speckit.analyze completed
+# (stdout-only analyze produces no spec-dir file; this field fills that gap).
 EXECUTION_EVIDENCE_FILE = "next_feature_execution_evidence.json"
 EVIDENCE_TESTS_PASSED = "TESTS_PASSED"
 EVIDENCE_IMPLEMENTED_COMMITTED = "IMPLEMENTED_COMMITTED"
 EVIDENCE_PUSHED = "PUSHED"
+EVIDENCE_ANALYZE_PASSED = "PASSED"
 
 # Constant guidance for the "Do not run yet" / "Report back" sections of the
 # SpecKit run card. These hold for every phase: the report names exactly one
@@ -762,8 +765,17 @@ def build_next_feature_readiness_report(
     base["verified_evidence"]["tasks.md"] = str(spec_dir / "tasks.md")
     base["completed_phases"].append(PHASE_TASKS_READY)
 
+    execution_evidence = _read_execution_evidence(
+        target_path, current_branch=branch_gate.get("current_branch")
+    )
+
     analyze_evidence = _analyze_evidence_path(spec_dir)
-    if analyze_evidence is None:
+    analyze_from_execution_evidence = (
+        analyze_evidence is None
+        and str(execution_evidence.get("analyze_status", "")).strip() == EVIDENCE_ANALYZE_PASSED
+    )
+
+    if analyze_evidence is None and not analyze_from_execution_evidence:
         base["missing_evidence"].append(
             " or ".join(str(spec_dir / name) for name in ANALYZE_EVIDENCE_NAMES)
         )
@@ -777,7 +789,10 @@ def build_next_feature_readiness_report(
             why_now="tasks.md exists with no recorded analyze evidence; /speckit.analyze is the next step before implementation begins.",
         )
 
-    base["verified_evidence"]["analyze_evidence"] = str(analyze_evidence)
+    if analyze_evidence is not None:
+        base["verified_evidence"]["analyze_evidence"] = str(analyze_evidence)
+    else:
+        base["verified_evidence"]["analyze_evidence"] = "execution_evidence:analyze_status=PASSED"
     base["completed_phases"].append(PHASE_ANALYZE_READY)
 
     git_lifecycle = gl.build_git_lifecycle_report(target_path, run=run)
@@ -789,8 +804,7 @@ def build_next_feature_readiness_report(
     }
     product_dirty = list(git_lifecycle.get("product_dirty_files") or [])
     phase_dirty = list(git_lifecycle.get("phase_dirty_files") or [])
-    evidence = _read_execution_evidence(target_path, current_branch=branch_gate.get("current_branch"))
-    evidence_status = str(evidence.get("status") or "")
+    evidence_status = str(execution_evidence.get("status") or "")
 
     if product_dirty:
         if evidence_status == EVIDENCE_TESTS_PASSED:
