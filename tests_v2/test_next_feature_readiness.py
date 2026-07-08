@@ -634,6 +634,46 @@ class NextFeatureReadinessTests(unittest.TestCase):
                        report["verified_evidence"]["analyze_evidence"])
 
     # ------------------------------------------------------------------
+    # Implement evidence from execution evidence (clean tree paths)
+    # ------------------------------------------------------------------
+
+    def test_file_analyze_plus_implement_evidence_reaches_push_phase(self) -> None:
+        """File-based analyze + IMPLEMENTED_COMMITTED in execution evidence
+        → READY_FOR_PUSH_OR_PR on a clean tree."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        self._write_execution_evidence(target, {
+            "branch": "001-feature",
+            "status": nfr.EVIDENCE_IMPLEMENTED_COMMITTED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_PUSH_OR_PR, report["phase"])
+
+    def test_file_analyze_plus_wrong_branch_implement_evidence_stays_at_implement(self) -> None:
+        """File-based analyze passes, but IMPLEMENTED_COMMITTED for a different
+        branch is stale; must fall through to READY_FOR_IMPLEMENT."""
+        target = self._target()
+        self._init_speckit(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        self._write_execution_evidence(target, {
+            "branch": "002-other",
+            "status": nfr.EVIDENCE_IMPLEMENTED_COMMITTED,
+        })
+
+        report = nfr.build_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature")
+        )
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_IMPLEMENT, report["phase"])
+
+    # ------------------------------------------------------------------
     # Branch/spec binding conflicts
     # ------------------------------------------------------------------
 
