@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from hldspec import hld_source_package as sp
 from hldspec import model_routing as mr
@@ -460,7 +461,8 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertIn("app.py", "\n".join(report["blockers"]))
         self.assertFalse(report["merge_allowed"])
 
-    def test_implementation_dirty_files_with_test_evidence_is_ready_for_commit(self) -> None:
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_implementation_dirty_files_with_test_evidence_is_ready_for_commit(self, _mock_reachable) -> None:
         target = self._target()
         self._init_speckit(target)
         self._hook(target)
@@ -468,7 +470,12 @@ class NextFeatureReadinessTests(unittest.TestCase):
         sync = target / ".hldspec" / "sync"
         sync.mkdir(parents=True, exist_ok=True)
         (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
-            json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "branch": "001-feature"}), encoding="utf-8"
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "spec_dir": "specs/001-feature",
+                "commit_sha": "abc123",
+            }), encoding="utf-8"
         )
 
         report = nfr.write_next_feature_readiness_report(
@@ -495,6 +502,122 @@ class NextFeatureReadinessTests(unittest.TestCase):
 
         self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
         self.assertEqual(nfr.SAFETY_ACTION, report["safety_status"])
+
+    # ------------------------------------------------------------------
+    # Execution evidence field guards
+    # ------------------------------------------------------------------
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_execution_evidence_with_wrong_spec_dir_is_rejected(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "spec_dir": "specs/999-wrong",
+                "commit_sha": "abc123",
+            }), encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_execution_evidence_without_spec_dir_is_rejected_when_feature_known(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "commit_sha": "abc123",
+            }), encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
+
+    def test_execution_evidence_without_commit_sha_is_rejected(self) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "spec_dir": "specs/001-feature",
+            }), encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=False)
+    def test_execution_evidence_with_unreachable_commit_sha_is_rejected(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "spec_dir": "specs/001-feature",
+                "commit_sha": "deadbeef",
+            }), encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_execution_evidence_with_all_valid_fields_is_accepted(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "branch": "001-feature",
+                "spec_dir": "specs/001-feature",
+                "commit_sha": "abc123",
+            }), encoding="utf-8"
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_READY_FOR_COMMIT, report["phase"])
 
     # ------------------------------------------------------------------
     # Branch/spec binding conflicts
