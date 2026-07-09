@@ -11,6 +11,19 @@ helper authority model (owned by [`JOURNEY3_HELPER_CONTRACT.md`](JOURNEY3_HELPER
 It adds one axis those docs do not cover: **who produced a piece of evidence, and
 whether the driver actually watched it happen.**
 
+**Role clarification (does not redefine, only restates precisely):** HLDspec is
+the specification/control framework — it provides materials, contracts, skills,
+agent prompts, and the Journey 3 driver/helper capability described here. HLDspec
+itself is not "the driver." The Journey 3 driver/helper may invoke or guide a
+toolchain and observes what happened, but the **toolchain** performs the actual
+target-repo work; target-repo mutations are attributed to the toolchain, even
+when the driver/helper initiated or guided the run. Any evidence the driver/
+helper writes is sidecar/control-plane evidence — written outside the target
+repo proper, into HLDspec's own control/sync-plane state (the `HLDSPEC_OWNED`
+zone per `TOOLCHAIN_DRIVER_BOUNDARY.md` §2) — never a direct mutation of the
+target repo's product files, and never a mutation of Flow or any other
+target-side system.
+
 ---
 
 ## 1. Why this doc exists
@@ -32,7 +45,7 @@ evidence field, which is exactly the failure mode this doc exists to prevent.
 | Term | Status | Meaning |
 |---|---|---|
 | Toolchain | **EXISTS** | The tool that performs the work (SpecKit today; Codex, Claude Code, manual editing, or a future tool generally). It does not know HLDspec's evidence format and is not coupled to it. |
-| Driver | **EXISTS** | HLDspec-side code that invokes the selected toolchain through a bounded adapter/execution boundary, observes the returned result, and owns normalized evidence writing plus the audit/reporting needed to improve HLDspec and the driver itself. See `hldspec/journey3_driver.py`, `hldspec/toolchain_driver.py`. |
+| Driver | **EXISTS** | The Journey 3 driver/helper capability HLDspec provides — not HLDspec as a whole — that invokes the selected toolchain through a bounded adapter/execution boundary, observes the returned result, and owns normalized sidecar/control-plane evidence writing plus the audit/reporting needed to improve HLDspec and the driver itself. It does not write to the target repo's product files. See `hldspec/journey3_driver.py`, `hldspec/toolchain_driver.py`. |
 | `DRIVER_OBSERVED` (evidence class) | **PROPOSED** | Evidence produced *only* when the driver itself invoked the toolchain and observed the result. Not implemented; no evidence file in this repo currently carries a provenance tag at all. |
 | `MANUAL_ATTESTED` / `DRIVER_VERIFIED_STATE` (evidence class) | **PROPOSED** | A separate, not-yet-designed evidence class for work the driver did not invoke (human ran a command directly, another agent bypassed the driver). Names are placeholders for a future slice to design, not a committed schema. |
 | Development receipt | **PROPOSED** | A future record the driver may write to help improve HLDspec, prompts, contracts, and adapters. Distinct artifact from readiness evidence; not built here. |
@@ -45,12 +58,18 @@ evidence field, which is exactly the failure mode this doc exists to prevent.
   this sense). A toolchain is not required to know, and must not be made to know,
   HLDspec's evidence file format — coupling evidence format into the toolchain would
   make every future toolchain re-implement HLDspec's bookkeeping.
-- The **driver belongs to HLDspec**. It invokes the selected toolchain through a
-  bounded adapter/execution boundary (the ownership zones in
-  `TOOLCHAIN_DRIVER_BOUNDARY.md` already bound *what* the driver may touch; this doc
-  is about *what it may claim it saw*), observes the returned result, and owns
-  normalized evidence writing plus the audit/reporting that helps improve HLDspec and
-  the driver.
+- The **driver belongs to HLDspec** — it is a capability HLDspec provides, not
+  HLDspec itself. It invokes the selected toolchain through a bounded adapter/
+  execution boundary (the ownership zones in `TOOLCHAIN_DRIVER_BOUNDARY.md`
+  already bound *what* the driver may touch; this doc is about *what it may
+  claim it saw*), observes the returned result, and owns normalized evidence
+  writing plus the audit/reporting that helps improve HLDspec and the driver.
+  All evidence the driver writes is sidecar/control-plane evidence — it lands in
+  HLDspec's own control/sync-plane state (`HLDSPEC_OWNED`, `TOOLCHAIN_DRIVER_BOUNDARY.md`
+  §2), never as a direct write into the target repo's product files, and never
+  into Flow or any other target-side system. Product-file mutations in the
+  target repo are the toolchain's, and are attributed to the toolchain, even
+  when the driver initiated or guided the run that produced them.
 - The nearest **EXISTS** mechanism for "driver invoked the toolchain and observed the
   result" is `SpecKitInvoker.InvocationResult.verified`
   (`hldspec/speckit_invoker.py`): a command is only treated as having done something
