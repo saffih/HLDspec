@@ -301,6 +301,96 @@ class TestLiveMode(unittest.TestCase):
         self.assertEqual("CONSTITUTION_APPROVED", result.state)
 
 
+def _pointer(target: Path, controller: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    (target / ".hldspec-run.json").write_text(
+        json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+    )
+
+
+def _ctx_new(workspace: Path) -> MachineContext:
+    return MachineContext(
+        repo_root=str(workspace), workspace=str(workspace), metadata={"workspace_layout": "new"}
+    )
+
+
+class TestControlSyncPathResolution(unittest.TestCase):
+    """A3.2c: SpecKitExecutionMachine must resolve its control/sync dir the
+    same pointer-aware way next_feature_readiness's evidence reader does, so
+    external-controller mode can't split writer/reader state.
+    """
+
+    def test_normal_mode_new_layout_writes_target_local_hldspec_sync(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        target_sync = ws / ".hldspec" / "sync"
+        _write_queue(target_sync, [_feature()])
+        _write_state(target_sync, {"constitution_decision": "APPROVED"})
+
+        result = SpecKitExecutionMachine().run(_ctx_new(ws))
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("CONSTITUTION_APPROVED", result.state)
+        self.assertTrue(_read_state(target_sync).get("constitution_approved"))
+
+    def test_external_controller_mode_writes_to_controller_sync(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        controller = Path(tempfile.mkdtemp())
+        _pointer(ws, controller)
+        controller_sync = controller / ".hldspec" / "sync"
+        _write_queue(controller_sync, [_feature()])
+        _write_state(controller_sync, {"constitution_decision": "APPROVED"})
+
+        result = SpecKitExecutionMachine().run(_ctx_new(ws))
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("CONSTITUTION_APPROVED", result.state)
+        self.assertTrue(_read_state(controller_sync).get("constitution_approved"))
+        # Nothing written into the target's own .hldspec — controller sync is
+        # the single source of truth in external-controller mode.
+        self.assertFalse((ws / ".hldspec").exists())
+
+    def test_external_controller_mode_ignores_stale_target_local_sync(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        controller = Path(tempfile.mkdtemp())
+        _pointer(ws, controller)
+        # Stale target-local state from before externalization (or a bug):
+        # must not be read once a controller pointer exists.
+        stale_sync = ws / ".hldspec" / "sync"
+        _write_queue(stale_sync, [_feature("stale-feature")])
+        _write_state(stale_sync, {"constitution_decision": "APPROVED", "active_feature_index": 5})
+
+        controller_sync = controller / ".hldspec" / "sync"
+        _write_queue(controller_sync, [_feature("feat-001")])
+
+        result = SpecKitExecutionMachine().run(_ctx_new(ws))
+
+        self.assertEqual(MachineStatus.STOP_CHECKPOINT, result.status)
+        self.assertEqual("CONSTITUTION_PENDING", result.state)
+        # The stale target-local state must be untouched by this run.
+        self.assertEqual(
+            {"constitution_decision": "APPROVED", "active_feature_index": 5},
+            _read_state(stale_sync),
+        )
+
+    def test_legacy_layout_default_unaffected_by_controller_pointer(self) -> None:
+        """Existing (legacy-layout) behavior must be preserved even if a
+        target somehow carries a controller pointer -- legacy layout's sync
+        dir (firstrun/.specify/sync) isn't part of the .hldspec pointer
+        contract, so it must keep resolving target-local exactly as before.
+        """
+        ws = Path(tempfile.mkdtemp())
+        controller = Path(tempfile.mkdtemp())
+        _pointer(ws, controller)
+        _write_queue(_sync(ws), [_feature()])
+        _write_state(_sync(ws), {"constitution_decision": "APPROVED"})
+
+        result = SpecKitExecutionMachine().run(_ctx(ws))
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("CONSTITUTION_APPROVED", result.state)
+        self.assertTrue(_read_state(_sync(ws)).get("constitution_approved"))
+
+
 class TestCheckpointContent(unittest.TestCase):
     """Spot-checks that checkpoints contain the right guidance."""
 

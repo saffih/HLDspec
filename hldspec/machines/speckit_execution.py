@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hldspec import control_paths
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -103,9 +104,11 @@ class SpecKitExecutionMachine:
                 message="workspace is required",
             )
 
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
-            context.workspace,
+        target_root = Path(context.workspace)
+        adapter = TargetWorkspaceAdapter(
+            target_root=target_root,
             layout=context.metadata.get("workspace_layout", "legacy"),
+            controller_root=control_paths.resolve_controller_root(target_root),
         )
         sync = adapter.sync_dir
         queue_path = sync / "speckit_invocation_queue.json"
