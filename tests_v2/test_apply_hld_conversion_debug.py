@@ -66,6 +66,74 @@ class ApplyHldConversionDebugTests(unittest.TestCase):
         self.assertEqual(2, debug["returncode"])
         self.assertIn("KEEP_AS_ONE requires approved_keep_reason", debug["stdout"])
 
+    def test_external_controller_mode_reads_and_writes_controller_conversion_sync(self) -> None:
+        repo = self.make_repo_with_apply_script(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "hld = Path(sys.argv[1])\n"
+            "hld.write_text('# HLD\\n\\n## HLD-001 - Demo\\n\\nConverted.\\n', encoding='utf-8')\n"
+            "print('Applied HLD conversion decisions.')\n"
+        )
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        source = work / "Flow-System-HLD.md"
+        source.write_text("# Source\n", encoding="utf-8")
+        (work / "targetHLD" / "HLD.md").parent.mkdir(parents=True, exist_ok=True)
+        (work / "targetHLD" / "HLD.md").write_text("# Raw HLD\n\n## Demo\n\nBody.\n", encoding="utf-8")
+        controller_sync = controller / ".hldspec" / "sync"
+        controller_sync.mkdir(parents=True)
+        (controller_sync / "hld_conversion_decision_queue.json").write_text(
+            json.dumps({"questions": []}), encoding="utf-8"
+        )
+
+        result = ApplyHldConversionMachine().run(
+            MachineContext(
+                repo_root=str(repo),
+                source_hld=str(source),
+                workspace=str(work),
+                metadata={"workspace_layout": "new"},
+            )
+        )
+
+        self.assertEqual(MachineStatus.DONE, result.status)
+        self.assertEqual("WORKING_HLD_CONVERTED", result.state)
+        self.assertTrue((controller_sync / "apply_hld_conversion_command.json").exists())
+        self.assertFalse((work / ".hldspec").exists())
+
+    def test_legacy_layout_default_unaffected_by_controller_pointer(self) -> None:
+        repo = self.make_repo_with_apply_script(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "hld = Path(sys.argv[1])\n"
+            "hld.write_text('# HLD\\n\\n## HLD-001 - Demo\\n\\nConverted.\\n', encoding='utf-8')\n"
+            "print('Applied HLD conversion decisions.')\n"
+        )
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        sync = work / ".specify" / "sync"
+        sync.mkdir(parents=True)
+        source = work / "Flow-System-HLD.md"
+        source.write_text("# Source\n", encoding="utf-8")
+        (work / "HLD.md").write_text("# Raw HLD\n\n## Demo\n\nBody.\n", encoding="utf-8")
+        (sync / "hld_conversion_decision_queue.json").write_text(
+            json.dumps({"questions": []}),
+            encoding="utf-8",
+        )
+
+        result = ApplyHldConversionMachine().run(
+            MachineContext(repo_root=str(repo), source_hld=str(source), workspace=str(work))
+        )
+
+        self.assertEqual(MachineStatus.DONE, result.status)
+        self.assertEqual("WORKING_HLD_CONVERTED", result.state)
+        self.assertTrue((sync / "apply_hld_conversion_command.json").exists())
+
     def test_successful_apply_writes_debug_logs(self) -> None:
         repo = self.make_repo_with_apply_script(
             "from pathlib import Path\n"

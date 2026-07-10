@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from hldspec import control_paths
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -11,14 +12,13 @@ from hldspec.state_machine import (
     continue_result,
     human_checkpoint,
 )
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class ApprovalGateMachine:
     name = "ApprovalGateMachine"
 
     def run(self, context: MachineContext) -> MachineResult:
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
+        adapter = control_paths.build_target_adapter(
             context.workspace or ".",
             layout=context.metadata.get("workspace_layout", "legacy"),
         )

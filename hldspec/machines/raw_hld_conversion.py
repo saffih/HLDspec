@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from hldspec import control_paths
 from hldspec.state_machine import (
     ArtifactRef,
     CheckpointKind,
@@ -17,7 +18,6 @@ from hldspec.state_machine import (
     error_result,
     human_checkpoint,
 )
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class RawHldConversionMachine:
@@ -27,7 +27,7 @@ class RawHldConversionMachine:
         if not context.workspace:
             return error_result(machine=self.name, state="NO_WORKSPACE", message="workspace is required")
 
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
+        adapter = control_paths.build_target_adapter(
             context.workspace,
             layout=context.metadata.get("workspace_layout", "legacy"),
         )

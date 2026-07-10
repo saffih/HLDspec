@@ -136,6 +136,25 @@ class ControlPathsTests(unittest.TestCase):
 
         self.assertEqual(controller / ".hldspec" / "sync", resolved)
 
+    def test_build_target_adapter_normal_mode_has_no_controller_root(self) -> None:
+        target = self.root / "target"
+        adapter = cp.build_target_adapter(str(target), layout="new")
+        self.assertIsNone(adapter.controller_root)
+        self.assertEqual(target / ".hldspec" / "sync", adapter.sync_dir)
+
+    def test_build_target_adapter_external_mode_sets_controller_root(self) -> None:
+        target = self.root / "target"
+        controller = self.root / "controller"
+        _pointer(target, controller)
+        adapter = cp.build_target_adapter(str(target), layout="new")
+        self.assertEqual(controller, adapter.controller_root)
+        self.assertEqual(controller / ".hldspec" / "sync", adapter.sync_dir)
+
+    def test_build_target_adapter_defaults_to_legacy_layout(self) -> None:
+        target = self.root / "target"
+        adapter = cp.build_target_adapter(str(target))
+        self.assertEqual("legacy", adapter.layout)
+
 
 class MigratedHelperTests(unittest.TestCase):
     """script_io / execution-state helpers must route through the resolver."""
