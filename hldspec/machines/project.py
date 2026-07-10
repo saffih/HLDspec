@@ -6,10 +6,10 @@ import shutil
 import sys
 from pathlib import Path
 
+from hldspec import control_paths, engineering_selection, hld_source_package
 from hldspec.command_runner import CommandRunner
 from hldspec.event_log import HldspecEvent, append_event, make_event_id
 from hldspec.handoff_docs import write_handoff_docs
-from hldspec import engineering_selection, hld_source_package
 from hldspec.machines.apply_hld_conversion import ApplyHldConversionMachine
 from hldspec.machines.approval_gate import ApprovalGateMachine
 from hldspec.machines.hld_readiness import HldReadinessMachine
@@ -198,7 +198,7 @@ class ProjectMachine:
         return None
 
     def _adapter(self, context: MachineContext) -> TargetWorkspaceAdapter:
-        return TargetWorkspaceAdapter.from_workspace_str(
+        return control_paths.build_target_adapter(
             context.workspace or ".",
             layout=context.metadata.get("workspace_layout", "legacy"),
         )

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from hldspec import engineering_selection
+from hldspec import control_paths, engineering_selection
 from hldspec.artifact_contracts import stale_registered_artifacts
 from hldspec.gates import prework_gate_status
 from hldspec.state_machine import (
@@ -16,7 +16,6 @@ from hldspec.state_machine import (
     blocked_result,
     continue_result,
 )
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class SpeckitPreworkMachine:
@@ -31,7 +30,7 @@ class SpeckitPreworkMachine:
                 blocking_reason="workspace is required",
             )
 
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
+        adapter = control_paths.build_target_adapter(
             context.workspace,
             layout=context.metadata.get("workspace_layout", "legacy"),
         )
