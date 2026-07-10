@@ -28,12 +28,28 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import run_state
+from .workspace_adapter import TargetWorkspaceAdapter
 
 LEGACY_SYNC_RELPATHS: tuple[str, ...] = (".specify/sync", "firstrun/.specify/sync")
 
 
 def resolve_controller_root(target: Path) -> Path | None:
     return run_state.controller_root_from_pointer(Path(target))
+
+
+def build_target_adapter(workspace: str | Path, layout: str = "legacy") -> TargetWorkspaceAdapter:
+    """Construct a `TargetWorkspaceAdapter` with pointer-aware `controller_root`.
+
+    Machines must use this instead of `TargetWorkspaceAdapter.from_workspace_str`,
+    which hardcodes `controller_root=None` and reintroduces the writer/reader
+    control-sync split this module exists to prevent.
+    """
+    target_root = Path(workspace)
+    return TargetWorkspaceAdapter(
+        target_root=target_root,
+        layout=layout,
+        controller_root=resolve_controller_root(target_root),
+    )
 
 
 def resolve_hldspec_dir(target: Path) -> Path:

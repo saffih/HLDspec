@@ -88,6 +88,56 @@ class SpecBuildPlanDebugTests(unittest.TestCase):
         self.assertEqual(MachineStatus.CONTINUE, result.status)
         self.assertEqual("SPEC_BUILD_PLAN_GREEN", result.state)
 
+    def _write_green_plan(self, sync: Path) -> None:
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / "spec_build_plan_review.md").write_text(
+            "Continue to SpecKit prework: `true`\n", encoding="utf-8"
+        )
+        (sync / "spec_build_plan.json").write_text(
+            json.dumps(
+                {
+                    "plan_quality": {"decision": "PASS", "recommendation": "KEEP_PLAN", "conflicts": []},
+                    "planned_specs": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_external_controller_mode_reads_controller_sync(self) -> None:
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        controller_sync = controller / ".hldspec" / "sync"
+        self._write_green_plan(controller_sync)
+
+        result = SpecBuildPlanMachine().run(
+            MachineContext(
+                repo_root=".", source_hld="source.md", workspace=str(work), metadata={"workspace_layout": "new"}
+            )
+        )
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("SPEC_BUILD_PLAN_GREEN", result.state)
+        self.assertFalse((work / ".hldspec").exists())
+
+    def test_legacy_layout_default_unaffected_by_controller_pointer(self) -> None:
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        sync = work / "firstrun" / ".specify" / "sync"
+        self._write_green_plan(sync)
+
+        result = SpecBuildPlanMachine().run(
+            MachineContext(repo_root=".", source_hld="source.md", workspace=str(work))
+        )
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertEqual("SPEC_BUILD_PLAN_GREEN", result.state)
+
 
 if __name__ == "__main__":
     unittest.main()

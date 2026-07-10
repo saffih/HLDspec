@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hldspec import control_paths
 from hldspec.hld_readiness import write_hld_readiness_artifacts
 from hldspec.state_machine import (
     ArtifactRef,
@@ -11,7 +12,6 @@ from hldspec.state_machine import (
     error_result,
     human_checkpoint,
 )
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class HldReadinessMachine:
@@ -21,7 +21,7 @@ class HldReadinessMachine:
         if not context.workspace:
             return error_result(machine=self.name, state="NO_WORKSPACE", message="workspace is required")
 
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
+        adapter = control_paths.build_target_adapter(
             context.workspace,
             layout=context.metadata.get("workspace_layout", "legacy"),
         )

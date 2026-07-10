@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from hldspec import control_paths
 from hldspec.command_runner import CommandResult, CommandRunner
 from hldspec.state_machine import (
     ArtifactRef,
@@ -17,7 +18,6 @@ from hldspec.state_machine import (
     done_result,
     error_result,
 )
-from hldspec.workspace_adapter import TargetWorkspaceAdapter
 
 
 class ApplyHldConversionMachine:
@@ -35,7 +35,7 @@ class ApplyHldConversionMachine:
             )
 
         repo_root = Path(context.repo_root)
-        adapter = TargetWorkspaceAdapter.from_workspace_str(
+        adapter = control_paths.build_target_adapter(
             context.workspace,
             layout=context.metadata.get("workspace_layout", "legacy"),
         )

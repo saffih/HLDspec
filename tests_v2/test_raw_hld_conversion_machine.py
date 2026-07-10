@@ -33,6 +33,58 @@ class RawHldConversionMachineV2Tests(unittest.TestCase):
         result = RawHldConversionMachine().run(MachineContext(repo_root=".", source_hld="source.md", workspace=str(work)))
         self.assertEqual(MachineStatus.CONTINUE, result.status)
 
+    def _answered_queue(self) -> str:
+        return json.dumps(
+            {
+                "questions": [
+                    {
+                        "question_id": "Q-003",
+                        "source_candidate_id": "HLD-019",
+                        "title": "Milestones",
+                        "question": "Keep or split?",
+                        "options": ["KEEP_AS_ONE", "SPLIT"],
+                        "human_decision": "KEEP_AS_ONE",
+                        "blocking": True,
+                    }
+                ]
+            }
+        )
+
+    def test_external_controller_mode_reads_controller_sync(self) -> None:
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        (work / "targetHLD").mkdir(parents=True)
+        (work / "targetHLD" / "HLD.md").write_text("# Raw HLD\n\n## Milestones\n\nBody.\n", encoding="utf-8")
+        controller_sync = controller / ".hldspec" / "sync"
+        controller_sync.mkdir(parents=True)
+        (controller_sync / "hld_conversion_decision_queue.json").write_text(self._answered_queue(), encoding="utf-8")
+
+        result = RawHldConversionMachine().run(
+            MachineContext(
+                repo_root=".", source_hld="source.md", workspace=str(work), metadata={"workspace_layout": "new"}
+            )
+        )
+
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+        self.assertFalse((work / ".hldspec").exists())
+
+    def test_legacy_layout_default_unaffected_by_controller_pointer(self) -> None:
+        work = self.make_workspace()
+        controller = Path(tempfile.mkdtemp())
+        (work / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        sync = work / ".specify" / "sync"
+        sync.mkdir(parents=True)
+        (work / "HLD.md").write_text("# Raw HLD\n\n## Milestones\n\nBody.\n", encoding="utf-8")
+        (sync / "hld_conversion_decision_queue.json").write_text(self._answered_queue(), encoding="utf-8")
+
+        result = RawHldConversionMachine().run(MachineContext(repo_root=".", source_hld="source.md", workspace=str(work)))
+        self.assertEqual(MachineStatus.CONTINUE, result.status)
+
 
 if __name__ == "__main__":
     unittest.main()
