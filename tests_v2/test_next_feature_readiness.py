@@ -620,6 +620,166 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertEqual(nfr.PHASE_READY_FOR_COMMIT, report["phase"])
 
     # ------------------------------------------------------------------
+    # Analyze completion via recorded execution evidence (stdout-only
+    # /speckit.analyze). Human/CI-recorded evidence, never DRIVER_OBSERVED.
+    # ------------------------------------------------------------------
+
+    def _write_analyze_stage_spec(self, target: Path) -> Path:
+        self._init_speckit(target)
+        self._hook(target)
+        return self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body")
+
+    def _write_execution_evidence(self, target: Path, **overrides: object) -> None:
+        payload: dict[str, object] = {
+            "status": nfr.EVIDENCE_ANALYZE_COMPLETED,
+            "branch": "001-feature",
+            "spec_dir": "specs/001-feature",
+            "commit_sha": "abc123",
+        }
+        payload.update(overrides)
+        payload = {key: value for key, value in payload.items() if value is not None}
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text(json.dumps(payload), encoding="utf-8")
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_analyze_completed_evidence_without_artifact_satisfies_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_IMPLEMENT, report["phase"])
+        self.assertEqual(
+            f"execution_evidence:{nfr.EVIDENCE_ANALYZE_COMPLETED}",
+            report["verified_evidence"]["analyze_evidence"],
+        )
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_analyze_artifact_takes_precedence_over_execution_evidence(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        spec_dir = self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        self._write_execution_evidence(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_IMPLEMENT, report["phase"])
+        self.assertEqual(
+            str((spec_dir / "analyze_report.md").resolve()),
+            str(Path(report["verified_evidence"]["analyze_evidence"]).resolve()),
+        )
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_analyze_completed_evidence_for_other_branch_is_ignored(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, branch="002-other")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_analyze_completed_evidence_with_wrong_spec_dir_is_ignored(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, spec_dir="specs/999-wrong")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    def test_analyze_completed_evidence_without_commit_sha_is_ignored(self) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, commit_sha=None)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=False)
+    def test_analyze_completed_evidence_with_unreachable_commit_is_ignored(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    def test_malformed_execution_evidence_is_ignored_at_analyze_gate(self) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        (sync / nfr.EXECUTION_EVIDENCE_FILE).write_text("not json {", encoding="utf-8")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_unknown_execution_evidence_status_is_ignored_at_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, status="SOMETHING_UNKNOWN")
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_tests_passed_evidence_satisfies_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, status=nfr.EVIDENCE_TESTS_PASSED)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_IMPLEMENT, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_implemented_committed_evidence_satisfies_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, status=nfr.EVIDENCE_IMPLEMENTED_COMMITTED)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_READY_FOR_PUSH_OR_PR, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_pushed_evidence_satisfies_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target, status=nfr.EVIDENCE_PUSHED)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertIn(nfr.PHASE_ANALYZE_READY, report["completed_phases"])
+        self.assertEqual(nfr.PHASE_MERGE_BLOCKED_PENDING_CI_OR_APPROVAL, report["phase"])
+        self.assertFalse(report["merge_allowed"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_recorded_analyze_evidence_is_not_classified_driver_observed(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_execution_evidence(target)
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+        rendered = nfr.render_next_feature_readiness_report(report)
+
+        self.assertNotIn("DRIVER_OBSERVED", json.dumps(report))
+        self.assertNotIn("DRIVER_OBSERVED", rendered)
+
+    # ------------------------------------------------------------------
     # Branch/spec binding conflicts
     # ------------------------------------------------------------------
 

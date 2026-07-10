@@ -100,9 +100,22 @@ ANALYZE_EVIDENCE_NAMES = ("analyze_report.md", "analysis.md")
 # checked against the current branch; evidence recorded for a different
 # branch is treated as stale (ignored), same as manual_branch_equivalent.json.
 EXECUTION_EVIDENCE_FILE = "next_feature_execution_evidence.json"
+EVIDENCE_ANALYZE_COMPLETED = "ANALYZE_COMPLETED"
 EVIDENCE_TESTS_PASSED = "TESTS_PASSED"
 EVIDENCE_IMPLEMENTED_COMMITTED = "IMPLEMENTED_COMMITTED"
 EVIDENCE_PUSHED = "PUSHED"
+
+# Statuses that prove /speckit.analyze completed for the recorded
+# branch/feature/commit: a valid durable record of a later stage necessarily
+# implies analyze ran. This is human/CI-recorded readiness evidence, not
+# DRIVER_OBSERVED (which remains unimplemented; see
+# docs/TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md).
+ANALYZE_COMPLETION_EVIDENCE_STATUSES = (
+    EVIDENCE_ANALYZE_COMPLETED,
+    EVIDENCE_TESTS_PASSED,
+    EVIDENCE_IMPLEMENTED_COMMITTED,
+    EVIDENCE_PUSHED,
+)
 
 # Constant guidance for the "Do not run yet" / "Report back" sections of the
 # SpecKit run card. These hold for every phase: the report names exactly one
@@ -790,7 +803,12 @@ def build_next_feature_readiness_report(
     base["completed_phases"].append(PHASE_TASKS_READY)
 
     analyze_evidence = _analyze_evidence_path(spec_dir)
-    if analyze_evidence is None:
+    # Single guarded read (branch, spec_dir feature identity, and commit
+    # ancestry are enforced inside); reused by the implement/push checks
+    # below — do not read the evidence file a second time.
+    evidence = _read_execution_evidence(target_path, current_branch=branch_gate.get("current_branch"), current_spec_dir=str(spec_dir))
+    evidence_status = str(evidence.get("status") or "")
+    if analyze_evidence is None and evidence_status not in ANALYZE_COMPLETION_EVIDENCE_STATUSES:
         base["missing_evidence"].append(
             " or ".join(str(spec_dir / name) for name in ANALYZE_EVIDENCE_NAMES)
         )
@@ -804,7 +822,10 @@ def build_next_feature_readiness_report(
             why_now="tasks.md exists with no recorded analyze evidence; /speckit.analyze is the next step before implementation begins.",
         )
 
-    base["verified_evidence"]["analyze_evidence"] = str(analyze_evidence)
+    if analyze_evidence is not None:
+        base["verified_evidence"]["analyze_evidence"] = str(analyze_evidence)
+    else:
+        base["verified_evidence"]["analyze_evidence"] = f"execution_evidence:{evidence_status}"
     base["completed_phases"].append(PHASE_ANALYZE_READY)
 
     git_lifecycle = gl.build_git_lifecycle_report(target_path, run=run)
@@ -816,8 +837,6 @@ def build_next_feature_readiness_report(
     }
     product_dirty = list(git_lifecycle.get("product_dirty_files") or [])
     phase_dirty = list(git_lifecycle.get("phase_dirty_files") or [])
-    evidence = _read_execution_evidence(target_path, current_branch=branch_gate.get("current_branch"), current_spec_dir=str(spec_dir))
-    evidence_status = str(evidence.get("status") or "")
 
     if product_dirty:
         if evidence_status == EVIDENCE_TESTS_PASSED:
