@@ -175,6 +175,22 @@ class ProjectMachineV2Tests(unittest.TestCase):
         self.assertEqual(str(target / "targetHLD" / "HLD.md"), received.read_text(encoding="utf-8").strip())
         self.assertTrue((target / ".hldspec" / "events.jsonl").exists())
 
+    def test_adapter_is_pointer_aware_in_normal_mode(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        adapter = ProjectMachine()._adapter(MachineContext(repo_root=".", workspace=str(ws)))
+        self.assertIsNone(adapter.controller_root)
+
+    def test_adapter_is_pointer_aware_in_external_controller_mode(self) -> None:
+        ws = Path(tempfile.mkdtemp())
+        controller = Path(tempfile.mkdtemp())
+        ws.mkdir(parents=True, exist_ok=True)
+        (ws / ".hldspec-run.json").write_text(
+            json.dumps({"schema_version": 1, "controller_root": str(controller)}), encoding="utf-8"
+        )
+        adapter = ProjectMachine()._adapter(MachineContext(repo_root=".", workspace=str(ws)))
+        self.assertEqual(controller, adapter.controller_root)
+        self.assertEqual(controller / ".hldspec" / "source_package", adapter.source_package_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
