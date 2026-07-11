@@ -780,6 +780,195 @@ class NextFeatureReadinessTests(unittest.TestCase):
         self.assertNotIn("DRIVER_OBSERVED", rendered)
 
     # ------------------------------------------------------------------
+    # Branch validation guards on execution evidence (fail-closed).
+    # A branch field is required and must exactly match the current branch;
+    # these prove the reader rejects every malformed/missing/mismatched
+    # shape instead of silently accepting it. Written as raw JSON where the
+    # JSON-level distinction (absent key vs null vs non-string) matters.
+    # ------------------------------------------------------------------
+
+    def _write_raw_evidence(self, target: Path, raw: str) -> Path:
+        sync = target / ".hldspec" / "sync"
+        sync.mkdir(parents=True, exist_ok=True)
+        path = sync / nfr.EXECUTION_EVIDENCE_FILE
+        path.write_text(raw, encoding="utf-8")
+        return path
+
+    # NOTE: every direct-call test below supplies a valid, reachable
+    # commit_sha (with _is_commit_reachable mocked True) and omits
+    # current_spec_dir so the *only* thing that can cause rejection is the
+    # branch-validation block under test -- otherwise a rejection could be
+    # a false-positive red caused by the unrelated commit-sha/ancestry guard.
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_absent_branch_key(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target, json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123"})
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="001-feature")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_null_branch(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target,
+            json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": None}),
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="001-feature")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_empty_branch(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target,
+            json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": ""}),
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="001-feature")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_whitespace_only_branch(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target,
+            json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": "   "}),
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="001-feature")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_branch_with_surrounding_whitespace(self, _mock_reachable) -> None:
+        target = self._target()
+        for raw_branch in (" 001-feature", "001-feature "):
+            with self.subTest(raw_branch=raw_branch):
+                self._write_raw_evidence(
+                    target,
+                    json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": raw_branch}),
+                )
+                result = nfr._read_execution_evidence(target, current_branch="001-feature")
+                self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_falsy_non_string_branch(self, _mock_reachable) -> None:
+        target = self._target()
+        for raw_branch in (False, 0):
+            with self.subTest(raw_branch=raw_branch):
+                self._write_raw_evidence(
+                    target,
+                    json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": raw_branch}),
+                )
+                result = nfr._read_execution_evidence(target, current_branch="001-feature")
+                self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_truthy_non_string_branch(self, _mock_reachable) -> None:
+        target = self._target()
+        for raw_branch in (["001-feature"], {}):
+            with self.subTest(raw_branch=raw_branch):
+                self._write_raw_evidence(
+                    target,
+                    json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": raw_branch}),
+                )
+                result = nfr._read_execution_evidence(target, current_branch="001-feature")
+                self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_numeric_branch_without_coercion(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target,
+            json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123", "branch": 123}),
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="123")
+
+        self.assertEqual({}, result)
+
+    # current_branch itself invalid: evidence "branch" is deliberately left
+    # absent, proving rejection happens regardless of the branch payload.
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_when_current_branch_unavailable(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target, json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123"})
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch=None)
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_when_current_branch_empty(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target, json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123"})
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_read_execution_evidence_rejects_when_current_branch_whitespace_only(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_raw_evidence(
+            target, json.dumps({"status": nfr.EVIDENCE_TESTS_PASSED, "commit_sha": "abc123"})
+        )
+
+        result = nfr._read_execution_evidence(target, current_branch="   ")
+
+        self.assertEqual({}, result)
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_pushed_evidence_with_absent_branch_is_rejected_at_analyze_gate(self, _mock_reachable) -> None:
+        target = self._target()
+        self._write_analyze_stage_spec(target)
+        self._write_raw_evidence(
+            target,
+            json.dumps({
+                "status": nfr.EVIDENCE_PUSHED,
+                "spec_dir": "specs/001-feature",
+                "commit_sha": "abc123",
+            }),
+        )
+
+        report = nfr.write_next_feature_readiness_report(target, run=_RunStub(git_root=target, branch="001-feature"))
+
+        self.assertEqual(nfr.PHASE_READY_FOR_ANALYZE, report["phase"])
+
+    @patch("hldspec.next_feature_readiness._is_commit_reachable", return_value=True)
+    def test_execution_evidence_with_valid_spec_dir_and_commit_but_absent_branch_is_rejected(self, _mock_reachable) -> None:
+        target = self._target()
+        self._init_speckit(target)
+        self._hook(target)
+        self._write_spec(target, "001-feature", plan="plan body", tasks="tasks body", analyze="analyze body")
+        self._write_raw_evidence(
+            target,
+            json.dumps({
+                "status": nfr.EVIDENCE_TESTS_PASSED,
+                "spec_dir": "specs/001-feature",
+                "commit_sha": "abc123",
+            }),
+        )
+
+        report = nfr.write_next_feature_readiness_report(
+            target, run=_RunStub(git_root=target, branch="001-feature", porcelain=" M app.py\n")
+        )
+
+        self.assertEqual(nfr.PHASE_IMPLEMENTATION_REVIEW_REQUIRED, report["phase"])
+
+    # ------------------------------------------------------------------
     # Branch/spec binding conflicts
     # ------------------------------------------------------------------
 

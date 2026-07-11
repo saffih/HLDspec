@@ -96,9 +96,10 @@ ANALYZE_EVIDENCE_NAMES = ("analyze_report.md", "analysis.md")
 # Read-only consumption of human/CI-recorded execution evidence, mirroring the
 # git_lifecycle.py manual-branch-equivalent-approval pattern. HLDspec never
 # writes this file; it only reads it to avoid inferring implementation/push
-# state beyond what is recorded. An optional top-level "branch" field is
-# checked against the current branch; evidence recorded for a different
-# branch is treated as stale (ignored), same as manual_branch_equivalent.json.
+# state beyond what is recorded. A top-level "branch" field is REQUIRED and
+# must exactly match the current branch; evidence with a missing, malformed,
+# or mismatched branch is rejected entirely (fail-closed), not merely ignored
+# as stale.
 EXECUTION_EVIDENCE_FILE = "next_feature_execution_evidence.json"
 EVIDENCE_ANALYZE_COMPLETED = "ANALYZE_COMPLETED"
 EVIDENCE_TESTS_PASSED = "TESTS_PASSED"
@@ -222,10 +223,24 @@ def _read_execution_evidence(
         return {}
     if not isinstance(data, dict):
         return {}
-    # Mirror git_lifecycle's manual-branch-equivalent staleness check: evidence
-    # recorded for a different branch must not be read as current.
-    evidence_branch = str(data.get("branch") or "").strip()
-    if current_branch and evidence_branch and evidence_branch != current_branch:
+    # Branch identity is mandatory and fail-closed: the current branch must be
+    # a well-formed, non-empty string, and the evidence's "branch" field must
+    # be a well-formed, non-empty string that exactly matches it. No str()
+    # coercion and no trim-then-accept -- whitespace only disqualifies.
+    if (
+        not isinstance(current_branch, str)
+        or not current_branch
+        or current_branch != current_branch.strip()
+    ):
+        return {}
+
+    evidence_branch = data.get("branch")
+    if (
+        not isinstance(evidence_branch, str)
+        or not evidence_branch
+        or evidence_branch != evidence_branch.strip()
+        or evidence_branch != current_branch
+    ):
         return {}
     if current_spec_dir is not None:
         evidence_spec_dir = data.get("spec_dir")
