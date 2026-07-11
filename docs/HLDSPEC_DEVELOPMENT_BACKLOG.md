@@ -884,48 +884,48 @@ Deferred (do not start without a separate gated prompt):
 - **Remove the `hldspec/mediator_guidance.py` compatibility shim** once all consumers
   migrate to `hldspec/agent_handoff_pack.py`.
 
-### P1-019 Durable SpecKit invocation audit log contract (added 2026-07-11)
+### P1-019 Durable SpecKit invocation audit log contract (docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md, added 2026-07-11)
 
-**Status: OPEN / DESIGN DECISION REQUIRED.**
+**Status: CONTRACT RATIFIED 2026-07-11 — implementation open.** The nine open
+design questions below are answered by
+[`docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`](SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md):
+canonical storage path (pointer-aware, `control_paths.resolve_hldspec_dir(target)/audit/speckit_invocations.jsonl`),
+NDJSON format with `schema_version`, STARTED/FINISHED invocation lifecycle,
+required fields (common, `target_binding`, `command_identity`), append
+durability/concurrency (lock + fsync), corruption behavior (fail closed, no
+silent skip/auto-repair), evidence-category separation, consumers/
+non-consumers, retention (indefinite, no auto-rotation), redaction rules, and
+the STARTED/FINISHED failure rule.
 
 **Current evidence:** point-in-time live-invocation proof records exist
 (`docs/FIRST_LIVE_E2E_PROOF.md` — Opus/IMPLEMENT fixture; `docs/SPECKIT_INVOKER_TASKS_HAIKU_LIVE_PROOF.md`,
 PR #154 — real default `SpecKitInvoker`, TASKS phase, haiku routing, one
-observed run). No durable runtime invocation log exists anywhere in the repo.
+observed run). No durable runtime invocation log exists anywhere in the repo;
+ratifying this contract does not create one.
 
-**Purpose:** preserve an auditable invocation history — what ran, when,
-against what, with what result — before repeated live execution or
-`speckit_drive_loop.py` reliance makes point-in-time markdown records
-insufficient to reconstruct what actually happened.
+**Explicit separation from:** readiness evidence, proof records
+(`docs/*_LIVE_PROOF.md`, `docs/FIRST_LIVE_E2E_PROOF.md` — one-off markdown
+snapshots, not a queryable durable log), development receipts,
+`DRIVER_OBSERVED`, manual-attested evidence. See contract §8.
 
-**Explicit separation from:**
-- readiness evidence (a different, already-defined evidence category)
-- proof records (`docs/*_LIVE_PROOF.md`, `docs/FIRST_LIVE_E2E_PROOF.md`) —
-  these are one-off markdown snapshots, not a queryable durable log
-- development receipts
-- `DRIVER_OBSERVED`
-- manual-attested evidence
+Follow-up (do not start without a separate gated prompt per contract §9):
 
-**Open design questions (not answered by this entry):**
-- authoritative storage location
-- pointer-aware control-plane placement (default vs external-controller mode,
-  per `docs/TOOLCHAIN_DRIVER_BOUNDARY.md`)
-- minimum required fields
-- target/source binding
-- command/model/phase identity capture
-- result and artifact-change evidence capture
-- redaction of sensitive command/output content
-- retention policy
-- consumers and non-consumers of the log
-- failure behavior (what happens if the log itself cannot be written)
+- **Phase A** — writer + schema validator library, unit-tested, not wired to
+  any invocation path.
+- **Phase B** — runtime integration into `SpecKitInvoker` only
+  (`execution_path: "speckit_invoker"`); STARTED/FINISHED around each live
+  invocation.
+- **Phase C** — read-only reader + `status`/`doctor` diagnostics for
+  invocation history and incomplete-lifecycle detection.
+- **Phase D** (reserved, not started) — `speckit_drive_loop.py`
+  (`execution_path: "speckit_drive_loop"`) coverage and drive-loop
+  audit-continuity gating; requires its own separately reviewed contract
+  slice.
 
-**Trigger:** design must be separately gated before repeated live invocation
-or any production reliance on live SpecKit driving.
-
-**Non-goals (explicitly out of scope until a separate gated slice):** no
-writer implementation, no schema implementation, no readiness-evidence
-integration, no provenance implementation, no `speckit_drive_loop.py` change,
-no Flow change.
+**Non-goals (still out of scope until the corresponding phase above is
+separately gated):** no writer implementation, no schema implementation, no
+readiness-evidence integration, no provenance implementation, no
+`speckit_drive_loop.py` change, no Flow change.
 
 ## P2 backlog
 
