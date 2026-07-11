@@ -886,7 +886,7 @@ Deferred (do not start without a separate gated prompt):
 
 ### P1-019 Durable SpecKit invocation audit log contract (docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md, added 2026-07-11)
 
-**Status: CONTRACT RATIFIED 2026-07-11 — implementation open.** The nine open
+**Status: CONTRACT RATIFIED 2026-07-11 — Slice A implemented 2026-07-11, B–E open.** The nine open
 design questions below are answered by
 [`docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`](SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md):
 canonical storage path (pointer-aware, `control_paths.resolve_hldspec_dir(target)/audit/speckit_invocations.jsonl`),
@@ -908,12 +908,16 @@ ratifying this contract does not create one.
 snapshots, not a queryable durable log), development receipts,
 `DRIVER_OBSERVED`, manual-attested evidence. See contract §8.
 
-Implementation roadmap is A–E (contract §9); no slice has started. Follow-up
+Implementation roadmap is A–E (contract §9). Follow-up
 (do not start without a separate gated prompt per contract §9):
 
-- **Slice A** — canonical pointer-aware path helper, typed STARTED/FINISHED
-  record models/validation, deterministic serialization. No writer, no
-  invocation wiring.
+- **Slice A — DONE (2026-07-11).** `hldspec/speckit_invocation_audit.py`:
+  canonical pointer-aware path helper (`resolve_invocation_audit_log_path`,
+  `INVOCATION_AUDIT_RELATIVE_PATH`), closed schema-version-1 STARTED/FINISHED
+  dict validation (`validate_invocation_record`), deterministic one-line
+  NDJSON serialization (`invocation_record_json_line`). No file writer, no
+  invocation wiring, no filesystem inspection. Tests:
+  `tests_v2/test_speckit_invocation_audit.py`.
 - **Slice B** — durable append writer: exclusive append lock, one NDJSON
   record per line, flush/fsync, corruption detection. No `SpecKitInvoker`
   wiring.
@@ -928,9 +932,8 @@ Implementation roadmap is A–E (contract §9); no slice has started. Follow-up
   invocation history and incomplete-lifecycle detection. No mutation, no
   readiness/approval/promotion effect.
 
-Recommended next slice, if and when work is authorized, is Slice A only —
-ratifying this contract does not itself authorize starting it. Implementation
-remains open; P1-019 is not complete.
+Recommended next slice, if and when work is authorized, is Slice B.
+Implementation remains open; P1-019 is not complete.
 
 **Non-goals (still out of scope until the corresponding slice above is
 separately gated):** no writer implementation, no schema implementation, no
