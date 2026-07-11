@@ -32,13 +32,18 @@ target-side system.
 (`next_feature_execution_evidence.json`, `EXECUTION_EVIDENCE_FILE`) to decide whether
 implementation/commit/push has happened, and a recent hardening slice
 (`_read_execution_evidence`, feature-identity + commit-ancestry guards) made that
-reader stricter. The next candidate slice (recorded in
-`docs/flow_journey3/flow-post-implement-status-decision-record.md`, "Selected: A") is
-to make the driver **itself** observe SpecKit analyze/implement phases rather than only
-reading whatever evidence happens to be on disk. Before that slice is built, the
-provenance/authority distinctions below need to be named — otherwise "the driver says
-this happened" and "someone told the driver this happened" collapse into the same
-evidence field, which is exactly the failure mode this doc exists to prevent.
+reader stricter. The candidate slice recorded in
+`docs/flow_journey3/flow-post-implement-status-decision-record.md` ("Selected: A") was
+to extend the reader to recognize recorded execution evidence — accepting
+`ANALYZE_COMPLETED` (and later monotone statuses) from the existing
+`next_feature_execution_evidence.json` file as an alternative satisfier of the analyze
+gate — not to make the driver itself invoke and observe SpecKit. That
+evidence-recognition slice, and a subsequent fail-closed branch-identity hardening of
+the same reader, have since been implemented. The provenance/authority distinctions
+below still apply: this evidence is human/CI-recorded, not `DRIVER_OBSERVED` —
+otherwise "the driver says this happened" and "someone told the driver this happened"
+collapse into the same evidence field, which is exactly the failure mode this doc
+exists to prevent.
 
 ## 2. Vocabulary
 
