@@ -86,9 +86,10 @@ This closes the core "it runs but produces no implementation" failure.
 ### Still TODO (from RunSkeptic + user)
 - **Default output = numbered spec list respecting existing project numbering.** Prior code has `existing_specs_scan`/`highest_number` (`tests/test_hldspec_speckit_ready.py`); wire it into the live/queue path so new specs continue an existing project's numbering.
 - **Gap analysis (desired vs. actual)** — NEW capability: when the HLD changes or a feature is added, derive specs THEN diff against the current implementation to surface the delta (what to add/change) and guide the feature work, before writing code. Needed for existing/evolving projects, not just greenfield.
-- **Verify the real mechanism**: one true headless run end-to-end on a *code* feature (not 027, which is governance/scope); confirm `claude --model haiku` alias is accepted.
-- **Prove minimal chain before relying on all 8 phases.**
-- **`SpecKit drive` live proof**: `hldspec/speckit_drive_loop.py` + `scripts/speckit_drive_loop.py` (non-stop multi-bundle loop, opt-in trigger documented in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §"User trigger vocabulary") are built and unit-tested with an injected runner. Running it live still depends on the unproven real headless `claude --print` invocation above — prove one real bundle run before relying on the loop for non-stop driving.
+- ~~Verify the real mechanism~~ — **Done (2026-07-11):** one real headless `claude --print` invocation through the default `SpecKitInvoker` (TASKS phase, `claude --model haiku` alias accepted) proved live against a disposable non-Flow target. Distinct from the earlier `docs/FIRST_LIVE_E2E_PROOF.md` (Opus/IMPLEMENT fixture). Record: `docs/SPECKIT_INVOKER_TASKS_HAIKU_LIVE_PROOF.md` (PR #154). This is one TASKS-phase invocation, not the first-ever live invocation and not a multi-phase proof.
+- **Prove minimal chain before relying on all 8 phases** — still open; the 2026-07-11 proof covers one phase only.
+- **`SpecKit drive` live proof**: `hldspec/speckit_drive_loop.py` + `scripts/speckit_drive_loop.py` (non-stop multi-bundle loop, opt-in trigger documented in `docs/HLDSPEC_TERMINOLOGY_AND_FLOW.md` §"User trigger vocabulary") are built and unit-tested with an injected runner. Running it live still depends on proving a real bundle run — still open; not established by the 2026-07-11 single-phase proof.
+- **Durable SpecKit invocation audit log** — still open, design decision required. See `docs/HLDSPEC_DEVELOPMENT_BACKLOG.md` P1-019. Point-in-time proof records (this file's entries, `docs/FIRST_LIVE_E2E_PROOF.md`, `docs/SPECKIT_INVOKER_TASKS_HAIKU_LIVE_PROOF.md`) are not a durable runtime invocation audit log.
 
 ---
 
