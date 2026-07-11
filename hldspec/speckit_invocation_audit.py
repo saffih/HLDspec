@@ -337,7 +337,7 @@ def validate_invocation_record(record: Mapping[str, Any]) -> list[str]:
 
     if "schema_version" in record:
         schema_version = record["schema_version"]
-        if isinstance(schema_version, bool) or schema_version != SCHEMA_VERSION:
+        if not _is_non_bool_int(schema_version) or schema_version != SCHEMA_VERSION:
             errors.append(f"schema_version: must be integer {SCHEMA_VERSION}")
 
     if "record_type" in record and record_type not in VALID_RECORD_TYPES:

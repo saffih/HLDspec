@@ -291,6 +291,12 @@ class TypeValidationTests(unittest.TestCase):
         errors = audit.validate_invocation_record(record)
         self.assertTrue(any("schema_version" in e for e in errors))
 
+    def test_schema_version_float_rejected(self):
+        # 1.0 == 1 in Python; a plain != check would silently accept this.
+        record = base_started(schema_version=1.0)
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("schema_version" in e for e in errors))
+
     def test_returncode_bool_rejected(self):
         record = base_finished(returncode=False)
         errors = audit.validate_invocation_record(record)
