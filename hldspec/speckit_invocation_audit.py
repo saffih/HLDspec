@@ -11,8 +11,15 @@ the target. `validate_invocation_record` is a pure structural check.
 """
 from __future__ import annotations
 
+import datetime
+import errno
+import fcntl
 import json
+import math
+import os
 import re
+import stat
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Mapping
@@ -132,8 +139,30 @@ def _is_non_empty_str(value: object) -> bool:
     return isinstance(value, str) and value != ""
 
 
+def _parse_utc_timestamp(value: str) -> datetime.datetime:
+    """Parse an already shape-validated RFC3339 UTC timestamp into a real datetime.
+
+    Callers must first confirm `_TIMESTAMP_RE` matches; this only performs the
+    calendar-validity parse (rejecting e.g. month 99, hour 25) that the regex
+    shape check alone cannot express. Raises `ValueError` on an impossible
+    calendar date/time.
+    """
+    body = value[:-1]  # strip the mandatory trailing "Z"
+    base, _, frac = body.partition(".")
+    parsed = datetime.datetime.strptime(base, "%Y-%m-%dT%H:%M:%S")
+    if frac:
+        parsed = parsed.replace(microsecond=int(f"{frac:0<6.6}"))
+    return parsed.replace(tzinfo=datetime.timezone.utc)
+
+
 def _is_valid_timestamp(value: object) -> bool:
-    return isinstance(value, str) and bool(_TIMESTAMP_RE.match(value))
+    if not isinstance(value, str) or not _TIMESTAMP_RE.match(value):
+        return False
+    try:
+        _parse_utc_timestamp(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _is_valid_uuid(value: object) -> bool:
@@ -567,3 +596,492 @@ def invocation_record_json_line(record: Mapping[str, Any]) -> str:
     if errors:
         raise ValueError("; ".join(errors))
     return json.dumps(dict(record), sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+
+
+# --- Slice B: durable append writer ------------------------------------------
+#
+# Implements docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md Sections 3, 4, 6, 7.
+# Deliberately out of scope: no reader, no repair, no SpecKitInvoker wiring.
+
+DEFAULT_LOCK_TIMEOUT_SECONDS = 10.0
+
+
+class InvocationAuditError(RuntimeError):
+    """Base class for Slice B writer operational failures.
+
+    Optional attributes are populated where known and left `None` otherwise;
+    never include complete raw record content in `message` or these fields.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: Path | None = None,
+        line_number: int | None = None,
+        reason: str | None = None,
+        invocation_id: str | None = None,
+        timeout_seconds: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.path = path
+        self.line_number = line_number
+        self.reason = reason
+        self.invocation_id = invocation_id
+        self.timeout_seconds = timeout_seconds
+
+
+class InvocationAuditCorruptionError(InvocationAuditError):
+    """Existing audit history failed strict validation; nothing was written."""
+
+
+class InvocationAuditLockTimeout(InvocationAuditError):
+    """The exclusive audit-log lock could not be acquired before the deadline."""
+
+
+_LOCK_POLL_SECONDS = 0.05
+_READ_CHUNK_BYTES = 65536
+
+_PAIR_IDENTITY_FIELDS: tuple[str, ...] = (
+    "schema_version",
+    "invocation_id",
+    "helper_id",
+    "toolchain",
+    "execution_path",
+    "runtime",
+    "phase",
+    "skill",
+    "model",
+    "authority_level",
+    "approval_ref",
+    "target_binding",
+    "command_identity",
+)
+
+
+def _validate_lock_timeout(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("lock_timeout_seconds: must be a non-boolean int or float")
+    value = float(value)
+    if math.isnan(value) or math.isinf(value):
+        raise ValueError("lock_timeout_seconds: must be finite")
+    if value <= 0:
+        raise ValueError("lock_timeout_seconds: must be positive")
+    return value
+
+
+def _open_existing_directory(path: Path) -> int:
+    try:
+        return os.open(str(path), os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError as exc:
+        raise InvocationAuditError(
+            "resolved audit root does not exist", path=path
+        ) from exc
+    except NotADirectoryError as exc:
+        raise InvocationAuditError(
+            "resolved audit root is not a directory", path=path
+        ) from exc
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise InvocationAuditError(
+                "resolved audit root must not be a symlink", path=path
+            ) from exc
+        raise InvocationAuditError(
+            "unable to open resolved audit root", path=path
+        ) from exc
+
+
+def _open_or_create_dir_component(parent_fd: int, name: str, context_path: Path) -> tuple[int, bool]:
+    created = False
+    try:
+        os.mkdir(name, 0o700, dir_fd=parent_fd)
+        created = True
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise InvocationAuditError(
+            f"unable to create audit path component {name!r}", path=context_path
+        ) from exc
+
+    try:
+        fd = os.open(name, os.O_DIRECTORY | os.O_NOFOLLOW | os.O_RDONLY, dir_fd=parent_fd)
+    except NotADirectoryError as exc:
+        raise InvocationAuditError(
+            f"audit path component {name!r} is not a directory", path=context_path
+        ) from exc
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise InvocationAuditError(
+                f"audit path component {name!r} must not be a symlink", path=context_path
+            ) from exc
+        raise InvocationAuditError(
+            f"unable to open audit path component {name!r}", path=context_path
+        ) from exc
+    return fd, created
+
+
+def _open_or_create_audit_file(parent_fd: int, name: str, context_path: Path) -> tuple[int, bool]:
+    flags = os.O_RDWR | os.O_APPEND | os.O_NOFOLLOW | os.O_NONBLOCK
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+
+    created = False
+    try:
+        fd = os.open(name, flags | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent_fd)
+        created = True
+    except FileExistsError:
+        try:
+            fd = os.open(name, flags, dir_fd=parent_fd)
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise InvocationAuditError(
+                    f"audit file {name!r} must not be a symlink", path=context_path
+                ) from exc
+            raise InvocationAuditError(
+                f"unable to open audit file {name!r}", path=context_path
+            ) from exc
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise InvocationAuditError(
+                f"audit file {name!r} must not be a symlink", path=context_path
+            ) from exc
+        raise InvocationAuditError(
+            f"unable to create audit file {name!r}", path=context_path
+        ) from exc
+
+    try:
+        file_stat = os.fstat(fd)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise InvocationAuditError(
+                f"audit file {name!r} is not a regular file", path=context_path
+            )
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd, created
+
+
+def _acquire_exclusive_lock(fd: int, timeout_seconds: float, path: Path) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise InvocationAuditLockTimeout(
+                    "timed out waiting for the exclusive audit log lock",
+                    path=path,
+                    timeout_seconds=timeout_seconds,
+                )
+            time.sleep(_LOCK_POLL_SECONDS)
+
+
+def _release_lock(fd: int) -> None:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: set[str] = set()
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        seen.add(key)
+        result[key] = value
+    return result
+
+
+def _reject_non_finite_constant(token: str) -> None:
+    raise ValueError(f"non-finite JSON constant: {token}")
+
+
+def _iter_existing_lines(fd: int, path: Path):
+    """Yield `(line_number, raw_line_bytes)` for each complete existing line.
+
+    Reads in bounded chunks rather than loading the whole file at once.
+    Raises `InvocationAuditCorruptionError` if trailing bytes exist with no
+    terminating newline (covers both a literally missing final newline and a
+    partial/interrupted trailing write left over from a prior failure).
+    """
+    os.lseek(fd, 0, os.SEEK_SET)
+    buffer = b""
+    line_number = 0
+    while True:
+        chunk = os.read(fd, _READ_CHUNK_BYTES)
+        if not chunk:
+            break
+        buffer += chunk
+        while True:
+            idx = buffer.find(b"\n")
+            if idx == -1:
+                break
+            raw_line = buffer[:idx]
+            buffer = buffer[idx + 1:]
+            line_number += 1
+            yield line_number, raw_line
+    if buffer:
+        line_number += 1
+        raise InvocationAuditCorruptionError(
+            "existing audit history has a trailing line with no final newline",
+            path=path,
+            line_number=line_number,
+            reason="missing_final_newline",
+        )
+
+
+def _decode_and_parse_existing_line(raw_line: bytes, path: Path, line_number: int) -> dict[str, Any]:
+    if raw_line == b"":
+        raise InvocationAuditCorruptionError(
+            "existing audit history contains a blank line",
+            path=path,
+            line_number=line_number,
+            reason="blank_line",
+        )
+
+    # Decode/parse failures are deliberately *not* re-raised with `from exc`:
+    # the underlying `UnicodeDecodeError`/`json.JSONDecodeError`/`ValueError`
+    # carry the raw offending bytes/text (or, for a duplicate-key rejection,
+    # the literal key name) in their own attributes. Chaining would leave
+    # that content reachable via `__cause__`/`__context__` even though this
+    # function's own message and `reason` are deliberately generic -- so the
+    # corruption exception is constructed and raised only after fully exiting
+    # the `except` block, which leaves both `__cause__` and `__context__` None.
+    decode_failed = False
+    try:
+        text = raw_line.decode("utf-8")
+    except UnicodeDecodeError:
+        decode_failed = True
+    if decode_failed:
+        raise InvocationAuditCorruptionError(
+            "existing audit history contains invalid UTF-8",
+            path=path,
+            line_number=line_number,
+            reason="invalid_utf8",
+        )
+
+    parse_failed = False
+    parsed = None
+    try:
+        parsed = json.loads(
+            text,
+            object_pairs_hook=_reject_duplicate_keys,
+            parse_constant=_reject_non_finite_constant,
+        )
+    except (json.JSONDecodeError, ValueError):
+        parse_failed = True
+    if parse_failed:
+        raise InvocationAuditCorruptionError(
+            "existing audit history contains malformed JSON",
+            path=path,
+            line_number=line_number,
+            reason="malformed_json",
+        )
+    if not isinstance(parsed, dict):
+        raise InvocationAuditCorruptionError(
+            "existing audit history line is not a JSON object",
+            path=path,
+            line_number=line_number,
+            reason="non_object_json",
+        )
+    if validate_invocation_record(parsed):
+        # Deliberately generic: Slice A's per-field messages echo field
+        # values (e.g. `phase`), which would leak existing line content.
+        raise InvocationAuditCorruptionError(
+            "existing audit history line fails schema validation",
+            path=path,
+            line_number=line_number,
+            reason="schema_invalid_record",
+        )
+    return parsed
+
+
+def _identity_subset(record: Mapping[str, Any]) -> dict[str, Any]:
+    return {field: record.get(field) for field in _PAIR_IDENTITY_FIELDS}
+
+
+def _lifecycle_violation(
+    existing: bool, message: str, *, path: Path, line_number: int | None, invocation_id: object
+) -> InvocationAuditError:
+    invocation_id = invocation_id if isinstance(invocation_id, str) else None
+    if existing:
+        return InvocationAuditCorruptionError(
+            message,
+            path=path,
+            line_number=line_number,
+            reason="lifecycle_violation",
+            invocation_id=invocation_id,
+        )
+    return InvocationAuditError(message, path=path, invocation_id=invocation_id)
+
+
+def _apply_lifecycle_transition(
+    lifecycle: dict[str, dict[str, Any]],
+    record: Mapping[str, Any],
+    *,
+    path: Path,
+    line_number: int | None,
+    existing: bool,
+) -> None:
+    invocation_id = record.get("invocation_id")
+    entry = lifecycle.setdefault(invocation_id, {"started": None, "finished": None})
+    record_type = record.get("record_type")
+
+    if record_type == RECORD_STARTED:
+        if entry["started"] is not None:
+            raise _lifecycle_violation(
+                existing,
+                "STARTED is a duplicate or follows an already-completed invocation",
+                path=path,
+                line_number=line_number,
+                invocation_id=invocation_id,
+            )
+        entry["started"] = record
+        return
+
+    if record_type == RECORD_FINISHED:
+        started = entry["started"]
+        if started is None:
+            raise _lifecycle_violation(
+                existing,
+                "FINISHED has no matching STARTED",
+                path=path,
+                line_number=line_number,
+                invocation_id=invocation_id,
+            )
+        if entry["finished"] is not None:
+            raise _lifecycle_violation(
+                existing,
+                "FINISHED is a duplicate for this invocation_id",
+                path=path,
+                line_number=line_number,
+                invocation_id=invocation_id,
+            )
+        if _identity_subset(started) != _identity_subset(record):
+            raise _lifecycle_violation(
+                existing,
+                "STARTED/FINISHED identity fields do not match",
+                path=path,
+                line_number=line_number,
+                invocation_id=invocation_id,
+            )
+        if _parse_utc_timestamp(record["finished_at_utc"]) < _parse_utc_timestamp(
+            started["started_at_utc"]
+        ):
+            raise _lifecycle_violation(
+                existing,
+                "finished_at_utc precedes started_at_utc",
+                path=path,
+                line_number=line_number,
+                invocation_id=invocation_id,
+            )
+        entry["finished"] = record
+
+
+def _write_all(fd: int, data: bytes, path: Path) -> None:
+    view = memoryview(data)
+    total = len(data)
+    written = 0
+    while written < total:
+        try:
+            n = os.write(fd, view[written:])
+        except InterruptedError:
+            if written == 0:
+                continue
+            raise InvocationAuditError(
+                "audit record write was interrupted after partial progress; "
+                "not retried",
+                path=path,
+            ) from None
+        except OSError as exc:
+            raise InvocationAuditError("audit record write failed", path=path) from exc
+        if n == 0:
+            raise InvocationAuditError(
+                "audit record write returned zero bytes", path=path
+            )
+        written += n
+
+
+def _fsync_fd(fd: int, path: Path) -> None:
+    try:
+        os.fsync(fd)
+    except OSError as exc:
+        raise InvocationAuditError("fsync failed", path=path) from exc
+
+
+def append_invocation_record(
+    target: str | Path,
+    record: Mapping[str, Any],
+    *,
+    lock_timeout_seconds: float = DEFAULT_LOCK_TIMEOUT_SECONDS,
+) -> Path:
+    """Durably append one validated record to the canonical audit log.
+
+    Raises `ValueError` for invalid `record`/`lock_timeout_seconds` (checked
+    before any filesystem mutation), `InvocationAuditLockTimeout` if the
+    exclusive lock cannot be acquired in time, `InvocationAuditCorruptionError`
+    if existing history fails strict validation, and `InvocationAuditError`
+    for any other operational/lifecycle/durability failure.
+    """
+    timeout = _validate_lock_timeout(lock_timeout_seconds)
+    line_bytes = invocation_record_json_line(record).encode("utf-8")
+
+    audit_log_path = resolve_invocation_audit_log_path(target)
+    audit_dir_path = audit_log_path.parent
+    hldspec_dir_path = audit_dir_path.parent
+    root_path = hldspec_dir_path.parent
+
+    opened_fds: list[int] = []
+    try:
+        root_fd = _open_existing_directory(root_path)
+        opened_fds.append(root_fd)
+
+        hldspec_fd, hldspec_created = _open_or_create_dir_component(
+            root_fd, hldspec_dir_path.name, audit_log_path
+        )
+        opened_fds.append(hldspec_fd)
+        if hldspec_created:
+            _fsync_fd(root_fd, audit_log_path)
+
+        audit_dir_fd, audit_dir_created = _open_or_create_dir_component(
+            hldspec_fd, audit_dir_path.name, audit_log_path
+        )
+        opened_fds.append(audit_dir_fd)
+        if audit_dir_created:
+            _fsync_fd(hldspec_fd, audit_log_path)
+
+        file_fd, file_created = _open_or_create_audit_file(
+            audit_dir_fd, audit_log_path.name, audit_log_path
+        )
+        opened_fds.append(file_fd)
+
+        _acquire_exclusive_lock(file_fd, timeout, audit_log_path)
+        try:
+            lifecycle: dict[str, dict[str, Any]] = {}
+            for line_number, raw_line in _iter_existing_lines(file_fd, audit_log_path):
+                parsed = _decode_and_parse_existing_line(raw_line, audit_log_path, line_number)
+                _apply_lifecycle_transition(
+                    lifecycle, parsed, path=audit_log_path, line_number=line_number, existing=True
+                )
+
+            _apply_lifecycle_transition(
+                lifecycle, dict(record), path=audit_log_path, line_number=None, existing=False
+            )
+
+            _write_all(file_fd, line_bytes, audit_log_path)
+            _fsync_fd(file_fd, audit_log_path)
+            if file_created:
+                _fsync_fd(audit_dir_fd, audit_log_path)
+        finally:
+            _release_lock(file_fd)
+    finally:
+        for fd in reversed(opened_fds):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+    return audit_log_path
