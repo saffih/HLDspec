@@ -754,6 +754,72 @@ class ErrorOrderingTests(unittest.TestCase):
         self.assertEqual(errors1, errors2)
 
 
+class ExactValueAndEmptyStringTests(unittest.TestCase):
+    def test_helper_id_wrong_value_rejected(self):
+        record = base_started(helper_id="not-speckit")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("helper_id" in e for e in errors))
+
+    def test_toolchain_wrong_value_rejected(self):
+        record = base_started(toolchain="NotSpecKit")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("toolchain" in e for e in errors))
+
+    def test_execution_path_invalid_value_rejected(self):
+        record = base_started(execution_path="bogus_path")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("execution_path" in e for e in errors))
+
+    def test_runtime_empty_string_rejected(self):
+        record = base_started(runtime="")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("runtime" in e for e in errors))
+
+    def test_approval_ref_empty_string_rejected(self):
+        record = base_started(approval_ref="")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("approval_ref" in e for e in errors))
+
+    def test_feature_id_empty_string_rejected(self):
+        record = base_started(target_binding=base_target_binding(feature_id=""))
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("feature_id" in e for e in errors))
+
+    def test_bundle_id_empty_string_rejected(self):
+        record = base_started(target_binding=base_target_binding(bundle_id=""))
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("bundle_id" in e for e in errors))
+
+    def test_remote_identity_sha256_malformed_rejected(self):
+        record = base_started(
+            target_binding=base_target_binding(remote_identity_sha256="not-hex")
+        )
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("remote_identity_sha256" in e for e in errors))
+
+    def test_source_package_sha256_malformed_rejected(self):
+        record = base_started(
+            target_binding=base_target_binding(source_package_sha256="not-hex")
+        )
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("source_package_sha256" in e for e in errors))
+
+    def test_git_signature_after_sha256_malformed_rejected(self):
+        record = base_finished(git_signature_after_sha256="not-hex")
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("git_signature_after_sha256" in e for e in errors))
+
+    def test_ok_non_bool_rejected(self):
+        record = base_finished(ok=1)
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("ok" in e for e in errors))
+
+    def test_produced_artifacts_non_bool_rejected(self):
+        record = base_finished(produced_artifacts=1)
+        errors = audit.validate_invocation_record(record)
+        self.assertTrue(any("produced_artifacts" in e for e in errors))
+
+
 class WatchdogAndBooleanFieldTests(unittest.TestCase):
     def test_watchdog_triggered_non_bool_rejected(self):
         record = base_finished(watchdog_triggered="yes")
