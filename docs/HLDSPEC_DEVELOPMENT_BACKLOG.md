@@ -908,21 +908,31 @@ ratifying this contract does not create one.
 snapshots, not a queryable durable log), development receipts,
 `DRIVER_OBSERVED`, manual-attested evidence. See contract §8.
 
-Follow-up (do not start without a separate gated prompt per contract §9):
+Implementation roadmap is A–E (contract §9); no slice has started. Follow-up
+(do not start without a separate gated prompt per contract §9):
 
-- **Phase A** — writer + schema validator library, unit-tested, not wired to
-  any invocation path.
-- **Phase B** — runtime integration into `SpecKitInvoker` only
+- **Slice A** — canonical pointer-aware path helper, typed STARTED/FINISHED
+  record models/validation, deterministic serialization. No writer, no
+  invocation wiring.
+- **Slice B** — durable append writer: exclusive append lock, one NDJSON
+  record per line, flush/fsync, corruption detection. No `SpecKitInvoker`
+  wiring.
+- **Slice C** — runtime integration into `SpecKitInvoker` only
   (`execution_path: "speckit_invoker"`); STARTED/FINISHED around each live
   invocation.
-- **Phase C** — read-only reader + `status`/`doctor` diagnostics for
-  invocation history and incomplete-lifecycle detection.
-- **Phase D** (reserved, not started) — `speckit_drive_loop.py`
+- **Slice D** (reserved, not started) — `speckit_drive_loop.py`
   (`execution_path: "speckit_drive_loop"`) coverage and drive-loop
-  audit-continuity gating; requires its own separately reviewed contract
-  slice.
+  audit-continuity gating; requires its own separate authorization and its
+  own separate live proof.
+- **Slice E** — read-only reader + `status`/`doctor` diagnostics for
+  invocation history and incomplete-lifecycle detection. No mutation, no
+  readiness/approval/promotion effect.
 
-**Non-goals (still out of scope until the corresponding phase above is
+Recommended next slice, if and when work is authorized, is Slice A only —
+ratifying this contract does not itself authorize starting it. Implementation
+remains open; P1-019 is not complete.
+
+**Non-goals (still out of scope until the corresponding slice above is
 separately gated):** no writer implementation, no schema implementation, no
 readiness-evidence integration, no provenance implementation, no
 `speckit_drive_loop.py` change, no Flow change.

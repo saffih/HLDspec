@@ -1,13 +1,14 @@
 # SpecKit Invocation Audit Log Contract
 
-**Status:** design contract, **PROPOSED** — no code in this repo implements the
+**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: NOT IMPLEMENTED.**
+The design questions below are resolved; no code in this repo implements the
 writer, schema validator, reader, or CLI surfaces described below. This doc
 resolves the open design questions recorded in
 [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019
-and records a phased implementation plan. It authorizes no implementation: the
-writer, schema validator, runtime integration, reader, CLI output, and
-`speckit_drive_loop.py` wiring are each a separate, separately gated slice
-(§9).
+and records a five-slice implementation plan (§9). Ratifying this contract
+authorizes no implementation slice: the writer, schema validator, runtime
+integration, reader, CLI output, and `speckit_drive_loop.py` wiring each
+require their own separate gate before work starts.
 
 This doc does not redefine the Driver/Toolchain vocabulary (owned by
 [`TOOLCHAIN_DRIVER_CONTRACT.md`](TOOLCHAIN_DRIVER_CONTRACT.md)), the ownership
@@ -101,7 +102,7 @@ recorded_at_utc        RFC3339 UTC timestamp ending in Z
 helper_id              "speckit" (matches hldspec/helper_registry.py helper_id convention)
 toolchain              "SpecKit"
 execution_path         "speckit_invoker" (initial); "speckit_drive_loop" reserved,
-                       see §9 Phase 4 — not authorized by this contract
+                       see §9 Slice D — not authorized by this contract
 runtime                runtime identity, e.g. "claude"
 phase                  HLDspec phase identity
 skill                  concrete installed skill identity, e.g. "speckit-tasks"
@@ -221,7 +222,7 @@ No audit-log entry may automatically advance a phase, set readiness, permit
 merging, grant execution authority, satisfy a human approval, or convert
 manual work into driver-observed work.
 
-## 9. Consumers and phased implementation plan
+## 9. Consumers and five-slice implementation plan
 
 Initial contract consumers are limited to: human/maintainer audit, future
 read-only status/doctor diagnostics, and future detection of incomplete
@@ -230,25 +231,30 @@ promotion calculation, merge approval, helper selection, source-package
 generation, product decisions, provenance classification. **This contract
 creates no runtime consumer.**
 
-Each phase below is a separate, separately gated implementation slice.
-Nothing beyond this contract doc is authorized by ratifying it; each phase
+Each slice below is a separate, separately gated implementation slice.
+Nothing beyond this contract doc is authorized by ratifying it; each slice
 returns to GATE before it starts.
 
-- **Phase A — writer + schema validator.** A library module implementing §3–§7
-  (NDJSON append, lock/fsync, STARTED/FINISHED pair validation, corruption
-  detection) with unit tests. No caller wires it to any invocation path yet.
-- **Phase B — runtime integration, `speckit_invoker` only.** Wire
-  `SpecKitInvoker` to append STARTED before invocation and FINISHED after,
-  per the failure rule (§10). `execution_path: "speckit_drive_loop"` is
-  explicitly **not** included in this phase.
-- **Phase C — reader + status/doctor diagnostics.** Read-only surfacing of
-  invocation history and incomplete-lifecycle detection in
-  `hldspec_agent_session.py status`/`doctor`. No effect on readiness,
-  promotion, or approval.
-- **Phase D — drive-loop audit-continuity gating (reserved, not started).**
-  Extending `execution_path` coverage to `speckit_drive_loop.py` and using
-  audit continuity to gate automatic drive-loop continuation. Requires its
-  own separately reviewed contract slice; not authorized here.
+- **Slice A — path and schema.** Canonical pointer-aware path helper, typed
+  STARTED/FINISHED record models or validation, deterministic serialization.
+  No file writer. No invocation wiring.
+- **Slice B — durable append writer.** Exclusive append lock, one complete
+  NDJSON record per line (§3–§7), flush and `fsync`, corruption detection
+  (§7). No `SpecKitInvoker` wiring.
+- **Slice C — `SpecKitInvoker` integration.** Append STARTED before external
+  invocation and FINISHED after return or termination, per the failure rule
+  (§11). Preserves the existing `InvocationResult` shape; exposes audit
+  failure separately. `execution_path: "speckit_drive_loop"` is explicitly
+  **not** included in this slice.
+- **Slice D — drive-loop integration (reserved, not started).** Separate
+  `execution_path: "speckit_drive_loop"` coverage and an automatic-continuation
+  audit gate for `speckit_drive_loop.py`. Requires its own separate
+  authorization and its own separate live proof — not covered by any prior
+  single-phase invocation proof.
+- **Slice E — read-only diagnostics.** Status/doctor reporting and
+  incomplete-lifecycle detection in `hldspec_agent_session.py
+  status`/`doctor`. No mutation or repair. No effect on readiness, approval,
+  or promotion.
 
 ## 10. Retention and privacy
 
