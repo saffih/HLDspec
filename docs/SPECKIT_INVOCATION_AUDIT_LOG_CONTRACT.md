@@ -195,12 +195,17 @@ byte counts.
 
 ## 6. Append durability and concurrency
 
-A future writer must: open in append mode, take an exclusive process-level
-lock around each record append, serialize one complete canonical JSON object,
-append exactly one newline, flush, `fsync`, release the lock. The file lock
-must not be held during the external invocation itself — only around each
-append. The shared `invocation_id` links a STARTED/FINISHED pair; concurrent
-appends must not interleave bytes or produce malformed lines.
+The implemented Slice B writer (`append_invocation_record`) opens the audit
+file in append mode, takes an exclusive process-level lock around each
+record append, serializes and appends one complete canonical JSON object
+plus one newline, performs the required file and parent-directory `fsync`
+sequence, and releases the lock. The implementation writes via unbuffered
+`os.write` calls on a raw file descriptor, so there is no separate
+userspace-buffer `flush()` step; `fsync` is the durability barrier and is
+performed after the complete line has been written. The file lock is not
+held during the external invocation itself — only around each append. The
+shared `invocation_id` links a STARTED/FINISHED pair; concurrent appends
+cannot interleave bytes or produce malformed lines.
 
 ## 7. Corruption behavior
 
@@ -278,8 +283,13 @@ returns to GATE before it starts.
     processed incrementally and the entire log is not normally loaded into
     memory at once; the current line is still buffered in full until its
     terminating newline, so one extremely large or unterminated line can
-    consume memory proportional to that line's length. No total record-size
-    limit is currently ratified.
+    consume memory proportional to that line's length. Lifecycle validation
+    also keeps state keyed by every `invocation_id` for the duration of the
+    scan — the STARTED/FINISHED information needed to detect duplicates,
+    orphans, incompatible pairs, and ordering violations — so total memory
+    grows with both the largest current line and the number/size of
+    lifecycle entries. No total record-size limit or bounded-total-memory
+    guarantee is currently ratified.
   - No runtime code constructs or submits records through this writer, no
     production invocation path calls it, and no audit record is emitted
     automatically by anything in this repo today.
@@ -322,7 +332,8 @@ continuation. Audit failure never fails silently.
 ## 12. See also
 
 - [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019 —
-  backlog entry this contract resolves; implementation phases (§9) remain open there.
+  backlog entry this contract resolves; Slices C–E remain open there —
+  Slices A–B are implemented.
 - [`TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md`](TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md) —
   the `DRIVER_OBSERVED` / `MANUAL_ATTESTED` / readiness-evidence axis this log is
   explicitly distinct from.
