@@ -328,6 +328,39 @@ class BasicAppendBehaviorTests(_TempTargetTestCase):
         lines = path.read_text(encoding="utf-8").splitlines()
         self.assertEqual(1, len(lines))
 
+    def test_existing_history_larger_than_one_read_chunk_parses_correctly(self):
+        # `_iter_existing_lines` reads in `_READ_CHUNK_BYTES`-sized chunks and
+        # buffers a line's bytes across `os.read()` calls until its newline
+        # is found. Construct existing history whose total size exceeds one
+        # chunk, with one line's own byte range deliberately straddling the
+        # chunk boundary, to prove the buffering logic reassembles a split
+        # line correctly instead of truncating or misparsing at the edge.
+        line_length = len(_serialized_line(base_started()))
+        self.assertLess(line_length, audit._READ_CHUNK_BYTES)
+        lines_needed = audit._READ_CHUNK_BYTES // line_length + 2
+
+        boundary_line_start = (audit._READ_CHUNK_BYTES // line_length) * line_length
+        boundary_line_end = boundary_line_start + line_length
+        self.assertLess(boundary_line_start, audit._READ_CHUNK_BYTES)
+        self.assertGreater(boundary_line_end, audit._READ_CHUNK_BYTES)
+
+        records = [_unique_record(base_started) for _ in range(lines_needed)]
+        raw = b"".join(_serialized_line(r) for r in records)
+        self.assertGreater(len(raw), audit._READ_CHUNK_BYTES)
+        _write_raw_audit_bytes(self.target, raw)
+
+        new_record = _unique_record(base_started)
+        path = audit.append_invocation_record(self.target, new_record)
+
+        lines = path.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(lines_needed + 1, len(lines))
+        seen_ids = set()
+        for line in lines:
+            parsed = _parse_ndjson_line(line)
+            self.assertEqual([], audit.validate_invocation_record(parsed))
+            seen_ids.add(parsed["invocation_id"])
+        self.assertEqual(lines_needed + 1, len(seen_ids))
+
 
 def _parse_ndjson_line(line):
     return json.loads(line)
@@ -596,7 +629,10 @@ class LockingConcurrencyTests(_TempTargetTestCase):
                 self.assertFalse(proc.is_alive(), "worker process did not terminate")
                 self.assertEqual(0, proc.exitcode, "worker process exited non-zero")
 
-            self.assertTrue(queue.empty(), "worker(s) produced more results than expected")
+            # `n` bounded `get(timeout=...)` calls above, plus every process
+            # joined and exited zero, already bound the result count -- no
+            # `queue.empty()` check, which races against a still-enqueuing
+            # worker rather than proving anything once workers have exited.
 
             errors = [r for r in results if r[0] == "error"]
             self.assertEqual([], errors)
@@ -690,7 +726,11 @@ class FilesystemSafetyTests(_TempTargetTestCase):
         try:
             proc.join(timeout=10)
             self.assertFalse(proc.is_alive(), "append against a FIFO hung the child process")
-            result = queue.get_nowait()
+            # `get_nowait()` can race the queue's feeder thread even after
+            # `join()` returns; a short bounded `get(timeout=...)` avoids
+            # that race without weakening the "child must not hang" check
+            # above (already enforced by the `join(timeout=10)`).
+            result = queue.get(timeout=5)
             self.assertEqual("expected_error", result[0], result)
         finally:
             if proc.is_alive():
@@ -698,17 +738,30 @@ class FilesystemSafetyTests(_TempTargetTestCase):
                 proc.join(timeout=5)
 
     def test_new_directory_permission_not_broader_than_0700(self):
+        # A subset check (`& ~0o700 == 0`), not an exact-bits check: umask
+        # may make the actual mode stricter than 0700, which must still pass.
         record = _unique_record(base_started)
         audit.append_invocation_record(self.target, record)
         audit_dir = audit.resolve_invocation_audit_log_path(self.target).parent
-        mode = stat.S_IMODE(audit_dir.stat().st_mode)
-        self.assertEqual(0, mode & 0o077)
+        directory_mode = stat.S_IMODE(audit_dir.stat().st_mode)
+        self.assertEqual(0, directory_mode & ~0o700)
 
     def test_new_file_permission_not_broader_than_0600(self):
+        # Same subset-check reasoning as the directory case above. Unlike the
+        # `& 0o077` form this used to use, `& ~0o600` also catches an
+        # owner-execute bit (0100): see
+        # test_file_permission_check_rejects_owner_execute_bit below.
         record = _unique_record(base_started)
         path = audit.append_invocation_record(self.target, record)
-        mode = stat.S_IMODE(path.stat().st_mode)
-        self.assertEqual(0, mode & 0o077)
+        file_mode = stat.S_IMODE(path.stat().st_mode)
+        self.assertEqual(0, file_mode & ~0o600)
+
+    def test_file_permission_check_rejects_owner_execute_bit(self):
+        # Discriminating demonstration for the assertion form used above:
+        # mode 0700 (owner rwx) satisfies the old `& 0o077 == 0` check (no
+        # group/other bits) but must still fail the file-mode requirement,
+        # which additionally forbids owner-execute. `& ~0o600` catches it.
+        self.assertNotEqual(0, 0o700 & ~0o600)
 
 
 @unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
@@ -843,10 +896,18 @@ class ErrorMetadataAndPrivacyTests(_TempTargetTestCase):
 
 @unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
 class FaultInjectionTests(_TempTargetTestCase):
-    """§10: deferred CP2 fault-injection coverage. Patches private
-    module-level OS calls (`os.write`, `os.fsync`) after the implementation
-    architecture (single write call site, single-or-double fsync call site
-    per append) was selected; never adds public test hooks.
+    """§10: deferred CP2 fault-injection coverage, plus CP3's parent-chain
+    durability hardening. Patches private module-level OS calls (`os.write`,
+    `os.fsync`, `os.open`, `os.close`) after the implementation architecture
+    was selected; never adds public test hooks.
+
+    A successful append now always performs exactly four `fsync` calls, in
+    order: the audit file, then the audit directory, the `.hldspec`
+    directory, and the resolved root directory -- unconditionally, whether or
+    not this invocation created any of those path components. (CP2 only
+    fsynced a directory when the current process believed it had just
+    created that entry, which gave a concurrent writer that found every
+    component already present no independent durability proof at all.)
 
     `mock.patch.object(audit.os, ...)` patches the process-wide `os` module
     (`audit.os is os`), not a private copy -- under `python3 -m unittest
@@ -855,9 +916,9 @@ class FaultInjectionTests(_TempTargetTestCase):
     via `os.write` from a background thread) can call the patched function
     concurrently and get miscounted or have a fault injected into unrelated
     IPC, producing flaky failures that only reproduce under full-suite runs.
-    Every wrapper below therefore ignores calls on a non-regular-file fd
-    (pipes, sockets) before counting or injecting anything, so only the
-    writer's own regular-file audit-log fd is ever affected.
+    Every wrapper below therefore ignores calls on an fd it cannot positively
+    classify (pipes, sockets) before counting or injecting anything, so only
+    the writer's own regular-file/directory fds are ever affected.
     """
 
     @staticmethod
@@ -866,6 +927,38 @@ class FaultInjectionTests(_TempTargetTestCase):
             return stat.S_ISREG(os.fstat(fd).st_mode)
         except OSError:
             return False
+
+    @staticmethod
+    def _path_key(path):
+        info = os.stat(path)
+        return (info.st_dev, info.st_ino)
+
+    @classmethod
+    def _classify_fd(cls, fd, audit_log_path):
+        """Identify `fd` as "file", "audit_dir", "hldspec_dir", "root_dir",
+        or `None` (unrelated fd, e.g. IPC), by (device, inode) identity
+        rather than call order -- robust to any reordering of the four
+        fsync calls the writer makes.
+        """
+        try:
+            info = os.fstat(fd)
+        except OSError:
+            return None
+        audit_dir = audit_log_path.parent
+        hldspec_dir = audit_dir.parent
+        root_dir = hldspec_dir.parent
+        if stat.S_ISREG(info.st_mode):
+            return "file" if (info.st_dev, info.st_ino) == cls._path_key(audit_log_path) else None
+        if not stat.S_ISDIR(info.st_mode):
+            return None
+        key = (info.st_dev, info.st_ino)
+        if key == cls._path_key(audit_dir):
+            return "audit_dir"
+        if key == cls._path_key(hldspec_dir):
+            return "hldspec_dir"
+        if key == cls._path_key(root_dir):
+            return "root_dir"
+        return None
 
     def test_short_write_completes_via_continuation(self):
         record = _unique_record(base_started)
@@ -937,9 +1030,10 @@ class FaultInjectionTests(_TempTargetTestCase):
 
     def test_file_fsync_failure_raises_and_does_not_retry_write(self):
         # Pre-create the file/dir structure with an unmocked append first, so
-        # the mocked failure below is isolated to the (only) fsync call this
-        # append performs -- the file-data fsync -- rather than also hitting
-        # the directory-creation fsyncs that would otherwise run first.
+        # the mocked failure below is isolated to the *first* fsync call this
+        # append performs -- the file-data fsync, always first -- rather than
+        # also hitting the directory-creation fsyncs that would otherwise run
+        # first. Raising there means none of the three directory fsyncs run.
         audit.append_invocation_record(self.target, _unique_record(base_started))
 
         record = _unique_record(base_started)
@@ -964,49 +1058,131 @@ class FaultInjectionTests(_TempTargetTestCase):
         self.assertNotIsInstance(ctx.exception, audit.InvocationAuditCorruptionError)
         self.assertEqual(1, write_calls["count"], "write was retried after an fsync failure")
 
-    def test_directory_fsync_failure_on_new_file_raises(self):
-        # Only reachable when the audit file itself is newly created, so the
-        # directory fsync (deferred until after the data fsync) actually runs.
-        # Pre-create the `.hldspec`/`audit` directory chain (but not the file)
-        # so the mocked failures below land on the file-data fsync (call 1,
-        # allowed to succeed) and then the new-file directory-entry fsync
-        # (call 2, made to fail) specifically -- not the directory *creation*
-        # fsyncs, which would otherwise run first on a fully fresh target and
-        # make this test pass without ever exercising the property it claims
-        # to cover. Filters out non-regular, non-directory fds (e.g. IPC
-        # pipes from other tests' background threads) so only fsync calls the
-        # writer itself makes are counted.
+    def test_fresh_path_append_performs_full_parent_chain_fsync(self):
+        # A totally fresh target: `.hldspec`, `audit`, and the file itself
+        # are all created by this call. All four fsyncs must still run, in
+        # order, on the successful path.
         audit_log_path = audit.resolve_invocation_audit_log_path(self.target)
-        audit_log_path.parent.mkdir(parents=True, exist_ok=True)
-
         record = _unique_record(base_started)
         real_fsync = os.fsync
-        fsync_calls = []
+        classified = []
 
-        def _is_relevant_fd(fd):
-            try:
-                mode = os.fstat(fd).st_mode
-            except OSError:
-                return False
-            return stat.S_ISREG(mode) or stat.S_ISDIR(mode)
+        def tracking_fsync(fd):
+            label = self._classify_fd(fd, audit_log_path)
+            if label is not None:
+                classified.append(label)
+            return real_fsync(fd)
+
+        with mock.patch.object(audit.os, "fsync", side_effect=tracking_fsync):
+            audit.append_invocation_record(self.target, record)
+
+        self.assertEqual(["file", "audit_dir", "hldspec_dir", "root_dir"], classified)
+
+    def test_pre_existing_path_append_performs_same_fsync_chain(self):
+        # CP2 regression target: once every path component already exists,
+        # CP2 performed *zero* directory fsyncs on this second append. A
+        # concurrent writer that only ever observes pre-existing components
+        # still needs its own durability proof for the whole chain.
+        audit.append_invocation_record(self.target, _unique_record(base_started))
+
+        audit_log_path = audit.resolve_invocation_audit_log_path(self.target)
+        record = _unique_record(base_started)
+        real_fsync = os.fsync
+        classified = []
+
+        def tracking_fsync(fd):
+            label = self._classify_fd(fd, audit_log_path)
+            if label is not None:
+                classified.append(label)
+            return real_fsync(fd)
+
+        with mock.patch.object(audit.os, "fsync", side_effect=tracking_fsync):
+            audit.append_invocation_record(self.target, record)
+
+        self.assertEqual(
+            ["file", "audit_dir", "hldspec_dir", "root_dir"],
+            classified,
+            "a fully pre-existing path must still fsync the complete parent chain",
+        )
+
+    def _assert_single_directory_fsync_failure_surfaced(self, failing_label):
+        """Shared body for the three directory-specific fsync-failure tests
+        below: fail exactly the named directory's fsync (identified by
+        inode, not call order) and assert the append raises the generic
+        operational error (not corruption), the write is not retried, no fd
+        leaks, and the lock is released -- for each of the three directories
+        independently.
+        """
+        audit_log_path = audit.resolve_invocation_audit_log_path(self.target)
+        record = _unique_record(base_started)
+        real_write = os.write
+        real_fsync = os.fsync
+        real_open = os.open
+        real_close = os.close
+        write_calls = {"n": 0}
+        fsync_calls = []
+        open_count = {"n": 0}
+        close_count = {"n": 0}
+
+        def counting_write(fd, data):
+            if self._is_regular_fd(fd):
+                write_calls["n"] += 1
+            return real_write(fd, data)
 
         def selective_fsync(fd):
-            if not _is_relevant_fd(fd):
-                return real_fsync(fd)
-            fsync_calls.append(fd)
-            if len(fsync_calls) == 1:
-                return real_fsync(fd)  # let the file-data fsync succeed
-            raise OSError(errno.EIO, "simulated directory fsync failure")
+            label = self._classify_fd(fd, audit_log_path)
+            if label is not None:
+                fsync_calls.append(label)
+                if label == failing_label:
+                    raise OSError(errno.EIO, f"simulated {label} fsync failure")
+            return real_fsync(fd)
 
-        with mock.patch.object(audit.os, "fsync", side_effect=selective_fsync):
-            with self.assertRaises(audit.InvocationAuditError):
+        def counting_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            open_count["n"] += 1
+            return fd
+
+        def counting_close(fd):
+            close_count["n"] += 1
+            return real_close(fd)
+
+        with mock.patch.object(audit.os, "write", side_effect=counting_write), \
+                mock.patch.object(audit.os, "fsync", side_effect=selective_fsync), \
+                mock.patch.object(audit.os, "open", side_effect=counting_open), \
+                mock.patch.object(audit.os, "close", side_effect=counting_close):
+            with self.assertRaises(audit.InvocationAuditError) as ctx:
                 audit.append_invocation_record(self.target, record)
-        self.assertEqual(2, len(fsync_calls))
-        # The first (file-data) fsync succeeded before the second (directory
-        # entry) fsync failed: the file must exist with its data durably
-        # written, even though the overall append still raised.
+
+        self.assertNotIsInstance(ctx.exception, audit.InvocationAuditCorruptionError)
+        self.assertEqual(1, write_calls["n"], "write was retried after a directory fsync failure")
+        self.assertEqual(failing_label, fsync_calls[-1])
+        self.assertEqual(
+            open_count["n"], close_count["n"], f"fd leak after {failing_label} fsync failure"
+        )
+        # The file-data fsync always runs (and, for hldspec_dir/root_dir
+        # failures, the audit_dir fsync too) before the failing directory
+        # fsync: the record bytes are durably on disk even though the
+        # overall append still raised.
         expected = audit.invocation_record_json_line(record).encode("utf-8")
         self.assertEqual(expected, audit_log_path.read_bytes())
+
+        # Lock released: re-acquire directly with a short timeout. If the
+        # lock leaked, this would time out instead.
+        fd = os.open(str(audit_log_path), os.O_RDWR)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+    def test_audit_directory_fsync_failure_raises(self):
+        self._assert_single_directory_fsync_failure_surfaced("audit_dir")
+
+    def test_hldspec_directory_fsync_failure_raises(self):
+        self._assert_single_directory_fsync_failure_surfaced("hldspec_dir")
+
+    def test_root_directory_fsync_failure_raises(self):
+        self._assert_single_directory_fsync_failure_surfaced("root_dir")
 
     def test_lock_released_after_scan_corruption_failure(self):
         _write_raw_audit_bytes(self.target, b"not json\n")

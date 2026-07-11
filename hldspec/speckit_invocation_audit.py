@@ -1,13 +1,16 @@
-"""SpecKit invocation audit log: canonical path, closed schema, deterministic serialization.
+"""SpecKit invocation audit log: canonical path, closed schema, durable writer.
 
-Implements Slice A of `docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`: the
-pointer-aware path helper and a closed schema-version-1 validator for
-STARTED/FINISHED records, plus deterministic one-line NDJSON serialization.
+Implements Slices A and B of `docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`:
+the pointer-aware path helper, a closed schema-version-1 validator for
+STARTED/FINISHED records, deterministic one-line NDJSON serialization
+(Slice A), and a durable exclusive-lock append writer with corruption and
+lifecycle-pair detection (Slice B, `append_invocation_record`).
 
-Deliberately out of scope (later slices): no writer, no append/lock/flush/
-fsync, no corruption-history or lifecycle-pair reading, no repair, no
-`SpecKitInvoker`/`speckit_drive_loop.py` wiring, no filesystem inspection of
-the target. `validate_invocation_record` is a pure structural check.
+Deliberately out of scope (later slices): no reader, no repair, no
+`SpecKitInvoker`/`speckit_drive_loop.py` wiring. `validate_invocation_record`
+remains a pure structural check with no filesystem access;
+`append_invocation_record` is the only function in this module that touches
+the filesystem.
 """
 from __future__ import annotations
 
@@ -802,7 +805,14 @@ def _reject_non_finite_constant(token: str) -> None:
 def _iter_existing_lines(fd: int, path: Path):
     """Yield `(line_number, raw_line_bytes)` for each complete existing line.
 
-    Reads in bounded chunks rather than loading the whole file at once.
+    Reads in bounded chunks, so multi-line history is processed
+    incrementally and the entire log is not normally loaded into memory at
+    once. This is not a bounded-memory guarantee for every input shape: the
+    current line is buffered in full until its terminating newline is found,
+    so one extremely large or unterminated line can still consume memory
+    proportional to that line's length. No total record-size limit is
+    currently ratified.
+
     Raises `InvocationAuditCorruptionError` if trailing bytes exist with no
     terminating newline (covers both a literally missing final newline and a
     partial/interrupted trailing write left over from a prior failure).
@@ -1039,21 +1049,17 @@ def append_invocation_record(
         root_fd = _open_existing_directory(root_path)
         opened_fds.append(root_fd)
 
-        hldspec_fd, hldspec_created = _open_or_create_dir_component(
+        hldspec_fd, _hldspec_created = _open_or_create_dir_component(
             root_fd, hldspec_dir_path.name, audit_log_path
         )
         opened_fds.append(hldspec_fd)
-        if hldspec_created:
-            _fsync_fd(root_fd, audit_log_path)
 
-        audit_dir_fd, audit_dir_created = _open_or_create_dir_component(
+        audit_dir_fd, _audit_dir_created = _open_or_create_dir_component(
             hldspec_fd, audit_dir_path.name, audit_log_path
         )
         opened_fds.append(audit_dir_fd)
-        if audit_dir_created:
-            _fsync_fd(hldspec_fd, audit_log_path)
 
-        file_fd, file_created = _open_or_create_audit_file(
+        file_fd, _file_created = _open_or_create_audit_file(
             audit_dir_fd, audit_log_path.name, audit_log_path
         )
         opened_fds.append(file_fd)
@@ -1073,8 +1079,15 @@ def append_invocation_record(
 
             _write_all(file_fd, line_bytes, audit_log_path)
             _fsync_fd(file_fd, audit_log_path)
-            if file_created:
-                _fsync_fd(audit_dir_fd, audit_log_path)
+            # Every successful append fsyncs the complete parent-directory
+            # chain, regardless of which process (if any) created each
+            # component: a concurrent writer that observed every component
+            # as already existing still needs independent proof that the
+            # path entries it relied on are durable, not just proof that
+            # *its own* creation was durable.
+            _fsync_fd(audit_dir_fd, audit_log_path)
+            _fsync_fd(hldspec_fd, audit_log_path)
+            _fsync_fd(root_fd, audit_log_path)
         finally:
             _release_lock(file_fd)
     finally:

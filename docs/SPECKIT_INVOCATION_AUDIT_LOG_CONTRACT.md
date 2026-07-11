@@ -1,10 +1,14 @@
 # SpecKit Invocation Audit Log Contract
 
-**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: Slice A done, B–E NOT IMPLEMENTED.**
+**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: Slices A–B
+IMPLEMENTED, C–E NOT IMPLEMENTED. Runtime invocation integration: NOT
+IMPLEMENTED.**
 The design questions below are resolved; Slice A (path helper + schema
-validator, `hldspec/speckit_invocation_audit.py`) is implemented — no code in
-this repo implements the writer, reader, or CLI surfaces described below.
-This doc resolves the open design questions recorded in
+validator) and Slice B (durable append writer), both in
+`hldspec/speckit_invocation_audit.py`, are implemented — no code in this repo
+implements the reader or CLI surfaces described below, and no production
+invocation path calls the writer. This doc resolves the open design
+questions recorded in
 [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019
 and records a five-slice implementation plan (§9). Ratifying this contract
 authorized no implementation slice by itself: the writer, runtime
@@ -241,9 +245,47 @@ returns to GATE before it starts.
   closed schema-version-1 STARTED/FINISHED dict validation, deterministic
   serialization. No file writer. No invocation wiring. Tests:
   `tests_v2/test_speckit_invocation_audit.py`.
-- **Slice B — durable append writer.** Exclusive append lock, one complete
-  NDJSON record per line (§3–§7), flush and `fsync`, corruption detection
-  (§7). No `SpecKitInvoker` wiring.
+- **Slice B — durable append writer. DONE (2026-07-11).**
+  `hldspec/speckit_invocation_audit.py:append_invocation_record`. Tests:
+  `tests_v2/test_speckit_invocation_audit_writer.py`.
+  - Accepts a caller-supplied, already-validated record; performs no record
+    construction of its own.
+  - Resolves the canonical path via the same pointer-aware
+    `resolve_invocation_audit_log_path` Slice A defined — normal and
+    external-controller mode both covered.
+  - A single exclusive `flock` on the audit file covers the entire
+    operation: scanning and validating existing history, validating the new
+    record's lifecycle transition against that history, appending the line,
+    and the full durability sequence below — released on every exit path,
+    including every failure.
+  - Existing corruption (malformed JSON, non-object lines, schema-invalid
+    records, duplicate/incompatible STARTED-FINISHED pairs, a trailing line
+    with no final newline) is rejected via `InvocationAuditCorruptionError`
+    without modifying the file.
+  - A successful append performs, in order and unconditionally (regardless
+    of which process, if any, created each path component): `fsync` the
+    audit file, then `fsync` the audit directory, the `.hldspec` directory,
+    and the resolved root directory — so a writer that finds every component
+    already present still gets independent durability proof for the whole
+    chain, not just for its own writes.
+  - The resolved root directory is opened with `O_NOFOLLOW`; a symlinked
+    root, `.hldspec` directory, audit directory, or audit file is rejected
+    rather than followed. This is new, self-contained hardening for this
+    control-state path specifically — no other HLDspec control-state
+    reader/writer currently rejects a symlinked target root, and nothing
+    established requires this writer to follow one.
+  - The history scan reads in bounded chunks, so multi-line history is
+    processed incrementally and the entire log is not normally loaded into
+    memory at once; the current line is still buffered in full until its
+    terminating newline, so one extremely large or unterminated line can
+    consume memory proportional to that line's length. No total record-size
+    limit is currently ratified.
+  - No runtime code constructs or submits records through this writer, no
+    production invocation path calls it, and no audit record is emitted
+    automatically by anything in this repo today.
+  - No public reader or diagnostics exist yet (Slice E).
+  - `SpecKitInvoker`/`speckit_drive_loop.py` wiring (Slice C/D) requires its
+    own separate authorization and is explicitly not part of this slice.
 - **Slice C — `SpecKitInvoker` integration.** Append STARTED before external
   invocation and FINISHED after return or termination, per the failure rule
   (§11). Preserves the existing `InvocationResult` shape; exposes audit
