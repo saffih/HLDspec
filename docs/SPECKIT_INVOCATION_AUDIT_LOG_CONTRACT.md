@@ -1,14 +1,15 @@
 # SpecKit Invocation Audit Log Contract
 
-**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: NOT IMPLEMENTED.**
-The design questions below are resolved; no code in this repo implements the
-writer, schema validator, reader, or CLI surfaces described below. This doc
-resolves the open design questions recorded in
+**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: Slice A done, B–E NOT IMPLEMENTED.**
+The design questions below are resolved; Slice A (path helper + schema
+validator, `hldspec/speckit_invocation_audit.py`) is implemented — no code in
+this repo implements the writer, reader, or CLI surfaces described below.
+This doc resolves the open design questions recorded in
 [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019
 and records a five-slice implementation plan (§9). Ratifying this contract
-authorizes no implementation slice: the writer, schema validator, runtime
+authorized no implementation slice by itself: the writer, runtime
 integration, reader, CLI output, and `speckit_drive_loop.py` wiring each
-require their own separate gate before work starts.
+still require their own separate gate before work starts.
 
 This doc does not redefine the Driver/Toolchain vocabulary (owned by
 [`TOOLCHAIN_DRIVER_CONTRACT.md`](TOOLCHAIN_DRIVER_CONTRACT.md)), the ownership
@@ -235,9 +236,11 @@ Each slice below is a separate, separately gated implementation slice.
 Nothing beyond this contract doc is authorized by ratifying it; each slice
 returns to GATE before it starts.
 
-- **Slice A — path and schema.** Canonical pointer-aware path helper, typed
-  STARTED/FINISHED record models or validation, deterministic serialization.
-  No file writer. No invocation wiring.
+- **Slice A — path and schema. DONE (2026-07-11).**
+  `hldspec/speckit_invocation_audit.py`: canonical pointer-aware path helper,
+  closed schema-version-1 STARTED/FINISHED dict validation, deterministic
+  serialization. No file writer. No invocation wiring. Tests:
+  `tests_v2/test_speckit_invocation_audit.py`.
 - **Slice B — durable append writer.** Exclusive append lock, one complete
   NDJSON record per line (§3–§7), flush and `fsync`, corruption detection
   (§7). No `SpecKitInvoker` wiring.
