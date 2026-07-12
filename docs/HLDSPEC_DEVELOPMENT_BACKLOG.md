@@ -886,7 +886,7 @@ Deferred (do not start without a separate gated prompt):
 
 ### P1-019 Durable SpecKit invocation audit log contract (docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md, added 2026-07-11)
 
-**Status: CONTRACT RATIFIED 2026-07-11 — Slice A implemented 2026-07-11, B–E open.** The nine open
+**Status: CONTRACT RATIFIED 2026-07-11 — Slices A–B implemented 2026-07-11, C–E open.** The nine open
 design questions below are answered by
 [`docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`](SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md):
 canonical storage path (pointer-aware, `control_paths.resolve_hldspec_dir(target)/audit/speckit_invocations.jsonl`),
@@ -918,12 +918,19 @@ Implementation roadmap is A–E (contract §9). Follow-up
   NDJSON serialization (`invocation_record_json_line`). No file writer, no
   invocation wiring, no filesystem inspection. Tests:
   `tests_v2/test_speckit_invocation_audit.py`.
-- **Slice B** — durable append writer: exclusive append lock, one NDJSON
-  record per line, flush/fsync, corruption detection. No `SpecKitInvoker`
-  wiring.
+- **Slice B — DONE (2026-07-11).** `hldspec/speckit_invocation_audit.py:
+  append_invocation_record`: exclusive `flock`-protected append, one NDJSON
+  record per line, full parent-directory `fsync` chain (file, audit dir,
+  `.hldspec` dir, resolved root — unconditional on every successful append,
+  not only on local creation), corruption detection (malformed JSON,
+  schema-invalid records, incompatible/duplicate STARTED-FINISHED pairs, no
+  trailing newline), symlinked-root/component rejection. Tests:
+  `tests_v2/test_speckit_invocation_audit_writer.py`. Durable writer exists;
+  no code path calls it and no audit record is produced automatically by
+  anything in this repo today. No `SpecKitInvoker` wiring (Slice C).
 - **Slice C** — runtime integration into `SpecKitInvoker` only
   (`execution_path: "speckit_invoker"`); STARTED/FINISHED around each live
-  invocation.
+  invocation. Requires its own separate authorization; not started.
 - **Slice D** (reserved, not started) — `speckit_drive_loop.py`
   (`execution_path: "speckit_drive_loop"`) coverage and drive-loop
   audit-continuity gating; requires its own separate authorization and its
@@ -932,13 +939,16 @@ Implementation roadmap is A–E (contract §9). Follow-up
   invocation history and incomplete-lifecycle detection. No mutation, no
   readiness/approval/promotion effect.
 
-Recommended next slice, if and when work is authorized, is Slice B.
-Implementation remains open; P1-019 is not complete.
+Recommended next slice, if and when work is authorized, is Slice C.
+Implementation remains open; P1-019 is not complete. Point-in-time proof
+records (`docs/FIRST_LIVE_E2E_PROOF.md`,
+`docs/SPECKIT_INVOKER_TASKS_HAIKU_LIVE_PROOF.md`) remain a separate evidence
+category from this durable log (§8) and are not superseded by Slice A/B.
 
 **Non-goals (still out of scope until the corresponding slice above is
-separately gated):** no writer implementation, no schema implementation, no
-readiness-evidence integration, no provenance implementation, no
-`speckit_drive_loop.py` change, no Flow change.
+separately gated):** no `SpecKitInvoker` integration, no reader/diagnostics
+implementation, no readiness-evidence integration, no provenance
+implementation, no `speckit_drive_loop.py` change, no Flow change.
 
 ## P2 backlog
 

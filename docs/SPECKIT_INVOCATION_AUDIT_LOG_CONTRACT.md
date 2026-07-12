@@ -1,10 +1,14 @@
 # SpecKit Invocation Audit Log Contract
 
-**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: Slice A done, B–E NOT IMPLEMENTED.**
+**Status: RATIFIED DESIGN CONTRACT. Runtime implementation: Slices A–B
+IMPLEMENTED, C–E NOT IMPLEMENTED. Runtime invocation integration: NOT
+IMPLEMENTED.**
 The design questions below are resolved; Slice A (path helper + schema
-validator, `hldspec/speckit_invocation_audit.py`) is implemented — no code in
-this repo implements the writer, reader, or CLI surfaces described below.
-This doc resolves the open design questions recorded in
+validator) and Slice B (durable append writer), both in
+`hldspec/speckit_invocation_audit.py`, are implemented — no code in this repo
+implements the reader or CLI surfaces described below, and no production
+invocation path calls the writer. This doc resolves the open design
+questions recorded in
 [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019
 and records a five-slice implementation plan (§9). Ratifying this contract
 authorized no implementation slice by itself: the writer, runtime
@@ -191,12 +195,17 @@ byte counts.
 
 ## 6. Append durability and concurrency
 
-A future writer must: open in append mode, take an exclusive process-level
-lock around each record append, serialize one complete canonical JSON object,
-append exactly one newline, flush, `fsync`, release the lock. The file lock
-must not be held during the external invocation itself — only around each
-append. The shared `invocation_id` links a STARTED/FINISHED pair; concurrent
-appends must not interleave bytes or produce malformed lines.
+The implemented Slice B writer (`append_invocation_record`) opens the audit
+file in append mode, takes an exclusive process-level lock around each
+record append, serializes and appends one complete canonical JSON object
+plus one newline, performs the required file and parent-directory `fsync`
+sequence, and releases the lock. The implementation writes via unbuffered
+`os.write` calls on a raw file descriptor, so there is no separate
+userspace-buffer `flush()` step; `fsync` is the durability barrier and is
+performed after the complete line has been written. The file lock is not
+held during the external invocation itself — only around each append. The
+shared `invocation_id` links a STARTED/FINISHED pair; concurrent appends
+cannot interleave bytes or produce malformed lines.
 
 ## 7. Corruption behavior
 
@@ -241,9 +250,94 @@ returns to GATE before it starts.
   closed schema-version-1 STARTED/FINISHED dict validation, deterministic
   serialization. No file writer. No invocation wiring. Tests:
   `tests_v2/test_speckit_invocation_audit.py`.
-- **Slice B — durable append writer.** Exclusive append lock, one complete
-  NDJSON record per line (§3–§7), flush and `fsync`, corruption detection
-  (§7). No `SpecKitInvoker` wiring.
+- **Slice B — durable append writer. DONE (2026-07-11).**
+  `hldspec/speckit_invocation_audit.py:append_invocation_record`. Tests:
+  `tests_v2/test_speckit_invocation_audit_writer.py`.
+  - Accepts a caller-supplied, already-validated record; performs no record
+    construction of its own.
+  - Resolves the canonical path via the same pointer-aware
+    `resolve_invocation_audit_log_path` Slice A defined — normal and
+    external-controller mode both covered.
+  - A single exclusive `flock` on the audit file covers the entire
+    operation: scanning and validating existing history, validating the new
+    record's lifecycle transition against that history, appending the line,
+    and the full durability sequence below — released on every exit path,
+    including every failure.
+  - Existing corruption (malformed JSON, non-object lines, schema-invalid
+    records, duplicate/incompatible STARTED-FINISHED pairs, a trailing line
+    with no final newline) is rejected via `InvocationAuditCorruptionError`
+    without modifying the file.
+  - A successful append performs, in order and unconditionally (regardless
+    of which process, if any, created each path component): `fsync` the
+    audit file, then `fsync` the audit directory, the `.hldspec` directory,
+    and the resolved root directory — so a writer that finds every component
+    already present still gets independent durability proof for the whole
+    chain, not just for its own writes.
+  - The resolved audit root is opened by walking every real directory
+    component of it — not by a single `O_NOFOLLOW` open of the assembled
+    path — from a fixed anchor (`/` for an absolute root, `.` for a relative
+    one), opening each component with `O_NOFOLLOW`. A one-shot open only
+    protects the trailing path component the kernel resolves; every
+    ancestor component is resolved by the kernel's normal lookup, and an
+    attacker-controlled symlink anywhere in that ancestry would otherwise be
+    followed silently. The component walk closes each intermediate fd as it
+    advances and returns exactly one open fd for the resolved root itself,
+    used for the `.hldspec`/audit/file creation and `fsync` steps already
+    described above. Every symlink in the traversal is rejected — including
+    a symlinked `.hldspec` directory, audit directory, or audit file, as
+    before — with exactly one narrow exception:
+    - **Trusted Darwin root aliases.** Stock macOS ships `/var` and `/tmp` as
+      root-owned symlinks to `private/var` and `private/tmp`; rejecting them
+      outright would break most real macOS target paths, since `/tmp`,
+      `TMPDIR`, and `/var/folders/...` are all spelled through these
+      aliases by the platform itself. When, and only when, all of the
+      following hold, the writer substitutes the real `private/var` or
+      `private/tmp` components (themselves opened with `O_NOFOLLOW` like
+      every other component) instead of following the alias:
+      - the platform is Darwin;
+      - the alias is the *first* component of an *absolute* resolved root
+        (never a relative root, never a later component);
+      - the anchor `/` directory is owned by UID 0 and is not
+        group- or world-writable;
+      - the alias entry itself is a symlink owned by UID 0;
+      - its `readlink` target is exactly `private/var`/`/private/var` (for
+        `var`) or `private/tmp`/`/private/tmp` (for `tmp`) — no prefix,
+        suffix, or nested variation is accepted.
+      No other alias — `/etc`, any other root-level symlink (including other
+      stock Darwin symlinks such as `/home`), a nested alias, a
+      dynamically-discovered alias, or any alias on a non-Darwin platform —
+      is authorized. This exception does not use `Path.resolve()`,
+      `os.path.realpath()`, or any other generic canonicalization; it is two
+      exact, explicitly authorized substitutions and nothing else.
+    - **Disclosed limits.** A relative resolved root's traversal starts from
+      the process's already-open current working directory; the historical
+      path used to reach that working directory is not itself revalidated.
+      This hardening is self-contained to the audit writer's own root
+      traversal and does not change `control_paths`/`run_state` pointer
+      resolution — the pointer that selects the normal or external-controller
+      root is read exactly as before this hardening. The Darwin alias trust
+      checks assume the standard, unmodified stock configuration
+      (root-owned `/`, root-owned alias symlinks); a privileged attacker able
+      to replace those root-owned filesystem objects, replace a mount
+      namespace, or otherwise act as root is outside this threat model, the
+      same as for every other root-owned path this writer already trusts.
+  - The history scan reads in bounded chunks, so multi-line history is
+    processed incrementally and the entire log is not normally loaded into
+    memory at once; the current line is still buffered in full until its
+    terminating newline, so one extremely large or unterminated line can
+    consume memory proportional to that line's length. Lifecycle validation
+    also keeps state keyed by every `invocation_id` for the duration of the
+    scan — the STARTED/FINISHED information needed to detect duplicates,
+    orphans, incompatible pairs, and ordering violations — so total memory
+    grows with both the largest current line and the number/size of
+    lifecycle entries. No total record-size limit or bounded-total-memory
+    guarantee is currently ratified.
+  - No runtime code constructs or submits records through this writer, no
+    production invocation path calls it, and no audit record is emitted
+    automatically by anything in this repo today.
+  - No public reader or diagnostics exist yet (Slice E).
+  - `SpecKitInvoker`/`speckit_drive_loop.py` wiring (Slice C/D) requires its
+    own separate authorization and is explicitly not part of this slice.
 - **Slice C — `SpecKitInvoker` integration.** Append STARTED before external
   invocation and FINISHED after return or termination, per the failure rule
   (§11). Preserves the existing `InvocationResult` shape; exposes audit
@@ -280,7 +374,8 @@ continuation. Audit failure never fails silently.
 ## 12. See also
 
 - [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019 —
-  backlog entry this contract resolves; implementation phases (§9) remain open there.
+  backlog entry this contract resolves; Slices C–E remain open there —
+  Slices A–B are implemented.
 - [`TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md`](TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md) —
   the `DRIVER_OBSERVED` / `MANUAL_ATTESTED` / readiness-evidence axis this log is
   explicitly distinct from.
