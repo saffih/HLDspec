@@ -22,6 +22,7 @@ import math
 import os
 import re
 import stat
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -673,25 +674,176 @@ def _validate_lock_timeout(value: object) -> float:
     return value
 
 
-def _open_existing_directory(path: Path) -> int:
+# --- CP3B: hardened ancestor traversal + narrow Darwin root-alias policy ---
+#
+# CP3A opened the resolved audit root in one shot
+# (`os.open(str(root_path), O_NOFOLLOW)`): the kernel resolves every
+# intermediate path component through its normal lookup and only the final,
+# already-resolved component is checked for O_NOFOLLOW -- so an
+# attacker-controlled symlink anywhere in `root_path`'s ancestry was followed
+# silently. `_open_root_fd` instead walks `root_path` one real component at a
+# time from a fixed anchor fd (`/` for an absolute path, `.` for a relative
+# one), opening every component with `O_NOFOLLOW`, so no ancestor symlink can
+# be followed regardless of position.
+#
+# The sole exception, per explicit owner authorization, is the first
+# component of an absolute path when it is exactly one of the two stock
+# Darwin root aliases (`/var -> private/var`, `/tmp -> private/tmp`):
+# `_darwin_alias_translation` decides whether to trust it (root-owned,
+# non-writable anchor directory; root-owned symlink entry; exact `readlink`
+# target) and, if trusted, `_open_root_fd` substitutes the real
+# `private/var` or `private/tmp` components -- themselves opened with
+# `O_NOFOLLOW` like every other component -- instead of following the alias.
+# No other symlink, alias, or generic `resolve()`/`realpath()` is permitted
+# anywhere in this traversal.
+
+_DARWIN_ROOT_ALIASES: dict[str, tuple[str, ...]] = {
+    "var": ("private", "var"),
+    "tmp": ("private", "tmp"),
+}
+
+_DARWIN_ALIAS_READLINK_TARGETS: dict[str, frozenset[str]] = {
+    "var": frozenset({"private/var", "/private/var"}),
+    "tmp": frozenset({"private/tmp", "/private/tmp"}),
+}
+
+_TRAVERSAL_DIR_FLAGS = os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW
+if hasattr(os, "O_CLOEXEC"):
+    _TRAVERSAL_DIR_FLAGS |= os.O_CLOEXEC
+
+
+def _darwin_alias_translation(
+    name: str,
+    *,
+    platform: str,
+    anchor_owner_uid: int,
+    anchor_mode: int,
+    entry_is_symlink: bool,
+    entry_owner_uid: int,
+    entry_target: str,
+) -> tuple[str, ...] | None:
+    """Pure trust decision for one first-absolute-component alias candidate.
+
+    Takes already-observed filesystem facts rather than a path or fd, so it
+    has no filesystem access of its own and runs identically on every
+    platform -- callers gate the real `os.stat`/`os.readlink` probing (and
+    the Darwin-only applicability) behind `_resolve_darwin_alias`. Returns
+    the real path components to substitute for `name`, or `None` if any
+    trust condition fails.
+    """
+    if platform != "darwin":
+        return None
+    real_components = _DARWIN_ROOT_ALIASES.get(name)
+    if real_components is None:
+        return None
+    if anchor_owner_uid != 0:
+        return None
+    if anchor_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        return None
+    if not entry_is_symlink:
+        return None
+    if entry_owner_uid != 0:
+        return None
+    if entry_target not in _DARWIN_ALIAS_READLINK_TARGETS[name]:
+        return None
+    return real_components
+
+
+def _resolve_darwin_alias(anchor_fd: int, name: str) -> tuple[str, ...] | None:
+    """Inspect (never follow) `name` under `anchor_fd` and apply
+    `_darwin_alias_translation`. `anchor_fd` is the already-open directory
+    fd the candidate alias entry lives in (the root anchor, for the first
+    absolute component); this never opens or dereferences the alias itself.
+    """
+    if sys.platform != "darwin" or name not in _DARWIN_ROOT_ALIASES:
+        return None
     try:
-        return os.open(str(path), os.O_DIRECTORY | os.O_RDONLY | os.O_NOFOLLOW)
+        anchor_stat = os.fstat(anchor_fd)
+        entry_stat = os.stat(name, dir_fd=anchor_fd, follow_symlinks=False)
+    except OSError:
+        return None
+    entry_is_symlink = stat.S_ISLNK(entry_stat.st_mode)
+    entry_target = ""
+    if entry_is_symlink:
+        try:
+            entry_target = os.readlink(name, dir_fd=anchor_fd)
+        except OSError:
+            return None
+    return _darwin_alias_translation(
+        name,
+        platform=sys.platform,
+        anchor_owner_uid=anchor_stat.st_uid,
+        anchor_mode=stat.S_IMODE(anchor_stat.st_mode),
+        entry_is_symlink=entry_is_symlink,
+        entry_owner_uid=entry_stat.st_uid,
+        entry_target=entry_target,
+    )
+
+
+def _open_traversal_anchor(is_absolute: bool, root_path: Path) -> int:
+    anchor_name = "/" if is_absolute else "."
+    try:
+        return os.open(anchor_name, _TRAVERSAL_DIR_FLAGS)
+    except OSError as exc:
+        raise InvocationAuditError(
+            "unable to open resolved audit root traversal anchor", path=root_path
+        ) from exc
+
+
+def _open_traversal_component(parent_fd: int, name: str, root_path: Path) -> int:
+    try:
+        return os.open(name, _TRAVERSAL_DIR_FLAGS, dir_fd=parent_fd)
     except FileNotFoundError as exc:
         raise InvocationAuditError(
-            "resolved audit root does not exist", path=path
+            "resolved audit root does not exist", path=root_path
         ) from exc
     except NotADirectoryError as exc:
         raise InvocationAuditError(
-            "resolved audit root is not a directory", path=path
+            "resolved audit root is not a directory", path=root_path
         ) from exc
     except OSError as exc:
         if exc.errno == errno.ELOOP:
             raise InvocationAuditError(
-                "resolved audit root must not be a symlink", path=path
+                "resolved audit root traversal must not follow a symlink",
+                path=root_path,
             ) from exc
         raise InvocationAuditError(
-            "unable to open resolved audit root", path=path
+            "unable to open resolved audit root traversal component", path=root_path
         ) from exc
+
+
+def _open_root_fd(root_path: Path) -> int:
+    """Open the full `root_path` directory chain component-by-component,
+    rejecting every symlink except the two owner-authorized Darwin root
+    aliases (see module notes above). Returns exactly one open directory fd
+    owning `root_path` itself; the caller owns and must close it. Never
+    creates anything -- `root_path` and every component in it must already
+    exist.
+    """
+    is_absolute = root_path.is_absolute()
+    remaining = list(root_path.parts[1:]) if is_absolute else list(root_path.parts)
+
+    current_fd = _open_traversal_anchor(is_absolute, root_path)
+    for index, component in enumerate(remaining):
+        # The entire per-component step -- including alias resolution, which
+        # itself performs filesystem calls against `current_fd` -- is one
+        # failure unit: any exception here must close the fd `_open_root_fd`
+        # currently owns before propagating, not only a failure from the
+        # final `os.open`.
+        try:
+            real_components: tuple[str, ...] = (component,)
+            if is_absolute and index == 0:
+                translated = _resolve_darwin_alias(current_fd, component)
+                if translated is not None:
+                    real_components = translated
+            for real_component in real_components:
+                next_fd = _open_traversal_component(current_fd, real_component, root_path)
+                os.close(current_fd)
+                current_fd = next_fd
+        except BaseException:
+            os.close(current_fd)
+            raise
+    return current_fd
 
 
 def _open_or_create_dir_component(parent_fd: int, name: str, context_path: Path) -> tuple[int, bool]:
@@ -1046,7 +1198,7 @@ def append_invocation_record(
 
     opened_fds: list[int] = []
     try:
-        root_fd = _open_existing_directory(root_path)
+        root_fd = _open_root_fd(root_path)
         opened_fds.append(root_fd)
 
         hldspec_fd, _hldspec_created = _open_or_create_dir_component(

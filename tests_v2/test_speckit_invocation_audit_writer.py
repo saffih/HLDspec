@@ -28,6 +28,7 @@ import multiprocessing
 import os
 import shutil
 import stat
+import sys
 import tempfile
 import time
 import unittest
@@ -1313,6 +1314,451 @@ class FaultInjectionTests(_TempTargetTestCase):
         record2 = _unique_record(base_started)
         with self.assertRaises(audit.InvocationAuditCorruptionError):
             audit.append_invocation_record(self.target, record2)
+
+
+# --- CP3B: hardened ancestor traversal + narrow Darwin root-alias policy ----
+#
+# CP3A opened the resolved audit root in one shot
+# (`os.open(str(root_path), O_NOFOLLOW)`): O_NOFOLLOW only rejects a symlink
+# in the *trailing* path component the kernel resolves, never an ancestor.
+# An attacker-controlled symlink anywhere above the final root component was
+# followed silently. These tests prove that defect against CP3A and pin the
+# CP3B per-component `O_NOFOLLOW` walk, plus the two owner-authorized Darwin
+# root aliases (`/var -> private/var`, `/tmp -> private/tmp`) and nothing
+# else.
+
+
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+class AncestorSymlinkRejectionTests(_TempTargetTestCase):
+    def test_single_level_ancestor_symlink_rejected(self):
+        real_parent = Path(self._tmp) / "real-parent"
+        (real_parent / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "attacker-link"
+        attacker_link.symlink_to(real_parent, target_is_directory=True)
+
+        record = _unique_record(base_started)
+        with self.assertRaises(audit.InvocationAuditError):
+            audit.append_invocation_record(attacker_link / "workspace", record)
+
+        self.assertFalse((real_parent / "workspace" / ".hldspec").exists())
+
+    def test_multilevel_ancestor_symlink_rejected(self):
+        real_root = Path(self._tmp) / "real-root"
+        (real_root / "a" / "b" / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "attacker-root-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+
+        record = _unique_record(base_started)
+        target = attacker_link / "a" / "b" / "workspace"
+        with self.assertRaises(audit.InvocationAuditError):
+            audit.append_invocation_record(target, record)
+
+        self.assertFalse((real_root / "a" / "b" / "workspace" / ".hldspec").exists())
+
+    def test_relative_ancestor_symlink_rejected(self):
+        real_parent = Path(self._tmp) / "rel-real-parent"
+        (real_parent / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "rel-attacker-link"
+        attacker_link.symlink_to(real_parent, target_is_directory=True)
+
+        original_cwd = os.getcwd()
+        os.chdir(self._tmp)
+        try:
+            record = _unique_record(base_started)
+            with self.assertRaises(audit.InvocationAuditError):
+                audit.append_invocation_record(Path("rel-attacker-link") / "workspace", record)
+        finally:
+            os.chdir(original_cwd)
+
+        self.assertFalse((real_parent / "workspace" / ".hldspec").exists())
+
+    def test_dot_dot_through_real_directories_is_accepted(self):
+        base = Path(self._tmp) / "dotdot-real"
+        (base / "a" / "b").mkdir(parents=True)
+        workspace = base / "a" / "workspace"
+        workspace.mkdir()
+
+        # Not normalized before traversal: the writer must open "a", then
+        # "b", then walk back out via a real ".." component, then
+        # "workspace" -- never collapse the path lexically first.
+        target = base / "a" / "b" / ".." / "workspace"
+        record = _unique_record(base_started)
+        path = audit.append_invocation_record(target, record)
+        self.assertTrue(path.is_file())
+
+    def test_dot_dot_after_symlink_component_is_rejected(self):
+        real_root = Path(self._tmp) / "dotdot-real-root"
+        (real_root / "sibling").mkdir(parents=True)
+        (real_root / "workspace").mkdir()
+        attacker_link = Path(self._tmp) / "dotdot-attacker-link"
+        attacker_link.symlink_to(real_root / "sibling", target_is_directory=True)
+
+        # The symlinked component itself must be rejected before ".." is
+        # ever processed -- CWD/ancestor semantics are never used to
+        # legitimize a path that starts by following an untrusted symlink.
+        target = attacker_link / ".." / "workspace"
+        record = _unique_record(base_started)
+        with self.assertRaises(audit.InvocationAuditError):
+            audit.append_invocation_record(target, record)
+
+    def test_alias_name_not_at_first_component_is_not_translated(self):
+        # A real directory literally named "var" (or "tmp"), anywhere but the
+        # first absolute path component, is an ordinary directory -- never
+        # alias-translated, on any platform.
+        base = Path(self._tmp) / "not-root-alias"
+        (base / "var" / "workspace").mkdir(parents=True)
+        target = base / "var" / "workspace"
+
+        record = _unique_record(base_started)
+        path = audit.append_invocation_record(target, record)
+        self.assertEqual(
+            target / ".hldspec" / "audit" / "speckit_invocations.jsonl", path
+        )
+
+
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+@unittest.skipUnless(sys.platform == "darwin", "Darwin root alias compatibility is macOS-specific")
+class DarwinRootAliasIntegrationTests(unittest.TestCase):
+    def test_var_alias_target_placement_supported(self):
+        # `tempfile.mkdtemp()` on stock macOS returns an unresolved path
+        # whose first component is literally "var" (verified below) -- this
+        # exercises the real alias translation rather than a pre-resolved
+        # path, which would launder the test into the plain component walk.
+        tmp = tempfile.mkdtemp(prefix="hldspec-audit-var-")
+        self.assertEqual("var", Path(tmp).parts[1], "fixture no longer alias-spelled")
+        target = Path(tmp) / "target"
+        target.mkdir()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+
+        record = _unique_record(base_started)
+        path = audit.append_invocation_record(target, record)
+        self.assertTrue(path.is_file())
+
+    def test_tmp_literal_alias_target_placement_supported(self):
+        parent = Path("/tmp") / f"hldspec-audit-tmp-alias-{uuid.uuid4().hex}"
+        target = parent / "target"
+        target.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
+        self.assertEqual("tmp", target.parts[1], "fixture no longer alias-spelled")
+
+        record = _unique_record(base_started)
+        path = audit.append_invocation_record(target, record)
+        self.assertTrue(path.is_file())
+
+    def test_home_root_symlink_first_component_rejected_despite_root_ownership(self):
+        # `/home` is itself an existing root-owned Darwin symlink but is not
+        # one of the two owner-authorized aliases; using it directly as the
+        # resolved root must be rejected as an untrusted first-component
+        # symlink, not because anything is missing underneath it (we have no
+        # write permission under `/home` to prove otherwise, so the root
+        # itself -- which already exists -- is the target under test).
+        record = _unique_record(base_started)
+        with self.assertRaises(audit.InvocationAuditError):
+            audit.append_invocation_record(Path("/home"), record)
+
+
+class DarwinRootAliasPolicyUnitTests(unittest.TestCase):
+    """Platform-independent coverage of `_darwin_alias_translation`: a pure
+    decision function taking already-observed filesystem facts, so every
+    case below runs identically on Linux CI and on macOS.
+    """
+
+    def _accepted(self, name, **overrides):
+        kwargs = dict(
+            platform="darwin",
+            anchor_owner_uid=0,
+            anchor_mode=0o755,
+            entry_is_symlink=True,
+            entry_owner_uid=0,
+            entry_target="",
+        )
+        kwargs.update(overrides)
+        return audit._darwin_alias_translation(name, **kwargs)
+
+    def test_darwin_var_relative_spelling_accepted(self):
+        self.assertEqual(
+            ("private", "var"), self._accepted("var", entry_target="private/var")
+        )
+
+    def test_darwin_var_absolute_spelling_accepted(self):
+        self.assertEqual(
+            ("private", "var"), self._accepted("var", entry_target="/private/var")
+        )
+
+    def test_darwin_tmp_relative_spelling_accepted(self):
+        self.assertEqual(
+            ("private", "tmp"), self._accepted("tmp", entry_target="private/tmp")
+        )
+
+    def test_darwin_tmp_absolute_spelling_accepted(self):
+        self.assertEqual(
+            ("private", "tmp"), self._accepted("tmp", entry_target="/private/tmp")
+        )
+
+    def test_non_root_owned_alias_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", entry_owner_uid=501)
+        )
+
+    def test_writable_root_anchor_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", anchor_mode=0o777)
+        )
+
+    def test_group_writable_root_anchor_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", anchor_mode=0o775)
+        )
+
+    def test_non_root_owned_anchor_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", anchor_owner_uid=501)
+        )
+
+    def test_unexpected_target_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/tmp")
+        )
+
+    def test_extra_suffix_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var/extra")
+        )
+
+    def test_etc_not_authorized(self):
+        self.assertIsNone(self._accepted("etc", entry_target="private/etc"))
+
+    def test_non_darwin_platform_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", platform="linux")
+        )
+
+    def test_non_symlink_entry_rejected(self):
+        self.assertIsNone(
+            self._accepted("var", entry_target="private/var", entry_is_symlink=False)
+        )
+
+
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+class ExternalControllerAliasTests(_TempTargetTestCase):
+    """`run_state.write_pointer` stores `controller_root.resolve()`, which
+    erases the literal alias spelling. These tests write the pointer payload
+    by hand -- never through `write_pointer` -- so the controller root stays
+    spelled through the literal `/var` or `/tmp` alias, exercising the same
+    alias-translation path an external-controller deployment would hit.
+    """
+
+    def _write_manual_pointer(self, target, controller_root_str):
+        payload = {
+            "schema_version": 1,
+            "controller_root": controller_root_str,
+            "target": str(target),
+            "source": str(target),
+            "source_sha256": "0" * 64,
+            "mode": "external",
+            "agent": "test",
+            "workflow_trigger": "test",
+            "created_or_updated_at": "2026-07-12T00:00:00Z",
+            "ownership": {
+                "hldspec_controller": "external",
+                "target_pointer": run_state.POINTER_FILE,
+                "speckit_workspace": ".specify/",
+                "product_files": "target-owned",
+            },
+        }
+        pointer_path = run_state.pointer_path(target)
+        pointer_path.parent.mkdir(parents=True, exist_ok=True)
+        pointer_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin root alias compatibility is macOS-specific")
+    def test_external_controller_literal_tmp_alias_accepted(self):
+        controller_root_str = f"/tmp/hldspec-audit-ext-tmp-{uuid.uuid4().hex}"
+        os.makedirs(controller_root_str, exist_ok=True)
+        self.addCleanup(shutil.rmtree, controller_root_str, ignore_errors=True)
+        self.assertEqual("tmp", Path(controller_root_str).parts[1])
+        self._write_manual_pointer(self.target, controller_root_str)
+
+        record = _unique_record(base_started)
+        path = audit.append_invocation_record(self.target, record)
+        self.assertEqual(
+            Path(controller_root_str) / ".hldspec" / "audit" / "speckit_invocations.jsonl",
+            path,
+        )
+        self.assertTrue(path.is_file())
+        self.assertFalse(
+            (self.target / ".hldspec" / "audit" / "speckit_invocations.jsonl").exists()
+        )
+
+    def test_external_controller_untrusted_ancestor_symlink_rejected(self):
+        real_root = Path(self._tmp) / "ext-real-root"
+        real_root.mkdir()
+        attacker_link = Path(self._tmp) / "ext-attacker-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+        self._write_manual_pointer(self.target, str(attacker_link))
+
+        record = _unique_record(base_started)
+        with self.assertRaises(audit.InvocationAuditError):
+            audit.append_invocation_record(self.target, record)
+        self.assertEqual([], list(real_root.iterdir()))
+
+
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+class TraversalFileDescriptorCleanupTests(_TempTargetTestCase):
+    def test_success_returns_exactly_one_live_fd(self):
+        # Tracks a *live set* (add on open, discard on close) rather than a
+        # list of every fd number ever seen: sequential open/close during
+        # the walk legitimately reuses fd numbers, so a "was this number
+        # ever opened" check would misreport an earlier, already-closed
+        # lifetime as still live.
+        base = Path(self._tmp) / "fd-real"
+        (base / "a" / "b").mkdir(parents=True)
+        target = base / "a" / "b"
+
+        live_fds = set()
+        real_open = os.open
+        real_close = os.close
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            live_fds.add(fd)
+            return fd
+
+        def tracking_close(fd):
+            live_fds.discard(fd)
+            real_close(fd)
+
+        with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                mock.patch.object(audit.os, "close", side_effect=tracking_close):
+            result_fd = audit._open_root_fd(target)
+
+        try:
+            self.assertEqual({result_fd}, live_fds)
+        finally:
+            os.close(result_fd)
+        with self.assertRaises(OSError):
+            os.fstat(result_fd)
+
+    def test_failure_closes_every_opened_intermediate_fd(self):
+        real_root = Path(self._tmp) / "fd-fail-real"
+        (real_root / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "fd-fail-attacker-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+        target = attacker_link / "workspace"
+
+        opened = []
+        real_open = os.open
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        with mock.patch.object(audit.os, "open", side_effect=tracking_open):
+            with self.assertRaises(audit.InvocationAuditError):
+                audit._open_root_fd(target)
+
+        self.assertGreater(len(opened), 0)
+        for fd in opened:
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_no_fd_is_double_closed(self):
+        # A live-set (add on open, discard on close) distinguishes a genuine
+        # double-close (closing an fd number not currently live) from the
+        # OS legitimately reissuing a just-freed fd number to a later,
+        # unrelated open during the same walk.
+        real_root = Path(self._tmp) / "fd-doubleclose-real"
+        (real_root / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "fd-doubleclose-attacker-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+        target = attacker_link / "workspace"
+
+        live_fds = set()
+        real_open = os.open
+        real_close = os.close
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            live_fds.add(fd)
+            return fd
+
+        def tracking_close(fd):
+            self.assertIn(fd, live_fds, f"fd {fd} closed while not open (double close)")
+            live_fds.discard(fd)
+            real_close(fd)
+
+        with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                mock.patch.object(audit.os, "close", side_effect=tracking_close):
+            with self.assertRaises(audit.InvocationAuditError):
+                audit._open_root_fd(target)
+
+    def test_repeated_failures_do_not_accumulate_open_fds(self):
+        real_root = Path(self._tmp) / "fd-repeat-real"
+        (real_root / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "fd-repeat-attacker-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+        target = attacker_link / "workspace"
+
+        if not os.path.isdir("/dev/fd"):
+            self.skipTest("/dev/fd unavailable on this platform")
+
+        before = len(os.listdir("/dev/fd"))
+        for _ in range(20):
+            with self.assertRaises(audit.InvocationAuditError):
+                audit._open_root_fd(target)
+        after = len(os.listdir("/dev/fd"))
+        self.assertEqual(before, after)
+
+    def test_root_fd_is_closed_by_append_invocation_record_on_success(self):
+        record = _unique_record(base_started)
+        captured = {}
+        real_open_root_fd = audit._open_root_fd
+
+        def capturing(*args, **kwargs):
+            fd = real_open_root_fd(*args, **kwargs)
+            captured["fd"] = fd
+            return fd
+
+        with mock.patch.object(audit, "_open_root_fd", side_effect=capturing):
+            audit.append_invocation_record(self.target, record)
+
+        self.assertIn("fd", captured)
+        with self.assertRaises(OSError):
+            os.fstat(captured["fd"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin root alias compatibility is macOS-specific")
+    def test_anchor_fd_closed_if_alias_resolution_itself_raises(self):
+        # `_resolve_darwin_alias` is invoked on the anchor fd before any
+        # `os.open` of a real destination component; an exception raised
+        # from *within* alias resolution (not just from the subsequent
+        # component open) must still close the fd `_open_root_fd` currently
+        # owns rather than leaking it.
+        tmp = tempfile.mkdtemp(prefix="hldspec-audit-alias-raise-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        self.assertEqual("var", Path(tmp).parts[1], "fixture no longer alias-spelled")
+        target = Path(tmp) / "target"
+        target.mkdir()
+
+        opened = []
+        real_open = os.open
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def raising_resolve(*args, **kwargs):
+            raise RuntimeError("simulated failure inside alias resolution")
+
+        with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                mock.patch.object(audit, "_resolve_darwin_alias", side_effect=raising_resolve):
+            with self.assertRaises(RuntimeError):
+                audit._open_root_fd(target)
+
+        self.assertGreater(len(opened), 0)
+        for fd in opened:
+            with self.assertRaises(OSError):
+                os.fstat(fd)
 
 
 if __name__ == "__main__":

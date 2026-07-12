@@ -273,12 +273,54 @@ returns to GATE before it starts.
     and the resolved root directory — so a writer that finds every component
     already present still gets independent durability proof for the whole
     chain, not just for its own writes.
-  - The resolved root directory is opened with `O_NOFOLLOW`; a symlinked
-    root, `.hldspec` directory, audit directory, or audit file is rejected
-    rather than followed. This is new, self-contained hardening for this
-    control-state path specifically — no other HLDspec control-state
-    reader/writer currently rejects a symlinked target root, and nothing
-    established requires this writer to follow one.
+  - The resolved audit root is opened by walking every real directory
+    component of it — not by a single `O_NOFOLLOW` open of the assembled
+    path — from a fixed anchor (`/` for an absolute root, `.` for a relative
+    one), opening each component with `O_NOFOLLOW`. A one-shot open only
+    protects the trailing path component the kernel resolves; every
+    ancestor component is resolved by the kernel's normal lookup, and an
+    attacker-controlled symlink anywhere in that ancestry would otherwise be
+    followed silently. The component walk closes each intermediate fd as it
+    advances and returns exactly one open fd for the resolved root itself,
+    used for the `.hldspec`/audit/file creation and `fsync` steps already
+    described above. Every symlink in the traversal is rejected — including
+    a symlinked `.hldspec` directory, audit directory, or audit file, as
+    before — with exactly one narrow exception:
+    - **Trusted Darwin root aliases.** Stock macOS ships `/var` and `/tmp` as
+      root-owned symlinks to `private/var` and `private/tmp`; rejecting them
+      outright would break most real macOS target paths, since `/tmp`,
+      `TMPDIR`, and `/var/folders/...` are all spelled through these
+      aliases by the platform itself. When, and only when, all of the
+      following hold, the writer substitutes the real `private/var` or
+      `private/tmp` components (themselves opened with `O_NOFOLLOW` like
+      every other component) instead of following the alias:
+      - the platform is Darwin;
+      - the alias is the *first* component of an *absolute* resolved root
+        (never a relative root, never a later component);
+      - the anchor `/` directory is owned by UID 0 and is not
+        group- or world-writable;
+      - the alias entry itself is a symlink owned by UID 0;
+      - its `readlink` target is exactly `private/var`/`/private/var` (for
+        `var`) or `private/tmp`/`/private/tmp` (for `tmp`) — no prefix,
+        suffix, or nested variation is accepted.
+      No other alias — `/etc`, any other root-level symlink (including other
+      stock Darwin symlinks such as `/home`), a nested alias, a
+      dynamically-discovered alias, or any alias on a non-Darwin platform —
+      is authorized. This exception does not use `Path.resolve()`,
+      `os.path.realpath()`, or any other generic canonicalization; it is two
+      exact, explicitly authorized substitutions and nothing else.
+    - **Disclosed limits.** A relative resolved root's traversal starts from
+      the process's already-open current working directory; the historical
+      path used to reach that working directory is not itself revalidated.
+      This hardening is self-contained to the audit writer's own root
+      traversal and does not change `control_paths`/`run_state` pointer
+      resolution — the pointer that selects the normal or external-controller
+      root is read exactly as before this hardening. The Darwin alias trust
+      checks assume the standard, unmodified stock configuration
+      (root-owned `/`, root-owned alias symlinks); a privileged attacker able
+      to replace those root-owned filesystem objects, replace a mount
+      namespace, or otherwise act as root is outside this threat model, the
+      same as for every other root-owned path this writer already trusts.
   - The history scan reads in bounded chunks, so multi-line history is
     processed incrementally and the entire log is not normally loaded into
     memory at once; the current line is still buffered in full until its
