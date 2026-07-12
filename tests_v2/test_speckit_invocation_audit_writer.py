@@ -1761,5 +1761,187 @@ class TraversalFileDescriptorCleanupTests(_TempTargetTestCase):
                 os.fstat(fd)
 
 
+class _SentinelPrimaryCloseFailure(OSError):
+    pass
+
+
+class _SentinelSecondaryCloseFailure(OSError):
+    pass
+
+
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+class RootFdOwnershipTransferTests(_TempTargetTestCase):
+    """CP3C: `_open_root_fd` must own exactly one fd at a time during the
+    per-component transfer. These use a relative-path fixture (anchor ".")
+    so no platform-specific Darwin alias translation is exercised -- the
+    ownership defect is in the plain transfer step, not the alias logic.
+    """
+
+    def _relative_target(self, *names):
+        original_cwd = os.getcwd()
+        self.addCleanup(os.chdir, original_cwd)
+        os.chdir(self._tmp)
+        target = Path(*names)
+        target.mkdir(parents=True)
+        return target
+
+    def test_old_close_failure_preserves_exception_no_retry_no_leak(self):
+        target = self._relative_target("a", "b")
+
+        live_fds = set()
+        close_calls = []
+        injected = {"failed_fd": None}
+        real_open = os.open
+        real_close = os.close
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            live_fds.add(fd)
+            return fd
+
+        def tracking_close(fd):
+            close_calls.append(fd)
+            if injected["failed_fd"] is None:
+                injected["failed_fd"] = fd
+                raise _SentinelPrimaryCloseFailure("simulated old-fd close failure")
+            live_fds.discard(fd)
+            real_close(fd)
+
+        try:
+            with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                    mock.patch.object(audit.os, "close", side_effect=tracking_close):
+                with self.assertRaises(_SentinelPrimaryCloseFailure):
+                    audit._open_root_fd(target)
+        finally:
+            # The fd whose close we intentionally never let complete has
+            # platform-dependent real state; best-effort close it so this
+            # test process does not itself leak a real descriptor.
+            failed_fd = injected["failed_fd"]
+            if failed_fd is not None:
+                try:
+                    real_close(failed_fd)
+                except OSError:
+                    pass
+            for fd in list(live_fds):
+                if fd != failed_fd:
+                    real_close(fd)
+
+        self.assertEqual(
+            1,
+            close_calls.count(injected["failed_fd"]),
+            "a close that already reported failure must not be retried",
+        )
+        leaked = live_fds - {injected["failed_fd"]}
+        self.assertEqual(
+            set(), leaked, "the newly opened fd must not leak when the old-fd close fails"
+        )
+
+    def test_old_close_failure_and_cleanup_failure_preserves_primary_exception(self):
+        # The old-fd close and the next-fd cleanup close are two genuinely
+        # different fds, so a correct fix makes exactly two close attempts
+        # here (one per fd) -- what must NOT happen is either fd's close
+        # being retried, or the secondary failure replacing the primary one.
+        target = self._relative_target("a", "b")
+
+        opened = []
+        close_calls = []
+        real_open = os.open
+        real_close = os.close
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def tracking_close(fd):
+            close_calls.append(fd)
+            if len(close_calls) == 1:
+                raise _SentinelPrimaryCloseFailure("simulated old-fd close failure")
+            raise _SentinelSecondaryCloseFailure("simulated cleanup-close failure")
+
+        try:
+            with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                    mock.patch.object(audit.os, "close", side_effect=tracking_close):
+                with self.assertRaises(_SentinelPrimaryCloseFailure):
+                    audit._open_root_fd(target)
+        finally:
+            for fd in opened:
+                try:
+                    real_close(fd)
+                except OSError:
+                    pass
+
+        self.assertEqual(
+            2, len(close_calls), "old-fd close and cleanup close must each be attempted"
+        )
+        self.assertEqual(
+            len(set(close_calls)),
+            len(close_calls),
+            "no single fd's close should be retried",
+        )
+
+    def test_component_open_failure_cleanup_close_failure_preserves_primary(self):
+        # Only the cleanup close that follows the real component-open
+        # failure is made to fail -- every earlier, unrelated successful
+        # transfer close in the ancestor chain behaves normally, so this
+        # isolates the masking behavior of exactly one failure unit
+        # (acquisition failure + cleanup-close failure) rather than
+        # perturbing the whole walk.
+        real_root = Path(self._tmp) / "fd-openfail-real"
+        (real_root / "workspace").mkdir(parents=True)
+        attacker_link = Path(self._tmp) / "fd-openfail-attacker-link"
+        attacker_link.symlink_to(real_root, target_is_directory=True)
+        target = attacker_link / "workspace"
+
+        opened = []
+        real_open = os.open
+        real_close = os.close
+        real_component_open = audit._open_traversal_component
+        marker = {"armed": False}
+
+        def tracking_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def wrapped_component_open(*args, **kwargs):
+            try:
+                return real_component_open(*args, **kwargs)
+            except audit.InvocationAuditError:
+                marker["armed"] = True
+                raise
+
+        def maybe_failing_close(fd):
+            if marker["armed"]:
+                raise _SentinelSecondaryCloseFailure("simulated cleanup-close failure")
+            real_close(fd)
+
+        try:
+            with mock.patch.object(audit.os, "open", side_effect=tracking_open), \
+                    mock.patch.object(
+                        audit, "_open_traversal_component", side_effect=wrapped_component_open
+                    ), mock.patch.object(audit.os, "close", side_effect=maybe_failing_close):
+                with self.assertRaises(audit.InvocationAuditError) as ctx:
+                    audit._open_root_fd(target)
+        finally:
+            # The final owned fd's close was made to fail without ever
+            # calling `real_close`, so it is genuinely still open at the OS
+            # level; close every fd this test opened so the test process
+            # itself does not leak a real descriptor.
+            for fd in opened:
+                try:
+                    real_close(fd)
+                except OSError:
+                    pass
+
+        # The exact errno for "opened a symlink as a directory component
+        # with O_NOFOLLOW" is platform-dependent (observed ELOOP on Linux,
+        # ENOTDIR on this macOS); what matters here is that the *original*
+        # component-open failure survives, not the masking cleanup failure.
+        self.assertIsInstance(ctx.exception.__cause__, OSError)
+        self.assertIn(ctx.exception.__cause__.errno, (errno.ELOOP, errno.ENOTDIR))
+        self.assertNotIsInstance(ctx.exception, _SentinelSecondaryCloseFailure)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -812,6 +812,18 @@ def _open_traversal_component(parent_fd: int, name: str, root_path: Path) -> int
         ) from exc
 
 
+def _close_quietly(fd: int) -> None:
+    """Best-effort cleanup close: a close that is itself cleaning up after
+    another failure must never replace that failure's exception, and a
+    close that already reported failure must never be retried, so any
+    `OSError` raised here is swallowed rather than propagated.
+    """
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+
+
 def _open_root_fd(root_path: Path) -> int:
     """Open the full `root_path` directory chain component-by-component,
     rejecting every symlink except the two owner-authorized Darwin root
@@ -829,7 +841,12 @@ def _open_root_fd(root_path: Path) -> int:
         # itself performs filesystem calls against `current_fd` -- is one
         # failure unit: any exception here must close the fd `_open_root_fd`
         # currently owns before propagating, not only a failure from the
-        # final `os.open`.
+        # final `os.open`. Ownership of `next_fd` transfers to `current_fd`
+        # immediately on open, before the old fd's close is even attempted,
+        # so a failing old-fd close can never strand `next_fd` unreachable
+        # from the `except` handler below -- and that old-fd close is never
+        # retried, since a close that already reported failure leaves the
+        # fd's real state platform-dependent.
         try:
             real_components: tuple[str, ...] = (component,)
             if is_absolute and index == 0:
@@ -838,10 +855,11 @@ def _open_root_fd(root_path: Path) -> int:
                     real_components = translated
             for real_component in real_components:
                 next_fd = _open_traversal_component(current_fd, real_component, root_path)
-                os.close(current_fd)
+                old_fd = current_fd
                 current_fd = next_fd
+                os.close(old_fd)
         except BaseException:
-            os.close(current_fd)
+            _close_quietly(current_fd)
             raise
     return current_fd
 
