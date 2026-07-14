@@ -1943,5 +1943,68 @@ class RootFdOwnershipTransferTests(_TempTargetTestCase):
         self.assertNotIsInstance(ctx.exception, _SentinelSecondaryCloseFailure)
 
 
+@unittest.skipUnless(_SLICE_B_API_AVAILABLE, "Slice B public API is not implemented yet")
+class AuditFileValidationCleanupTests(_TempTargetTestCase):
+    """`_open_or_create_audit_file`'s S_ISREG validation failure and its
+    cleanup close are two genuinely different failure units: a close that is
+    itself cleaning up after a validation failure must never replace that
+    failure's exception (mirrors the `_open_root_fd` cleanup-close masking
+    already covered by
+    `RootFdOwnershipTransferTests.test_component_open_failure_cleanup_close_failure_preserves_primary`).
+    """
+
+    def test_non_regular_file_cleanup_close_failure_preserves_primary_exception(self):
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("os.mkfifo unavailable on this platform")
+        audit_dir = self.target / ".hldspec" / "audit"
+        audit_dir.mkdir(parents=True)
+        name = "speckit_invocations.jsonl"
+        os.mkfifo(audit_dir / name)
+
+        parent_fd = os.open(str(audit_dir), os.O_DIRECTORY | os.O_RDONLY)
+        real_open = os.open
+        real_close = os.close
+        opened_fd = {"fd": None}
+        close_calls = []
+
+        def capturing_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            if kwargs.get("dir_fd") == parent_fd:
+                opened_fd["fd"] = fd
+            return fd
+
+        def failing_close(fd):
+            close_calls.append(fd)
+            if fd == opened_fd["fd"]:
+                raise _SentinelSecondaryCloseFailure("simulated cleanup-close failure")
+            real_close(fd)
+
+        try:
+            with mock.patch.object(audit.os, "open", side_effect=capturing_open), \
+                    mock.patch.object(audit.os, "close", side_effect=failing_close):
+                with self.assertRaises(audit.InvocationAuditError) as ctx:
+                    audit._open_or_create_audit_file(parent_fd, name, self.target)
+        finally:
+            # The cleanup close was made to fail without ever calling
+            # `real_close`, so the opened fd is genuinely still open at the
+            # OS level; close it directly so this test process does not
+            # itself leak a real descriptor.
+            fd = opened_fd["fd"]
+            if fd is not None:
+                try:
+                    real_close(fd)
+                except OSError:
+                    pass
+            os.close(parent_fd)
+
+        self.assertNotIsInstance(ctx.exception, _SentinelSecondaryCloseFailure)
+        self.assertIn("not a regular file", str(ctx.exception))
+        self.assertEqual(
+            1,
+            close_calls.count(opened_fd["fd"]),
+            "cleanup close must not be retried on the same fd",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
