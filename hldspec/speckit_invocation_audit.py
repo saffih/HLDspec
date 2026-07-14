@@ -929,7 +929,7 @@ def _open_or_create_audit_file(parent_fd: int, name: str, context_path: Path) ->
                 f"audit file {name!r} is not a regular file", path=context_path
             )
     except BaseException:
-        os.close(fd)
+        _close_quietly(fd)
         raise
     return fd, created
 
