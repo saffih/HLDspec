@@ -15,6 +15,14 @@ authorized no implementation slice by itself: the writer, runtime
 integration, reader, CLI output, and `speckit_drive_loop.py` wiring each
 still require their own separate gate before work starts.
 
+**Slice C decision ratification (2026-07-14, §12):** the three consequential
+design decisions that previously blocked Slice C implementation-readiness —
+audit-failure exposure mechanism, no-explicit-model representation, and
+pre-execution signature-failure handling — are ratified in §12. Slice C is
+now design-ready but remains **NOT IMPLEMENTED**; ratifying these decisions
+authorizes no code change and does not itself start Slice C — Slice C still
+requires its own separate gated implementation task.
+
 This doc does not redefine the Driver/Toolchain vocabulary (owned by
 [`TOOLCHAIN_DRIVER_CONTRACT.md`](TOOLCHAIN_DRIVER_CONTRACT.md)), the ownership
 zones (owned by [`TOOLCHAIN_DRIVER_BOUNDARY.md`](TOOLCHAIN_DRIVER_BOUNDARY.md)),
@@ -111,7 +119,8 @@ execution_path         "speckit_invoker" (initial); "speckit_drive_loop" reserve
 runtime                runtime identity, e.g. "claude"
 phase                  HLDspec phase identity
 skill                  concrete installed skill identity, e.g. "speckit-tasks"
-model                  routed model identity
+model                  routed model identity; null when routing is disabled
+                       (`route_models=False`) — see §12.2
 authority_level        existing authority classification, normally
                        "EXECUTE_WITH_APPROVAL" (hldspec/helper_registry.py
                        AUTHORITY_EXECUTE_WITH_APPROVAL)
@@ -160,6 +169,9 @@ started_at_utc
 git_signature_before_sha256
 ```
 
+Failure to obtain `git_signature_before_sha256` blocks STARTED construction —
+see §12.3.
+
 May include a bounded, non-sensitive preflight classification.
 
 ### 5.5 FINISHED-specific
@@ -192,6 +204,11 @@ watchdog_triggered
 
 Raw stdout/stderr and changed-file content are never stored; only hashes and
 byte counts.
+
+Failure to obtain `git_signature_after_sha256` after the external command has
+already run is a FINISHED-construction failure, distinct from a
+pre-execution (STARTED-side) signature failure because the command has
+already executed and blocking is no longer possible — see §12.1 and §12.3.
 
 ## 6. Append durability and concurrency
 
@@ -338,10 +355,12 @@ returns to GATE before it starts.
   - No public reader or diagnostics exist yet (Slice E).
   - `SpecKitInvoker`/`speckit_drive_loop.py` wiring (Slice C/D) requires its
     own separate authorization and is explicitly not part of this slice.
-- **Slice C — `SpecKitInvoker` integration.** Append STARTED before external
+- **Slice C — `SpecKitInvoker` integration. Design-ready (decisions ratified
+  2026-07-14, §12); NOT IMPLEMENTED.** Append STARTED before external
   invocation and FINISHED after return or termination, per the failure rule
-  (§11). Preserves the existing `InvocationResult` shape; exposes audit
-  failure separately. `execution_path: "speckit_drive_loop"` is explicitly
+  (§11) and the ratified failure/identity decisions (§12). Preserves the
+  existing `InvocationResult` shape; exposes audit failure separately via the
+  mechanism in §12.1. `execution_path: "speckit_drive_loop"` is explicitly
   **not** included in this slice.
 - **Slice D — drive-loop integration (reserved, not started).** Separate
   `execution_path: "speckit_drive_loop"` coverage and an automatic-continuation
@@ -369,13 +388,199 @@ target-relative changed paths, and bounded redacted failure summaries.
 
 Audit durability is mandatory for repeated live execution: failure to write
 STARTED blocks invocation; failure to write FINISHED blocks automatic
-continuation. Audit failure never fails silently.
+continuation. Audit failure never fails silently. Failure to obtain the
+pre-execution Git signature is a STARTED-construction failure and is governed
+by this same rule — see §12.3.
 
-## 12. See also
+## 12. Slice C failure and identity decisions (ratified 2026-07-14)
+
+This section ratifies the three consequential design decisions that
+previously blocked Slice C implementation-readiness. Ratifying these
+decisions is a **documentation-only act**: it authorizes no code, no test,
+and no schema-validator change, and does not itself start Slice C. Slice C
+remains **NOT IMPLEMENTED**. Where a rule below states target behavior that
+the current Slice A/B validator (`hldspec/speckit_invocation_audit.py`) does
+not yet implement (e.g. a `model: null` path, an audit-failure exception
+type), that is explicitly a **deferred Slice C implementation requirement**,
+not a description of current validator behavior — the current validator
+requires non-empty `model` and hex64 `git_signature_before_sha256`/
+`git_signature_after_sha256` with no null path, and continues to do so until
+Slice C's own implementation task amends it.
+
+### 12.1 Audit-failure exposure (STARTED and FINISHED)
+
+MUST: on STARTED-write failure (including STARTED-record construction
+failure — e.g. an unavailable pre-execution signature, §12.3), the external
+command MUST NOT run, and the caller MUST receive a dedicated audit-failure
+signal.
+
+MUST: on FINISHED-write failure (including FINISHED-record construction
+failure — e.g. an unavailable post-execution signature) after the external
+command has already executed, the true command outcome MUST NOT be
+discarded, replaced, or falsely converted to success; the caller MUST
+receive a dedicated audit-failure signal separately from the real result;
+automatic continuation MUST be blocked; and the unmatched `STARTED` record
+stands as durable evidence of an incomplete lifecycle, per §4.
+
+MECHANISM: the audit-failure signal MUST be a dedicated exception type that
+extends the existing `InvocationAuditError` hierarchy
+(`hldspec/speckit_invocation_audit.py:613`) — this ratifies that Slice C's
+implementation will extend that hierarchy; it does not itself define any
+class. The exception MUST NOT carry the full `InvocationResult` (which holds
+raw `stdout`/`stderr`) as a directly-inspectable attribute. Instead:
+- the exception MUST carry, at minimum, `invocation_id`, `phase`, and
+  `skill` — so an operator can correlate the failure with a specific
+  attempt — and MAY additionally carry other bounded, already-sanitized
+  fields (e.g. `returncode`, hashes, byte counts — values that are already
+  safe to persist per §5.3/§10);
+- a separate, explicitly documented mechanism MUST exist for a caller to
+  retrieve the real `InvocationResult` after a FINISHED-write failure (the
+  exact shape — accessor method, injected sink, or documented
+  catch-and-read pattern — is Slice C implementation latitude, not a policy
+  question this contract leaves open).
+
+PUBLIC CALL SHAPE: `invoke()` continues to return a plain `InvocationResult`
+on the non-audit-failure path; it raises the dedicated audit-failure
+exception on STARTED or FINISHED audit failure. No wrapper/envelope return
+type is introduced. `InvocationResult`'s dataclass shape
+(`hldspec/speckit_invoker.py:71-90`) remains byte-for-byte unchanged.
+
+STARTED FAILURE OBSERVABLE: via the raised exception, before the external
+command runs.
+
+FINISHED FAILURE OBSERVABLE: via the raised exception, after the external
+command has already run.
+
+ACTUAL INVOCATION RESULT LOCATION: for FINISHED failure, retrievable via the
+separately documented retrieval mechanism above — never embedded directly
+and unboundedly in the exception.
+
+CALLER OBLIGATION: callers of `invoke()` (currently
+`hldspec/machines/speckit_execution.py:221,308` and
+`scripts/proof_e2e_v0.py:451,455`) MUST NOT wrap the call in a broad
+`except Exception` (or any handler) that silently swallows the
+audit-failure exception. A caller MAY catch the specific audit-failure
+exception type to surface it to a human/operator, but MUST NOT
+automatically retry or continue as if the invocation were unaudited.
+
+AUTOMATIC CONTINUATION RULE: MUST NOT auto-continue or auto-retry after any
+audit-failure exception, per §11.
+
+PRIVACY / REDACTION RULE: the audit-failure exception's `__str__`,
+`__repr__`, and any structured-logging representation MUST be limited to the
+bounded sanitized fields listed above. Raw prompt text, full `stdout`, and
+full `stderr` MUST NOT appear on the exception's default string, repr, or
+logging surface, matching the existing `InvocationAuditError` docstring rule
+("never include complete raw record content in `message` or these fields").
+This rule governs the exception's own representation only. The real
+`InvocationResult`, once retrieved via the separate documented mechanism
+above, is the same pre-existing dataclass callers already receive on the
+non-audit-failure path (`hldspec/speckit_invoker.py:71-90`) and already
+carries raw `stdout`/`stderr` today — this contract does not newly restrict
+what a caller does with an `InvocationResult` it already legitimately holds;
+it restricts only what the audit-failure exception itself exposes by
+default.
+
+BACKWARD-COMPATIBILITY EFFECT: `InvocationResult`'s shape is unchanged.
+Existing tests in `tests_v2/test_speckit_invoker.py` that construct
+`SpecKitInvoker` without any audit wiring and expect a plain
+`InvocationResult` return MUST continue to pass unmodified — Slice C's
+implementation MUST NOT make audit writing unconditional in a way that
+breaks those fixtures (following the existing `runner`/`change_detector`
+injection precedent, `hldspec/speckit_invoker.py:110-117`).
+
+### 12.2 No explicit `--model` flag (`route_models=False`)
+
+MODEL FIELD DOMAIN: `model` MAY be schema-`null`. `model` records what was
+*requested* of `SpecKitInvoker` (via `phase_models`/`route_models`); it MUST
+NOT assert a concrete effective model identity that the external `claude`
+runtime was not told to use. This is a deferred validator amendment — the
+shipped Slice A/B validator currently requires non-empty `model` on every
+record (`hldspec/speckit_invocation_audit.py:410-412`) and has no null path
+yet.
+
+NO-FLAG REPRESENTATION: when `model` is `null`, `argv_without_prompt` MUST
+contain zero `--model` occurrences. When `model` is a non-empty string,
+`argv_without_prompt` MUST contain exactly one `--model` occurrence whose
+value equals `model` (existing rule, unchanged).
+
+ARGV VALIDATION RULE: the deferred validator amendment MUST enforce the
+symmetric rule above — not merely permit zero occurrences when `model` is
+null, but require exactly zero in that case, so a `null` model can never
+coexist with a fabricated `--model` flag.
+
+ROUTE_MODELS_FALSE BEHAVIOR: `SpecKitInvoker(route_models=False)` is a
+supported, currently-exercised production configuration
+(`scripts/proof_e2e_v0.py:451`). It MUST continue to produce a command with
+no `--model` flag and, once Slice C is implemented, an audit record with
+`model: null`. This decision requires no change to
+`scripts/proof_e2e_v0.py` or any other production caller.
+
+PROOF_E2E_V0 COMPATIBILITY: `scripts/proof_e2e_v0.py`'s default
+(`route_models=False`) path becomes schema-compliant under the deferred
+validator amendment without any production-code change.
+
+REPRODUCIBILITY LIMITATION: no field in this schema can assert which model
+the external `claude --print` process actually selected when invoked
+without `--model` — that runtime's own default-model behavior is opaque to
+`hldspec/command_runner.py` (a bare `subprocess.run` wrapper) and is out of
+scope for this contract to observe or claim.
+
+### 12.3 Pre-execution (and post-execution) Git-signature failure
+
+PREFLIGHT FAILURE BEHAVIOR: fail closed. Inability to obtain the
+pre-execution Git signature (`SpecKitInvoker._safe_signature()` returning
+`None` before the external command runs) is a STARTED-construction failure
+and is governed by §12.1's STARTED-failure rule. No null or sentinel value
+for `git_signature_before_sha256` is authorized; the field's existing
+hex64-only requirement (`hldspec/speckit_invocation_audit.py:443-446`) is
+unchanged.
+
+EXTERNAL COMMAND RUNS: no.
+
+STARTED RECORD WRITTEN: no — STARTED cannot be validly constructed without a
+real signature, so none is written, and none is fabricated.
+
+BINDING STATUS: not applicable to this failure — `target_binding.binding_status`
+(§5.2) is a distinct field governing target-resolution confidence, not
+pre-execution signature availability. This decision does not extend or
+repurpose `binding_status` for signature-collection failure.
+
+OPERATOR-VISIBLE FAILURE: yes, via the same audit-failure exception
+mechanism as §12.1's STARTED-failure path — no separate mechanism is
+introduced.
+
+AUTOMATIC CONTINUATION: MUST NOT auto-continue or auto-retry after a
+preflight signature failure, per §11.
+
+Symmetric post-execution case: failure to obtain the post-execution Git
+signature (`git_signature_after_sha256`) occurs after the external command
+has already run, so blocking the invocation is no longer possible. This is
+governed as a FINISHED-construction failure under §12.1's FINISHED-failure
+rule, not as a STARTED-style block: the real `InvocationResult` (which
+already exists at that point) MUST be preserved and retrievable per §12.1,
+automatic continuation MUST be blocked, and the unmatched `STARTED` record
+stands as durable evidence of an incomplete lifecycle. No null or sentinel
+value for `git_signature_after_sha256` is authorized; a best-effort FINISHED
+record using a fabricated or missing after-signature is explicitly
+prohibited, since it would make `produced_artifacts`
+(`before != after`, `hldspec/speckit_invoker.py:160`) misrepresent an
+artifact-producing run.
+
+### 12.4 Unchanged boundaries
+
+Nothing in this section expands Slice C's scope, authorizes Slice D
+(`speckit_drive_loop.py`, §9) or Slice E (read-only diagnostics, §9), or
+changes the evidence-category separation in §8. The audit log created by a
+future Slice C implementation remains not readiness evidence, not approval
+evidence, not promotion evidence, and creates no runtime consumer, exactly
+as ratified in §8/§9.
+
+## 13. See also
 
 - [`docs/HLDSPEC_DEVELOPMENT_BACKLOG.md`](HLDSPEC_DEVELOPMENT_BACKLOG.md) P1-019 —
-  backlog entry this contract resolves; Slices C–E remain open there —
-  Slices A–B are implemented.
+  backlog entry this contract resolves; Slices A–B are implemented, Slice C is
+  design-ready (§12) but not implemented, Slices D–E remain open.
 - [`TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md`](TOOLCHAIN_DRIVER_EVIDENCE_CONTRACT.md) —
   the `DRIVER_OBSERVED` / `MANUAL_ATTESTED` / readiness-evidence axis this log is
   explicitly distinct from.

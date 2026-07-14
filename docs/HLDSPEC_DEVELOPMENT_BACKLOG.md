@@ -886,7 +886,9 @@ Deferred (do not start without a separate gated prompt):
 
 ### P1-019 Durable SpecKit invocation audit log contract (docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md, added 2026-07-11)
 
-**Status: CONTRACT RATIFIED 2026-07-11 — Slices A–B implemented 2026-07-11, C–E open.** The nine open
+**Status: CONTRACT RATIFIED 2026-07-11 — Slices A–B implemented 2026-07-11;
+Slice C's three blocking design decisions ratified 2026-07-14 (design-ready,
+NOT IMPLEMENTED); Slices D–E open.** The nine open
 design questions below are answered by
 [`docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`](SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md):
 canonical storage path (pointer-aware, `control_paths.resolve_hldspec_dir(target)/audit/speckit_invocations.jsonl`),
@@ -928,9 +930,48 @@ Implementation roadmap is A–E (contract §9). Follow-up
   `tests_v2/test_speckit_invocation_audit_writer.py`. Durable writer exists;
   no code path calls it and no audit record is produced automatically by
   anything in this repo today. No `SpecKitInvoker` wiring (Slice C).
-- **Slice C** — runtime integration into `SpecKitInvoker` only
-  (`execution_path: "speckit_invoker"`); STARTED/FINISHED around each live
-  invocation. Requires its own separate authorization; not started.
+- **Slice C — design-ready 2026-07-14; NOT IMPLEMENTED.** Runtime
+  integration into `SpecKitInvoker` only (`execution_path: "speckit_invoker"`);
+  STARTED/FINISHED around each live invocation. Requires its own separate
+  implementation authorization; not started. The three decisions that
+  previously blocked implementation-readiness are now ratified in
+  [`docs/SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md`](SPECKIT_INVOCATION_AUDIT_LOG_CONTRACT.md)
+  §12:
+  - **§12.1 Audit-failure exposure:** a dedicated audit-failure exception
+    (extending the existing `InvocationAuditError` hierarchy,
+    `hldspec/speckit_invocation_audit.py:613`) raised on STARTED or FINISHED
+    audit failure; `InvocationResult`'s shape stays byte-for-byte unchanged;
+    the exception carries only a bounded sanitized receipt plus a separately
+    documented retrieval path to the real `InvocationResult` on FINISHED
+    failure; no raw prompt/stdout/stderr on the exception's default
+    string/repr/logging surface; no broad `except Exception` may swallow it;
+    no automatic continuation after audit failure.
+  - **§12.2 No explicit `--model` (`route_models=False`):** `model` may be
+    schema-`null`, with a symmetric argv rule (zero `--model` occurrences
+    required when `model` is null, exactly one when non-null). Requires no
+    change to `scripts/proof_e2e_v0.py`'s existing `route_models=False`
+    default path.
+  - **§12.3 Pre-execution Git-signature failure:** fail closed. An
+    unobtainable pre-execution signature blocks STARTED construction (and
+    therefore the external invocation) via the §12.1 mechanism; no
+    null/sentinel signature or degraded `binding_status` is authorized. The
+    symmetric post-execution case (signature unobtainable after the command
+    already ran) is a FINISHED-construction failure under §12.1, not a
+    STARTED-style block, since the command has already executed.
+
+  Minimum expected implementation/test scope, once separately authorized:
+  bracket STARTED/FINISHED around `SpecKitInvoker.invoke()`
+  (`hldspec/speckit_invoker.py:141-161`); resolve the model-null/argv
+  conflict; implement the STARTED/FINISHED audit-failure exception path per
+  §12.1; extend `tests_v2/test_speckit_invoker.py` (or an adjacent test
+  module) to cover at minimum: STARTED write success/failure, FINISHED
+  write success/failure after both command success and command failure,
+  `route_models=False`/`model=None`, pre- and post-execution signature
+  failure, no-silent-swallow at both `hldspec/machines/speckit_execution.py`
+  call sites, and no raw prompt/stdout/stderr leakage through the
+  audit-failure exception's string/repr/logging surface. Slice D
+  (`speckit_drive_loop.py`) and Slice E (reader/diagnostics) remain excluded
+  from Slice C and are not authorized by this ratification.
 - **Slice D** (reserved, not started) — `speckit_drive_loop.py`
   (`execution_path: "speckit_drive_loop"`) coverage and drive-loop
   audit-continuity gating; requires its own separate authorization and its
@@ -939,14 +980,18 @@ Implementation roadmap is A–E (contract §9). Follow-up
   invocation history and incomplete-lifecycle detection. No mutation, no
   readiness/approval/promotion effect.
 
-Recommended next slice, if and when work is authorized, is Slice C.
+Recommended next slice, if and when work is authorized, is Slice C — now
+design-ready (contract §12) but still requiring its own separate gated
+implementation task before any code, test, or schema-validator change starts.
 Implementation remains open; P1-019 is not complete. Point-in-time proof
 records (`docs/FIRST_LIVE_E2E_PROOF.md`,
 `docs/SPECKIT_INVOKER_TASKS_HAIKU_LIVE_PROOF.md`) remain a separate evidence
 category from this durable log (§8) and are not superseded by Slice A/B.
 
 **Non-goals (still out of scope until the corresponding slice above is
-separately gated):** no `SpecKitInvoker` integration, no reader/diagnostics
+separately gated):** no `SpecKitInvoker` integration (Slice C's three
+blocking decisions are ratified as of 2026-07-14, but Slice C itself remains
+unimplemented until separately authorized), no reader/diagnostics
 implementation, no readiness-evidence integration, no provenance
 implementation, no `speckit_drive_loop.py` change, no Flow change.
 
